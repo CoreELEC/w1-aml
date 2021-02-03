@@ -1,0 +1,1765 @@
+/*
+ ****************************************************************************************
+ *
+ * Copyright (C) amlogic.com 2009
+ *
+ * Project: amlogic Software
+ *
+ * Description:
+ *      wifi soft mac hardware function
+ *
+ * Revision History:
+ * $Source: wifi_hal_cmd.c
+ *
+ ****************************************************************************************
+ */
+#ifdef HAL_SIM_VER
+#ifdef FW_NAME
+namespace FW_NAME
+{
+#endif
+#endif
+
+#include "wifi_hal_com.h"
+#include "wifi_hif.h"
+#include "wifi_hal_cmd.h"
+#include "wifi_hal_txdesc.h"
+#include "wifi_hal.h"
+#include "t9023_calb.h"
+#include "patch_fi_cmd.h"
+
+#if defined (HAL_FPGA_VER)
+#include "rf_t9026/t9026_top.h"
+#include "wifi_drv_statistic.h"
+#endif
+
+static char *cali_cfg_path = "/vendor/etc/wifi/w1/aml_wifi_rf.txt";
+
+
+//set cmd to firmware
+unsigned int phy_set_param_cmd(unsigned char cmd,unsigned char vid,unsigned int data)
+{
+    unsigned char CmdData[64] = {0};
+    struct hal_private * hal_priv = hal_get_priv();
+    bool ret = false;
+#ifdef POWER_SAVE_NO_SDIO
+    unsigned int ptr = 0;
+#endif
+    DBG_ENTER();
+
+    CmdData[0] = cmd;
+    CmdData[3] = vid;
+    CmdData[4] = (unsigned char)(data&0x00FF);
+    CmdData[5] = (unsigned char)((data>>8)&0x00FF);
+    CmdData[6] = (unsigned char)((data>>16)&0x00FF);
+    CmdData[7] = (unsigned char)((data>>24)&0x00FF);
+
+    if (cmd < MAX_HI_CMD)
+        wifi_conf_mib.cmddata[cmd] = data;
+
+    POWER_BEGIN_LOCK();
+    if ((cmd == Power_Save_Cmd)
+            //&& (data == PS_DOZE)
+            && (hal_priv->powersave_init_flag == 0))
+    {
+        /* whatever driver ps status (active or sleep), just return when new cmd is PS_DOZE */
+        if ((hal_priv->hal_drv_ps_status & HAL_DRV_STS_MASK) != 0)
+        {
+            POWER_END_LOCK();
+            if (((hal_priv->hal_drv_ps_status & HAL_DRV_IN_ACTIVE) != 0) && (data == PS_DOZE))
+            {
+                hal_priv->hal_call_back->drv_pwrsave_wake_req(hal_priv->drv_priv, 1);
+                return 0;
+            }
+            else if ((hal_priv->hal_drv_ps_status & HAL_DRV_IN_SLEEPING) != 0)
+            {
+                return 0;
+            }
+        }
+        else
+        {
+            // set driver sleep flag to protect power save flow
+            hal_priv->hal_drv_ps_status |= HAL_DRV_IN_SLEEPING;
+        }
+    }
+    POWER_END_LOCK();
+
+    HAL_BEGIN_LOCK();
+    ret = hi_set_cmd(CmdData,8);
+
+    POWER_BEGIN_LOCK();
+
+    if (ret && (cmd == Power_Save_Cmd)
+            && (data == PS_DOZE)
+            && (hal_priv->powersave_init_flag == 0))
+    {
+        hal_priv->hal_fw_ps_status = HAL_FW_IN_SLEEP;
+        hal_priv->hal_drv_ps_status &= ~HAL_DRV_IN_SLEEPING;
+    }
+    else if ((ret && (cmd == Power_Save_Cmd) && (data == PS_ACTIVE))
+                || (!ret && (cmd == Power_Save_Cmd)))
+    {
+        if (hal_priv->hal_suspend_mode == HIF_SUSPEND_STATE_NONE)
+        {
+            hal_priv->hal_fw_ps_status = HAL_FW_IN_ACTIVE;
+        }
+        hal_priv->hal_drv_ps_status &= ~HAL_DRV_IN_SLEEPING;
+    }
+
+    POWER_END_LOCK();
+    HAL_END_LOCK();
+
+#ifdef POWER_SAVE_NO_SDIO
+    if ((ret && (cmd == Power_Save_Cmd) && (data == PS_ACTIVE))
+        || (!ret && (cmd == Power_Save_Cmd)))
+    {
+        ptr = hal_priv->hal_ops.phy_get_rw_ptr(0);
+        hal_priv->rx_host_offset = ((ptr >> 16) & 0xffff) * 4;
+    }
+#endif
+
+    if (cmd == Power_Save_Cmd)
+        hal_priv->hal_call_back->drv_pwrsave_wake_req(hal_priv->drv_priv, 0);
+    DBG_EXIT();
+    return 1;
+}
+
+unsigned int phy_get_param_cmd_ul(unsigned char cmd,unsigned char vid)
+{
+    unsigned int CmdData[2] = {0};
+
+    CmdData[0] = cmd|(vid<<24);
+    HAL_BEGIN_LOCK();
+    hi_get_cmd((unsigned char *)&CmdData[0],8);
+    HAL_END_LOCK();
+
+    return CmdData[1];
+}
+
+unsigned long long phy_get_param_cmd_ull(unsigned char cmd,unsigned char vid)
+{
+    CommonCmdULL scmd = {0};
+
+    scmd.Cmd = cmd;
+    scmd.vid = vid;
+    HAL_BEGIN_LOCK();
+    hi_get_cmd((unsigned char *)&scmd, sizeof(CommonCmdULL));
+    HAL_END_LOCK();
+    return scmd.param0;
+}
+
+#if defined (HAL_FPGA_VER)
+unsigned int phy_set_rtc_enable(int enrtc)
+{
+    PRINT("Mac_Rtc_Cmd %x \n", enrtc);
+    phy_set_param_cmd( Mac_Rtc_Cmd, 0, enrtc);
+    return 1;
+}
+
+#endif
+
+unsigned int phy_register_sta_id(unsigned char vid,unsigned short StaAid,unsigned char *pMac, unsigned char encrypt)
+{
+    RegStaIdParam CmdParam;
+    struct hal_private * hal_priv =hal_get_priv();
+
+    PRINT("++phy_register_sta_id\n");
+    PRINT("phy_register_sta_id %02x%02x%02x%02x%02x%02x\n", pMac[0], pMac[1], pMac[2], pMac[3], pMac[4], pMac[5]);
+    CmdParam.Cmd = RegStaID_CMD;
+    CmdParam.StaId= StaAid;
+    CmdParam.vid= vid;
+    memcpy(CmdParam.StaMac,pMac,6);
+    CmdParam.encrypt = encrypt;
+    memcpy((void *)&(hal_priv->sta_con_msg.CmdParam) , (void *)&CmdParam, sizeof(RegStaIdParam));
+
+    PRINT("====>phy_register_sta_id StaAid %d wnet_vif_id=%d\n",StaAid,vid );
+    if(StaAid >0)
+    {
+        HAL_BEGIN_LOCK();
+        hi_set_cmd((unsigned char *)&CmdParam,sizeof(RegStaIdParam));
+        HAL_END_LOCK() ;   
+    }
+
+    return 1;
+}
+
+unsigned int phy_addba_ok(unsigned char wnet_vif_id,unsigned short StaAid,unsigned char TID,
+    unsigned short SeqNumStart,unsigned char BA_Size,unsigned char AuthRole,unsigned char BA_TYPE)
+{
+    struct hal_private *hal_priv = hal_get_priv();
+    Add_BA_Struct AddBA = {0};
+
+    //PRINT("phy_addba_okwnet_vif_id %d StaAid %d,tid %d,sn 0x%x,baw,%d,aothrole %d,batype %d \n",
+      //  wnet_vif_id, StaAid, TID, SeqNumStart, BA_Size, AuthRole, BA_TYPE);
+
+    DBG_ENTER();
+    AddBA.Cmd = ADDBA_OK_CMD;
+    AddBA.vid = wnet_vif_id;
+    AddBA.STA_ID = StaAid;
+    AddBA.TID = TID;
+    AddBA.BA_TYPE = BA_TYPE /*immidiate_BA_TYPE*/;
+    AddBA.AuthRole = AuthRole;
+    AddBA.BA_Size = BA_Size;
+    AddBA.SeqNumStart = SeqNumStart;
+
+    memcpy((void *)&(hal_priv->sta_con_msg.AddBA) , (void *)&AddBA, sizeof(Add_BA_Struct));
+    HAL_BEGIN_LOCK();
+    hi_set_cmd((unsigned char *)&AddBA,sizeof(Add_BA_Struct) );
+    HAL_END_LOCK() ;   
+
+    return 1;
+}
+
+unsigned int phy_get_extern_chan_status(void)
+{
+    Extern_Channel_Status Channel_Status = {0};
+    DBG_ENTER();
+    Channel_Status.Cmd = EXTERN_CHANNEL_STATUS_CMD;
+    Channel_Status.Status = 0;
+    HAL_BEGIN_LOCK();
+    hi_get_cmd((unsigned char*)&Channel_Status,sizeof(Channel_Status));
+    HAL_END_LOCK() ;   
+
+    return (Channel_Status.Status/10000);
+}
+
+unsigned int phy_delt_ba_ok(unsigned char wnet_vif_id,unsigned short StaAid,unsigned char TID,
+    unsigned char AuthRole)
+{
+    Delete_TxBA_Struct Delete_TxBA = {0};
+
+    DBG_ENTER();
+    Delete_TxBA.Cmd = Del_BA_CMD;
+    Delete_TxBA.vid = wnet_vif_id;
+    Delete_TxBA.STA_ID = StaAid;
+    Delete_TxBA.TID = TID;
+    Delete_TxBA.AuthRole = AuthRole;
+    PRINT("phy_delt_ba_ok StaAid %d,TID %d,AuthRole=%d\n",StaAid ,TID,AuthRole);
+    HAL_BEGIN_LOCK();
+    hi_set_cmd((unsigned char *)&Delete_TxBA,sizeof(Delete_TxBA_Struct) );
+    HAL_END_LOCK() ;   
+
+    return 1;
+}
+
+unsigned int phy_enable_bcn(unsigned char wnet_vif_id,unsigned short BeaconInterval,
+     unsigned short DtimPeriod, unsigned char BssType)
+{
+     struct hal_private *hal_priv = hal_get_priv();
+    if (BssType == WIFI_M_IBSS)
+    {
+        PRINT("Mode: IBSS_MODE\n");
+    }
+    else if (BssType == WIFI_M_HOSTAP)
+    {
+        PRINT("Mode: WIFI_M_HOSTAP\n");
+    }
+    else
+    {
+        return 0;
+    }
+    phy_set_bcn_intvl(wnet_vif_id,BeaconInterval);
+    phy_set_param_cmd( Beacon_Enable_Cmd, wnet_vif_id,ENABLE_BEACON );
+#if defined (HAL_FPGA_VER)
+    hal_priv->sts_en_bcn[wnet_vif_id]++;
+#endif
+    
+    return 1;
+}
+
+unsigned int phy_set_preamble_type( unsigned char PreambleType)
+{
+    struct hal_private *hal_priv = hal_get_priv();
+    printk("%s(%d) %x \n\n",__FUNCTION__, __LINE__,PreambleType);
+    wifi_conf_mib.dot11PreambleType = PreambleType;
+    hal_priv->sta_con_msg.PreambleType = PreambleType;
+    return 1;
+}
+
+unsigned int phy_set_bcn_buf(unsigned char wnet_vif_id,unsigned char *pBeacon,
+        unsigned short len,unsigned short Rate,unsigned short Flag)
+{
+    unsigned char buffer[1024] = {0};
+    struct hal_private * hal_priv = hal_get_priv();
+    struct  hw_interface* hif = hif_get_hw_interface();
+
+    struct hw_tx_vector_bits *TxVector_Bit = NULL;
+    unsigned short tmp = 0;
+    unsigned int BcnAddr = hif->hw_config.beaconframeaddress;
+    struct TxDescPage *pbeacon_s = (struct TxDescPage *)buffer;
+    struct OtherTxPage  *other_page = NULL;
+    int total_len = len + sizeof(struct TxDescPage) -1 + FCS_LEN;
+    /* beacon len per page */
+    int firstpagelen = 0, otherpagelen = 0;
+
+    ASSERT(len < (sizeof(buffer) - sizeof(struct TxDescPage) - sizeof(struct HW_TxBufferInfo)));
+    /* get beacon frame address in firmware */
+    if(hal_priv->beaconaddr[wnet_vif_id] == 0)
+    {
+        hal_priv->beaconaddr[wnet_vif_id] = phy_get_param_cmd_ul(Bcn_Frm_Addr_Cmd, wnet_vif_id);
+    }
+    BcnAddr = hal_priv->beaconaddr[wnet_vif_id];
+    memcpy(pbeacon_s->txdata,  pBeacon,  len);
+
+    /* build page flag */
+    if (total_len <= PAGE_LEN)
+    {
+        /* set firstpagelen and otherpagelen to 0 to be flag */
+        firstpagelen = otherpagelen = 0;
+        pbeacon_s->BufferInfo.MPDUBufFlag = 0;
+        pbeacon_s->BufferInfo.MPDUBufFlag =  HW_FIRST_MPDUBUF_FLAG
+                                                            |HW_FIRST_AGG_FLAG
+                                                            |HW_LAST_MPDUBUF_FLAG
+                                                            |HW_LAST_AGG_FLAG;
+        pbeacon_s->BufferInfo.MPDUBufFlag |= HW_MPDU_LEN_SET(len);
+        pbeacon_s->BufferInfo.MPDUBufFlag |= HW_BUFFER_LEN_SET(firstpagelen);
+        pbeacon_s->BufferInfo.MPDUBufNext = 0;
+
+        pbeacon_s->BufferInfo.MPDUBufAddr =
+                    (unsigned int)(SYS_TYPE)((struct TxDescPage*)(SYS_TYPE)BcnAddr)->txdata;
+        pbeacon_s->TxPriv.PageNum = 1;
+    }
+    else
+    {
+        firstpagelen = PAGE_LEN - (sizeof(struct TxDescPage) - 1);
+        otherpagelen = len - firstpagelen;
+        other_page = (struct OtherTxPage *)(buffer + PAGE_LEN);
+        if (otherpagelen > 0)
+        {
+            /* move or push the beacon data to later position to prepare BufferInfo of 'other_page' */
+            memmove((void *)(other_page->txdata), (void *)other_page, otherpagelen);
+            memset((void *)other_page, 0, sizeof(struct HW_TxBufferInfo));
+        }
+        /*first page */
+        pbeacon_s->BufferInfo.MPDUBufFlag = 0;
+        pbeacon_s->BufferInfo.MPDUBufFlag = HW_FIRST_MPDUBUF_FLAG
+                                                            |HW_FIRST_AGG_FLAG
+                                                            |HW_LAST_AGG_FLAG;
+        pbeacon_s->BufferInfo.MPDUBufFlag |= HW_MPDU_LEN_SET(len);
+        pbeacon_s->BufferInfo.MPDUBufFlag |= HW_BUFFER_LEN_SET(firstpagelen);
+        pbeacon_s->BufferInfo.MPDUBufAddr =
+                    (unsigned int)(SYS_TYPE)((struct TxDescPage*)(SYS_TYPE)BcnAddr)->txdata;
+        pbeacon_s->BufferInfo.MPDUBufNext =
+                    (unsigned int)(SYS_TYPE)(BcnAddr + PAGE_LEN);
+
+        /* other page */
+        other_page->BufferInfo.MPDUBufFlag = 0;
+        other_page->BufferInfo.MPDUBufFlag = HW_LAST_MPDUBUF_FLAG
+                                                            |HW_FIRST_AGG_FLAG
+                                                            |HW_LAST_AGG_FLAG;
+        other_page->BufferInfo.MPDUBufFlag |= HW_MPDU_LEN_SET(len);
+        other_page->BufferInfo.MPDUBufFlag |= HW_BUFFER_LEN_SET(0);
+        other_page->BufferInfo.MPDUBufNext = 0;
+        other_page->BufferInfo.MPDUBufAddr =
+                    (unsigned int)(SYS_TYPE)((struct OtherTxPage*)(SYS_TYPE)(BcnAddr + PAGE_LEN))->txdata;
+        otherpagelen += FCS_LEN;
+        pbeacon_s->TxPriv.PageNum = 2;
+    }
+
+    /* build tx vector */
+    TxVector_Bit = &pbeacon_s->TxVector;
+    TxVector_Bit->tv_reserved0 = 0;
+    TxVector_Bit->tv_fw_duration_valid = 0;
+    TxVector_Bit->tv_rty_flag = 0;
+    TxVector_Bit->tv_ack_policy = NOACK;
+    TxVector_Bit->tv_single_ampdu = 0;
+    TxVector_Bit->tv_wnet_vif_id = wnet_vif_id;
+    TxVector_Bit->tv_ack_to_en = 0;
+    TxVector_Bit->tv_ack_timeout = 0;
+    tmp = (Flag & WIFI_CHANNEL_BW_MASK)>>WIFI_CHANNEL_BW_OFFSET;
+
+    TxVector_Bit->tv_ht.htbit.tv_format = hw_rate2tv_format(Rate);
+    TxVector_Bit->tv_ht.htbit.tv_nonht_mod  = (hal_tx_desc_nonht_mode(Rate,tmp));
+    TxVector_Bit->tv_ht.htbit.tv_tx_pwr = hal_tx_desc_get_power(Rate);
+    TxVector_Bit->tv_ht.htbit.tv_tx_rate = Rate;
+    TxVector_Bit->tv_ht.htbit.tv_Channel_BW = tmp&0x3;
+    TxVector_Bit->tv_ht.htbit.tv_preamble_type = wifi_conf_mib.dot11PreambleType;
+    TxVector_Bit->tv_ht.htbit.tv_GI_type = (!!(Flag & WIFI_IS_SHORTGI));
+    TxVector_Bit->tv_ht.htbit.tv_antenna_set = 0;
+    TxVector_Bit->tv_ht.htbit.tv_cfend_flag = 0;
+    TxVector_Bit->tv_ht.htbit.tv_bar_flag = 0;
+    TxVector_Bit->tv_ht.htbit.tv_beamformed = 0;
+    TxVector_Bit->tv_ht.htbit.tv_rts_flag = 0;
+    TxVector_Bit->tv_ht.htbit.tv_cts_flag = 0;
+
+    TxVector_Bit->tv_L_length =
+                        hal_tx_desc_get_len(Rate, len + FCS_LEN, (!!(Flag & WIFI_IS_SHORTGI)),
+                        (Flag & WIFI_CHANNEL_BW_MASK) >> WIFI_CHANNEL_BW_OFFSET, 0);
+    TxVector_Bit->tv_sounding = 0;
+    TxVector_Bit->tv_ampdu_flag = 0;
+    TxVector_Bit->tv_length = len + FCS_LEN;
+    TxVector_Bit->tv_STBC = 0;
+    TxVector_Bit->tv_FEC_coding = 0;
+    TxVector_Bit->tv_num_exten_ss = 0;
+    TxVector_Bit->tv_num_tx= 1;
+    TxVector_Bit->tv_expansion_mat_type = 1;
+    TxVector_Bit->tv_no_sig_extn = ((Rate>WIFI_11B_11M)?0:1);
+    TxVector_Bit->tv_SequenceNum = 0;
+    TxVector_Bit->tv_FrameControl = *(unsigned short *)pBeacon;
+    TxVector_Bit->tv_sq_valid = 0;
+    TxVector_Bit->tv_fc_valid = 1;
+    TxVector_Bit->tv_du_valid = 0;
+    TxVector_Bit->tv_beacon_flag = 1;
+    TxVector_Bit->tv_htc_modify =0;
+    TxVector_Bit->tv_txcsum_enbale = 1;
+    TxVector_Bit->tv_encrypted_disable = 0;
+    TxVector_Bit->tv_tkip_mic_enable = 1;
+    TxVector_Bit->tv_dyn_bw_nonht = 0;
+    TxVector_Bit->tv_txop_ps_not = 0;
+    TxVector_Bit->tv_usr_postion = 0;
+    TxVector_Bit->tv_group_id = 0;
+    TxVector_Bit->tv_partial_id = 0;
+    TxVector_Bit->tv_num_users = 0;
+    TxVector_Bit->tv_num_sts = 0;
+    TxVector_Bit->tv_ch_bw_nonht = SW_CBW20;
+
+    TxVector_Bit->tv_MPDUInfoAddr  = BcnAddr;
+    TxVector_Bit->tv_tid_num = 0;
+    TxVector_Bit->tv_control_wrapper = 0;
+    TxVector_Bit->tv_llength_hw_calc = 0;
+    TxVector_Bit->tv_tid_num = 0;
+    TxVector_Bit->tv_control_wrapper = 0;
+    TxVector_Bit->tv_llength_hw_calc = 0;
+
+    /* build firmware private data */
+    pbeacon_s->TxPriv.TID = QUEUE_BEACON;
+    pbeacon_s->TxPriv.StaId = 1;
+    pbeacon_s->TxPriv.Flag = WIFI_IS_Group|WIFI_IS_NOACK|(Flag & WIFI_CHANNEL_BW_MASK);
+    pbeacon_s->TxPriv.vid = wnet_vif_id;
+    pbeacon_s->TxPriv.TxCurrentRate = Rate;
+    pbeacon_s->TxPriv.AggrNum = 1;
+    pbeacon_s->TxPriv.AggrLen = len + FCS_LEN;
+    pbeacon_s->TxPriv.txretrynum = 0;
+    pbeacon_s->TxPriv.txsretrynum = 0;
+    pbeacon_s->TxPriv.pTxInfo = 0;
+    pbeacon_s->TxPriv.Flag2 = TX_DESCRIPTER_NOT_FREE|TX_DESCRIPTER_BEACON;
+    pbeacon_s->TxPriv.FrameExchDur = 30;
+
+    if (otherpagelen == 0)
+    {
+        hif->hif_ops.hi_write_sram((unsigned char*)(SYS_TYPE)buffer,
+            (unsigned char*)(SYS_TYPE)BcnAddr, total_len);
+    }
+    else
+    {
+        hif->hif_ops.hi_write_sram((unsigned char*)(SYS_TYPE)buffer,
+            (unsigned char*)(SYS_TYPE)BcnAddr, PAGE_LEN);
+        hif->hif_ops.hi_write_sram((unsigned char*)(SYS_TYPE)(buffer + PAGE_LEN),
+            (unsigned char*)(SYS_TYPE)(BcnAddr + PAGE_LEN), otherpagelen);
+    }
+    return 1;
+}
+
+
+unsigned int phy_init_hmac(unsigned char wnet_vif_id)
+{
+    //clear all key
+    phy_set_param_cmd(Reset_Key_Cmd,wnet_vif_id,ALL_KEY_RST);
+    //life time
+    phy_set_param_cmd(MaxTxLifetime_Cmd,0,512);
+    printk("%s(%d)\n", __func__, __LINE__);
+    return 1;
+}
+
+//vmac connect to ap
+unsigned int phy_vmac_connect(unsigned char wnet_vif_id)
+{
+    //start mac
+    //clear all key
+    //phy_set_param_cmd(Reset_Key_Cmd,vmac_id,ALL_KEY_RST);
+    //life time
+    phy_set_param_cmd(MaxTxLifetime_Cmd, 0, 1024);
+    printk("%s(%d)\n", __func__, __LINE__);
+    return 1;
+}
+//vmac disconnect to ap
+unsigned int  phy_vmac_disconnect(unsigned char wnet_vif_id)
+{
+    struct hal_private *hal_priv = hal_get_priv();
+    // trun off beacon send
+    phy_set_param_cmd(Beacon_Enable_Cmd,wnet_vif_id,DISABLE_BEACON);
+#if defined (HAL_FPGA_VER)
+    hal_priv->sts_dis_bcn[wnet_vif_id]++;
+#endif
+    return 1;
+}
+
+unsigned int phy_update_bcn_intvl(unsigned char wnet_vif_id,unsigned short BcnInterval)
+{
+    PRINT("phy_update_bcn_intvl  0x%x \n",BcnInterval);
+    // Make sure that BcnInterval  > ATIMWnd >= 0
+    if (BcnInterval < 10)
+    {
+        BcnInterval = 10;
+    }
+    phy_set_param_cmd( BCNInterval_Cmd, wnet_vif_id, BcnInterval);
+    return 1;
+}
+
+unsigned int phy_unregister_sta_id(unsigned char wnet_vif_id,unsigned short StaAid)
+{
+    PRINT("phy_unregister_sta_id StaAid %d\n",StaAid );
+    if((StaAid >0) && (StaAid<= WIFI_MAX_STA))
+    {
+        phy_set_param_cmd(UnRegStaID_CMD,wnet_vif_id, (unsigned int)StaAid);
+    }
+    else
+    {
+        PRINT("WARNING!!phy_unregister_sta_id StaAid %d ERROR\n",StaAid );
+    }
+    return 1;
+}
+
+unsigned int phy_unregister_all_sta_id(unsigned char wnet_vif_id)
+{
+    phy_set_param_cmd(UnRegAllStaID_CMD,  wnet_vif_id,0);
+    return 1;
+}
+
+unsigned int phy_switch_chan(unsigned short channel, unsigned char bw, unsigned char restore)
+{
+    struct hw_interface* hif =hif_get_hw_interface();
+    // fix me, it works,but why len = sizeof(unsigned int) for read unsigned short channel
+
+    hif->hif_ops.hi_write_word(RG_MAC_CHANNEL_INDEX, channel);
+
+#ifdef HAL_FPGA_VER
+    #ifdef RF_T9026
+        t9026_channel_switch(channel, bw, restore);
+    #endif
+    #ifdef RF_T9023
+        t9023_channel_switch(channel);
+    #endif
+#endif
+
+    return 1;
+}
+
+unsigned int phy_set_rf_chan(struct hal_channel *hchan, unsigned char flag, unsigned char vid)
+{
+    struct hal_private *halPriv = hal_get_priv();
+
+#ifndef FW_RF_CALIBRATION
+    phy_switch_chan(hchan->cchan_num, hchan->chan_bw, flag);
+
+#else
+    struct PHY_PRIMARY_CHANNEL_BIT primary_chan;
+    struct Channel_Switch channel_switch;
+
+    channel_switch.Cmd = CHANNEL_SWITCH_CMD;
+    channel_switch.channel = hchan->cchan_num;
+    channel_switch.bw = hchan->chan_bw;
+    channel_switch.flag = flag;
+    channel_switch.vid = vid;
+
+    primary_chan.rf_fs = RF_SMP_160;
+    primary_chan.ap_bw = hchan->chan_bw;
+
+    switch (hchan->pchan_num - hchan->cchan_num)
+    {
+        case 0:
+            primary_chan.def_pri_ch = SW_COFF_0;
+            break;
+        case 2:
+            primary_chan.def_pri_ch = SW_COFF_U10M;
+            break;
+        case 6:
+            primary_chan.def_pri_ch = SW_COFF_U30M;
+            break;
+         case -2:
+            primary_chan.def_pri_ch = SW_COFF_L10M;
+            break;
+         case -6:
+            primary_chan.def_pri_ch = SW_COFF_L30M;
+            break;
+        default:
+            primary_chan.def_pri_ch = SW_COFF_0;
+            printk("%s(%d) channel relation err!!!\n", __func__, __LINE__);
+            break;
+    }
+
+    channel_switch.pri_chan = *(unsigned int *)&primary_chan;
+
+    if ((flag & CHANNEL_CONNECT_FLAG) != 0)
+    {
+        hal_dpd_memory_download();
+    }
+
+    //printk("%s:%d, channel %d, bw %d, flag %d \n", __func__, __LINE__, channel, bw, flag);
+    HAL_BEGIN_LOCK();
+    hi_set_cmd((unsigned char *)&channel_switch, sizeof(struct Channel_Switch));
+    HAL_END_LOCK();
+#endif
+
+    halPriv->sta_con_msg.channel = hchan->cchan_num;
+    return 1;
+}
+
+unsigned int phy_set_cam_mode(unsigned char wnet_vif_id,unsigned char OpMode)
+{
+    PRINT("phy_set_cam_mode %d \n",OpMode);
+    wifi_conf_mib.dot11CamMode = OpMode;
+    phy_set_param_cmd( CAM_Mode_Cmd,wnet_vif_id, OpMode);
+    return 1;
+}
+
+unsigned int phy_set_dhcp(unsigned char wnet_vif_id, unsigned int ip)
+{
+    phy_set_param_cmd(dhcp_start_cmd,wnet_vif_id, ip);
+    return 1;
+}
+
+unsigned int phy_set_chan_support_type(struct hal_channel *chan)
+{
+#ifndef FW_RF_CALIBRATION
+    unsigned int to_set = 0;
+    struct PHY_PRIMARY_CHANNEL_BIT * to_change = (struct  PHY_PRIMARY_CHANNEL_BIT *)&to_set;
+    struct hw_interface* hif = hif_get_hw_interface();
+
+    to_set = hif->hif_ops.hi_read_word(RG_PHY_BW_REG);
+
+    to_change->rf_fs = RF_SMP_160;
+    to_change->ap_bw = chan->chan_bw;
+
+    switch (chan->pchan_num - chan->cchan_num)
+    {
+        case 0:
+            to_change->def_pri_ch = SW_COFF_0;
+            break;
+        case 2:
+            to_change->def_pri_ch = SW_COFF_U10M;
+            break;
+        case 6:
+            to_change->def_pri_ch = SW_COFF_U30M;
+            break;
+         case -2:
+            to_change->def_pri_ch = SW_COFF_L10M;
+            break;
+         case -6:
+            to_change->def_pri_ch = SW_COFF_L30M;
+            break;
+        default:
+            to_change->def_pri_ch = SW_COFF_0;
+            printk("%s(%d) channel relation err!!!\n", __func__, __LINE__);
+            break;
+    }
+
+
+    hif->hif_ops.hi_write_word(RG_PHY_BW_REG, to_set);
+
+    to_set = 0;
+    to_set = hif->hif_ops.hi_read_word( RG_PHY_BW_REG);
+    //printk("%s(%d) check: reg_0x%x is 0x%x cchan_num %d, chan_bw %d, cchan %d\n", __func__, __LINE__,
+        //RG_PHY_BW_REG, to_set, chan->cchan_num, chan->chan_bw, chan->cchan_num);
+    return 1;
+#else
+    return 0;
+#endif
+}
+
+unsigned int phy_set_chan_phy_type(int chbw)
+{
+    return 1;
+}
+
+unsigned int phy_set_mac_bssid(unsigned char wnet_vif_id,unsigned char * Bssid)
+{
+    struct hal_private *halPriv;
+    struct hw_interface* hif = hif_get_hw_interface();
+    unsigned int temp = 0;
+    unsigned int addr_low =  RG_MAC_BSSIDLO_N(wnet_vif_id);
+    unsigned int addr_high = RG_MAC_BSSIDHI_N(wnet_vif_id);
+
+    halPriv = hal_get_priv();
+    temp = Bssid[0] | ( Bssid[1] << 8 ) | ( Bssid[2] << 16 ) | ( Bssid[3] << 24 );
+    hif->hif_ops.hi_write_word(addr_low,temp);
+
+    temp = 0;
+    temp = Bssid[4] | ( Bssid[5] << 8 );
+    hif->hif_ops.hi_write_word(addr_high, temp);
+    PRINT(" %s:wnet_vif_id= %d bssid=%02x:%02x:%02x:%02x:%02x:%02x\n",__func__,
+		wnet_vif_id, Bssid[0], Bssid[1], Bssid[2], Bssid[3], Bssid[4], Bssid[5]);
+    return 1;
+}
+
+unsigned int phy_set_mac_addr(unsigned char wnet_vif_id,unsigned char * MacAddr)
+{
+    struct hal_private *halPriv;
+    unsigned int temp = 0;
+    struct hw_interface* hif = hif_get_hw_interface();
+
+    halPriv = hal_get_priv();
+    /* BUP stores the first 4 bytes and last 2 bytes in two separate registers*/
+    temp = MacAddr[0] | ( MacAddr[1] << 8 ) | ( MacAddr[2] << 16 ) | ( MacAddr[3] << 24 );
+    hif->hif_ops.hi_write_word(RG_MAC_LOCAL_ADDRLN(wnet_vif_id), temp);
+
+    temp = 0;
+    temp = MacAddr[4] | ( MacAddr[5] << 8 );
+    hif->hif_ops.hi_write_word(RG_MAC_LOCAL_ADDRHN(wnet_vif_id), temp);
+
+    PRINT("%s-->%02x:%02x:%02x:%02x:%02x:%02x\n",__func__,
+        MacAddr[0], MacAddr[1], MacAddr[2], MacAddr[3], MacAddr[4], MacAddr[5]);
+    return 1;
+}
+
+unsigned int phy_debug( unsigned short len,unsigned int offset,unsigned char * buffer)
+{
+    struct phydebugcmd ebug = {0};
+    ebug.Cmd = PHY_DEBUG;
+    ebug.offset = offset;
+    ebug.len = len;
+    HAL_BEGIN_LOCK();
+    hi_get_cmd((unsigned char *)&ebug,sizeof(struct phydebugcmd ));
+    HAL_END_LOCK();
+    memcpy(buffer,ebug.buf,ebug.len);
+    return 0;
+}
+
+// reset key table
+unsigned int phy_rst_all_key(unsigned char wnet_vif_id)
+{
+    struct hal_private * hal_priv =hal_get_priv();
+    PRINT(" ++  %s \n",__FUNCTION__);
+    if (hal_priv->bhalUKeySet[wnet_vif_id] || hal_priv->bhalMKeySet[wnet_vif_id] )
+        phy_set_param_cmd(Reset_Key_Cmd,  wnet_vif_id,ALL_KEY_RST);
+    hal_priv->bhalUKeySet[wnet_vif_id] =0;
+    hal_priv->bhalMKeySet[wnet_vif_id] =0;
+    return 1;
+}
+
+// reset key table
+unsigned int phy_rst_ucast_key(unsigned char wnet_vif_id)
+{
+    struct hal_private * hal_priv =hal_get_priv();
+    PRINT(" ++  %s \n",__FUNCTION__);
+    if (hal_priv->bhalUKeySet[wnet_vif_id] )
+        phy_set_param_cmd(Reset_Key_Cmd,  wnet_vif_id,ALL_UNIKEY_RST);
+    hal_priv->bhalUKeySet[wnet_vif_id] =0;
+    return 1;
+}
+
+// reset key table
+unsigned int phy_rst_mcast_key(unsigned char wnet_vif_id)
+{
+    struct hal_private * hal_priv =hal_get_priv();
+    PRINT(" ++  %s \n",__FUNCTION__);
+    if (hal_priv->bhalMKeySet[wnet_vif_id] )
+        phy_set_param_cmd(Reset_Key_Cmd, wnet_vif_id, MULTI_KEY_RST);
+    hal_priv->bhalMKeySet[wnet_vif_id] =0;
+    return 1;
+}
+
+//reset StaAid key
+unsigned int phy_clr_key(unsigned char wnet_vif_id,unsigned short StaAid)
+{
+    PRINT(" ++  %s StaAid = %x\n",__FUNCTION__,StaAid);
+    phy_set_param_cmd(Reset_Key_Cmd,wnet_vif_id, StaAid);
+    return 1;
+}
+
+unsigned int phy_set_ucast_key(unsigned char wnet_vif_id,unsigned short StaAid,
+    unsigned char *pMac, unsigned char *pKey, unsigned char keyLen, unsigned char encryType,
+    unsigned char keyId)
+{
+    struct hal_private * hal_priv =hal_get_priv();
+    //UniCastKeyCmd
+    unsigned char       cmdbuf[68]= {0};
+    struct UniCastKeyCmd *unitikey = (struct UniCastKeyCmd *)ALIGN_POINT(cmdbuf,4);
+
+    unitikey->Cmd = UniCast_Key_Set_Cmd;
+    unitikey->vid = wnet_vif_id;
+    unitikey->StaId= StaAid;
+    unitikey->KeyType =encryType;
+    unitikey->KeyLen = keyLen;
+    unitikey->KeyId= keyId;
+
+    if(encryType== WIFI_WPI)
+        unitikey->PNStep=2;
+    else
+        unitikey->PNStep=1;
+
+    memcpy(unitikey->Key,pKey,keyLen);
+    memcpy((void *)&(hal_priv->sta_con_msg.unitikey), (void *)unitikey, sizeof(struct UniCastKeyCmd));
+    HAL_BEGIN_LOCK();
+    hi_set_cmd((unsigned char *)unitikey, sizeof(struct UniCastKeyCmd) );
+    HAL_END_LOCK();
+    PRINT("phy_set_ucast_key wnet_vif_id %x encryType=%d StaAid %x \n",wnet_vif_id,encryType, StaAid);
+    hal_urep_cnt_init(&hal_priv->uRepCnt[wnet_vif_id][StaAid],encryType);
+    return 1;
+}
+
+unsigned int phy_set_mcast_key(unsigned char wnet_vif_id, unsigned char *pKey,
+    unsigned char keyLen, unsigned int keyId,unsigned char encryType,unsigned char AuthRole)
+{
+    struct hal_private * hal_priv =hal_get_priv();
+
+//Multicast_Key_Set_Cmd
+    unsigned char       cmdbuf[68]= {0};
+    struct MultiCastKeyCmd *multikey = (struct MultiCastKeyCmd *)ALIGN_POINT(cmdbuf,4);
+    if (( encryType !=  WIFI_WEP64)
+        &&(encryType != WIFI_WEP128)
+        &&(encryType != WIFI_WEP256))
+        keyLen = 32;
+    PRINT("Multicast_Key_Set_Cmd wnet_vif_id %d encryType %x keyId %x\n",wnet_vif_id,encryType,keyId);
+    multikey->Cmd = Multicast_Key_Set_Cmd;
+    multikey->vid  = wnet_vif_id;
+    multikey->AuthRole = AuthRole;
+    multikey->KeyType =encryType;
+    multikey->KeyLen = keyLen;
+    multikey->KeyId= keyId;
+    multikey->PNStep=1;
+    memcpy(multikey->Key,pKey,keyLen);
+    memcpy((void *)&(hal_priv->sta_con_msg.multikey), (void *)multikey, sizeof(struct MultiCastKeyCmd));
+    HAL_BEGIN_LOCK();
+    hi_set_cmd((unsigned char *)multikey, sizeof(struct MultiCastKeyCmd) );
+    HAL_END_LOCK();
+    hal_priv->bhalMKeySet[0] =1;
+    hal_priv->bhalMKeySet[1] =1;
+    hal_priv->bhalMKeySet[2] =1;
+    hal_priv->bhalMKeySet[3] =1;
+    hal_mrep_cnt_init(hal_priv,wnet_vif_id,encryType);
+    return 1;
+}
+
+unsigned int phy_set_rekey_data(unsigned char wnet_vif_id, void *rekey_data, unsigned short StaAid)
+{
+    unsigned char cmdbuf[68]= {0};
+
+    struct RekeyDataCmd *rekey_cmd = (struct RekeyDataCmd *)ALIGN_POINT(cmdbuf, 4);
+
+    rekey_cmd->Cmd = Rekey_Data_Set_Cmd;
+    rekey_cmd->vid = wnet_vif_id;
+    rekey_cmd->StaId= StaAid;
+    memcpy((void *)(&rekey_cmd->kek[0]), rekey_data, 40);
+
+    HAL_BEGIN_LOCK();
+    hi_set_cmd((unsigned char *)rekey_cmd, sizeof(struct RekeyDataCmd));
+    HAL_END_LOCK();
+
+    PRINT("phy_set_rekey_data wnet_vif_id %x StaAid %x \n",wnet_vif_id, StaAid);
+    return 1;
+}
+
+unsigned int phy_set_lretry_limit(unsigned int data)
+{
+    struct hal_private * hal_priv =hal_get_priv();
+
+    DBG_ENTER();
+    PRINT("************>set_long_retry_limit %d\n",data);
+    hal_priv->sta_con_msg.lr_limit = data;
+    phy_set_param_cmd(LongRetryLimit_Cmd,0,data);
+    return 1;
+}
+
+unsigned int phy_set_sretry_limit(unsigned int data)
+{
+    struct hal_private * hal_priv =hal_get_priv();
+    DBG_ENTER();
+    PRINT("************>phy_set_sretry_limit %d\n",data);
+    hal_priv->sta_con_msg.sr_limit = data;
+    phy_set_param_cmd(ShortRetryLimit_Cmd,0,data);
+    return 1;
+}
+unsigned int phy_set_rd_support(unsigned char wnet_vif_id, unsigned int data)
+{
+    phy_set_param_cmd(RD_SUPPORT_CMD, wnet_vif_id, data);
+    return 1;
+}
+
+unsigned int phy_pwr_save_mode(unsigned char wnet_vif_id,unsigned int data)
+{
+#ifdef CONFIG_RTC_ENABLE
+    Phy_WakeUp_RTC(wnet_vif_id, data);
+    phy_set_param_cmd(Power_Save_Cmd,wnet_vif_id,data);
+    Phy_Restore_Wakeup_Bit(data);
+    PhySetFw2Rtc(wnet_vif_id,  data);
+#else
+    phy_set_param_cmd(Power_Save_Cmd,wnet_vif_id,data);
+#endif
+    return 1;
+}
+
+unsigned int phy_set_txlive_time(unsigned int  txlivetime)
+{
+    phy_set_param_cmd(MaxTxLifetime_Cmd,0,txlivetime);
+    return 1;
+}
+
+void  phy_scan_cmd(unsigned int data)
+{
+    struct hal_private * hal_priv =hal_get_priv();
+
+    hal_priv->sta_con_msg.scan = data & 0xff;
+    phy_set_param_cmd(MAC_SCAN_CMD,0,data);
+}
+
+unsigned int phy_set_slot_time(unsigned int slot)
+{
+    struct hal_private * hal_priv =hal_get_priv();
+    unsigned int temp = 0;
+    struct hw_interface* hif = hif_get_hw_interface();
+
+    temp = hif->hif_ops.hi_read_word(RG_MAC_COUNT2);
+    temp =( temp &(~SLOT_MASK) )|(slot<<16);
+    hif->hif_ops.hi_write_word( RG_MAC_COUNT2, temp);
+    hal_priv->sta_con_msg.slot = slot;
+    return 0;
+}
+
+
+unsigned int phy_set_bcn_intvl(unsigned char vid,unsigned int bcninterval)
+{
+    phy_set_param_cmd(BCNInterval_Cmd,vid, bcninterval);
+    return 0;
+}
+
+unsigned int phy_set_ac_param(unsigned char wnet_vif_id,unsigned char ac,unsigned char aifsn,
+    unsigned char cwminmax,unsigned short txop)
+{
+    struct hal_private * hal_priv =hal_get_priv();
+    unsigned int wme_acparam = aifsn|(cwminmax<<8)|(txop<<16);
+
+    PRINT("%s-->wnet_vif_id:%d, aifsn:%d, cwminmax:%02x txop:%d\n",__func__, wnet_vif_id, aifsn, cwminmax, txop);
+
+    if((cwminmax ==0)||(aifsn==0))
+    {
+        PRINT("phy_set_ac_param wnet_vif_id %d ERROR!\n",wnet_vif_id);
+        return -1;
+    }
+
+    hal_priv->sta_con_msg.wme_acparam[ac].ac = ac;
+    hal_priv->sta_con_msg.wme_acparam[ac].aifsn = aifsn;
+    hal_priv->sta_con_msg.wme_acparam[ac].cwminmax = cwminmax;
+    hal_priv->sta_con_msg.wme_acparam[ac].txop = txop;
+
+    switch (ac)
+    {
+        case WME_AC_BE:
+            phy_set_param_cmd(AC_BE_Param_Cmd,wnet_vif_id,wme_acparam);
+            break;
+        case WME_AC_BK:
+            phy_set_param_cmd(AC_BK_Param_Cmd,wnet_vif_id,wme_acparam);
+            break;
+        case WME_AC_VI:
+            phy_set_param_cmd(AC_VI_Param_Cmd,wnet_vif_id,wme_acparam);
+            break;
+        case WME_AC_VO:
+            phy_set_param_cmd(AC_VO_Param_Cmd,wnet_vif_id,wme_acparam);
+            break;
+        default:
+            PRINT(" phy_set_ac_param Err: queue_id=%d is fault \n",ac);
+            break;
+    }
+
+    return 0;
+}
+
+int phy_set_p2p_opps_cwend_enable(unsigned char vid, unsigned char p2p_oppps_cw)
+{
+    return phy_set_param_cmd(P2P_OPPPS_CWEND_IRQ_ENABLE_CMD, vid, p2p_oppps_cw);
+}
+
+int phy_set_p2p_noa_enable(unsigned char vid, unsigned int duration, unsigned int interval,
+    unsigned int starttime, unsigned char count, unsigned char flag)
+{
+    NoACmd cmd = {0};
+
+    cmd.Cmd = P2P_NoA_ENABLE_CMD;
+    cmd.vid = vid;
+    cmd.count = count;
+    cmd.flag = flag;
+    cmd.duration = duration;
+    cmd.interval = interval;
+    cmd.starttime = starttime;
+
+    HAL_BEGIN_LOCK();
+    hi_set_cmd((unsigned char *)&cmd, sizeof(struct NoACmd));
+    HAL_END_LOCK();
+
+    return 0;
+}
+
+unsigned long long phy_get_tsf(unsigned char vid)
+{
+    return phy_get_param_cmd_ull(GET_TSF_CMD, vid);
+}
+
+unsigned long long phy_get_pn(unsigned char vid)
+{
+    return phy_get_param_cmd_ull(GET_PN_CMD, vid);
+}
+
+unsigned int phy_get_rw_ptr(unsigned char vid)
+{
+    return phy_get_param_cmd_ul(GET_SDIO_PTR_CMD, vid);
+}
+
+//for beamform test
+unsigned int phy_send_ndp_announcement(struct NDPAnncmntCmd ndp_anncmnt)
+{
+    HAL_BEGIN_LOCK();
+    hi_set_cmd((unsigned char *)&ndp_anncmnt, sizeof(struct NDPAnncmntCmd));
+    HAL_END_LOCK();
+    return 0;
+}
+
+unsigned int phy_send_null_data(struct NullDataCmd null_data, int len)
+{
+    null_data.Cmd = Send_NullData_Cmd;
+    null_data.tv_l_length = hal_tx_desc_get_len(null_data.rate, len,
+        0/*GI*/, null_data.bw/*bw*/, 0/*green mode*/);
+
+    HAL_BEGIN_LOCK();
+    hi_set_cmd((unsigned char *)&null_data, sizeof(struct NullDataCmd));
+    HAL_END_LOCK();
+    return 0;
+}
+
+unsigned int phy_keep_alive(struct NullDataCmd null_data_param, int null_data_len,
+    int enable, int period)
+{
+    struct KeepAliveCmd keep_alive_cmd;
+
+    null_data_param.tv_l_length = hal_tx_desc_get_len(null_data_param.rate, null_data_len,
+        0/*GI*/, null_data_param.bw/*bw*/, 0/*green mode*/);
+
+    keep_alive_cmd.Cmd = Keep_Alive_Cmd;
+    keep_alive_cmd.null_data_param = null_data_param;
+    keep_alive_cmd.enable = enable;
+    keep_alive_cmd.period = period;
+
+    HAL_BEGIN_LOCK();
+    hi_set_cmd((unsigned char *)&keep_alive_cmd, sizeof(struct KeepAliveCmd));
+    HAL_END_LOCK();
+    return 0;
+}
+
+unsigned int phy_set_beacon_miss(unsigned char vid, unsigned char enable, int period)
+{
+    struct BeaconMissCmd beacon_miss_cmd = {0};
+
+    beacon_miss_cmd.Cmd = Beacon_Miss_Cmd;
+    beacon_miss_cmd.enable = enable;
+    beacon_miss_cmd.period = period;
+    beacon_miss_cmd.vid = vid;
+
+    HAL_BEGIN_LOCK();
+    hi_set_cmd((unsigned char *)&beacon_miss_cmd, sizeof(struct BeaconMissCmd));
+    HAL_END_LOCK();
+    return 0;
+}
+
+unsigned int phy_set_vsdb(unsigned char vid, unsigned char enable)
+{
+    struct vsdb_cmd set_vsdb_cmd = {0};
+
+    set_vsdb_cmd.Cmd = vsdb_set_cmd;
+    set_vsdb_cmd.enable = enable;
+    set_vsdb_cmd.vid = vid;
+
+    HAL_BEGIN_LOCK();
+    hi_set_cmd((unsigned char *)&set_vsdb_cmd, sizeof(struct vsdb_cmd));
+    HAL_END_LOCK();
+    return 0;
+}
+
+unsigned int phy_set_arp_agent(unsigned char vid, unsigned char enable, unsigned int ipv4,
+        unsigned char * ipv6)
+{
+    struct ArpAgentCmd arp_agent_cmd = {0};
+
+    arp_agent_cmd.Cmd = ARP_Agent_Cmd;
+    arp_agent_cmd.enable = enable;
+    arp_agent_cmd.vid = vid;
+    arp_agent_cmd.ip_addr = ipv4;
+
+    if (ipv6 != NULL)
+        memcpy(arp_agent_cmd.ip6_addr, ipv6, IPV6_ADDR_BUF_LEN);
+
+    printk("%s:%d, set arp agent, enable %d \n", __func__, __LINE__, enable);
+    HAL_BEGIN_LOCK();
+    hi_set_cmd((unsigned char *)&arp_agent_cmd, sizeof(struct ArpAgentCmd));
+    HAL_END_LOCK();
+
+    return 0;
+}
+
+unsigned int phy_set_pattern(unsigned char vid, unsigned char offset, unsigned char len,
+            unsigned char id, unsigned char *mask, unsigned char *pattern)
+{
+    struct AddPatternCmd add_pattern_cmd;
+    int mask_len = 0;
+
+    mask_len = ALIGN(len, WOW_PATTERN_MASK_SIZE) / WOW_PATTERN_MASK_SIZE;
+    add_pattern_cmd.Cmd = Add_Pattern_Cmd;
+    add_pattern_cmd.vid = vid;
+    add_pattern_cmd.pattern_offset = offset;
+    /*we just compare pattern with max pattern size */
+    add_pattern_cmd.pattern_len = len > WOW_PATTERN_SIZE ? WOW_PATTERN_SIZE : len;
+    add_pattern_cmd.pattern_id = id;
+    memcpy(add_pattern_cmd.pattern, pattern, add_pattern_cmd.pattern_len);
+    memcpy(add_pattern_cmd.mask, mask, mask_len);
+
+    printk("%s:%d, wow len %d, mask 0x%x, pattern 0x%lx\n", __func__, __LINE__, len,
+        *(unsigned int *)mask, *(unsigned long*)pattern);
+    HAL_BEGIN_LOCK();
+    hi_set_cmd((unsigned char *)&add_pattern_cmd, sizeof(struct AddPatternCmd));
+    HAL_END_LOCK();
+    return 0;
+}
+
+int phy_set_suspend(unsigned char vid, unsigned char enable,
+        unsigned char mode, unsigned int filters)
+{
+    struct SuspendCmd suspend_cmd = {0};
+    struct hal_private * hal_priv = hal_get_priv();
+    unsigned long long PN = 0;
+    bool ret = false;
+    int cnt = 0;
+    unsigned int ptr = 0;
+
+    suspend_cmd.Cmd = WoW_Enable_Cmd;
+    suspend_cmd.vid = vid;
+    suspend_cmd.enable = enable;
+
+    if (enable == 1)
+    {
+        memcpy(suspend_cmd.PN, hal_priv->uRepCnt[vid][1].txPN[TX_UNICAST_REPCNT_ID], 8);
+        /* wait for fw upload tx status */
+        while (hal_priv->bhaltxdrop == 1)
+        {
+            msleep(20);
+            cnt++;
+            if (cnt > 10)
+            {
+                printk("%s:%d, haltxdrop = 1 0x%lx, 0x%lx\n", __func__, __LINE__,
+                    hal_priv->tx_frames_map[0], hal_priv->tx_frames_map[1]);
+                break;
+            }
+        }
+    }
+    else
+    {
+        while ((enable == 0) && (atomic_read(&hal_priv->sdio_suspend_cnt) > 0))
+        {
+            msleep(20);
+            cnt++;
+            if (cnt > 10)
+            {
+                printk("%s:%d, no resume cnt 0x%x\n", __func__, __LINE__,
+                        atomic_read(&hal_priv->sdio_suspend_cnt));
+                return -1;
+            }
+        }
+        /* in case */
+        if (hal_priv->bhaltxdrop == 1)
+        {
+            printk("%s:%d, haltxdrop = 1 0x%lx, 0x%lx, pagenum %d \n", __func__, __LINE__,
+                hal_priv->tx_frames_map[0], hal_priv->tx_frames_map[1], hal_priv->txPageFreeNum);
+            hal_priv->bhaltxdrop = 0;
+            hal_priv->tx_frames_map[0] = 0;
+            hal_priv->tx_frames_map[1] = 0;
+            hal_priv->txPageFreeNum = DEFAULT_TXPAGENUM;
+        }
+    }
+
+    suspend_cmd.filters = filters;
+
+    atomic_set(&hal_priv->sdio_suspend_cnt, 0);
+
+    /* if last suspend fail,this time is resume,just return */
+    if ((enable == 0) && (atomic_read(&hal_priv->drv_suspend_cnt) == 0))
+    {
+        printk("last suspend fail,don't need resume, just return\n");
+        return 0;
+    }
+
+    POWER_BEGIN_LOCK();
+    if ((enable == 1) && (hal_priv->powersave_init_flag == 0))
+    {
+        if ((hal_priv->hal_drv_ps_status & HAL_DRV_STS_MASK) != 0)
+        {
+            POWER_END_LOCK();
+            atomic_set(&hal_priv->drv_suspend_cnt, 0);
+            return -1;
+        }
+        else
+        {
+            // set driver sleep flag to protect power save flow
+            hal_priv->hal_drv_ps_status |= HAL_DRV_IN_SLEEPING;
+        }
+    }
+
+    if (mode == 0)
+    {
+        suspend_cmd.wow = 0;
+        suspend_cmd.deepsleep = 0;
+        hal_priv->hal_suspend_mode = HIF_SUSPEND_STATE_NONE;
+        atomic_set(&hal_priv->drv_suspend_cnt, 0);
+    }
+    else if (mode == 1)
+    {
+        suspend_cmd.wow = 1;
+        suspend_cmd.deepsleep = 0;
+        hal_priv->hal_suspend_mode = HIF_SUSPEND_STATE_WOW;
+    }
+    else
+    {
+        suspend_cmd.deepsleep = 1;
+        suspend_cmd.wow = 0;
+        hal_priv->hal_suspend_mode = HIF_SUSPEND_STATE_DEEPSLEEP;
+    }
+
+    POWER_END_LOCK();
+
+    if (enable == 0)
+    {
+        ptr = hal_priv->hal_ops.phy_get_rw_ptr(0);
+        hal_priv->rx_host_offset = ((ptr >> 16) & 0xffff) * 4;
+    }
+
+    HAL_BEGIN_LOCK();
+    ret = hi_set_cmd((unsigned char *)&suspend_cmd, sizeof(struct SuspendCmd));
+
+    POWER_BEGIN_LOCK();
+    if (ret && (enable == 1) && (hal_priv->powersave_init_flag == 0))
+    {
+        hal_priv->hal_fw_ps_status = HAL_FW_IN_SLEEP;
+        atomic_set(&hal_priv->drv_suspend_cnt, 1);
+    }
+    else if (ret && (enable == 0) && (hal_priv->powersave_init_flag == 0))
+    {
+        hal_priv->hal_fw_ps_status = HAL_FW_IN_ACTIVE;
+    }
+    hal_priv->hal_drv_ps_status &= ~HAL_DRV_IN_SLEEPING;
+
+    POWER_END_LOCK();
+    HAL_END_LOCK();
+
+    if (enable == 0)
+    {
+        ptr = hal_priv->hal_ops.phy_get_rw_ptr(0);
+        hal_priv->tx_page_offset = ptr & 0xffff;
+
+        PN = phy_get_pn(vid);
+        memcpy(hal_priv->uRepCnt[vid][1].txPN[TX_UNICAST_REPCNT_ID], &PN, 8);
+    }
+    printk("%s end, wow enable %d, mode %d, filter 0x%x, ret %d\n",
+        ((enable == 1) ? "suspend" : "resume"), enable, mode, filters, ret);
+    return 0;
+}
+
+void phy_set_bmfm_info(int wnet_vif_id, unsigned char *group_id,
+        unsigned char * user_position, unsigned char feedback_type)
+{
+    struct Bmfm_Info_Cmd bmfm_info_cmd = {0};
+#ifdef PROJECT_T9026
+    struct hw_interface* hif =hif_get_hw_interface();
+
+    if (group_id == NULL) {
+        hif->hif_ops.hi_write_word(0x000001d0, 0x20000000);
+        hif->hif_ops.hi_write_word(0x000001d4, 0x20000000);
+        hif->hif_ops.hi_write_word(0x000001d8, 0x20000000);
+        hif->hif_ops.hi_write_word(0x000001dC, 0x20000000);
+        return;
+    }
+#else
+    if (group_id == NULL) {
+        printk("%s:%d, group id null\n", __func__, __LINE__);
+        return;
+    }
+#endif
+
+    bmfm_info_cmd.Cmd = BmfmInfo_Cmd;
+    bmfm_info_cmd.vid = wnet_vif_id;
+    bmfm_info_cmd.feedback_type = feedback_type;
+
+    memcpy(bmfm_info_cmd.group_id, group_id, sizeof(bmfm_info_cmd.group_id));
+    memcpy(bmfm_info_cmd.user_position, user_position, sizeof(bmfm_info_cmd.user_position));
+
+    HAL_BEGIN_LOCK();
+    hi_set_cmd((unsigned char *)&bmfm_info_cmd, sizeof(struct Bmfm_Info_Cmd));
+    HAL_END_LOCK();
+}
+
+unsigned int hal_dpd_memory_download_cmd(void)
+{
+    struct DPD_Memory_Downlod dpd_download;
+
+    memset(&dpd_download, 0, sizeof(struct DPD_Memory_Downlod));
+    dpd_download.Cmd = DPD_MEMORY_CMD;
+
+    HAL_BEGIN_LOCK();
+    hi_set_cmd((unsigned char *)&dpd_download, sizeof(struct DPD_Memory_Downlod));
+    HAL_END_LOCK();
+
+    return 0;
+}
+
+unsigned int phy_set_coexist_en( unsigned char enable)
+{
+    struct Coexist_Cmd coexist_cmd;
+
+    memset(&coexist_cmd, 0 , sizeof( struct Coexist_Cmd));
+    coexist_cmd.Cmd = COEXIST_CMD;
+    coexist_cmd.coexist_id_bitmap = COEXIST_EN_CMD;
+    coexist_cmd.coexist_enable = enable;
+
+    printk("%s:%d, phy_set_coexist_en, enable %d \n", __func__, __LINE__, enable);
+    HAL_BEGIN_LOCK();
+    hi_set_cmd((unsigned char *)&coexist_cmd, sizeof(struct Coexist_Cmd));
+    HAL_END_LOCK();
+
+    return 0;
+}
+
+unsigned int phy_set_coexist_max_miss_bcn( unsigned int miss_bcn_cnt)
+{
+    struct Coexist_Cmd coexist_cmd;
+
+    memset(&coexist_cmd, 0 , sizeof( struct Coexist_Cmd));
+
+    coexist_cmd.Cmd = COEXIST_CMD;
+    coexist_cmd.coexist_id_bitmap = COEXIST_MAX_MISS_BCN_CNT;
+    coexist_cmd.max_miss_bcn_cnt = miss_bcn_cnt;
+
+    printk("%s:%d, miss_bcn_cnt, %d \n", __func__, __LINE__, miss_bcn_cnt);
+    HAL_BEGIN_LOCK();
+    hi_set_cmd((unsigned char *)&coexist_cmd, sizeof(struct Coexist_Cmd));
+    HAL_END_LOCK();
+
+    return 0;
+}
+
+unsigned int phy_set_coexist_req_timeslice_timeout_value( unsigned int timeout_value)
+{
+    struct Coexist_Cmd coexist_cmd;
+
+    memset(&coexist_cmd, 0 , sizeof( struct Coexist_Cmd));
+    coexist_cmd.Cmd = COEXIST_CMD;
+    coexist_cmd.coexist_id_bitmap = COEXIST_REQ_TIMEOUT;
+    coexist_cmd.req_timeout_value = timeout_value;
+
+    printk("%s:%d, req_timeslice_timeout_value %d \n", __func__, __LINE__, timeout_value);
+    HAL_BEGIN_LOCK();
+    hi_set_cmd((unsigned char *)&coexist_cmd, sizeof(struct Coexist_Cmd));
+    HAL_END_LOCK();
+    return 0;
+
+
+}
+
+
+
+unsigned int phy_set_coexist_not_grant_weight( unsigned int not_grant_weight)
+{
+    struct Coexist_Cmd coexist_cmd;
+
+    memset(&coexist_cmd, 0 , sizeof( struct Coexist_Cmd));
+    coexist_cmd.Cmd = COEXIST_CMD;
+    coexist_cmd.coexist_id_bitmap = COEXIST_NOT_GRANT_WEIGHT;
+    coexist_cmd.not_grant_weight = not_grant_weight;
+
+    printk("%s:%d, not_grant_weight %d \n", __func__, __LINE__, not_grant_weight);
+    HAL_BEGIN_LOCK();
+    hi_set_cmd((unsigned char *)&coexist_cmd, sizeof(struct Coexist_Cmd));
+    HAL_END_LOCK();
+
+    return 0;
+
+
+}
+
+
+unsigned int phy_set_coexist_max_not_grant_cnt( unsigned int coexist_max_not_grant_cnt)
+{
+    struct Coexist_Cmd coexist_cmd;
+
+    memset(&coexist_cmd, 0 , sizeof( struct Coexist_Cmd));
+    coexist_cmd.Cmd = COEXIST_CMD;
+    coexist_cmd.coexist_id_bitmap = COEXIST_MAX_NOT_GRANT_CNT;
+    coexist_cmd.max_not_grant_cnt = coexist_max_not_grant_cnt;
+
+    printk("%s:%d, coexist_max_not_grant_cnt %d \n", __func__, __LINE__, coexist_max_not_grant_cnt);
+    HAL_BEGIN_LOCK();
+    hi_set_cmd((unsigned char *)&coexist_cmd, sizeof(struct Coexist_Cmd));
+    HAL_END_LOCK();
+
+    return 0;
+
+}
+
+/*
+bit31-bit16 : minimal  priority
+bit15:bit0: max prioriyt
+*/
+unsigned int phy_set_coexist_scan_priority_range( unsigned int coexist_scan_priority_range)
+{
+    struct Coexist_Cmd coexist_cmd;
+
+    memset(&coexist_cmd, 0 , sizeof( struct Coexist_Cmd));
+    coexist_cmd.Cmd = COEXIST_CMD;
+    coexist_cmd.coexist_id_bitmap = COEXIST_SCAN_PRIORITY_RANGE;
+    coexist_cmd.scan_priority_range = coexist_scan_priority_range;
+
+    printk("%s:%d, coexist  scan min priority is %d,max priority is %d\n", __func__, __LINE__, coexist_scan_priority_range&0xffff,  coexist_scan_priority_range>>16);
+    HAL_BEGIN_LOCK();
+    hi_set_cmd((unsigned char *)&coexist_cmd, sizeof(struct Coexist_Cmd));
+    HAL_END_LOCK();
+
+    return 0;
+
+}
+
+
+/*
+bit31-bit16 : minimal  priority
+bit15:bit0: max prioriyt
+*/
+unsigned int phy_set_coexist_be_bk_noqos_priority_range( unsigned int coexist_scan_priority_range)
+{
+    struct Coexist_Cmd coexist_cmd;
+
+    memset(&coexist_cmd, 0 , sizeof( struct Coexist_Cmd));
+    coexist_cmd.Cmd = COEXIST_CMD;
+    coexist_cmd.coexist_id_bitmap = COEXIST_BE_BK_NOQOS_PRI_RANGE;
+    coexist_cmd.be_bk_no_qos_priority_range = coexist_scan_priority_range;
+
+    printk("%s:%d, coexist be/bk/noqos  min priority is %d,max priority is %d\n", __func__, __LINE__, coexist_scan_priority_range&0xffff,  coexist_scan_priority_range>>16);
+    HAL_BEGIN_LOCK();
+    hi_set_cmd((unsigned char *)&coexist_cmd, sizeof(struct Coexist_Cmd));
+    HAL_END_LOCK();
+
+    return 0;
+
+}
+
+
+unsigned int phy_infor_bt_wifi_work_freq(unsigned int enable_infor_bt_wifi_req)
+{
+    struct Coexist_Cmd coexist_cmd;
+
+    memset(&coexist_cmd, 0 , sizeof( struct Coexist_Cmd));
+    coexist_cmd.Cmd = COEXIST_CMD;
+    coexist_cmd.coexist_id_bitmap = COEXIST_INFOR_BT_WIFI_WORK_FREQ;
+    coexist_cmd.enable_infor_bt_wifi_work_freq = enable_infor_bt_wifi_req;
+
+    printk("%s:%d, enable_infor_bt_wifi_req %d\n", __func__, __LINE__, enable_infor_bt_wifi_req);
+    HAL_BEGIN_LOCK();
+    hi_set_cmd((unsigned char *)&coexist_cmd, sizeof(struct Coexist_Cmd));
+    HAL_END_LOCK();
+
+    return 0;
+
+}
+
+unsigned int phy_interface_enable(unsigned char enable, unsigned char vid)
+{
+#if 0
+    struct hw_interface* hif = hif_get_hw_interface();
+    struct hal_private *hal_priv = hal_get_priv();
+    unsigned int reg_data = 0;
+
+    if (enable == 1)
+    {
+        if (hal_priv->bRfInit == 0)
+            return 0;
+
+        /* 0x00a08010 */
+        reg_data = hif->hif_ops.hi_read_word(RG_AGC_EN);
+        hif->hif_ops.hi_write_word(RG_AGC_EN, reg_data & ~BIT(28));
+
+        phy_set_coexist_en(enable);
+    }
+    else
+    {
+        phy_set_coexist_en(enable);
+
+        reg_data = hif->hif_ops.hi_read_word(RG_AGC_EN);
+        hif->hif_ops.hi_write_word(RG_AGC_EN, reg_data | BIT(28));
+    }
+    reg_data = hif->hif_ops.hi_read_word(RG_AGC_EN);
+    printk("%s:%d, enable %d, agc 0x%x \n", __func__, __LINE__, enable, reg_data);
+#endif
+    struct Phy_Interface_Param phy_interface;
+    memset(&phy_interface, 0, sizeof(struct Phy_Interface_Param));
+
+    phy_interface.Cmd = PHY_INTERFACE_CMD;
+    phy_interface.vid = vid;
+    phy_interface.interface_enable = enable;
+
+    HAL_BEGIN_LOCK();
+    hi_set_cmd((unsigned char *)&phy_interface, sizeof(struct Phy_Interface_Param));
+    HAL_END_LOCK();
+    printk("%s:%d, vid %d, enable %d\n", __func__, __LINE__, vid, enable);
+
+    return 0;
+}
+
+unsigned int hal_set_fwlog_cmd(unsigned char enable)
+{
+    struct Fwlog_Mode_Control fwlog_mode;
+    memset(&fwlog_mode, 0, sizeof(struct Fwlog_Mode_Control));
+
+    fwlog_mode.Cmd = FWLOG_MODE_CMD;
+    if ((enable & 0x01) != 0)
+    {
+        fwlog_mode.mode= 1;
+    }
+    else
+    {
+        fwlog_mode.mode= 0;
+    }
+
+    HAL_BEGIN_LOCK();
+    hi_set_cmd((unsigned char *)&fwlog_mode, sizeof(struct Fwlog_Mode_Control));
+    HAL_END_LOCK();
+    printk("%s:%d, enable %d \n", __func__, __LINE__, enable);
+
+    if ((enable & 0x02) != 0)
+    {
+        hal_print_fwlog();
+    }
+
+    return 0;
+}
+
+unsigned int process_cali_content(char *varbuf, unsigned int len)
+{
+    char *dp;
+    bool findNewline;
+    int column;
+    unsigned int buf_len, n;
+    unsigned int pad = 0;
+
+    dp = varbuf;
+    findNewline = false;
+    column = 0;
+
+    for (n = 0; n < len; n++) {
+        if (varbuf[n] == '\r')
+            continue;
+
+        if (findNewline && varbuf[n] != '\n')
+            continue;
+        findNewline = false;
+        if (varbuf[n] == '#') {
+            findNewline = true;
+            continue;
+        }
+        if (varbuf[n] == '\n') {
+            if (column == 0)
+                continue;
+            *dp++ = 0;
+            column = 0;
+            continue;
+        }
+        *dp++ = varbuf[n];
+        column++;
+    }
+    buf_len = (unsigned int)(dp - varbuf);
+    if (buf_len % 4) {
+        pad = 4 - buf_len % 4;
+        if (pad && (buf_len + pad <= len)) {
+            buf_len += pad;
+        }
+    }
+
+    while (dp < varbuf + n)
+        *dp++ = 0;
+
+    return buf_len;
+}
+
+unsigned char get_s8_item(char *varbuf, int len, char *item, char *item_value)
+{
+    unsigned int n;
+    char tmpbuf[20];
+    char *p = item_value;
+    int ret = 0;
+    unsigned int pos = 0;
+    unsigned int index = 0;
+
+    while (pos  < len) {
+        index = pos;
+        ret = 0;
+
+        while ((varbuf[pos] != 0) && (varbuf[pos] != '=')) {
+            if (((pos - index) >= strlen(item)) || (varbuf[pos] != item[pos - index])) {
+                ret = 1;
+                break;
+            }
+            else {
+                pos++;
+            }
+        }
+
+        pos++;
+
+        if ((ret == 0) && (strlen(item) == pos - index - 1)) {
+            do {
+                memset(tmpbuf, 0, sizeof(tmpbuf));
+                n = 0;
+                while ((varbuf[pos] != 0) && (varbuf[pos] != ',') && (pos < len))
+                    tmpbuf[n++] = varbuf[pos++];
+
+                *p++ = (char)simple_strtol(tmpbuf, NULL, 0);
+            }
+            while (varbuf[pos++] == ',');
+
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
+unsigned char get_s16_item(char *varbuf, int len, char *item, short *item_value)
+{
+    unsigned int n;
+    char tmpbuf[20];
+    short *p = item_value;
+    int ret = 0;
+    unsigned int pos = 0;
+    unsigned int index = 0;
+
+    while (pos  < len) {
+        index = pos;
+        ret = 0;
+
+        while ((varbuf[pos] != 0) && (varbuf[pos] != '=')) {
+            if (((pos - index) >= strlen(item)) || (varbuf[pos] != item[pos - index])) {
+                ret = 1;
+                break;
+            }
+            else {
+                pos++;
+            }
+        }
+
+        pos++;
+
+        if ((ret == 0) && (strlen(item) == pos - index - 1)) {
+            do {
+                memset(tmpbuf, 0, sizeof(tmpbuf));
+                n = 0;
+                while ((varbuf[pos] != 0) && (varbuf[pos] != ',') && (pos < len))
+                    tmpbuf[n++] = varbuf[pos++];
+
+                *p++ = (short)simple_strtol(tmpbuf, NULL, 0);
+            }
+            while (varbuf[pos++] == ',');
+
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
+
+unsigned char parse_cali_param(char *varbuf, int len, struct Cali_Param *cali_param)
+{
+    get_s8_item(varbuf, len, "version", &cali_param->version);
+    get_s16_item(varbuf, len, "cali_config", &cali_param->cali_config);
+    get_s8_item(varbuf, len, "freq_offset", &cali_param->freq_offset);
+    get_s8_item(varbuf, len, "tssi_2g_offset", &cali_param->tssi_2g_offset);
+    get_s8_item(varbuf, len, "tssi_5g_offset_5200", &cali_param->tssi_5g_offset[0]);
+    get_s8_item(varbuf, len, "tssi_5g_offset_5400", &cali_param->tssi_5g_offset[1]);
+    get_s8_item(varbuf, len, "tssi_5g_offset_5600", &cali_param->tssi_5g_offset[2]);
+    get_s8_item(varbuf, len, "tssi_5g_offset_5800", &cali_param->tssi_5g_offset[3]);
+    get_s8_item(varbuf, len, "hdmi_enable", &cali_param->hdmi_enable);
+    get_s16_item(varbuf, len, "hdmi_freq", &cali_param->hdmi_freq);
+
+    return 0;
+}
+
+unsigned char get_cali_param(struct Cali_Param *cali_param)
+{
+    struct file *fp;
+    struct kstat stat;
+    int size, len;
+    int error = 0;
+    char *content =  NULL;
+    mm_segment_t fs;
+
+    fs = get_fs();
+    set_fs(KERNEL_DS);
+
+    fp = filp_open(cali_cfg_path, O_RDONLY, 0);
+
+    if (IS_ERR(fp)) {
+        fp = NULL;
+        goto err;
+    }
+
+    error = vfs_stat(cali_cfg_path, &stat);
+    if (error) {
+        filp_close(fp, NULL);
+        goto err;
+    }
+
+    size = (int)stat.size;
+    if (size <= 0) {
+        filp_close(fp, NULL);
+        goto err;
+    }
+
+    content = ZMALLOC(size, "wifi_cali_param", GFP_KERNEL);
+
+    if (content == NULL) {
+        filp_close(fp, NULL);
+        goto err;
+    }
+
+    if (vfs_read(fp, content, size, &fp->f_pos) != size) {
+        FREE(content, "wifi_cali_param");
+        filp_close(fp, NULL);
+        goto err;
+    }
+
+    len = process_cali_content(content, size);
+    parse_cali_param(content, len, cali_param);
+
+    FREE(content, "wifi_cali_param");
+    filp_close(fp, NULL);
+    set_fs(fs);
+
+    return 0;
+err:
+    set_fs(fs);
+    return 1;
+}
+
+unsigned int hal_cfg_cali_param(void)
+{
+    struct Cali_Param cali_param;
+    unsigned char err = 0;
+
+    memset((void *)&cali_param, 0, sizeof(struct Cali_Param));
+    cali_param.Cmd = CALI_PARAM_CMD;
+    err = get_cali_param(&cali_param);
+
+    printk("calibration parameter: version %d, config %d, freq_offset %d, tssi_2g %d, tssi_5g %d %d %d %d\n",
+            cali_param.version, cali_param.cali_config, cali_param.freq_offset, cali_param.tssi_2g_offset,
+            cali_param.tssi_5g_offset[0], cali_param.tssi_5g_offset[1], cali_param.tssi_5g_offset[2], cali_param.tssi_5g_offset[3]);
+
+    if (err == 0) {
+        printk("%s:%d, set calibration parameter \n", __func__, __LINE__);
+        HAL_BEGIN_LOCK();
+        hi_set_cmd((unsigned char *)&cali_param, sizeof(struct Cali_Param));
+        HAL_END_LOCK();
+    }
+    else {
+        printk("%s:%d, set calibration parameter failed\n", __func__, __LINE__);
+    }
+
+    return 0;
+}
+
+
+#ifdef HAL_SIM_VER
+#ifdef FW_NAME
+}
+#endif
+#endif

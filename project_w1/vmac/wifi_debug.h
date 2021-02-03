@@ -1,0 +1,228 @@
+#ifndef _AML_DEBUG_H_
+#define _AML_DEBUG_H_
+
+#include <linux/bitops.h>
+#include <linux/kernel.h>
+
+#ifndef BIT
+#define BIT(n)    (1UL << (n))
+#endif //BIT
+
+#define  CTRL_BYTE
+#define LINEBYTE 32
+#define ASCII_IN  1
+
+enum
+{
+    AML_DEBUG_ACL              = BIT(0),   /* reset module  */
+    AML_DEBUG_XMIT      = BIT(1),   /* xmit ampdu */       //AML_DEBUG_TX_AMPDU==>AML_DEBUG_XMIT
+    AML_DEBUG_KEY               = BIT(2),   /* key module  */
+    AML_DEBUG_STATE     = BIT(3),   /* state module  */
+    AML_DEBUG_RATE              = BIT(4),   /* rate control */
+    AML_DEBUG_RECV          = BIT(5),   /* rx module */
+    AML_DEBUG_P2P           = BIT(6),   /* p2p module */
+    AML_DEBUG_CFG80211      = BIT(7),   /* cfg80211 module */
+    AML_DEBUG_SCAN              = BIT(8),   /* scan module */
+    AML_DEBUG_LOCK  = BIT(9),   /*  */
+    AML_DEBUG_INIT              = BIT(10),   /* initial module */
+    AML_DEBUG_ROAM              = BIT(11),   /* exit module */
+    AML_DEBUG_NODE              = BIT(12),   /* nsta module */
+    AML_DEBUG_ANDROID               = BIT(13),   /* android module */
+    AML_DEBUG_ACTION            = BIT(14),   /* channel module */
+    AML_DEBUG_IOCTL             = BIT(15),   /* ioctl module */
+    AML_DEBUG_CONNECT               = BIT(16),   /* Connect Operating */
+    AML_DEBUG_TIMER             = BIT(17),   /* TIMER Debug */
+    AML_DEBUG_ADDBA             = BIT(18),   /* ADDBA Debug */
+    AML_DEBUG_NETDEV            = BIT(19),   /* netdev module */
+    AML_DEBUG_HAL               = BIT(20),   /* hal module  */
+    AML_DEBUG_BEACON           = BIT(21),   /* beacon module  */
+    AML_DEBUG_UAPSD             = BIT(22),   /* uapsd */
+    AML_DEBUG_BWC               = BIT(23),   /* channel bw control */
+    AML_DEBUG_ELEMID      = BIT(24),   /* elemid */
+    AML_DEBUG_PWR_SAVE      = BIT(25),   /* PS Poll and PS save */
+    AML_DEBUG_DEBUG     = BIT(26),   /*  debug */
+    AML_DEBUG_INFO          = BIT(27),   /*  info */
+    AML_DEBUG_WARNING       = BIT(28),   /*  warning */
+    AML_DEBUG_ERROR             = BIT(29),   /*  errors */
+    AML_DEBUG_WME          =BIT(30),
+    AML_DEBUG_DOTH         =BIT(31),
+    AML_DEBUG_ANY               = 0xffffffff
+};
+
+enum
+{
+    AML_DEBUG_VHT		  = BIT(0),
+    AML_DEBUG_VHT_ANY       = 0xffffffff
+};
+/*
+** Define the "default" debug mask
+*/
+//#define AML_DEBUG_LEVEL   AML_DEBUG_BWC         //40M
+#define AML_DEBUG_LEVEL (AML_DEBUG_STATE|AML_DEBUG_ERROR|AML_DEBUG_WARNING|AML_DEBUG_INIT|\
+                            AML_DEBUG_CFG80211)
+
+
+#ifdef DRV_PT_SUPPORT
+#define DBG_HAL_THR_ENTER()          //printk("---xman debug---:%s ++ \n",__FUNCTION__);
+#define DBG_HAL_THR_EXIT()           //printk("---xman debug---:%s -- \n",__FUNCTION__);
+#endif
+
+extern int aml_debug;
+extern unsigned long long g_dbg_info_enable;
+#define DPRINTF( _m,  ...) do {         \
+                if (aml_debug& (_m))                \
+                        printk(__VA_ARGS__);      \
+        } while (0)
+
+/* shijie.chen add printk class for debug */
+enum
+{
+    AML_DEBUG_TX = BIT(0),
+    AML_DEBUG_RX = BIT(1),
+    AML_DBG_TCP_IP_DOWN = BIT(2),
+    AML_DBG_TXLIST_CNT = BIT(3),
+    AML_DBG_TX_DROP = BIT(4),
+    AML_DBG_HAL_FULL = BIT(5),
+    AML_DBG_TX_ITVL = BIT(6),
+    AML_DEBUG_AGG = BIT(7),
+    AML_DBG_TXPKT_ITVL = BIT(8),
+    AML_DBG_TX_PATH_LOCKS=BIT(9),
+    AML_DBG_TX_SN=BIT(10),
+    AML_DBG_TX_SHOW_TXVEC=BIT(11),
+    AML_DBG_TX_HAL = BIT(12),
+    AML_DBG_TX_BA_RECYCLE = BIT(14),
+    AML_DBG_TX_FLOW = BIT(15),
+    AML_DBG_TX_AGG_CNT = BIT(16),
+    AML_DEBUG_CNT = BIT(18), /*log for connecting  */
+    AML_DBG_P2P_GO=BIT(19),
+    AML_DBG_HAL_TX_DW=BIT(20),
+    AML_DBG_HAL_RX_FRM=BIT(21),
+    AML_DBG_TX_VIP_INFO=BIT(22),
+    AML_DBG_DUMP_BCN = BIT(28),
+
+    AML_DBG_CT=BIT(31),
+    AML_DEBUG_ALL = 0xffffffffffffffff,
+};
+
+
+#define __D( _m, ...) do {         \
+                if (g_dbg_info_enable & (_m)) \
+					{ printk(__VA_ARGS__);}      \
+        } while (0)
+
+
+				
+#ifdef DRV_PT_SUPPORT
+#include "wifi_pt_init.h"
+extern struct _B2B_Platform_Conf gB2BPlatformConf;
+
+#endif
+
+
+#define DEBUG_LOCK
+
+#ifdef DEBUG_LOCK
+#define OS_SPIN_LOCK_IRQ(a, b)        {if (aml_debug& (AML_DEBUG_LOCK))  printk("%s,%d,%p, #a ++\n",__func__,__LINE__,(a));spin_lock_irqsave((a), (b));}
+#define OS_SPIN_UNLOCK_IRQ(a, b)   {if (aml_debug& (AML_DEBUG_LOCK)) printk("%s,%d,%p,#a --\n",__func__,__LINE__,(a));spin_unlock_irqrestore((a), (b));}
+
+
+#define OS_SPIN_LOCK_BH(a)        {if (aml_debug& (AML_DEBUG_LOCK)) printk("%s,%d,%p,#a ++\n",__func__,__LINE__,(a));spin_lock_bh((a));}
+#define OS_SPIN_UNLOCK_BH(a)   {if (aml_debug& (AML_DEBUG_LOCK))  printk("%s,%d,%p,#a --\n",__func__,__LINE__,(a));spin_unlock_bh((a));}
+
+
+#define OS_SPIN_LOCK(a)        {if (aml_debug& (AML_DEBUG_LOCK))  printk("%s,%d,%p,#a ++\n",__func__,__LINE__,(a));spin_lock((a));}
+#define OS_SPIN_UNLOCK(a)   {if (aml_debug& (AML_DEBUG_LOCK))  printk("%s,%d,%p,#a --\n",__func__,__LINE__,(a));spin_unlock((a));}
+
+
+#define OS_WRITE_LOCK(a)        {if (aml_debug& (AML_DEBUG_LOCK))  printk("%s,%d,%p,#a ++\n",__func__,__LINE__,(a));write_lock((a));}
+#define OS_WRITE_UNLOCK(a)   {if (aml_debug& (AML_DEBUG_LOCK))  printk("%s,%d,%p,#a --\n",__func__,__LINE__,(a));write_unlock((a));}
+
+#define OS_WRITE_LOCK_BH(a)        {if (aml_debug& (AML_DEBUG_LOCK)) printk("%s,%d,%p,#a ++\n",__func__,__LINE__,(a));write_lock_bh((a));}
+#define OS_WRITE_UNLOCK_BH(a)   {if (aml_debug& (AML_DEBUG_LOCK))  printk("%s,%d,%p,#a --\n",__func__,__LINE__,(a));write_unlock_bh((a));}
+
+#define OS_WRITE_LOCK_IRQ(a, b)        {if (aml_debug& (AML_DEBUG_LOCK))  printk("%s,%d,%p,#a ++\n",__func__,__LINE__,(a));write_lock_irqsave((a), (b));}
+#define OS_WRITE_UNLOCK_IRQ(a, b)   {if (aml_debug& (AML_DEBUG_LOCK)) printk("%s,%d,%p,#a --\n",__func__,__LINE__,(a));write_unlock_irqrestore((a), (b));}
+
+#define OS_MUTEX_LOCK(a)        {/*printk("%s,%d,%p, #a ++\n",__func__,__LINE__,(a));*/mutex_lock(a);}
+#define OS_MUTEX_UNLOCK(a)        {/*printk("%s,%d,%p, #a --\n",__func__,__LINE__,(a));*/mutex_unlock(a);}
+
+#else
+#define OS_SPIN_LOCK_IRQ(a, b)        {spin_lock_irqsave((a), (b));}
+#define OS_SPIN_UNLOCK_IRQ(a, b)   {spin_unlock_irqrestore((a), (b));}
+
+
+#define OS_SPIN_LOCK_BH(a)        {spin_lock_bh((a));}
+#define OS_SPIN_UNLOCK_BH(a)   {spin_unlock_bh((a));}
+
+
+#define OS_SPIN_LOCK(a)        {spin_lock((a));}
+#define OS_SPIN_UNLOCK(a)   {spin_unlock((a));}
+
+
+#define OS_WRITE_LOCK(a)        {write_lock((a));}
+#define OS_WRITE_UNLOCK(a)   {write_unlock((a));}
+
+#define OS_WRITE_LOCK_BH(a)        {write_lock_bh((a));}
+#define OS_WRITE_UNLOCK_BH(a)   {write_unlock_bh((a));}
+
+#define OS_WRITE_LOCK_IRQ(a, b)        {write_lock_irqsave((a), (b));}
+#define OS_WRITE_UNLOCK_IRQ(a, b)   {write_unlock_irqrestore((a), (b));}
+
+
+#define OS_MUTEX_LOCK(a)        {mutex_lock(a);}
+#define OS_MUTEX_UNLOCK(a)        {mutex_unlock(a);}
+
+#endif
+
+#if defined (FPGA) ||defined (CHIP)
+#define PRINT(...)      do {printk("wifiHAL->");printk( __VA_ARGS__ );}while(0)
+#define PRINT_ERR(...)      do {printk("wifiHAL->");printk( __VA_ARGS__ );}while(0)
+#define PUTC( character )   printk("%c" ,character )
+#define PUTX8(size, value)    printk("%02x", value);
+#define PUTU8(value)            printk("%u", value);
+#define PUTS( ... )    printk(__VA_ARGS__)
+#define PUTU( number)   printk("%d\n",number)
+#define DBG_ENTER()           //printk("--->%s ++ \n",__FUNCTION__);
+#define DBG_EXIT()              //printk("--->%s -- \n",__FUNCTION__);
+#endif
+
+
+#ifndef ASSERT
+#define ASSERT(exp) do{    \
+                if (!(exp)) {   \
+                        printk("=>=>=>=>=>assert %s,%d\n",__func__,__LINE__);   \
+                        /*BUG();        while(1);   */  \
+                }                       \
+        } while (0);
+#endif
+
+#ifdef __KERNEL__
+#include <asm/page.h>
+
+#define KASSERT(exp, msg) do {          \
+                if (unlikely(!(exp))) {         \
+                        printk msg;         \
+                        BUG();              \
+                }                   \
+        } while (0)
+
+#endif /* __KERNEL__ */
+
+void address_print( unsigned char* address );
+void IPv4_address_print( unsigned char* address );
+void dump_memory_internel(unsigned char *data,int len);
+void address_read( unsigned char* cursor, unsigned char* address );
+
+ unsigned short READ_16L( const unsigned char* address );
+ void WRITE_16L( unsigned char* address, unsigned short value );
+unsigned int READ_32L( const unsigned char* address );
+void WRITE_32L( unsigned char* address, unsigned int value );
+
+unsigned short READ_16B( const unsigned char* address );
+void WRITE_16B( unsigned char* address, unsigned short value );
+unsigned int READ_32B( const unsigned char* address );
+void WRITE_32B( unsigned char* address, unsigned int value );
+
+void ie_dbg(unsigned char *ie ) ;
+
+#endif /* _DRV_AH_INTERAL_H_ */
