@@ -143,6 +143,7 @@ enum P2P_FLAG
     P2P_CHECK_RX_CHANNEL_LIST_PASS = BIT(8),
     P2P_CHECK_TX_CHANNEL_LIST_PASS = BIT(9),
     P2P_CHANGE_CHANNEL_LIST = BIT(10),
+    P2P_REQUEST_SSID = BIT(11),
 };
 
 #define SOCIAL_CHAN_1       (2412)
@@ -322,7 +323,7 @@ struct channel_list
 };
 
 #define P2P_MAX_CHANNELS 50
-#define P2P_MAX_ACTION_LEN 384
+#define P2P_MAX_ACTION_LEN 438
 #define MAX_MAC_BUF_LEN 18
 #define MAC_WFD_SESSION_LEN 16
 struct wifi_mac_p2p

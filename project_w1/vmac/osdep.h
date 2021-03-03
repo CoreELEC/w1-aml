@@ -58,8 +58,7 @@
 /*
  * Normal Delay functions. Time specified in microseconds.
  */
-#define OS_DELAY(_us)           udelay(_us)
-
+#define OS_DELAY(_us) udelay(_us)
 #define OS_SLEEP(_us) do {                  \
                 set_current_state(TASK_INTERRUPTIBLE);  \
                 schedule_timeout((_us) * HZ / 1000000); \

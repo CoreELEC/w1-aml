@@ -19,9 +19,9 @@
 #include <linux/ieee80211.h>
 #include <net/cfg80211.h>
 #include <net/rtnetlink.h>
+#include "wifi_mac_p2p.h"
 
 
-#define INDICATE_DIFF_CHANNEL 0
 #define AMLOGIC_VENDOR_ID 0x8899
 #define AML_SCAN_IE_LEN_MAX      sizeof(struct wifi_scan_info)
 #define AML_MAX_NUM_PMKIDS 4
@@ -123,6 +123,7 @@ enum vm_vendor_command_attr{
     VM_NL80211_VENDER_DYNAMIC_BW_CFG=0x42,
 
     VM_NL80211_VENDER_BCN_INTERVAL=0x43,
+    VM_NL80211_VENDOR_GET_STA_RSSI_NOISE=0x44,
 
     VM_NL80211_T9023_CALB_TOP = 0x50,
     VM_NL80211_T9023_SET_TXM_CT= 0x51,
@@ -268,7 +269,7 @@ struct vm_wdev_priv
     struct cfg80211_connect_params *connect_request;
     spinlock_t connect_req_lock;
     unsigned long connect_req_lock_flags;
-    struct os_timer_ext       connect_timeout;
+    struct os_timer_ext connect_timeout;
 
     struct net_device *pmon_ndev;
     struct net_device *pGo_ndev;
@@ -277,7 +278,7 @@ struct vm_wdev_priv
     char ifname_go[IFNAMSIZ + 1];
     char ifname_mon[IFNAMSIZ + 1];
     unsigned char block;
-    int     send_action_id;
+    int send_action_id;
 #ifdef CONFIG_P2P
     struct wifi_mac_p2p p2p;
 #endif //CONFIG_P2P
@@ -291,7 +292,7 @@ struct vm_netdev_priv_indicator
 #define PM_OFF  0
 #define PM_MAX  1
 
-#define TU_DURATION                                     1024
+#define TU_DURATION 1024
 #define wdev_to_priv(w) ((struct vm_wdev_priv *)(wdev_priv(w)))
 #define wdev_to_p2p(w) (&(((struct vm_wdev_priv *)(wdev_priv(w)))->p2p))
 #define wdev_to_ndev(w) ((w)->netdev)
@@ -311,19 +312,18 @@ enum
     WIFINET_MACCMD_DETACH       = 4,
 };//yishu
 
-
 struct wifi_macreq_key
 {
-    unsigned char  ik_type;
-    unsigned char  ik_pad;
+    unsigned char ik_type;
+    unsigned char ik_pad;
     unsigned short ik_keyix;
-    unsigned char  ik_keylen;
-    unsigned char  ik_flags;
+    unsigned char ik_keylen;
+    unsigned char ik_flags;
 #define WIFINET_KEY_DEFAULT 0x80
-    unsigned char  ik_macaddr[WIFINET_ADDR_LEN];
-    u_int64_t   ik_keyrsc;
-    u_int64_t   ik_keytsc;
-    unsigned char  ik_keydata[WIFINET_KEYBUF_SIZE+WIFINET_MICBUF_SIZE];
+    unsigned char ik_macaddr[WIFINET_ADDR_LEN];
+    unsigned char ik_keyrsc[WIFINET_TID_SIZE];
+    u_int64_t ik_keytsc;
+    unsigned char ik_keydata[WIFINET_KEYBUF_SIZE + WIFINET_MICBUF_SIZE];
 };//yishu
 
 //yishu
@@ -353,11 +353,6 @@ int vm_p2p_set_wpsp2pie(struct net_device *net, char *buf, int len, int type);
 int vm_p2p_update_beacon_app_ie (struct wlan_net_vif *wnet_vif);
 int vm_p2p_set_p2p_noa(struct net_device *dev, char* buf, int len);
 int vm_p2p_set_p2p_ps(struct net_device *dev, char* buf, int len);
-extern int vm_send_addba_req(char *buf, int tid);
-int vm_sta_send_coexist_mgmt(const char* buf);
-int vm_wmm_ac_addts(char** buf);
-int vm_wmm_ac_delts(const char* buf);
-
 
 int translate_to_dbm(int rssi);
 struct device *vm_cfg80211_get_parent_dev(void);

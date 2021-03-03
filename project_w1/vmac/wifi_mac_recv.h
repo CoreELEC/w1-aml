@@ -2,6 +2,7 @@
 #define __VMAC_WIFI_INPUT_H__
 
 #include "wifi_mac_var.h"
+#include "wifi_mac_action.h"
 
 #define UNSUPPORTED_AUTH_ALGORITHM 13
 #define SUCCESS 0
@@ -63,6 +64,7 @@ int rsn_cipher(unsigned char *sel, unsigned char *keylen);
 int rsn_keymgmt(unsigned char *sel);
 void wifi_mac_savenie(unsigned char **, const unsigned char *, size_t, char *name);
 void wifi_mac_saveie(unsigned char **, const unsigned char *, char *name);
+int wifi_mac_parse_rsn(struct wifi_station *sta, unsigned char *frm);
 void wifi_mac_parse_htcap(struct wifi_station *sta, unsigned char *ie);
 void wifi_mac_parse_htinfo(struct wifi_station *sta, unsigned char *ie);
 void wifi_mac_parse_vht_cap(struct wifi_station *sta, unsigned char *ie);
@@ -87,5 +89,6 @@ void wifi_mac_recv_mgmt(struct wifi_station *, struct sk_buff *, int, int, unsig
 void wifi_mac_parse_group_id_mgmt(struct wlan_net_vif *wnet_vif, struct wifi_station *sta, unsigned char *frame);
 void wifi_mac_parse_operate_mode_notification_mgmt(struct wlan_net_vif *wnet_vif, struct wifi_station *sta, unsigned char *frame);
 void wifi_mac_check_mic(struct wifi_station *, struct sk_buff *);
+int wifi_mac_send_arp_req(struct wlan_net_vif *wnet_vif);
 
 #endif

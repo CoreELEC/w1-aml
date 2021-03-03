@@ -14,7 +14,7 @@ static int aml_ap_send_addba_req(struct net_device *dev,
     arg = aml_cmd_char_prase(sep, extra, &cmd_arg);
     printk("%s, %s, %s\n", __func__,*arg, *(arg+1));
 
-    vm_send_addba_req(*arg, simple_strtoul(arg[1],NULL,10));
+    wifi_mac_send_addba_req(*arg, simple_strtoul(arg[1],NULL,10));
     kfree(arg);
     return 0;
 }

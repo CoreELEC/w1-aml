@@ -47,5 +47,7 @@ extern int aml_set_dynamic_bw(struct wlan_net_vif *wnet_vif, char* buf, int len)
 extern int aml_set_short_gi(struct wlan_net_vif *wnet_vif, char* buf, int len);
 extern int aml_set_eat_count_max(struct wlan_net_vif *wnet_vif, char* buf, int len);
 extern int aml_set_aggr_thresh(struct wlan_net_vif *wnet_vif, char* buf, int len);
-int aml_set_hrtimer_interval(struct wlan_net_vif *wnet_vif, char* buf, int len);
+extern int aml_set_hrtimer_interval(struct wlan_net_vif *wnet_vif, char* buf, int len);
+extern int aml_get_ap_ip(struct wlan_net_vif *wnet_vif, char* buf, int len);
+
 #endif

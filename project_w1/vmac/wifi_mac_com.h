@@ -43,6 +43,8 @@
 #include "wifi_mac.h"
 #include "wifi_mac_encrypt.h"
 #include "wifi_mac_sta.h"
+#include "wifi_mac_pmf.h"
+#include "wifi_mac_action.h"
 #include "wifi_mac_power.h"
 #include "wifi_mac_scan.h"
 #include "wifi_mac_var.h"
@@ -61,12 +63,12 @@
 #include "wifi_rate_ctrl.h"
 #include "rc80211_minstrel_init.h"
 #include "wifi_hal_txdesc.h"
+#include "wifi_mac_arp.h"
 
 #include "wifi_hal.h"
 #include "wifi_mac_beacon.h"
 #include "wifi_mac_concurrent.h"
 #include "wifi_pkt_desc.h"
-
 
 extern unsigned long long g_dbg_info_enable;
 extern const char *wifi_mac_state_name[WIFINET_S_MAX];

@@ -939,6 +939,10 @@ struct sk_buff* TxBuffer_Alloc(void)
 {
     struct sk_buff *skb = OS_SKBBUF_ALLOC(TX_BUFFER_SIZE+HI_TXDESC_DATAOFFSET);
 
+    while (!skb) {
+        skb = OS_SKBBUF_ALLOC(TX_BUFFER_SIZE+HI_TXDESC_DATAOFFSET);
+    }
+
     ASSERT(skb);
     skb_reserve(skb, HI_TXDESC_DATAOFFSET);
 

@@ -17,6 +17,7 @@
 
 #include "wifi_drv_main.h"
 #include "wifi_pkt_desc.h"
+#include "wifi_mac_action.h"
 
 #define VM_WIFI_CONNECT_STATE(s )       (((s)== WIFINET_S_CONNECTING)||\
             ((s)== WIFINET_S_AUTH)||\

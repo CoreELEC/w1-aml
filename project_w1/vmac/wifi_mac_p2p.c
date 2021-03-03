@@ -1155,7 +1155,7 @@ unsigned int vm_wfd_add_ie(struct wlan_net_vif *wnet_vif,
 
     switch (p2p_pub_act->category)
     {
-        case WIFINET_ACTION_CAT_PUBLIC:
+        case AML_CATEGORY_PUBLIC:
         {
             if ( p2p_pub_act->action == WIFINET_ACT_PUBLIC_P2P)
             {
@@ -1213,7 +1213,8 @@ unsigned int vm_wfd_add_ie(struct wlan_net_vif *wnet_vif,
             }
         }
         break;
-        case WIFINET_ACTION_CAT_P2P:
+
+        case AML_CATEGORY_P2P:
         {
             switch (p2p_act->subtype)
             {
@@ -2221,7 +2222,7 @@ int vm_p2p_parse_negotiation_frames(struct wifi_mac_p2p *p2p,
     buflen += sprintf(printbuf+buflen, "%s ACT_P2P %s ", __func__, (tx)?"Tx":"Rx");
 
     switch (p2p_pub_act->category) {
-        case WIFINET_ACTION_CAT_PUBLIC:
+        case AML_CATEGORY_PUBLIC:
             if (p2p_pub_act->action == WIFINET_ACT_PUBLIC_P2P) {
                 p2p_action_type = p2p_pub_act->subtype;
                 is_p2p_frame = true;
@@ -2234,9 +2235,9 @@ int vm_p2p_parse_negotiation_frames(struct wifi_mac_p2p *p2p,
             }
             break;
 
-        case WIFINET_ACTION_CAT_P2P:
+        case AML_CATEGORY_P2P:
             is_p2p_frame = true;
-            DPRINTF(AML_DEBUG_P2P,"%s WIFINET_ACTION_CAT_P2P:%d\n", __func__, p2p_act->subtype);
+            DPRINTF(AML_DEBUG_P2P,"%s AML_CATEGORY_P2P:%d\n", __func__, p2p_act->subtype);
             break;
 
         default:
@@ -2263,7 +2264,7 @@ int vm_p2p_parse_negotiation_frames(struct wifi_mac_p2p *p2p,
             default:
                 break;
         }
-        vm_p2p_print_attr((char *)p2p_pub_act + 8);
+//        vm_p2p_print_attr((char *)p2p_pub_act + 8);
     }
 
     FREE(printbuf, "printbuf");
@@ -2308,13 +2309,8 @@ void vm_p2p_scanstart(struct wiphy *wiphy, struct net_device *ndev,
         }
         else
         {
-            if (p2p->p2p_negotiation_state < NET80211_P2P_STATE_GONEGO_CONF) {
-                printk("use social channel\n");
-                p2p->social_channel = 1;//ignore all channel scan
+            p2p->social_channel = 0;
 
-            } else {
-                p2p->social_channel = 0;
-            }
             DPRINTF(AML_DEBUG_SCAN|AML_DEBUG_P2P,
                     "%s(%d), not use social channel\n", __func__,__LINE__);
         }

@@ -20,6 +20,7 @@
 #include "wifi_mac_rx_status.h"
 #include "wifi_mac.h"
 #include "wifi_mac_var.h"
+#include "wifi_mac_action.h"
 #include <linux/list.h>
 
 enum drv_rx_type
@@ -551,6 +552,7 @@ struct drv_private
     unsigned int drv_not_init_flag  ;/* not be initial */
     unsigned char drv_scanning      ;/*wifi_mac layer at  scanning  */
     unsigned char drv_connetting      ;/*wifi_mac layer at  drv_connetting  */
+    unsigned char always_mpdu_timeout;
     unsigned char wait_mpdu_timeout;
     unsigned char add_wakeup_work;
     unsigned char drv_pkt_drop[2];

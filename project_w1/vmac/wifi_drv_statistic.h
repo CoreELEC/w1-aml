@@ -275,6 +275,8 @@ struct sts_iw_if
 
 void sts_sw_probe(unsigned int sts_idx, unsigned int unit) ;
 void phy_stc(void);
+void get_phy_stc_info(unsigned int *arr);
+
 unsigned int cca_busy_check(void);
 void sts_prt_info_map(void);
 void sts_default_cfg(struct sts_cfg_data* cfg_data, unsigned char sts_sys_type);

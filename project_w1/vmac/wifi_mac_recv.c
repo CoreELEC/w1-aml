@@ -14,7 +14,7 @@
 
 #include "wifi_mac_com.h"
 #include "wifi_hal_com.h"
-
+#include "wifi_mac_action.h"
 
 static struct sk_buff *wifi_mac_defrag(struct wifi_station *,
                                       struct sk_buff *, int);
@@ -367,9 +367,7 @@ int wifi_mac_input(void *station, struct sk_buff *skb, struct wifi_mac_rx_status
                         if  (wnet_vif->vm_state == WIFINET_S_CONNECTED)
                         {
                             // printk("<running> %s %d \n",__func__,__LINE__);
-                            wifi_mac_send_error(sta, wh->i_addr2,
-                                               WIFINET_FC0_SUBTYPE_DEAUTH,
-                                               WIFINET_REASON_NOT_AUTHED);
+                            wifi_mac_send_error(sta, wh->i_addr2, WIFINET_FC0_SUBTYPE_DEAUTH, WIFINET_REASON_NOT_AUTHED);
                         }
                         wnet_vif->vif_sts.sts_rx_not_assoc++;
                         goto err;
@@ -471,27 +469,24 @@ int wifi_mac_input(void *station, struct sk_buff *skb, struct wifi_mac_rx_status
 
             if (subtype == WIFINET_FC0_SUBTYPE_QOS)
             {
-
-                is_amsdu = (dir != WIFINET_FC1_DIR_DSTODS) ?
-                           (((struct wifi_qos_frame *)wh)->i_qos[0] &
-                            WIFINET_QOS_AMSDU) :
-                           (((struct WIFINET_S_FRAME_QOS_ADDR4 *)wh)->i_qos[0] &
-                            WIFINET_QOS_AMSDU);
+                is_amsdu = (dir != WIFINET_FC1_DIR_DSTODS)
+                    ? (((struct wifi_qos_frame *)wh)->i_qos[0] & WIFINET_QOS_AMSDU)
+                    : (((struct WIFINET_S_FRAME_QOS_ADDR4 *)wh)->i_qos[0] & WIFINET_QOS_AMSDU);
             }
 
             wh = NULL;
             if (key != NULL &&
                 !wifi_mac_security_demic(wnet_vif, key, skb, hdrspace, !M_FLAG_GET(skb,M_TKIPMICHW)))
             {
-                WIFINET_DPRINTF_MACADDR( AML_DEBUG_RECV,
-                                         sta->sta_macaddr, "data %s", "demic error");
+                WIFINET_DPRINTF_MACADDR(AML_DEBUG_RECV, sta->sta_macaddr, "data %s", "demic error");
                 WIFINET_NODE_STAT(sta, rx_demicfail);
-
                 goto out;
             }
+
             /*TEMPORARY solution. shijie.chen add for prevent (qos) null datas are delivered to upper protocol. */
             if ((subtype == WIFINET_FC0_SUBTYPE_NODATA) || (subtype == WIFINET_FC0_SUBTYPE_QOS_NULL))
                 goto out;
+
             skb = wifi_mac_decap(wnet_vif, skb, hdrspace);
             if (skb == NULL)
             {
@@ -515,27 +510,7 @@ int wifi_mac_input(void *station, struct sk_buff *skb, struct wifi_mac_rx_status
                     goto err;
                 }
             }
-            else
-            {
-#if 0
-                /*
-                * When denying unencrypted frames, discard
-                * any non-PAE frames received without encryption.
-                */
-                if ((wnet_vif->vm_flags & WIFINET_F_DROPUNENC) &&
-                    key == NULL &&
-                    eh->ether_type != __constant_htons(ETHERTYPE_PAE))
-                {
-                    /*
-                    * Drop unencrypted frames.
-                    */
-                    wnet_vif->vif_sts.sts_rx_uncrypted++;
-                    WIFINET_NODE_STAT(sta, rx_unencrypted);
 
-                    goto out;
-                }
-#endif //0
-            }
             wnet_vif->vm_devstats.rx_packets++;
             wnet_vif->vm_devstats.rx_bytes += os_skb_get_pktlen(skb);
             WIFINET_NODE_STAT(sta, rx_data);
@@ -562,45 +537,16 @@ int wifi_mac_input(void *station, struct sk_buff *skb, struct wifi_mac_rx_status
                 wnet_vif->vif_sts.sts_rx_wrong_dir++;
                 goto err;
             }
-            if (os_skb_get_pktlen(skb) < sizeof(struct wifi_frame))
-            {
-                WIFINET_DPRINTF( AML_DEBUG_ANY, "mgt too short: len %u",
-                                 os_skb_get_pktlen(skb));
+
+            if (os_skb_get_pktlen(skb) < sizeof(struct wifi_frame)) {
+                WIFINET_DPRINTF( AML_DEBUG_ANY, "mgt too short: len %u", os_skb_get_pktlen(skb));
                 wnet_vif->vif_sts.sts_rx_too_short++;
                 goto out;
             }
-            if (wh->i_fc[1] & WIFINET_FC1_WEP)
-            {
-                /* shijie.chen add
-                    FC1_WEP just meaning protect, but PMF is for de-auth,
-                    de-assoc, action frames... FIXME?? */
-                if (subtype != WIFINET_FC0_SUBTYPE_AUTH)
-                {
-                    WIFINET_DPRINTF( AML_DEBUG_RECV,
-                                     "%s", "WEP set but not permitted");
-                    wnet_vif->vif_sts.sts_mng_discard++;
-                    goto out;
-                }
-                if ((wnet_vif->vm_flags & WIFINET_F_PRIVACY) == 0)
-                {
-                    WIFINET_DPRINTF( AML_DEBUG_RECV,
-                                     "mgt %s", "WEP set but PRIVACY off");
-                    wnet_vif->vif_sts.sts_no_priv_ac++;
-                    goto out;
-                }
-                hdrspace = wifi_mac_hdrspace(wifimac, wh);
-                key = wifi_mac_security_decap(sta, skb, hdrspace);
-                if (key == NULL)
-                {
-                    WIFINET_DPRINTF( AML_DEBUG_RECV,
-                                     "WEP 0x%p", key);
-                    goto out;
-                }
-                wh = (struct wifi_frame *)os_skb_data(skb);
-                wh->i_fc[1] &= ~WIFINET_FC1_WEP;
-            }
 
-            wifi_mac_recv_mgmt(sta, skb, subtype, rs->rs_rssi, rs->rs_channel);
+            if (!wifi_mac_mgmt_validate(sta, skb, subtype)) {
+                wifi_mac_recv_mgmt(sta, skb, subtype, rs->rs_rssi, rs->rs_channel);
+            }
             goto out;
 
         case WIFINET_FC0_TYPE_CTL:
@@ -618,8 +564,7 @@ int wifi_mac_input(void *station, struct sk_buff *skb, struct wifi_mac_rx_status
             goto out;
 
         default:
-            WIFINET_DPRINTF( AML_DEBUG_ANY,
-                             "bad frame type 0x%x", type);
+            WIFINET_DPRINTF( AML_DEBUG_ANY, "bad frame type 0x%x", type);
             break;
     }
 err:
@@ -876,6 +821,8 @@ void wifi_mac_recv_pkt_parse(struct wifi_station *sta, struct sk_buff *skb) {
     struct iphdr *iphdrp = (struct iphdr *)((unsigned char *)eh + sizeof(struct ether_header));
     struct tcphdr *th = (struct tcphdr *)((unsigned char *)iphdrp + (iphdrp->ihl << 2));
     struct udphdr *uh = (struct udphdr *)((unsigned char *)iphdrp + (iphdrp->ihl << 2));
+    struct arphdr *arp = (struct arphdr *)((unsigned char *)os_skb_data(skb) + 14);
+    unsigned char *arp_sip = NULL;
 
     unsigned char *dhcp_p;
     unsigned short offset;
@@ -884,10 +831,10 @@ void wifi_mac_recv_pkt_parse(struct wifi_station *sta, struct sk_buff *skb) {
     if (eh->ether_type == __constant_htons(ETHERTYPE_IP)) {
         if (iphdrp->protocol == IPPROTO_TCP) {
             __D(BIT(17), "%s tcp src:%04x, dst:%04x, seq:%08x, tcp ack:%08x\n", __func__, th->source, th->dest, th->seq, th->ack_seq);
+            #ifdef DRV_TCP_RETRANSMISSION
+                wifi_mac_tcp_pkt_retransmit(sta, th);
+            #endif
 
-#ifdef DRV_TCP_RETRANSMISSION
-    wifi_mac_tcp_pkt_retransmit(sta, th);
-#endif
         } else if (iphdrp->protocol == IPPROTO_UDP) {
             if (((uh->source == 0x4400) && (uh->dest == 0x4300))
                 || ((uh->source == 0x4300) && (uh->dest == 0x4400))) {
@@ -911,6 +858,20 @@ void wifi_mac_recv_pkt_parse(struct wifi_station *sta, struct sk_buff *skb) {
 
                     offset += dhcp_p[offset + 1] + 2;
                 }
+            }
+        }
+    } else if (eh->ether_type == __constant_htons(ETHERTYPE_ARP)) {
+        arp_sip = (unsigned char *)arp + 14;
+
+        if ((arp->ar_op == __constant_htons(ARP_RESPONSE)) && !memcmp(eh->ether_shost, sta->sta_bssid, WIFINET_ADDR_LEN)) {
+            unsigned int addr = *((unsigned int *)arp_sip);
+
+            if (addr != 0) {
+                printk("arp ip is:%d:%d:%d:%d, mac:%02x:%02x:%02x:%02x:%02x:%02x\n", arp_sip[0], arp_sip[1], arp_sip[2], arp_sip[3],
+                    eh->ether_shost[0], eh->ether_shost[1], eh->ether_shost[2], eh->ether_shost[3], eh->ether_shost[4], eh->ether_shost[5]);
+
+                sta->sta_arp_flag |= WIFI_ARP_GET_AP_IP;
+                memcpy(sta->sta_ap_ip, arp_sip, 4);
             }
         }
     }
@@ -1416,7 +1377,6 @@ bad:
     }
 }
 
-
 static int __inline
 iswpaoui(const unsigned char *frm)
 {
@@ -1604,10 +1564,6 @@ wifi_mac_parse_wpa(struct wlan_net_vif *wnet_vif, unsigned char *frm,
                         "WPA %s", "no acceptable key mgmt alg");
         return WIFINET_REASON_IE_INVALID;
     }
-    if (w & WPA_ASE_8021X_UNSPEC)
-        rsn->rsn_keymgmt = WPA_ASE_8021X_UNSPEC;
-    else
-        rsn->rsn_keymgmt = WPA_ASE_8021X_PSK;
 
     if (len > 2)
         rsn->rsn_caps = READ_16L(frm);
@@ -1644,7 +1600,6 @@ int rsn_cipher(unsigned char *sel, unsigned char *keylen)
 
 int rsn_keymgmt(unsigned char *sel)
 {
-
     unsigned int w = READ_32L(sel);
 
     switch (w)
@@ -1653,6 +1608,8 @@ int rsn_keymgmt(unsigned char *sel)
             return RSN_ASE_8021X_UNSPEC;
         case RSN_SEL(RSN_ASE_8021X_PSK):
             return RSN_ASE_8021X_PSK;
+        case RSN_SEL(RSN_ASE_8021X_SAE):
+            return RSN_ASE_8021X_SAE;
         case RSN_SEL(RSN_ASE_NONE):
             return RSN_ASE_NONE;
     }
@@ -1660,105 +1617,112 @@ int rsn_keymgmt(unsigned char *sel)
 
 }
 
-
-static int
-wifi_mac_parse_rsn(struct wlan_net_vif *wnet_vif, unsigned char *frm,
-                  struct wifi_mac_Rsnparms *rsn, const struct wifi_frame *wh)
+int wifi_mac_parse_rsn(struct wifi_station *sta, unsigned char *frm)
 {
+    struct wlan_net_vif *wnet_vif = sta->sta_wnet_vif;
+    struct wifi_mac_Rsnparms *rsn = &sta->sta_rsn;
     unsigned char len = frm[1];
     unsigned int w;
-    int n;
-    if (!(wnet_vif->vm_flags & WIFINET_F_WPA2))
-    {
-        WIFINET_DPRINTF(AML_DEBUG_ELEMID | AML_DEBUG_KEY,
-                        "RSN wnet_vif not RSN, flags 0x%x", wnet_vif->vm_flags);
+    unsigned char n;
+    unsigned char pmkid_offset = frm[1];
+
+    if (!(wnet_vif->vm_flags & WIFINET_F_WPA2)) {
+        WIFINET_DPRINTF(AML_DEBUG_WARNING, "RSN wnet_vif not RSN, flags 0x%x", wnet_vif->vm_flags);
         return WIFINET_REASON_IE_INVALID;
     }
 
-    if (len < 10)
-    {
-        WIFINET_DPRINTF(AML_DEBUG_ELEMID | AML_DEBUG_KEY,
-                        "RSN too short, len %u", len);
+    if (len < 10) {
+        WIFINET_DPRINTF(AML_DEBUG_WARNING, "RSN too short, len %u", len);
         return WIFINET_REASON_IE_INVALID;
     }
+
     frm += 2;
     w = READ_16L(frm);
-    if (w != RSN_VERSION)
-    {
-        WIFINET_DPRINTF(AML_DEBUG_ELEMID | AML_DEBUG_KEY,
-                        "RSN bad version %u", w);
+    if (w != RSN_VERSION) {
+        WIFINET_DPRINTF(AML_DEBUG_WARNING, "RSN bad version %u", w);
         return WIFINET_REASON_IE_INVALID;
     }
     frm += 2, len -= 2;
 
     w = rsn_cipher(frm, &rsn->rsn_mcastkeylen);
-    if (w != rsn->rsn_mcastcipher)
-    {
-        WIFINET_DPRINTF(AML_DEBUG_ELEMID | AML_DEBUG_KEY,
-                        "RSN mcast cipher mismatch; got %u, expected %u",
-                        w, rsn->rsn_mcastcipher);
+    if (w != rsn->rsn_mcastcipher) {
+        WIFINET_DPRINTF(AML_DEBUG_WARNING, "RSN mcast cipher mismatch; got %u, expected %u", w, rsn->rsn_mcastcipher);
         return WIFINET_REASON_IE_INVALID;
     }
     frm += 4, len -= 4;
 
     n = READ_16L(frm);
     frm += 2, len -= 2;
-    if (len < n*4+2)
-    {
-        WIFINET_DPRINTF(AML_DEBUG_ELEMID | AML_DEBUG_KEY,
-                        "RSN ucast cipher data too short; len %u, n %u",
-                        len, n);
+    if (len < n * 4 + 2) {
+        WIFINET_DPRINTF(AML_DEBUG_WARNING, "RSN ucast cipher data too short; len %u, n %u", len, n);
         return WIFINET_REASON_IE_INVALID;
     }
+
     w = 0;
-    for (; n > 0; n--)
-    {
-        w |= 1<<rsn_cipher(frm, &rsn->rsn_ucastkeylen);
+    for (; n > 0; n--) {
+        w |= 1 << rsn_cipher(frm, &rsn->rsn_ucastkeylen);
         frm += 4, len -= 4;
     }
+
     w &= rsn->rsn_ucastcipherset;
-    if (w == 0)
-    {
-        WIFINET_DPRINTF(AML_DEBUG_ELEMID | AML_DEBUG_KEY,
-                        "RSN %s", "ucast cipher set empty");
+    if (w == 0) {
+        WIFINET_DPRINTF(AML_DEBUG_WARNING, "RSN %s", "ucast cipher set empty");
         return WIFINET_REASON_IE_INVALID;
     }
-    if (w & (1<<WIFINET_CIPHER_TKIP))
+
+    if (w & (1 << WIFINET_CIPHER_TKIP))
         rsn->rsn_ucastcipher = WIFINET_CIPHER_TKIP;
     else
         rsn->rsn_ucastcipher = WIFINET_CIPHER_AES_CCM;
 
     n = READ_16L(frm);
     frm += 2, len -= 2;
-    if (len < n*4)
-    {
-        WIFINET_DPRINTF(AML_DEBUG_ELEMID | AML_DEBUG_KEY,
-                        "RSN key mgmt alg data too short; len %u, n %u",
-                        len, n);
+    if (len < n*4) {
+        WIFINET_DPRINTF(AML_DEBUG_WARNING, "RSN key mgmt alg data too short; len %u, n %u", len, n);
         return WIFINET_REASON_IE_INVALID;
     }
+
     w = 0;
-    for (; n > 0; n--)
-    {
+    for (; n > 0; n--) {
         w |= rsn_keymgmt(frm);
         frm += 4, len -= 4;
     }
+
     w &= rsn->rsn_keymgmtset;
-    if (w == 0)
-    {
-        WIFINET_DPRINTF(AML_DEBUG_ELEMID | AML_DEBUG_KEY,
-                        "RSN %s", "no acceptable key mgmt alg");
+    if (w == 0) {
+        WIFINET_DPRINTF(AML_DEBUG_WARNING, "RSN %s", "no acceptable key mgmt alg");
         return WIFINET_REASON_IE_INVALID;
     }
-    if (w & RSN_ASE_8021X_UNSPEC)
-        rsn->rsn_keymgmt = RSN_ASE_8021X_UNSPEC;
-    else
-        rsn->rsn_keymgmt = RSN_ASE_8021X_PSK;
 
-    if (len > 2)
+    if (len >= 2) {
         rsn->rsn_caps = READ_16L(frm);
+        frm += 2;
+        len -= 2;
+    }
 
+    if (len >= 17) {
+        rsn->rsn_pmkid_count = READ_16L(frm);
+        frm += 2;
+        len -= 2;
+        rsn->rsn_pmkid_offset = pmkid_offset - len + 2;
+        memcpy(rsn->rsn_pmkid, frm, 16);
+        frm += 16;
+        len -= 16;
 
+    } else {
+        WIFINET_DPRINTF(AML_DEBUG_WARNING, "RSN %s", "no pmkid count");
+        rsn->rsn_pmkid_count = 0;
+        rsn->rsn_pmkid_offset = 0;
+        return 0;
+    }
+
+    if (len >= 2) {
+        rsn->rsn_gmcipher = READ_16L(frm);
+        frm += 2;
+        len -= 2;
+    }
+
+    WIFINET_DPRINTF(AML_DEBUG_WARNING, "RSN pmkid_count:%d, pmkid_offset:%d", rsn->rsn_pmkid_count, rsn->rsn_pmkid_offset);
     return 0;
 }
 
@@ -3228,6 +3192,9 @@ void wifi_mac_recv_probe_req(struct wlan_net_vif *wnet_vif,
             if ((ssid != NULL) &&  ((ssid[1] != P2P_WILDCARD_SSID_LEN)
                 || memcmp(&ssid[2],P2P_WILDCARD_SSID,P2P_WILDCARD_SSID_LEN)))
             {
+               if (memcmp(&ssid[2], wnet_vif->vm_mainsta->sta_essid, wnet_vif->vm_mainsta->sta_esslen) == 0)
+                   wnet_vif->vm_p2p->p2p_flag |= P2P_REQUEST_SSID;
+
                 WIFINET_VERIFY_SSID(wnet_vif->vm_mainsta, ssid);
             }
         }
@@ -3237,7 +3204,6 @@ void wifi_mac_recv_probe_req(struct wlan_net_vif *wnet_vif,
             //CONFIG_P2P
             WIFINET_VERIFY_SSID(wnet_vif->vm_mainsta, ssid);
         }
-
         WIFINET_VERIFY_ELEMENT(rates, WIFINET_RATE_MAXSIZE);
         WIFINET_VERIFY_ELEMENT(ssid, WIFINET_NWID_LEN);
         if ((wnet_vif->vm_flags & WIFINET_F_HIDESSID) && ssid && ssid[1] == 0)
@@ -3322,7 +3288,7 @@ void wifi_mac_recv_probe_req(struct wlan_net_vif *wnet_vif,
 }
 
 static void wifi_mac_recv_auth(struct wlan_net_vif *wnet_vif,
-    struct wifi_station *sta, struct sk_buff *skb,int rssi)
+    struct wifi_station *sta, struct sk_buff *skb, unsigned int channel, int rssi)
 {
     struct wifi_frame *wh;
     unsigned char *frm, *efrm;
@@ -3345,29 +3311,24 @@ static void wifi_mac_recv_auth(struct wlan_net_vif *wnet_vif,
     if ((sta->sta_associd) && (wnet_vif->vm_opmode == WIFINET_M_HOSTAP))
         wifi_mac_sta_disconnect(sta);
 
-    if (wnet_vif->vm_aclop != NULL &&
-        !wnet_vif->vm_aclop->iac_check(wnet_vif, wh->i_addr2))
-    {
+    if ((wnet_vif->vm_aclop != NULL) && !wnet_vif->vm_aclop->iac_check(wnet_vif, wh->i_addr2)) {
         WIFINET_DPRINTF( AML_DEBUG_ACL, "auth %s", "disallowed by ACL");
         wnet_vif->vif_sts.sts_rx_acl_mismatch++;
         return;
     }
 
-    if (wnet_vif->vm_flags & WIFINET_F_COUNTERM)
-    {
+    if (wnet_vif->vm_flags & WIFINET_F_COUNTERM) {
         WIFINET_DPRINTF(AML_DEBUG_CONNECT | AML_DEBUG_KEY, "auth %s", "TKIP countermeasures enabled");
-        if (wnet_vif->vm_opmode == WIFINET_M_HOSTAP)
-        {
+        if (wnet_vif->vm_opmode == WIFINET_M_HOSTAP) {
             wifi_mac_send_error(sta, wh->i_addr2, WIFINET_FC0_SUBTYPE_AUTH, WIFINET_REASON_MIC_FAILURE);
         }
 
         return;
     }
 
-    if ((status != SUCCESS) && (wnet_vif->vm_opmode == WIFINET_M_STA) &&
-        (wnet_vif->vm_mainsta->sta_authmode == WIFINET_AUTH_AUTO) &&
-        (wnet_vif->vm_cur_authmode == WIFINET_AUTH_SHARED))
-    {
+    if ((status != SUCCESS) && (wnet_vif->vm_opmode == WIFINET_M_STA)
+        && (wnet_vif->vm_mainsta->sta_authmode == WIFINET_AUTH_AUTO)
+        && (wnet_vif->vm_cur_authmode == WIFINET_AUTH_SHARED)) {
         wnet_vif->vm_cur_authmode = WIFINET_AUTH_OPEN;
         arg = WIFINET_AUTH_SHARED_REQUEST;
         printk("%s(%d) tx_auth 10\n", __func__, __LINE__);
@@ -3376,26 +3337,27 @@ static void wifi_mac_recv_auth(struct wlan_net_vif *wnet_vif,
     }
 
     //upper layer config wrong auth algorithm, so if get this error, try to switch auth algorithm
-    if (status == UNSUPPORTED_AUTH_ALGORITHM)
-    {
+    if (status == UNSUPPORTED_AUTH_ALGORITHM) {
        wnet_vif->vm_mainsta->sta_authmode = WIFINET_AUTH_AUTO;
        return;
     }
 
-    if (algo == WIFINET_AUTH_ALG_SHARED)
-    {
+    if (algo == WIFINET_AUTH_ALG_SHARED) {
         wifi_mac_auth_shared(sta, wh, frm + 6, efrm, rssi, rstamp, seq, status);
-    }
-    else if (algo == WIFINET_AUTH_ALG_OPEN)
-    {
+
+    } else if (algo == WIFINET_AUTH_ALG_OPEN) {
         wifi_mac_auth_open(sta, wh, rssi, rstamp, seq, status);
-    }
-    else
-    {
+
+    } else if (algo == WIFINET_AUTH_ALG_SAE) {
+        printk("%s WIFINET_AUTH_ALG_SAE\n", __func__);
+
+        seq = AML_GET_LE16((unsigned char *)wh + sizeof(struct wifi_frame) + 2);
+        vm_cfg80211_notify_mgmt_rx(wnet_vif, channel, os_skb_data(skb),os_skb_get_pktlen(skb));
+
+    } else {
         WIFINET_DPRINTF( AML_DEBUG_ANY, "auth Challenge Failure. alg %d",algo);
         wnet_vif->vif_sts.sts_auth_unsprt++;
-        if (wnet_vif->vm_opmode == WIFINET_M_HOSTAP)
-        {
+        if (wnet_vif->vm_opmode == WIFINET_M_HOSTAP) {
             wifi_mac_send_error(sta, wh->i_addr2, WIFINET_FC0_SUBTYPE_AUTH,
                 (seq+1) | (WIFINET_STATUS_CHALLENGE<<16));
         }
@@ -3574,12 +3536,8 @@ void wifi_mac_recv_assoc_req(struct wlan_net_vif *wnet_vif,
         if (sta == wnet_vif->vm_mainsta)
         {
             WIFINET_DPRINTF_MACADDR( AML_DEBUG_ANY, wh->i_addr2,
-                                     "deny %s request, sta not authenticated",
-                                     reassoc ? "reassoc" : "assoc");
-            printk("<running> %s %d \n",__func__,__LINE__);
-            wifi_mac_send_error(sta, wh->i_addr2,
-                               WIFINET_FC0_SUBTYPE_DEAUTH,
-                               WIFINET_REASON_ASSOC_NOT_AUTHED);
+                "deny %s request, sta not authenticated", reassoc ? "reassoc" : "assoc");
+            wifi_mac_send_error(sta, wh->i_addr2, WIFINET_FC0_SUBTYPE_DEAUTH, WIFINET_REASON_ASSOC_NOT_AUTHED);
             wnet_vif->vif_sts.sts_rx_assoc_unauth++;
             return;
         }
@@ -3589,8 +3547,7 @@ void wifi_mac_recv_assoc_req(struct wlan_net_vif *wnet_vif,
             (vm_p2p_rx_assocreq(wnet_vif->vm_p2p,p2p[0],sta)!=P2P_SC_SUCCESS))
         {
             WIFINET_DPRINTF_MACADDR( AML_DEBUG_ANY, wh->i_addr2,
-                                     "deny %s request, sta is not p2p station ",
-                                     reassoc ? "reassoc" : "assoc");
+                "deny %s request, sta is not p2p station ", reassoc ? "reassoc" : "assoc");
             return;
         }
 #endif //CONFIG_P2P
@@ -3606,11 +3563,11 @@ void wifi_mac_recv_assoc_req(struct wlan_net_vif *wnet_vif,
             else
             {
                 printk("<running> %s %d \n",__func__,__LINE__);
-                reason = wifi_mac_parse_rsn(wnet_vif, wpa, &rsn, wh);
+                reason = wifi_mac_parse_rsn(sta, wpa);
             }
             if (reason != 0)
             {
-                WIFINET_DPRINTF_STA( AML_DEBUG_CONNECT | AML_DEBUG_KEY, sta,
+                WIFINET_DPRINTF_STA(AML_DEBUG_CONNECT | AML_DEBUG_KEY, sta,
                     "%s: Bad WPA IE in Assoc/Reassoc Req: sending deauth, reason %d", __func__, reason);
                 arg = reason;
                 printk("<running> %s %d reason=%d\n",__func__,__LINE__, reason);
@@ -3622,7 +3579,7 @@ void wifi_mac_recv_assoc_req(struct wlan_net_vif *wnet_vif,
 
             WIFINET_DPRINTF_MACADDR(AML_DEBUG_CONNECT | AML_DEBUG_KEY, wh->i_addr2,
                 "%s ie: mc %u/%u uc %u/%u key %u caps 0x%x", wpa[0] != WIFINET_ELEMID_RSN ?  "WPA" : "RSN",
-                rsn.rsn_mcastcipher, rsn.rsn_mcastkeylen, rsn.rsn_ucastcipher, rsn.rsn_ucastkeylen, rsn.rsn_keymgmt, rsn.rsn_caps);
+                rsn.rsn_mcastcipher, rsn.rsn_mcastkeylen, rsn.rsn_ucastcipher, rsn.rsn_ucastkeylen, rsn.rsn_keymgmtset, rsn.rsn_caps);
 
             if (rsn.rsn_ucastcipher == WIFINET_CIPHER_TKIP)
             {
@@ -3880,9 +3837,8 @@ void wifi_mac_recv_assoc_rsp(struct wlan_net_vif *wnet_vif,
         status = le16toh(*(unsigned short *)frm);
         frm += 2;
 
-        if (status != 0)
-        {
-            DPRINTF(AML_DEBUG_WARNING, "%s assoc failed (reason %d)\n", __func__, status);
+        if (status != 0) {
+            DPRINTF(AML_DEBUG_WARNING, "%s assoc failed (status code:%d)\n", __func__, status);
             wnet_vif->vif_sts.sts_rx_auth_fail++;
             wifi_mac_top_sm(wnet_vif, WIFINET_S_SCAN,0);
             return;
@@ -4154,87 +4110,81 @@ void wifi_mac_recv_disassoc(struct wlan_net_vif *wnet_vif,
     }
 }
 
-void wifi_mac_recv_action(struct wlan_net_vif *wnet_vif,
-    struct wifi_station *sta,
+void wifi_mac_recv_action(struct wlan_net_vif *wnet_vif, struct wifi_station *sta,
     struct sk_buff *skb,unsigned int channel)
 {
     struct wifi_mac *wifimac = wnet_vif->vm_wmac;
     struct wifi_frame *wh;
     unsigned char *frm, *efrm;
-    unsigned short subtype =0;
-    struct wifi_mac_action *ia=NULL;
-    struct wifi_mac_action_ht_txchwidth *iachwidth=NULL;
-    struct wifi_mac_action_bss_coex_frame *iabsscoex=NULL;
-    struct wifi_mac_action_ht_smpowersave *iasmpowersave=NULL;
-    enum wifi_mac_bwc_width  chwidth;
-    struct wifi_mac_action_ba_addbarequest *addbarequest=NULL;
-    struct wifi_mac_action_ba_addbaresponse *addbaresponse=NULL;
-    struct wifi_mac_action_ba_delba *delba=NULL;
+    unsigned short subtype = 0;
+    struct wifi_mac_action *ia = NULL;
+    struct wifi_mac_action_ht_txchwidth *iachwidth = NULL;
+    struct wifi_mac_action_bss_coex_frame *iabsscoex = NULL;
+    struct wifi_mac_action_ht_smpowersave *iasmpowersave = NULL;
+    enum wifi_mac_bwc_width chwidth;
+    struct wifi_mac_action_ba_addbarequest *addbarequest = NULL;
+    struct wifi_mac_action_ba_addbaresponse *addbaresponse = NULL;
+    struct wifi_mac_action_ba_delba *delba = NULL;
     struct wifi_mac_ba_parameterset baparamset;
-    struct wifi_mac_ba_seqctrl      basequencectrl;
+    struct wifi_mac_ba_seqctrl basequencectrl;
     struct wifi_mac_delba_parameterset delbaparamset;
     struct wifi_mac_action_mgt_args actionargs;
+    struct wifi_mac_action_sa_query *sa_query = NULL;
 
     unsigned short statuscode;
     unsigned short batimeout;
     unsigned short reasoncode;
+    unsigned short transaction_identifier;
 
-    wh = (struct wifi_frame *) os_skb_data(skb);
-    frm = (unsigned char *)os_skb_data(skb)+sizeof(struct wifi_frame);
+    wh = (struct wifi_frame *)os_skb_data(skb);
+    frm = (unsigned char *)os_skb_data(skb) + sizeof(struct wifi_frame);
     efrm = os_skb_data(skb) + os_skb_get_pktlen(skb);
     subtype = wh->i_fc[0] & WIFINET_FC0_SUBTYPE_MASK;
     {
-
         if (wnet_vif->vm_state != WIFINET_S_CONNECTED &&
             wnet_vif->vm_state != WIFINET_S_ASSOC &&
             wnet_vif->vm_state != WIFINET_S_AUTH)
         {
 #ifdef CONFIG_P2P
-            if ((wnet_vif->vm_p2p_support == false) ||
-                (!wnet_vif->vm_p2p->p2p_enable))
+            if ((wnet_vif->vm_p2p_support == false) || (!wnet_vif->vm_p2p->p2p_enable))
 #endif
             {
                 wnet_vif->vif_sts.sts_mng_discard++;
                 return;
             }
-
         }
 
         WIFINET_VERIFY_LENGTH(efrm - frm, sizeof(struct wifi_mac_action));
-
-        ia = (struct wifi_mac_action *) frm;
+        ia = (struct wifi_mac_action *)frm;
 
         wnet_vif->vif_sts.sts_rx_action++;
         WIFINET_NODE_STAT(sta, rx_action);
-        WIFINET_DPRINTF_STA( AML_DEBUG_ACTION, sta,
-                            "%s: action mgt frame (cat %d, act %d)",
-                             __func__, ia->ia_category, ia->ia_action);
+        WIFINET_DPRINTF_STA(AML_DEBUG_WARNING, sta, "%s: action mgt frame (cat %d, act %d)",
+            __func__, ia->ia_category, ia->ia_action);
 
         switch (ia->ia_category)
         {
-            case WIFINET_ACTION_CAT_QOS:
+            case AML_CATEGORY_QOS:
                 printk("<running> %s %d \n",__func__,__LINE__);
-                WIFINET_DPRINTF_STA( AML_DEBUG_ACTION, sta,
-                                     "%s: QoS action mgt frames not supported, vm_state %d \n",
-                                     __func__, wnet_vif->vm_state);
+                WIFINET_DPRINTF_STA(AML_DEBUG_ACTION, sta, "%s: QoS action mgt frames not supported, vm_state %d \n",
+                    __func__, wnet_vif->vm_state);
                 wnet_vif->vif_sts.sts_mng_discard++;
                 break;
-            case WIFINET_ACTION_CAT_BA:
 
+            case AML_CATEGORY_BACK:
                 switch (ia->ia_action)
                 {
                     case WIFINET_ACTION_BA_ADDBA_REQUEST:
                         WIFINET_VERIFY_LENGTH(efrm - frm, sizeof(struct wifi_mac_action_ba_addbarequest));
 
-                        addbarequest = (struct wifi_mac_action_ba_addbarequest *) frm;
-
+                        addbarequest = (struct wifi_mac_action_ba_addbarequest *)frm;
                         *(unsigned short *)&baparamset = le16toh(*(unsigned short *)&addbarequest->rq_baparamset);
 
                         if (sta->connect_status < CONNECT_STATUS_REGISTERED)
                         {
                             struct wifi_mac_action_mgt_args actionargs;
 
-                            actionargs.category = WIFINET_ACTION_CAT_BA;
+                            actionargs.category = AML_CATEGORY_BACK;
                             actionargs.action = WIFINET_ACTION_BA_DELBA;
                             actionargs.arg1 = baparamset.tid;
                             actionargs.arg2 = 0; /* recipient */
@@ -4254,7 +4204,6 @@ void wifi_mac_recv_action(struct wlan_net_vif *wnet_vif,
                         if (!WIFINET_NODE_USEAMPDU(sta))
                         {
                             wifi_mac_addba_set_rsp(sta, baparamset.tid, WIFINET_STATUS_REFUSED);
-
                         }
                         else
                         {
@@ -4262,49 +4211,48 @@ void wifi_mac_recv_action(struct wlan_net_vif *wnet_vif,
                         }
                         wifi_mac_addba_req(sta, addbarequest->rq_dialogtoken, &baparamset, batimeout, basequencectrl);
 
-                        actionargs.category = WIFINET_ACTION_CAT_BA;
-                        actionargs.action   = WIFINET_ACTION_BA_ADDBA_RESPONSE;
-                        actionargs.arg1     = baparamset.tid;
-                        actionargs.arg2     = baparamset.amsdusupported;
-                        actionargs.arg3     = 0;
+                        actionargs.category = AML_CATEGORY_BACK;
+                        actionargs.action = WIFINET_ACTION_BA_ADDBA_RESPONSE;
+                        actionargs.arg1 = baparamset.tid;
+                        actionargs.arg2 = baparamset.amsdusupported;
+                        actionargs.arg3 = 0;
                         wifi_mac_send_mgmt(sta, WIFINET_FC0_SUBTYPE_ACTION, (void *) &actionargs);
                         break;
 
                     case WIFINET_ACTION_BA_ADDBA_RESPONSE:
                         WIFINET_VERIFY_LENGTH(efrm - frm, sizeof(struct wifi_mac_action_ba_addbaresponse));
-
                         addbaresponse = (struct wifi_mac_action_ba_addbaresponse *) frm;
 
                         DPRINTF(AML_DEBUG_ADDBA, "%s:%d vm_state %d \n",__func__,__LINE__, wnet_vif->vm_state);
-                        //dump_memory_internel( os_skb_data(skb),os_skb_get_pktlen(skb));
 
-                        statuscode          = le16toh(addbaresponse->rs_statuscode);
-                        *(unsigned short *)&baparamset     = le16toh(*(unsigned short *)&addbaresponse->rs_baparamset);
-                        batimeout           = le16toh(addbaresponse->rs_batimeout);
+                        statuscode = le16toh(addbaresponse->rs_statuscode);
+                        *(unsigned short *)&baparamset = le16toh(*(unsigned short *)&addbaresponse->rs_baparamset);
+                        batimeout = le16toh(addbaresponse->rs_batimeout);
                         wifi_mac_addba_rsp(sta, statuscode, &baparamset, batimeout);
-			
-			    DPRINTF(AML_DEBUG_ADDBA,
-                                "%s: ADDBA response . TID %d, buffer size %d,tid %d statuscode %d vm_state %d\n",
+
+                        DPRINTF(AML_DEBUG_ADDBA, "%s: ADDBA response . TID %d, buffer size %d,tid %d statuscode %d vm_state %d\n",
                                 __func__, baparamset.tid, baparamset.buffersize,addbaresponse->rs_baparamset.tid,statuscode, wnet_vif->vm_state);
                         break;
 
                     case WIFINET_ACTION_BA_DELBA:
                         WIFINET_VERIFY_LENGTH(efrm - frm, sizeof(struct wifi_mac_action_ba_delba));
 
-                        delba = (struct wifi_mac_action_ba_delba *) frm;
+                        delba = (struct wifi_mac_action_ba_delba *)frm;
                         *(unsigned short *)&delbaparamset= le16toh(*(unsigned short *)&delba->dl_delbaparamset);
                         reasoncode = le16toh(delba->dl_reasoncode);
                         wifi_mac_delba(sta, &delbaparamset, reasoncode);
                         DPRINTF(AML_DEBUG_ADDBA, "%s: DELBA  . TID %d, initiator %d, reason code %d vm_state %d\n",
                             __func__, delbaparamset.tid, delbaparamset.initiator, reasoncode, wnet_vif->vm_state);
                         break;
+
                     default:
                         DPRINTF(AML_DEBUG_ADDBA, "%s: invalid BA action mgt frame", __func__);
                         wnet_vif->vif_sts.sts_mng_discard++;
                         break;
                 }
                 break;
-            case WIFINET_ACTION_CAT_PUBLIC:
+
+            case AML_CATEGORY_PUBLIC:
                 switch (ia->ia_action)
                 {
                     case WIFINET_ACT_PUBLIC_BSSCOEXIST:
@@ -4321,55 +4269,43 @@ void wifi_mac_recv_action(struct wlan_net_vif *wnet_vif,
                                              iabsscoex->coex.obss_exempt_req,
                                              iabsscoex->coex.obss_exempt_grant);
 
-                        if (iabsscoex->coex.ht40_intolerant ||
-                            iabsscoex->coex.ht20_width_req ||
-                            (wifi_mac_recv_bss_intol_channelCheck(wifimac, &iabsscoex->chan_report)==true))
+                        if (iabsscoex->coex.ht40_intolerant || iabsscoex->coex.ht20_width_req
+                            || (wifi_mac_recv_bss_intol_channelCheck(wifimac, &iabsscoex->chan_report)==true))
                             wifi_mac_change_cbw(wifimac, 1);
                         break;
-#ifdef CONFIG_P2P
-                    case  WIFINET_ACT_PUBLIC_P2P:
-                        vm_cfg80211_notify_mgmt_rx(wnet_vif, channel, os_skb_data(skb),os_skb_get_pktlen(skb));
-                        break;
-#endif//CONFIG_P2P
 
                     default:
-                        WIFINET_DPRINTF_STA( AML_DEBUG_ACTION, sta,
-                                             "%s: invalid Coex action mgt frame", __func__);
-                        wnet_vif->vif_sts.sts_mng_discard++;
+                        vm_cfg80211_notify_mgmt_rx(wnet_vif, channel, os_skb_data(skb),os_skb_get_pktlen(skb));
+                        break;
                 }
                 break;
-            case WIFINET_ACTION_CAT_HT:
 
+            case AML_CATEGORY_HT:
                 switch (ia->ia_action)
                 {
                     case WIFINET_ACTION_HT_TXCHWIDTH:
-
                         WIFINET_VERIFY_LENGTH(efrm - frm, sizeof(struct wifi_mac_action_ht_txchwidth));
 
                         iachwidth = (struct wifi_mac_action_ht_txchwidth *) frm;
                         chwidth = (iachwidth->at_chwidth == WIFINET_A_HT_TXCHWIDTH_2040) ?
-                                  WIFINET_BWC_WIDTH40 : WIFINET_BWC_WIDTH20;
+                            WIFINET_BWC_WIDTH40 : WIFINET_BWC_WIDTH20;
                         sta->sta_chbw = chwidth;
-
-			    DPRINTF(AML_DEBUG_BWC, "%s(%d) sta_chbw 0x%x \n", __func__, __LINE__,  sta->sta_chbw);
+                        DPRINTF(AML_DEBUG_BWC, "%s(%d) sta_chbw 0x%x \n", __func__, __LINE__,  sta->sta_chbw);
 
                         WIFINET_DPRINTF_STA( AML_DEBUG_ACTION, sta,
-                                             "%s: HT txchwidth action mgt frame. Width %d ",
-                                             __func__, chwidth);
-
+                            "%s: HT txchwidth action mgt frame. Width %d ", __func__, chwidth);
                         break;
+
                     case WIFINET_ACTION_HT_SMPOWERSAVE:
                         printk("<running> %s %d \n",__func__,__LINE__);
                         WIFINET_VERIFY_LENGTH(efrm - frm, sizeof(struct wifi_mac_action_ht_smpowersave));
 
                         iasmpowersave = (struct wifi_mac_action_ht_smpowersave *) frm;
-
                         if (iasmpowersave->as_control & WIFINET_A_HT_SMPOWERSAVE_ENABLED)
                         {
                             if (iasmpowersave->as_control & WIFINET_A_HT_SMPOWERSAVE_MODE)
                             {
-                                if ((sta->sta_htcap & WIFINET_HTCAP_C_SM_MASK) !=
-                                    WIFINET_HTCAP_DYNAMIC_SMPS)
+                                if ((sta->sta_htcap & WIFINET_HTCAP_C_SM_MASK) != WIFINET_HTCAP_DYNAMIC_SMPS)
                                 {
                                     sta->sta_htcap &= (~WIFINET_HTCAP_C_SM_MASK);
                                     sta->sta_htcap |= WIFINET_HTCAP_DYNAMIC_SMPS;
@@ -4378,8 +4314,7 @@ void wifi_mac_recv_action(struct wlan_net_vif *wnet_vif,
                             }
                             else
                             {
-                                if ((sta->sta_htcap & WIFINET_HTCAP_C_SM_MASK) !=
-                                    WIFINET_HTCAP_STATIC_SMPS)
+                                if ((sta->sta_htcap & WIFINET_HTCAP_C_SM_MASK) != WIFINET_HTCAP_STATIC_SMPS)
                                 {
                                     sta->sta_htcap &= (~WIFINET_HTCAP_C_SM_MASK);
                                     sta->sta_htcap |= WIFINET_HTCAP_STATIC_SMPS;
@@ -4389,8 +4324,7 @@ void wifi_mac_recv_action(struct wlan_net_vif *wnet_vif,
                         }
                         else
                         {
-                            if ((sta->sta_htcap & WIFINET_HTCAP_C_SM_MASK) !=
-                                WIFINET_HTCAP_DISABLE_SMPS)
+                            if ((sta->sta_htcap & WIFINET_HTCAP_C_SM_MASK) != WIFINET_HTCAP_DISABLE_SMPS)
                             {
                                 sta->sta_htcap &= (~WIFINET_HTCAP_C_SM_MASK);
                                 sta->sta_htcap |= WIFINET_HTCAP_DISABLE_SMPS;
@@ -4401,22 +4335,40 @@ void wifi_mac_recv_action(struct wlan_net_vif *wnet_vif,
                         {
                             sta->sta_update_rate_flag |= WIFINET_NODE_RATECHG;
                         }
-
                         break;
+
                     default:
-                        WIFINET_DPRINTF_STA( AML_DEBUG_ACTION, sta,
-                                             "%s: invalid HT action mgt frame", __func__);
+                        WIFINET_DPRINTF_STA( AML_DEBUG_ACTION, sta, "%s: invalid HT action mgt frame", __func__);
                         wnet_vif->vif_sts.sts_mng_discard++;
                         break;
                 }
                 break;
+
+            case AML_CATEGORY_SA_QUERY:
+                WIFINET_VERIFY_LENGTH(efrm - frm, sizeof(struct wifi_mac_action_sa_query));
+
+                sa_query = (struct wifi_mac_action_sa_query *)frm;
+                transaction_identifier = sa_query->sa_transaction_identifier;
+                if (sa_query->sa_header.ia_action == WIFINET_ACTION_SA_QUERY_REQ) {
+                    actionargs.category = AML_CATEGORY_SA_QUERY;
+                    actionargs.action = WIFINET_ACTION_SA_QUERY_RSP;
+                    actionargs.arg1 = transaction_identifier;
+                    actionargs.arg2 = 0;
+                    actionargs.arg3 = 0;
+                    wifi_mac_send_action(sta, (void *)&actionargs);
+                }
+
+                DPRINTF(AML_DEBUG_WARNING, "%s: get sa query . action:%d, identifier:%d\n",
+                    __func__, sa_query->sa_header.ia_action, transaction_identifier);
+                break;
+
 #ifdef CONFIG_P2P
-            case  WIFINET_ACTION_CAT_P2P:
+            case  AML_CATEGORY_P2P:
                 vm_cfg80211_notify_mgmt_rx(wnet_vif,channel, os_skb_data(skb),os_skb_get_pktlen(skb));
                 break;
 #endif//CONFIG_P2P
 
-            case WIFINET_ACTION_CAT_VHT:
+            case AML_CATEGORY_VHT:
                 switch (ia->ia_action)
                 {
                     case WIFINET_ACTION_VHT_CMPRSSD_BMFRM:
@@ -4430,11 +4382,11 @@ void wifi_mac_recv_action(struct wlan_net_vif *wnet_vif,
                     default:
                         break;
                 }
-
                 break;
+
             default:
-                WIFINET_DPRINTF_STA( AML_DEBUG_ACTION, sta,
-                                     "%s: action mgt frame has invalid category %d", __func__, ia->ia_category);
+                WIFINET_DPRINTF_STA(AML_DEBUG_WARNING, sta,
+                    "%s: action mgt frame has invalid category %d", __func__, ia->ia_category);
                 wnet_vif->vif_sts.sts_mng_discard++;
                 break;
         }
@@ -4486,9 +4438,8 @@ void wifi_mac_parse_group_id_mgmt(struct wlan_net_vif *wnet_vif,
 #endif
 }
 
-void
-wifi_mac_recv_mgmt(struct wifi_station *sta, struct sk_buff *skb,
-                  int subtype, int rssi, unsigned int channel)
+void wifi_mac_recv_mgmt(struct wifi_station *sta, struct sk_buff *skb,
+    int subtype, int rssi, unsigned int channel)
 {
     struct wlan_net_vif *wnet_vif = sta->sta_wnet_vif;
     struct wifi_frame *wh;
@@ -4528,8 +4479,6 @@ wifi_mac_recv_mgmt(struct wifi_station *sta, struct sk_buff *skb,
         }
     }
 
-
-
     switch (subtype)
     {
         case WIFINET_FC0_SUBTYPE_BEACON:
@@ -4545,7 +4494,7 @@ wifi_mac_recv_mgmt(struct wifi_station *sta, struct sk_buff *skb,
             break;
 
         case WIFINET_FC0_SUBTYPE_AUTH:
-            wifi_mac_recv_auth(wnet_vif,sta,skb, rssi);
+            wifi_mac_recv_auth(wnet_vif,sta,skb, channel, rssi);
             break;
 
         case WIFINET_FC0_SUBTYPE_ASSOC_REQ:

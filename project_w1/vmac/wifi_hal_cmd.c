@@ -1670,6 +1670,7 @@ unsigned char parse_cali_param(char *varbuf, int len, struct Cali_Param *cali_pa
     get_s8_item(varbuf, len, "tssi_5g_offset_5800", &cali_param->tssi_5g_offset[3]);
     get_s8_item(varbuf, len, "hdmi_enable", &cali_param->hdmi_enable);
     get_s16_item(varbuf, len, "hdmi_freq", &cali_param->hdmi_freq);
+    get_s8_item(varbuf, len, "rf_count", &cali_param->rf_num);
 
     return 0;
 }

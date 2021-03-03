@@ -99,28 +99,29 @@ struct wifi_mac_tx_info
     unsigned short mpdulen;     /* frame length  */
 
     unsigned int b_mcast:1,
-                    b_txfrag:1,
-                    b_mgmt:1,
-                    b_datapkt:1,
-                    b_qosdata:1,
-                    b_nulldata:1,
-                    ps:1,       /*is powersave mode */
-                    b_buffered:1, /* flag frames are buffered. */
-                    shortPreamble:1, /* is short preamble */
-                    ht:1,
-                    b_BarPkt:1,
-                    b_PsPoll:1,
-                    b_noack:1,
-                    b_uapsd:1,
-                    b_rsten:1,  /* if this frame needs rts first */
-                    b_csten:1,  /* if this frame needs cts first */
-                    b_11n:1,
-                    b_aggr:1,
-                    b_Ampdu:1,
-                    b_hwchecksum:1, /* need hw tcp/ip checksum*/
-                    b_hwtkipmic:1,/* need hw tkip mic add*/
-                    b_amsdu:1,
-                    b_tcp_saved_flag:1;
+        b_txfrag:1,
+        b_mgmt:1,
+        b_datapkt:1,
+        b_qosdata:1,
+        b_nulldata:1,
+        ps:1,       /*is powersave mode */
+        b_buffered:1, /* flag frames are buffered. */
+        shortPreamble:1, /* is short preamble */
+        ht:1,
+        b_BarPkt:1,
+        b_PsPoll:1,
+        b_noack:1,
+        b_uapsd:1,
+        b_rsten:1,  /* if this frame needs rts first */
+        b_csten:1,  /* if this frame needs cts first */
+        b_11n:1,
+        b_aggr:1,
+        b_Ampdu:1,
+        b_hwchecksum:1, /* need hw tcp/ip checksum*/
+        b_hwtkipmic:1,/* need hw tkip mic add*/
+        b_amsdu:1,
+        b_tcp_saved_flag:1,
+        b_pmf:1;
 } ;
 
 #define TX_DESC_BUF_LOCK_INIT(_sc) spin_lock_init(&(_sc)->tx_desc_buf_lock)

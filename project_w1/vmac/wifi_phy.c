@@ -158,14 +158,64 @@ unsigned int cca_busy_check(void)
         v2 = hif->hif_ops.hi_read_word(RG_AGC_OB_CCA_COND01);
         v4 = hif->hif_ops.hi_read_word(RG_AGC_OB_CCA_COND23);
         printk("cca: ts 0x%x, ts_num %d, cond0 %d cond1 %d cond2 %d cond3 %d \n",
-                data3->cca_cond_ts, data3->cca_cond_ts_num, 
+                data3->cca_cond_ts, data3->cca_cond_ts_num,
                 v2 & 0xffff,  (v2 >> 16) & 0xffff,  v4 & 0xffff, (v4 >> 16 ) & 0xffff);
     }
-    
+
     return 0;
 
 }
 
+void get_phy_stc_info(unsigned int *arr)
+{
+    int i;
+    unsigned int reg[8] = {0};
+    unsigned int trig_num[4] = {0};
+    unsigned int min_num[4]  = {0};
+    unsigned int max_num[4]  = {0};
+    unsigned int avg_num[4]  = {0};
+    unsigned int noise_floor = 0;
+
+    struct hw_interface* hif = hif_get_hw_interface();
+    unsigned int reg_tmp = 0x01;
+
+
+    hif->hif_ops.hi_write_word(RG_PHY_ADR_2C20, reg_tmp);
+
+    udelay(320);
+
+    for (i = 0; i < 8; i++) {
+        reg[i] = hif->hif_ops.hi_read_word(RG_PHY_STS_REG_0 + i *sizeof(unsigned int));
+    }
+    noise_floor = hif->hif_ops.hi_read_word(RG_AGC_OB_ANT_NFLOOR);
+
+    trig_num[0] = reg[0] & 0xffff;
+    trig_num[1] = (reg[0] >> 16) & 0xffff;
+    trig_num[2] = reg[4] & 0xffff;
+    trig_num[3] = (reg[4] >> 16) & 0xffff;
+
+    min_num[0] = (reg[1] >> 16) & 0xffff;
+    min_num[1] = (reg[3] >> 16) & 0xffff;
+    min_num[2] = (reg[5] >> 16) & 0xffff;
+    min_num[3] = (reg[7] >> 16) & 0xffff;
+
+    max_num[0] = (reg[1]) & 0xffff;
+    max_num[1] = (reg[3]) & 0xffff;
+    max_num[2] = (reg[5]) & 0xffff;
+    max_num[3] = (reg[7]) & 0xffff;
+
+    avg_num[0] = reg[2] & 0xffff;
+    avg_num[1] = (reg[2] >> 16) & 0xffff;
+    avg_num[2] = reg[6] & 0xffff;
+    avg_num[3] = (reg[6] >> 16) & 0xffff;
+
+    arr[0] = avg_num[0]; //CP1
+    arr[1] = avg_num[1]; //L-SIG avg SNR
+    arr[2] = avg_num[2]; //crc err avg
+    arr[3] = avg_num[3]; //crc ok avg
+    arr[4] = (noise_floor >> 12) & 0x3ff;
+    arr[5] = noise_floor & 0x3ff;//snr_qdb
+}
 
 
 #if defined (HAL_SIM_VER)

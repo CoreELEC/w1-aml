@@ -167,19 +167,20 @@ unsigned char hal_chk_replay_cnt(struct hal_private *hal_priv,HW_RxDescripter_bi
     return true;
 }
 
-void hal_soft_rx_cs( struct hal_private *hal_priv,OS_SKBBUF * skb )
+void hal_soft_rx_cs(struct hal_private *hal_priv, OS_SKBBUF *skb)
 #if defined (HAL_FPGA_VER)
 {
     HW_RxDescripter_bit *RxPrivHdr_bit;
     unsigned char wnet_vif_id = 0;
     static unsigned char print_count = 0;
+    unsigned char pkt_drop = 0;
 
     RxPrivHdr_bit = (HW_RxDescripter_bit *)OS_SKBBUF_DATA(skb);
     if (g_dbg_info_enable & AML_DBG_HAL_RX_FRM)
     {
         hal_show_rxframe(RxPrivHdr_bit);
     }
-    OS_SKBBUF_PULL(skb,sizeof(HW_RxDescripter_bit));
+    OS_SKBBUF_PULL(skb, sizeof(HW_RxDescripter_bit));
 
     if (WIFI_ADDR_ISGROUP(RxPrivHdr_bit->data))
         wnet_vif_id = RxPrivHdr_bit->bssidmatch_id;
@@ -189,7 +190,7 @@ void hal_soft_rx_cs( struct hal_private *hal_priv,OS_SKBBUF * skb )
     if (wnet_vif_id >= WIFI_MAX_VID)
     {
         PRINT("hal_soft_rx_cs wnet_vif_id %d \n", wnet_vif_id);
-        dump_memory_internel(RxPrivHdr_bit->data, 32);
+        //dump_memory_internel(RxPrivHdr_bit->data, 32);
         OS_SKBBUF_FREE(skb);
         return;
     }
@@ -202,11 +203,15 @@ void hal_soft_rx_cs( struct hal_private *hal_priv,OS_SKBBUF * skb )
 
         if (RxPrivHdr_bit->mic_err)
         {
+            pkt_drop = hal_priv->hal_call_back->pmf_encrypt_pkt_handle(hal_priv->drv_priv, skb, RxPrivHdr_bit->RxRSSI_ant0,
+                RxPrivHdr_bit->RxRate, RxPrivHdr_bit->RxChannel, RxPrivHdr_bit->aggregation, wnet_vif_id,RxPrivHdr_bit->key_id);
+
             hal_priv->hal_call_back->mic_error_event(hal_priv->drv_priv,RxPrivHdr_bit->data,
                 WIFI_ADDR2(RxPrivHdr_bit->data),wnet_vif_id);
         }
 
-        OS_SKBBUF_FREE(skb);
+        if (pkt_drop)
+            OS_SKBBUF_FREE(skb);
         return;
     }
     else
@@ -987,8 +992,8 @@ int hal_is_empty_tx_id(struct hal_private * hal_priv)
 }
 
 #ifdef DRV_PT_SUPPORT
-static void
-b2b_tx_throughput_calc(struct Tx_FrameDesc*  pTxFrameDesc,
+extern void do_gettimeofday(struct timeval *tv);
+static void b2b_tx_throughput_calc(struct Tx_FrameDesc*  pTxFrameDesc,
                              struct txdonestatus * txstatus )
 {
     static int rx_count=0;

@@ -78,7 +78,7 @@ typedef struct Cali_Param
     unsigned char tssi_5g_offset[TSSI_5G_CAL_NUM];
     unsigned char hdmi_enable;
     unsigned short hdmi_freq;
-    unsigned char reserve;
+    unsigned char rf_num;
 } Cali_Param;
 
 typedef struct Phy_Interface_Param

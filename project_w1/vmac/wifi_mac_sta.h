@@ -39,14 +39,17 @@
 
 struct wifi_mac_Rsnparms
 {
-    unsigned char  rsn_mcastcipher;
-    unsigned char  rsn_mcastkeylen;
-    unsigned char  rsn_ucastcipherset;
-    unsigned char  rsn_ucastcipher;
-    unsigned char  rsn_ucastkeylen;
-    unsigned char  rsn_keymgmtset;
-    unsigned char  rsn_keymgmt;
+    unsigned char rsn_mcastcipher;
+    unsigned char rsn_mcastkeylen;
+    unsigned char rsn_ucastcipherset;
+    unsigned char rsn_ucastcipher;
+    unsigned char rsn_ucastkeylen;
+    unsigned char rsn_keymgmtset;
     unsigned short rsn_caps;
+    unsigned char rsn_pmkid_count;
+    unsigned char rsn_pmkid_offset;
+    unsigned char rsn_pmkid[16];
+    unsigned char rsn_gmcipher;
 };
 
 struct wifi_station_tbl;
@@ -164,6 +167,8 @@ struct wifi_station
     unsigned short sta_listen_intval;
     unsigned char sta_fetch_pkt_method;
     unsigned short sta_capinfo;
+    unsigned char sta_ap_ip[4];
+    unsigned char sta_arp_flag;
 
     enum wifi_mac_bwc_width sta_chbw;
     enum sta_connect_status connect_status;
@@ -225,6 +230,8 @@ struct wifi_station
 
     unsigned char *sta_rsn_ie;
     int8_t sta_tmp_nsta;
+    struct wifi_mac_key pmf_key;
+    unsigned short sa_query_seq;
 
     int32_t sta_avg_bcn_rssi;    // dbm =  Rssi-256
     int32_t sta_avg_rssi;
@@ -583,7 +590,7 @@ extern int my_mod_use;
 #define _BYTE_ORDER _LITTLE_ENDIAN
 
 void wifi_mac_create_adhoc_bssid(struct wlan_net_vif *wnet_vif, unsigned char *sta_bssid);
-struct sk_buff *wifi_mac_get_mgmt_frm(struct wifi_mac *wifimac, unsigned char **frm, unsigned int pktlen);
+struct sk_buff *wifi_mac_get_mgmt_frm(struct wifi_mac *wifimac, unsigned int pktlen);
 void wifi_mac_notify_nsta_connect(struct wifi_station *, int newassoc);
 void wifi_mac_notify_nsta_disconnect(struct wifi_station *, int reassoc);
 void wifi_mac_notify_scan_done(struct wlan_net_vif *);

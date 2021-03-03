@@ -56,13 +56,13 @@ drv_tx_ack_optimize(struct drv_private *drv_priv, struct drv_tx_scoreboard *tid,
                 *(unsigned short*)wh->i_seq = htole16(ptxdesc_last->txinfo->seqnum << WIFINET_SEQ_SEQ_SHIFT);
 
                 mac_pkt_info_last->eat_count = mac_pkt_info->eat_count + 1;
+                list_move(&ptxdesc_last->txdesc_queue, &ptxdesc->txdesc_queue);
                 list_del_init(&ptxdesc->txdesc_queue);
                 wifi_mac_free_skb(ptxdesc->txdesc_mpdu);
                 counts++;
                 break;
             }
-
-            if (mac_pkt_info->eat_count >= drv_priv->drv_config.cfg_eat_count_max) {
+            else {
                 break;
             }
         }
@@ -878,7 +878,7 @@ enum tx_frame_flag drv_set_tx_frame_flag(char* buf)
     unsigned char ret = TX_OTHER_FRAME;
     p2p_pub_act = (struct wifi_mac_p2p_pub_act_frame *)(buf + sizeof(struct wifi_frame));
     p2p_act = (struct wifi_mac_p2p_action_frame *)(buf + sizeof(struct wifi_frame));
-    if (p2p_pub_act && (p2p_pub_act->category == WIFINET_ACTION_CAT_PUBLIC)
+    if (p2p_pub_act && (p2p_pub_act->category == AML_CATEGORY_PUBLIC)
     && (p2p_pub_act->action == WIFINET_ACT_PUBLIC_P2P)) {
         switch (p2p_pub_act->subtype)
         {
@@ -898,8 +898,7 @@ enum tx_frame_flag drv_set_tx_frame_flag(char* buf)
                 break;
         }
     }
-    else if (p2p_act && (p2p_act->category == WIFINET_ACTION_CAT_P2P)
-                     && (p2p_act->subtype == P2P_PRESENCE_REQ)) {
+    else if (p2p_act && (p2p_act->category == AML_CATEGORY_P2P) && (p2p_act->subtype == P2P_PRESENCE_REQ)) {
         ret = TX_P2P_PRESENCE_REQ;
     }
     return ret;
@@ -2579,6 +2578,7 @@ static void drv_txampdu_tasklet(unsigned long arg)
 
         if ((i == HAL_WME_AC_VO) && wait_mpdu_timeout_status_change) {
             /* BYPASS */
+        if (!drv_priv->always_mpdu_timeout)
             drv_priv->wait_mpdu_timeout = 0;
         }
         DRV_TXQ_UNLOCK(txlist);
@@ -2616,7 +2616,8 @@ static void drv_tx_sched_aggr(struct drv_private *drv_priv, struct drv_txlist *t
                 if (HI_AGG_TXD_NUM_PER_QUEUE - hal_co_get_cnt >= drv_priv->drv_config.cfg_ampdu_subframes) {
                     __D(BIT(17), "%s wait more mpdu to form ampdu due to hal_co_get_cnt:%d\n",__func__, hal_co_get_cnt);
                     /* BYPASS */
-                    drv_priv->wait_mpdu_timeout = 0;//wait another tx_ok or pending enough mpdu
+                    if (!drv_priv->always_mpdu_timeout)
+                        drv_priv->wait_mpdu_timeout = 0;//wait another tx_ok or pending enough mpdu
                     break;
                 }
             }
@@ -2655,7 +2656,8 @@ static void drv_tx_sched_aggr(struct drv_private *drv_priv, struct drv_txlist *t
         ptxdesc->txinfo->b_11n = 1;
 
         /* BYPASS */
-        drv_priv->wait_mpdu_timeout = 0;
+        if (!drv_priv->always_mpdu_timeout)
+            drv_priv->wait_mpdu_timeout = 0;
 
         if (ptxdesc->txdesc_pktnum == 1)
         {

@@ -18,6 +18,7 @@
 #include "wifi_mac_power.h"
 #include "wifi_mac_scan.h"
 #include "wifi_mac_xmit.h"
+#include "wifi_mac_action.h"
 
 struct wifi_mac_statistic
 {
@@ -126,10 +127,7 @@ struct vm_wlan_net_vif_params
 #define DEFAULT_P2P_ACTION_RETRY_INTERVAL 50
 #define FIRST_AUTH_RETRY_INTERVAL_DUE_TO_CHANNEL_SWITCH 500
 
-#define MAX_ACTION_LEN 384
-
 #define WIFINET_PS_MAX_QUEUE  100
-
 
 #define WIFINET_BMISS_THRS  (25*100)
 #define WIFINET_BMISS_COUNT_MAX  4
@@ -223,7 +221,6 @@ struct wifi_mac_addba_delba_request
     unsigned int arg1;
     unsigned int arg2;
 };
-
 
 struct wifi_mac_app_ie_t
 {
@@ -497,18 +494,19 @@ struct wifi_mac_wmm_ac_params
 struct wlan_net_vif
 {
     struct list_head vm_next;
-    struct net_device* vm_ndev;
-    struct wifi_mac* vm_wmac;
+    struct net_device *vm_ndev;
+    struct wifi_mac *vm_wmac;
     struct net_device_stats vm_devstats;
     struct iw_statistics vm_iwstats;
-    struct vlan_group* vm_vlgrp;
-    struct wireless_dev* vm_wdev;
+    struct vlan_group *vm_vlgrp;
+    struct wireless_dev *vm_wdev;
 
-    struct wifi_station* vm_mainsta;
+    struct wifi_station *vm_mainsta;
     struct wifi_mac_statistic vif_sts;
     struct wifi_station_tbl vm_sta_tbl;
     struct wifi_mac_wme_state vm_wme;
     struct wifi_net_vif_ops vif_ops;
+    unsigned int vm_debug;
 
     unsigned char wnet_vif_id;
     enum wifi_mac_opmode vm_opmode;
@@ -528,8 +526,8 @@ struct wlan_net_vif
     unsigned char vm_chan_switch_scan_flag;
     unsigned char vm_chan_switch_scan_count;
 
-    void* vm_aclpriv;
-    const struct wifi_mac_aclator* vm_aclop;
+    void *vm_aclpriv;
+    const struct wifi_mac_aclator *vm_aclop;
 
     unsigned int vm_flags;
     unsigned int vm_flags_ext;
@@ -557,9 +555,9 @@ struct wlan_net_vif
     unsigned short vm_ps_pending;
     unsigned char* vm_tim_bitmap;
     unsigned short vm_tim_len;
-    unsigned char vm_dtim_period;
+    unsigned int vm_dtim_period;
     struct wifi_mac_beacon_offsets vm_beaconbuf_offset;
-    void* vm_beaconbuf;
+    void *vm_beaconbuf;
     int wnet_vif_replaycounter;
     unsigned short vm_bcn_intval;
     unsigned char mgmt_pkt_retry_count;
@@ -570,8 +568,6 @@ struct wlan_net_vif
     unsigned short vm_fragthreshold;
     unsigned char vm_opt_ie[WIFINET_MAX_IV_OPT_IE];
     unsigned short vm_opt_ie_len;
-    unsigned short vm_def_txkey;
-    struct wifi_mac_key vm_nw_keys[WIFINET_WEP_NKID];
 
     /* for channge channel when sta receive a channel change announce frame*/
     unsigned char vm_chanchange_count;
@@ -597,7 +593,13 @@ struct wlan_net_vif
 #ifdef  AML_MCAST_QUEUE
     int vm_mqueue_flag_send;
 #endif
+
+    unsigned short vm_def_txkey;
+    struct wifi_mac_key vm_nw_keys[WIFINET_WEP_NKID];
     unsigned int current_keytype;
+    /* wpa2 pmk list */
+    struct aml_pmk_list *pmk_list;
+
     /* Short Guard Interval Enable:1 Disable:0 */
     /* Short Guard Interval Enable:1 Disable:0 for VHT fixed rates */
     /* LDPC Enable Rx:1 TX: 2 ; Disable:0 */
@@ -611,12 +613,6 @@ struct wlan_net_vif
                  vm_ratemask_default:1,
                  vm_key_flag:1,
                  vm_list_scanning:1;
-    /* 256 QAM support in 2.4GHz mode Enable:1 Disable:0 */
-    unsigned int vm_256qam:1;
-    /* 2.4NG 256 QAM Interop mode Enable:1 Disable:0 */
-    unsigned char vm_11ng_vht_interop:1;
-
-    unsigned int vm_debug;
 
     unsigned short vm_htcap;
     /*only for ht info ie */
@@ -669,7 +665,6 @@ struct wlan_net_vif
 #define WIFINET_F_WPA1 0x00800000
 #define WIFINET_F_WPA2 0x01000000
 #define WIFINET_F_WPA 0x01800000
-#define WIFINET_F_DROPUNENC 0x02000000
 #define WIFINET_F_COUNTERM 0x04000000
 #define WIFINET_F_HIDESSID 0x08000000
 #define WIFINET_F_WMEUPDATE 0x20000000
@@ -880,11 +875,7 @@ wifi_mac_is_vht_enable(struct wlan_net_vif *wnet_vif)
 #define IS_RUNNING(_dev)\
         (((_dev)->flags & (IFF_RUNNING|IFF_UP)) == (IFF_RUNNING|IFF_UP))
 
-
-
-
-#define IS_UP(_dev)\
-        (((_dev)->flags & (IFF_UP)) == (IFF_UP))
+#define IS_UP(_dev) (((_dev)->flags & (IFF_UP)) == (IFF_UP))
 
 struct wifi_mac_aclator
 {

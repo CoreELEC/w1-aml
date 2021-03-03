@@ -905,6 +905,7 @@ static int aml_insmod(void)
     struct hw_interface * hif = hif_get_hw_interface();
 
     print_driver_version();
+    printk("driver version: %s\n", DRIVERVERSION);
     printk("%s(%d) dhcp_offload %d set done.\n\n",
         __func__,__LINE__, dhcp_offload);
 

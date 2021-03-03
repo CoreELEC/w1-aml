@@ -368,12 +368,6 @@ struct sk_buff *wifi_mac_amsdu_aggr(struct wifi_mac *wifimac, struct wifi_mac_am
             amsdu_ptxdesc = txinfo->ptxdesc;
             memcpy(&amsdu_ptxdesc->drv_pkt_info.pkt_info[i], &msdu_ptxdesc->drv_pkt_info.pkt_info[0], sizeof(struct wifi_mac_pkt_info));
 
-            if (!((amsdu_ptxdesc->drv_pkt_info.pkt_info[0].b_tcp_ack_del && amsdu_ptxdesc->drv_pkt_info.pkt_info[i].b_tcp_ack_del) &&
-                ((amsdu_ptxdesc->drv_pkt_info.pkt_info[0].tcp_src_port == amsdu_ptxdesc->drv_pkt_info.pkt_info[i].tcp_src_port) &&
-                (amsdu_ptxdesc->drv_pkt_info.pkt_info[0].tcp_dst_port == amsdu_ptxdesc->drv_pkt_info.pkt_info[i].tcp_dst_port)))) {
-                amsdu_ptxdesc->drv_pkt_info.pkt_info[0].b_tcp_ack_del = 0;
-            }
-
             amsdu_ptxdesc->drv_pkt_info.pkt_info_count++;
 
             if (M_FLAG_GET(amsdutx->msdu_tmp_buf[i], M_CHECKSUMHW))
@@ -387,6 +381,13 @@ struct sk_buff *wifi_mac_amsdu_aggr(struct wifi_mac *wifimac, struct wifi_mac_am
             wifi_mac_amsdu_encap(amsdu_wbuf, amsdutx->msdu_tmp_buf[i], 0);
             msdu_ptxdesc = ((struct wifi_mac_tx_info *)os_skb_cb(amsdutx->msdu_tmp_buf[i]))->ptxdesc;
             memcpy(&amsdu_ptxdesc->drv_pkt_info.pkt_info[i], &msdu_ptxdesc->drv_pkt_info.pkt_info[0], sizeof(struct wifi_mac_pkt_info));
+
+            if (!((amsdu_ptxdesc->drv_pkt_info.pkt_info[0].b_tcp_ack_del && amsdu_ptxdesc->drv_pkt_info.pkt_info[i].b_tcp_ack_del) &&
+                ((amsdu_ptxdesc->drv_pkt_info.pkt_info[0].tcp_src_port == amsdu_ptxdesc->drv_pkt_info.pkt_info[i].tcp_src_port) &&
+                (amsdu_ptxdesc->drv_pkt_info.pkt_info[0].tcp_dst_port == amsdu_ptxdesc->drv_pkt_info.pkt_info[i].tcp_dst_port)))) {
+                amsdu_ptxdesc->drv_pkt_info.pkt_info[0].b_tcp_ack_del = 0;
+            }
+
             amsdu_ptxdesc->drv_pkt_info.pkt_info_count++;
         }
 

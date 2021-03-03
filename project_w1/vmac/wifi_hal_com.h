@@ -1340,7 +1340,9 @@ struct aml_hal_call_backs
     void (*intr_tx_handle)(void *drv_prv, struct txdonestatus *tx_done_status, SYS_TYPE callback, unsigned char queue_id);
     void (*intr_tx_ok_timeout)(void *drv_prv);
     void (*intr_tx_pkt_clear)(void *drv_prv);
-    void (*intr_rx_handle)(void *  drv_prv,struct sk_buff *skb,unsigned char Rssi,unsigned char RxRate,
+    void (*intr_rx_handle)(void *drv_prv,struct sk_buff *skb,unsigned char Rssi,unsigned char RxRate,
+        unsigned char channel,  unsigned char aggr, unsigned char wnet_vif_id,unsigned char keyid);
+    int (*pmf_encrypt_pkt_handle)(void *drv_prv, struct sk_buff *skb, unsigned char rssi, unsigned char RxRate,
         unsigned char channel,  unsigned char aggr, unsigned char wnet_vif_id,unsigned char keyid);
     void (*intr_bcn_send)(void *  drv_prv,unsigned char wnet_vif_id);
     void (*intr_dtim_send)(void *  drv_prv,unsigned char wnet_vif_id);

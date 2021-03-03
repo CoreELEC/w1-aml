@@ -150,13 +150,12 @@ enum wifi_mac_protmode
 
 enum wifi_mac_authmode
 {
-    WIFINET_AUTH_NONE   = 0,
-    WIFINET_AUTH_OPEN   = 1,
+    WIFINET_AUTH_NONE = 0,
+    WIFINET_AUTH_OPEN = 1,
     WIFINET_AUTH_SHARED = 2,
-    WIFINET_AUTH_8021X  = 3,
-    WIFINET_AUTH_AUTO   = 4,
-    WIFINET_AUTH_WPA    = 5,
-    WIFINET_AUTH_WAPI   = 6,
+    WIFINET_AUTH_SAE = 3,
+    WIFINET_AUTH_8021X = 4,
+    WIFINET_AUTH_AUTO = 5,
 };
 
 enum wifi_mac_roamingmode
@@ -237,21 +236,14 @@ struct country_set
 #define WIFINET_IS_CHAN_11N_HT40(_c) \
         (((_c)->chan_bw == WIFINET_BWC_WIDTH40))
 
-
-
 #define WIFINET_RATE_SIZE   8
 #define WIFINET_RATE_MAXSIZE    57
 #define WIFINET_HT_RATE_SIZE    77
-
-
 #define WIFINET_RATE_BASIC      0x80
-
 #define WIFINET_RATE_VAL        0x7f
 #define WIFINET_GET_RATE_VAL(_rate)  ((_rate)&WIFINET_RATE_VAL)
-
 #define WIFINET_RATE_MCS    0x80
 #define WIFINET_RATE_VHT_MCS    0xC0
-
 #define WIFINET_AMPDU_LIMIT_MAX          (32768)// (16 * 1024 - 1)
 
 struct wifi_mac_rateset
@@ -289,22 +281,10 @@ enum wifi_mac_connect_state
     WIFINET_CON_MAX,
 };
 
-
-struct wifi_mac_action_mgt_args
-{
-    unsigned char  category;
-    unsigned char  action;
-    unsigned int arg1;
-    unsigned int arg2;
-    unsigned int arg3;
-};
-
-
 #define WIFINET_F_DOSORT    0x00000001
 #define WIFINET_F_DOFRATE   0x00000002
 #define WIFINET_F_DOXSECT   0x00000004
 #define WIFINET_F_DOBRS 0x00000008
-
 
 struct wmeParams
 {
@@ -372,8 +352,6 @@ struct wifi_mac_beacon_offsets
     unsigned short  bo_bcn_seq;
 };
 
-
-
 #define WME_NUM_AC      4
 
 #ifndef __packed
@@ -392,9 +370,6 @@ struct wifi_frame
     unsigned char  i_seq[2];
 } __packed;
 
-
-
-
 struct wifi_qos_frame
 {
     unsigned char  i_fc[2];
@@ -405,7 +380,6 @@ struct wifi_qos_frame
     unsigned char  i_seq[2];
     unsigned char  i_qos[2];
 } __packed;
-
 
 struct wifi_htc_frame
 {
@@ -430,7 +404,6 @@ struct wifi_qos_htc_frame
     unsigned char  i_htc[4];
 } __packed;
 
-
 struct WIFINET_S_FRAME_ADDR4
 {
     unsigned char  i_fc[2];
@@ -441,7 +414,6 @@ struct WIFINET_S_FRAME_ADDR4
     unsigned char  i_seq[2];
     unsigned char  i_addr4[WIFINET_ADDR_LEN];
 } __packed;
-
 
 struct WIFINET_S_FRAME_QOS_ADDR4
 {
@@ -510,13 +482,7 @@ struct WIFINET_S_FRAME_ADDR2
 #define WIFINET_SEQ_SEQ_SHIFT           4
 #define WIFINET_SEQ_MAX               4096
 
-
 #define WIFINET_NWID_LEN            32
-
-#ifdef CONFIG_WAPI
-#endif //#ifdef CONFIG_WAPI
-
-
 
 #define WIFINET_QOS_AMSDU                     0x80
 #define WIFINET_QOS_AMSDU_S                   7
@@ -525,6 +491,25 @@ struct WIFINET_S_FRAME_ADDR2
 #define WIFINET_QOS_EOSP            0x10
 #define WIFINET_QOS_TID         0x0f
 
+#define WLAN_FC_PVER 0x0003
+#define WLAN_FC_TODS 0x0100
+#define WLAN_FC_FROMDS 0x0200
+#define WLAN_FC_MOREFRAG 0x0400
+#define WLAN_FC_RETRY 0x0800
+#define WLAN_FC_PWRMGT 0x1000
+#define WLAN_FC_MOREDATA 0x2000
+#define WLAN_FC_ISWEP 0x4000
+#define WLAN_FC_ORDER 0x8000
+
+#define WLAN_FC_TYPE_DATA 0x0008
+#define WLAN_FC_TYPE_MGMT 0x0000
+
+#define WLAN_FC_STYPE_QOS_DATA 0x0080
+
+#define WLAN_FC_GET_TYPE(fc) ((fc) & WIFINET_FC0_TYPE_MASK)
+#define WLAN_FC_GET_STYPE(fc) ((fc) & WIFINET_FC0_SUBTYPE_MASK)
+#define WLAN_GET_SEQ_FRAG(seq) ((seq) & 0x000F)
+#define WLAN_GET_SEQ_SEQ(seq)  ((seq) & 0xFFF0)
 
 #define WIFINET_IS_CRTL(_frame)   (((_frame)->i_fc[0] & WIFINET_FC0_TYPE_MASK) == WIFINET_FC0_TYPE_CTL)
 
@@ -539,9 +524,6 @@ struct WIFINET_S_FRAME_ADDR2
 #define WIFINET_IS_BEACON(_frame)    ((((_frame)->i_fc[0] & WIFINET_FC0_TYPE_MASK) == WIFINET_FC0_TYPE_MGT) && \
                                         (((_frame)->i_fc[0] & WIFINET_FC0_SUBTYPE_MASK) == WIFINET_FC0_SUBTYPE_BEACON))
 
-
-
-
 #define WIFINET_IS_ACTION(_frame)    ((((_frame)->i_fc[0] & WIFINET_FC0_TYPE_MASK) == WIFINET_FC0_TYPE_MGT) && \
                                         (((_frame)->i_fc[0] & WIFINET_FC0_SUBTYPE_MASK) == WIFINET_FC0_SUBTYPE_ACTION))
 
@@ -553,6 +535,9 @@ struct WIFINET_S_FRAME_ADDR2
 
 #define WIFINET_IS_DISASSOC(_frame)    ((((_frame)->i_fc[0] & WIFINET_FC0_TYPE_MASK) == WIFINET_FC0_TYPE_MGT) && \
                                         (((_frame)->i_fc[0] & WIFINET_FC0_SUBTYPE_MASK) == WIFINET_FC0_SUBTYPE_DISASSOC))
+
+#define WIFINET_IS_AUTH(_frame)    ((((_frame)->i_fc[0] & WIFINET_FC0_TYPE_MASK) == WIFINET_FC0_TYPE_MGT) && \
+                                        (((_frame)->i_fc[0] & WIFINET_FC0_SUBTYPE_MASK) == WIFINET_FC0_SUBTYPE_AUTH))
 
 #define WIFINET_IS_DEAUTH(_frame)    ((((_frame)->i_fc[0] & WIFINET_FC0_TYPE_MASK) == WIFINET_FC0_TYPE_MGT) && \
                                         (((_frame)->i_fc[0] & WIFINET_FC0_SUBTYPE_MASK) == WIFINET_FC0_SUBTYPE_DEAUTH))
@@ -579,8 +564,6 @@ struct WIFINET_S_FRAME_ADDR2
 #define WIFINET_TX_4_SPATIAL_STREAMS 0x30
 
 #define WIFINET_TX_MCS_SET 0xf8
-
-
 
 #define WIFINET_COUNTRY_MAX_TRIPLETS (83)
 struct wifi_mac_ie_country
@@ -683,33 +666,6 @@ enum ts_dir_idx {
 #define WMM_AC_ACCESS_POLICY_EDCA  1
 #define WMM_AC_FIXED_MSDU_SIZE  BIT(15)
 
-
-struct wifi_mac_wmm_tspec_element {
-    unsigned char eid; /* 221 = 0xdd */
-    unsigned char length; /* 6 + 55 = 61 */
-    unsigned char  oui[3]; /* 00:50:f2 */
-    unsigned char oui_type; /* 2 */
-    unsigned char oui_subtype; /* 2 */
-    unsigned char version; /* 1 */
-    /* WMM TSPEC body (55 octets): */
-    unsigned char ts_info[3];
-    unsigned short nominal_msdu_size;
-    unsigned short maximum_msdu_size;
-    unsigned int minimum_service_interval;
-    unsigned int maximum_service_interval;
-    unsigned int inactivity_interval;
-    unsigned int suspension_interval;
-    unsigned int service_start_time;
-    unsigned int minimum_data_rate;
-    unsigned int mean_data_rate;
-    unsigned int peak_data_rate;
-    unsigned int maximum_burst_size;
-    unsigned int delay_bound;
-    unsigned int minimum_phy_rate;
-    unsigned short surplus_bandwidth_allowance;
-    unsigned short medium_time;
-}__packed;
-
 #define WME_CAPINFO_UAPSD_EN            0x00000080
 #define WME_CAPINFO_UAPSD_VO            0x00000001
 #define WME_CAPINFO_UAPSD_VI            0x00000002
@@ -748,150 +704,13 @@ inline static int wme_sta_uapsd_get_triggered_ac (int qosinfo)
 }
 
 #define WME_AP_UAPSD_ENABLED(_qosinfo)  ((_qosinfo)&WME_CAPINFO_UAPSD_EN)
-struct wifi_mac_action
-{
-    unsigned char  ia_category;
-    unsigned char  ia_action;
-} __packed;
 
-
-#define WIFINET_ACTION_CAT_QOS 0
-#define WIFINET_ACTION_CAT_BA 3
-#define WIFINET_ACTION_CAT_PUBLIC 4
-#define WIFINET_ACTION_CAT_HT 7
-#define WIFINET_ACTION_CAT_VHT 21
-#define WIFINET_ACTION_CAT_P2P 0x7f
-#define WIFINET_ACTION_HT_TXCHWIDTH 0
-#define WIFINET_ACTION_HT_SMPOWERSAVE 1
-#define WIFINET_ACTION_CAT_WMM 17
-
-enum WIFINET_WMM_ACTION
-{
-    WIFINET_ACTION_ADDTS_REQ= 0,
-    WIFINET_ACTION_ADDTS_RESP = 1,
-    WIFINET_ACTION_DELTS = 2,
-};
-
-struct wifi_mac_action_addts_req_frame {
-    struct wifi_mac_action       ac_header;
-    unsigned char dialog_token;
-    unsigned char status_code;
-    struct wifi_mac_wmm_tspec_element wmm_tspec_element;
-};
-
-struct wifi_mac_action_delts_req_frame {
-    struct wifi_mac_action       ac_header;
-    unsigned char dialog_token;
-    unsigned char status_code;
-    struct wifi_mac_wmm_tspec_element wmm_tspec_element;
-};
-
-
-enum WIFINET_VHT_ACTION
-{
-    WIFINET_ACTION_VHT_CMPRSSD_BMFRM = 0,
-    WIFINET_ACTION_VHT_GROUP_ID = 1,
-    WIFINET_ACTION_VHT_OPERATE_MODE_NOTIFICATION = 2,
-};
-
-enum WIFINET_PUBLIC_ACTION
-{
-    WIFINET_ACT_PUBLIC_BSSCOEXIST = 0,
-    WIFINET_ACT_PUBLIC_MP = 7,
-    WIFINET_ACT_PUBLIC_P2P = 9,
-};
-struct wifi_mac_action_ht_txchwidth
-{
-    struct wifi_mac_action   at_header;
-    unsigned char          at_chwidth;
-} __packed;
-
-#define WIFINET_A_HT_TXCHWIDTH_20   0
+#define WIFINET_A_HT_TXCHWIDTH_20 0
 #define WIFINET_A_HT_TXCHWIDTH_2040 1
-
-struct wifi_mac_action_ht_smpowersave
-{
-    struct wifi_mac_action       as_header;
-    unsigned char          as_control;
-} __packed;
-
-#define WIFINET_A_HT_SMPOWERSAVE_ENABLED      0x01
-#define WIFINET_A_HT_SMPOWERSAVE_MODE         0x02
-
-
-
-#define WIFINET_ACTION_BA_ADDBA_REQUEST       0
-#define WIFINET_ACTION_BA_ADDBA_RESPONSE      1
-#define WIFINET_ACTION_BA_DELBA         2
-
-struct wifi_mac_ba_parameterset
-{
-#if _BYTE_ORDER == _BIG_ENDIAN
-    unsigned short buffersize      : 10,
-        tid             : 4,
-        bapolicy        : 1,
-        amsdusupported  : 1;
-#else
-    unsigned short   amsdusupported  : 1,
-          bapolicy        : 1,
-          tid             : 4,
-          buffersize      : 10;
-#endif
-} __packed;
-
-#define  WIFINET_BA_POLICY_IMMEDIATE    1
-#define  WIFINET_BA_AMSDU_SUPPORTED     1
-
-struct wifi_mac_ba_seqctrl
-{
-#if _BYTE_ORDER == _BIG_ENDIAN
-    unsigned short     startseqnum     : 12,
-            fragnum         : 4;
-#else
-    unsigned short     fragnum         : 4,
-            startseqnum     : 12;
-#endif
-} __packed;
-
-struct wifi_mac_delba_parameterset
-{
-#if _BYTE_ORDER == _BIG_ENDIAN
-    unsigned short tid             : 4,
-        initiator       : 1,
-        reserved0       : 11;
-#else
-    unsigned short     reserved0       : 11,
-            initiator       : 1,
-            tid             : 4;
-#endif
-} __packed;
-
-struct wifi_mac_action_ba_addbarequest
-{
-    struct wifi_mac_action rq_header;
-    unsigned char rq_dialogtoken;
-    struct wifi_mac_ba_parameterset rq_baparamset;
-    unsigned short rq_batimeout;
-    struct wifi_mac_ba_seqctrl rq_basequencectrl;
-} __packed;
-
-
-struct wifi_mac_action_ba_addbaresponse
-{
-    struct wifi_mac_action rs_header;
-    unsigned char rs_dialogtoken;
-    unsigned short rs_statuscode;
-    struct wifi_mac_ba_parameterset rs_baparamset;
-    unsigned short rs_batimeout;
-} __packed;
-
-struct wifi_mac_action_ba_delba
-{
-    struct wifi_mac_action           dl_header;
-    struct wifi_mac_delba_parameterset     dl_delbaparamset;
-    unsigned short                     dl_reasoncode;
-} __packed;
-
+#define WIFINET_A_HT_SMPOWERSAVE_ENABLED 0x01
+#define WIFINET_A_HT_SMPOWERSAVE_MODE 0x02
+#define WIFINET_BA_POLICY_IMMEDIATE 1
+#define WIFINET_BA_AMSDU_SUPPORTED 1
 
 struct wifi_mac_frame_min
 {
@@ -899,8 +718,8 @@ struct wifi_mac_frame_min
     unsigned char  i_dur[2];
     unsigned char  i_addr1[WIFINET_ADDR_LEN];
     unsigned char  i_addr2[WIFINET_ADDR_LEN];
-
 } __packed;
+
 #define WIFINET_BAR_CTL_TID_M     0xF000
 #define WIFINET_BAR_CTL_TID_S         12
 struct wifi_mac_frame_bar
@@ -911,7 +730,6 @@ struct wifi_mac_frame_bar
     unsigned char  i_ta[WIFINET_ADDR_LEN];
     unsigned short   i_ctl;
     unsigned short   i_seq;
-
 } __packed;
 
 struct wifi_mac_frame_rts
@@ -920,7 +738,6 @@ struct wifi_mac_frame_rts
     unsigned char  i_dur[2];
     unsigned char  i_ra[WIFINET_ADDR_LEN];
     unsigned char  i_ta[WIFINET_ADDR_LEN];
-
 } __packed;
 
 struct wifi_mac_frame_cts
@@ -928,7 +745,6 @@ struct wifi_mac_frame_cts
     unsigned char  i_fc[2];
     unsigned char  i_dur[2];
     unsigned char  i_ra[WIFINET_ADDR_LEN];
-
 } __packed;
 
 struct wifi_mac_frame_ack
@@ -936,7 +752,6 @@ struct wifi_mac_frame_ack
     unsigned char  i_fc[2];
     unsigned char  i_dur[2];
     unsigned char  i_ra[WIFINET_ADDR_LEN];
-
 } __packed;
 
 struct wifi_mac_frame_pspoll
@@ -945,7 +760,6 @@ struct wifi_mac_frame_pspoll
     unsigned char  i_aid[2];
     unsigned char  i_bssid[WIFINET_ADDR_LEN];
     unsigned char  i_ta[WIFINET_ADDR_LEN];
-
 } __packed;
 
 struct wifi_mac_frame_cfend
@@ -954,10 +768,7 @@ struct wifi_mac_frame_cfend
     unsigned char  i_dur[2];
     unsigned char  i_ra[WIFINET_ADDR_LEN];
     unsigned char  i_bssid[WIFINET_ADDR_LEN];
-
 } __packed;
-
-
 
 #define WIFINET_CAPINFO_ESS             0x0001
 #define WIFINET_CAPINFO_IBSS            0x0002
@@ -995,8 +806,6 @@ struct wifi_mac_ie_rsn
 #ifndef _BYTE_ORDER
 #error "Don't know native byte order"
 #endif
-
-
 
 struct wifi_mac_ie_htcap_cmn
 {
@@ -1150,8 +959,6 @@ enum
     WIFINET_HTINFO_RIFSMODE_ALLOWED,
 };
 
-
-
 enum
 {
     WIFINET_ELEMID_SSID     = 0,
@@ -1289,6 +1096,7 @@ struct wifi_mac_erp_ie
 #define WPA_ASE_NONE        0x00
 #define WPA_ASE_8021X_UNSPEC    0x01
 #define WPA_ASE_8021X_PSK   0x02
+#define WPA_ASE_8021X_SAE   0x08
 
 #define RSN_OUI         0xac0f00
 #define RSN_VERSION     1
@@ -1303,6 +1111,7 @@ struct wifi_mac_erp_ie
 #define RSN_ASE_NONE        0x00
 #define RSN_ASE_8021X_UNSPEC    0x01
 #define RSN_ASE_8021X_PSK   0x02
+#define RSN_ASE_8021X_SAE   0x08
 
 #define RSN_CAP_PREAUTH     0x01
 
@@ -1322,6 +1131,7 @@ struct wifi_mac_erp_ie
 
 #define WIFINET_AUTH_ALG_OPEN       0x0000
 #define WIFINET_AUTH_ALG_SHARED 0x0001
+#define WIFINET_AUTH_ALG_SAE 0x0003
 
 enum
 {
@@ -1394,11 +1204,8 @@ enum
 #define WIFINET_MTU_MAX     2290
 #define WIFINET_MTU_MIN     32
 
-
 #define WIFINET_MIN_LEN (sizeof(struct wifi_mac_frame_min))
 #define WIFINET_N_MAX_FRAMELEN  3839
-
-
 
 #define WIFINET_AID_MAX     2007
 #define WIFINET_AID_DEF     (WIFI_MAX_STA+1)
@@ -1436,49 +1243,6 @@ struct wifi_mac_ie_ext_cap
     unsigned char ext3_capflags[4];
 } __packed;
 
-
-struct wifi_mac_ie_bss_coex
-{
-    unsigned char elem_id;
-    unsigned char elem_len;
-#if _BYTE_ORDER == _BIG_ENDIAN
-    unsigned char reserved1          : 1,
-    reserved2          : 1,
-    reserved3          : 1,
-    obss_exempt_grant  : 1,
-    obss_exempt_req    : 1,
-    ht20_width_req       : 1,
-    ht40_intolerant      : 1,
-    inf_request        : 1;
-#else
-    unsigned char inf_request        : 1,
-    ht40_intolerant      : 1,
-    ht20_width_req       : 1,
-    obss_exempt_req    : 1,
-    obss_exempt_grant  : 1,
-    reserved3          : 1,
-    reserved2          : 1,
-    reserved1          : 1;
-#endif
-} __packed;
-
-
-struct wifi_mac_ie_intolerant_report
-{
-    unsigned char elem_id;
-    unsigned char elem_len;
-    unsigned char reg_class;
-    unsigned char chan_list[0];
-} __packed;
-
-struct wifi_mac_action_bss_coex_frame
-{
-    struct wifi_mac_action                ac_header;
-    struct wifi_mac_ie_bss_coex           coex;
-    struct wifi_mac_ie_intolerant_report    chan_report;
-} __packed;
-
-
 struct wifi_mac_txparam
 {
     uint8_t     ucastrate;
@@ -1487,60 +1251,8 @@ struct wifi_mac_txparam
     uint8_t     maxretry;
 };
 
-
-/*ht info set and get operation*/
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 #define SET_HT_CAP_INFO_LGSIG_TXOP_PRCT(dst, val) do {(dst) &= ~(0x1 <<15) ; (dst) |= (val) << 15;}while(0)
 	#define HT_CAP_INFO_NOT_SPT_LGSIG_TXOP_PRCT	(0)
-
-
-//take add blow code 20170112
-/*
- * 802.11ac Operating Mode  Notification
- */
-struct wifi_mac_ie_op_mode {
-#if _BYTE_ORDER == _BIG_ENDIAN
-        unsigned char rx_nss_type        : 1,
-                 rx_nss             : 3,
-                 reserved           : 2,
-                 ch_width           : 2;
-#else
-        unsigned char ch_width           : 2,
-                 reserved           : 2,
-                 rx_nss             : 3,
-                 rx_nss_type        : 1;
-#endif
-} __packed;
-
-struct wifi_mac_ie_op_mode_ntfy {
-        unsigned char    elem_id;
-        unsigned char    elem_len;
-        struct wifi_mac_ie_op_mode opmode;
-} __packed;
-
-
-/* VHT - recommended Channel width and Nss */
-struct wifi_mac_action_vht_opmode {
-    struct wifi_mac_action     at_header;
-    struct wifi_mac_ie_op_mode at_op_mode;
-} __packed;
-
-
-
 
 /* VHT capability flags */
 /* B0-B1 Maximum MPDU Length */
@@ -1805,9 +1517,6 @@ enum
 
 struct wifi_scan_info;
 struct wlan_net_vif;
-//enum wifi_mac_opmode;
-
-
 
 struct WmeParamDefault
 {
@@ -1884,5 +1593,7 @@ static const unsigned char log_cwwin_BE_agg_log[WIFINET_WMM_PHYMODE_MAX] =
     4,
     3,
 };
+
+#define AML_GET_LE16(a) ((u16) (((a)[1] << 8) | (a)[0]))
 
 #endif /* _NET80211_IEEE80211_H_ */

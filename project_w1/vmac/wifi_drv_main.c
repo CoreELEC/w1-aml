@@ -25,6 +25,7 @@
 #include "patch_fi_cmd.h"
 #include "wifi_mac_chan.h"
 #include "wifi_hal_platform.h"
+#include "wifi_mac_action.h"
 
 static char *version = "(Amlogic) 2018-06-01 v1.00" ;
 static char *dev_info = "aml_sdio";
@@ -1518,10 +1519,8 @@ static void drv_tx_pkt_clear(void *drv_priv)
 }
 
 static void
-drv_intr_rx_ok(void * dpriv,struct sk_buff *skb,
-    unsigned char Rssi,unsigned char vendor_rate_code,
-    unsigned char channel, unsigned char aggr,
-    unsigned char wnet_vif_id, unsigned char keyid)
+drv_intr_rx_ok(void * dpriv,struct sk_buff *skb, unsigned char Rssi,unsigned char vendor_rate_code,
+    unsigned char channel, unsigned char aggr, unsigned char wnet_vif_id, unsigned char keyid)
 {
 
     struct wifi_mac       *wifimac;
@@ -1562,7 +1561,62 @@ drv_intr_rx_ok(void * dpriv,struct sk_buff *skb,
     }
 }
 
+static int pmf_encrypt_pkt_handle(void *dpriv, struct sk_buff *skb, unsigned char rssi,
+    unsigned char vendor_rate_code, unsigned char channel, unsigned char aggr, unsigned char wnet_vif_id, unsigned char keyid)
+{
 
+    struct wifi_mac *wifimac;
+    struct drv_private *drv_priv= (struct drv_private *)dpriv;
+    struct sk_buff *skbbuf = ( struct sk_buff *)skb;
+    struct wifi_frame *wh;
+    struct wifi_mac_rx_status rxstatus;
+    int type;
+    int rate_index = 0;
+    unsigned char pkt_type;
+    unsigned char is_protect;
+
+    wh = (struct wifi_frame *)os_skb_data(skb);
+    pkt_type = wh->i_fc[0] & WIFINET_FC0_TYPE_MASK;
+    is_protect = wh->i_fc[1] & WIFINET_FC1_WEP;
+    if (!((pkt_type == WIFINET_FC0_TYPE_MGT) && is_protect)) {
+        return 1;
+
+    } else {
+    #if 0
+        unsigned char i;
+
+        printk("pmf pkt, not drop\n");
+        for (i = 0; i < 32; ++i) {
+            printk("%02x:", ((unsigned char *)wh)[i]);
+        }
+        printk("\n");
+    #endif
+    }
+
+    wifimac = drv_priv->wmac;
+    rate_index = drv_rate_findindex_from_ratecode(drv_priv->drv_currratetable, vendor_rate_code);
+
+    rxstatus.rs_flags = aggr;
+    rxstatus.rs_channel = channel;
+    rxstatus.rs_rssi = rssi;
+    rxstatus.rs_datarate = drv_priv->drv_currratetable->info[rate_index].rateKbps;
+    rxstatus.rs_tstamp.tsf = jiffies;
+    rxstatus.rs_wnet_vif_id = wnet_vif_id;
+    rxstatus.rs_keyid = keyid ;
+
+    __D(AML_DEBUG_RX, "%s:%d, frame type:0x%x\n", __func__, __LINE__, wh->i_fc[0]);
+    if (!list_empty(&wifimac->wm_wnet_vifs)) {
+        drv_priv->drv_stats.rx_indicate_cnt++;
+        type = drv_rx_indicate(drv_priv, skbbuf, &rxstatus);
+
+    } else {
+        __D(AML_DEBUG_RX, "%s:%d, wnet_vif empty, frame type:0x%x\n", __func__, __LINE__, wh->i_fc[0]);
+        drv_priv->drv_stats.rx_free_skb_cnt++;
+        os_skb_free(skb);
+    }
+
+    return 0;
+}
 
 #ifdef CONFIG_P2P
 void p2p_noa_start_irq (struct wifi_mac_p2p *p2p,
@@ -2133,7 +2187,7 @@ static void drv_trigger_send_delba(SYS_TYPE param1,
                 RxTidState = &drv_sta->rx_scb[tid_index];
 
                 if (RxTidState->rx_addba_exchangecomplete) {
-                    actionargs.category = WIFINET_ACTION_CAT_BA;
+                    actionargs.category = AML_CATEGORY_BACK;
                     actionargs.action = WIFINET_ACTION_BA_DELBA;
                     actionargs.arg1 = tid_index;
                     /*
@@ -2294,6 +2348,7 @@ struct aml_hal_call_backs hal_call_back_table =
     .intr_tx_ok_timeout = drv_tx_ok_timeout,
     .intr_tx_pkt_clear = drv_tx_pkt_clear,
     .intr_rx_handle = drv_intr_rx_ok,
+    .pmf_encrypt_pkt_handle = pmf_encrypt_pkt_handle,
     .intr_bcn_send = drv_intr_bcn_send_ok,
     .intr_dtim_send = drv_intr_dtim_send_ok,
     .intr_ba_recv = drv_intr_ba_recv_ok,

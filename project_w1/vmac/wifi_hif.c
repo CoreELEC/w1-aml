@@ -90,6 +90,7 @@ void hif_init_ops(void)
 }
 
 #ifdef DRV_PT_SUPPORT
+extern void do_gettimeofday(struct timeval *tv);
 void b2b_rx_throughput_calc(HW_RxDescripter_bit *RxPrivHdr)
 {
     static int rx_count=0;

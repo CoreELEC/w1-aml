@@ -35,6 +35,7 @@ cmd_to_func_table_t cmd_to_func[] =
     {"set_eat_count", aml_set_eat_count_max},
     {"set_aggr_thresh", aml_set_aggr_thresh},
     {"set_hrt_int", aml_set_hrtimer_interval},
+    {"get_ap_ip", aml_get_ap_ip},
     {"", NULL},
 };
 
@@ -87,7 +88,7 @@ int aml_sta_send_addba_req(struct wlan_net_vif *wnet_vif, char* buf, int len)
 
     skip = strlen("sta_send_bareq") + 1;
     sscanf(buf + skip, "%s %d", mac, &tid);
-    vm_send_addba_req(buf + skip, tid);
+    wifi_mac_send_addba_req(buf + skip, tid);
     return 0;
 }
 
@@ -280,7 +281,7 @@ int aml_sta_send_coexist_mgmt(struct wlan_net_vif *wnet_vif, char* buf, int len)
     int skip = 0;
 
     skip = strlen("send_bss_coex") + 1;
-    vm_sta_send_coexist_mgmt(buf + skip);
+    wifi_mac_send_coexist_mgmt(buf + skip);
     return 0;
 }
 
@@ -353,7 +354,7 @@ int aml_wmm_ac_addts(struct wlan_net_vif *wnet_vif, char* buf, int len)
     char sep = ' ';
     skip = strlen("wmm_ac_addts") + 1;
     arg = aml_cmd_char_prase(sep, buf + skip, &cmd_arg);
-    vm_wmm_ac_addts(arg);
+    wifi_mac_send_wmm_ac_addts(arg);
     return 0;
 }
 
@@ -361,7 +362,7 @@ int aml_wmm_ac_delts(struct wlan_net_vif *wnet_vif, char* buf, int len)
 {
     int skip = 0;
     skip = strlen("wmm_ac_delts") + 1;
-    vm_wmm_ac_delts(buf + skip);
+    wifi_mac_send_wmm_ac_delts(buf + skip);
     return 0;
 }
 
@@ -647,6 +648,19 @@ int aml_set_hrtimer_interval(struct wlan_net_vif *wnet_vif, char* buf, int len)
     }
 
     kfree(arg);
+    return 0;
+}
+
+int aml_get_ap_ip(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    if (!(wnet_vif->vm_mainsta->sta_arp_flag & WIFI_ARP_GET_AP_IP)) {
+        wifi_mac_send_arp_req(wnet_vif);
+
+    } else {
+        printk("ap ip is:%d:%d:%d:%d\n", wnet_vif->vm_mainsta->sta_ap_ip[0],
+            wnet_vif->vm_mainsta->sta_ap_ip[1], wnet_vif->vm_mainsta->sta_ap_ip[2], wnet_vif->vm_mainsta->sta_ap_ip[3]);
+    }
+
     return 0;
 }
 

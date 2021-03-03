@@ -36,32 +36,32 @@
 
 struct wifi_mac_security;
 
-
+#define WIFINET_KEY_XMIT 0x01
+#define WIFINET_KEY_RECV 0x02
+#define WIFINET_KEY_GROUP 0x04
+#define WIFINET_KEY_MFP 0x08
+#define WIFINET_KEY_SWCRYPT 0x10
+#define WIFINET_KEY_SWMIC 0x20
+#define WIFINET_KEY_PERSTA 0x80
+#define WIFINET_KEY_NOFREE 0x40
 
 struct wifi_mac_key
 {
-    unsigned char  wk_keylen;
-    unsigned char  wk_flags;
-    int         wk_valid;
-#define WIFINET_KEY_XMIT        0x01
-#define WIFINET_KEY_RECV        0x02
-#define WIFINET_KEY_GROUP       0x04
-#define WIFINET_KEY_MFP       0x08
-#define WIFINET_KEY_SWCRYPT 0x10
-#define WIFINET_KEY_SWMIC       0x20
-#define WIFINET_KEY_PERSTA  0x80
-#define WIFINET_KEY_NOFREE      0x40
-
+    unsigned char wk_keylen;
+    unsigned char wk_flags;
+    unsigned char wk_key_type;
+    unsigned char wk_valid;
     unsigned short wk_keyix;
-    unsigned char  wk_key[WIFINET_KEYBUF_SIZE+WIFINET_MICBUF_SIZE];
-#define wk_txmic    wk_key+WIFINET_KEYBUF_SIZE+0
-#define wk_rxmic    wk_key+WIFINET_KEYBUF_SIZE+8
+    unsigned char wk_key[WIFINET_KEYBUF_SIZE + WIFINET_MICBUF_SIZE];
 
-    u_int64_t   wk_keyrsc[WIFINET_TID_SIZE];
-    u_int64_t   wk_keytsc;
+#define wk_txmic wk_key + WIFINET_KEYBUF_SIZE+0
+#define wk_rxmic wk_key + WIFINET_KEYBUF_SIZE+8
+
+    unsigned char wk_keyrsc[WIFINET_TID_SIZE];
+    u_int64_t wk_keytsc;
     const struct wifi_mac_security *wk_cipher;
-    void        *wk_private;
-    unsigned short   wk_clearkeyix;
+    void *wk_private;
+    unsigned short wk_clearkeyix;
 };
 #define WIFINET_KEY_COMMON      \
         (WIFINET_KEY_XMIT | WIFINET_KEY_RECV | WIFINET_KEY_GROUP)
@@ -72,7 +72,8 @@ struct wifi_mac_key
 #define WIFINET_CIPHER_AES_OCB  2
 #define WIFINET_CIPHER_AES_CCM  3
 #define WIFINET_CIPHER_WPI      4
-#define WIFINET_CIPHER_NONE 5
+#define WIFINET_CIPHER_AES_CMAC 5
+#define WIFINET_CIPHER_NONE 6
 
 #define WIFINET_CIPHER_MAX      (WIFINET_CIPHER_NONE+1)
 
@@ -92,29 +93,17 @@ struct wlan_net_vif;
 struct wifi_station;
 struct sk_buff;
 
-void    wifi_mac_security_attach(struct wifi_mac *);
-void    wifi_mac_security_detach(struct wifi_mac *);
-void    wifi_mac_security_vattach(struct wlan_net_vif *);
-void    wifi_mac_security_vdetach(struct wlan_net_vif *);
-int     wifi_mac_security_req(struct wlan_net_vif *,
-                             int cipher,
-                             int flags,
-                             struct wifi_mac_key *);
+void wifi_mac_security_attach(struct wifi_mac *);
+void wifi_mac_security_detach(struct wifi_mac *);
+void wifi_mac_security_vattach(struct wlan_net_vif *);
+void wifi_mac_security_vdetach(struct wlan_net_vif *);
+int wifi_mac_security_req(struct wlan_net_vif *, int cipher, int flags, struct wifi_mac_key *);
 
-int wifi_mac_sec_delt_key(struct wlan_net_vif *,
-                      struct wifi_mac_key *,
-                      struct wifi_station *);
-
-int wifi_mac_security_setkey(struct wlan_net_vif *,
-                            struct wifi_mac_key *,
-                            const unsigned char macaddr[WIFINET_ADDR_LEN],
-                            struct wifi_station *);
-
-int wifi_mac_security_set_rekey_data(struct wlan_net_vif *wnet_vif,
-                            struct wifi_mac_rekey_data rekey_data);
-
-void    wifi_mac_security_delt_default_key(struct wlan_net_vif *);
-
+int wifi_mac_sec_delt_key(struct wlan_net_vif *, struct wifi_mac_key *, struct wifi_station *);
+int wifi_mac_security_setkey(struct wlan_net_vif *, struct wifi_mac_key *,
+    const unsigned char macaddr[WIFINET_ADDR_LEN], struct wifi_station *);
+int wifi_mac_security_set_rekey_data(struct wlan_net_vif *wnet_vif, struct wifi_mac_rekey_data rekey_data);
+void wifi_mac_security_delt_default_key(struct wlan_net_vif *);
 
 struct wifi_mac_security
 {
@@ -137,35 +126,26 @@ extern  const struct wifi_mac_security wifi_mac_cipher_wep;
 extern  const struct wifi_mac_security wifi_mac_cipher_tkip;
 extern  const struct wifi_mac_security wifi_mac_cipher_ccmp;
 
-int     wifi_mac_security_available(unsigned int cipher);
+int wifi_mac_security_available(unsigned int cipher);
+struct wifi_mac_key *wifi_mac_security_encap(struct wifi_station *, struct sk_buff *);
+struct wifi_mac_key *wifi_mac_security_decap(struct wifi_station *, struct sk_buff *, int);
 
-struct wifi_mac_key *wifi_mac_security_encap(struct wifi_station *,
-        struct sk_buff *);
-struct wifi_mac_key *wifi_mac_security_decap(struct wifi_station *,
-        struct sk_buff *, int);
-
-
-static __inline int
-wifi_mac_security_demic(struct wlan_net_vif *wnet_vif, struct wifi_mac_key *k,
-                       struct sk_buff *skb, int hdrlen, int force)
+static __inline int wifi_mac_security_demic(struct wlan_net_vif *wnet_vif, struct wifi_mac_key *k,
+    struct sk_buff *skb, int hdrlen, int force)
 {
     const struct wifi_mac_security *cip = k->wk_cipher;
     return (cip->wm_miclen > 0 ? cip->wm_demic(k, skb, hdrlen, force) : 1);
 }
 
-
-static __inline int
-wifi_mac_security_enmic(struct wlan_net_vif *wnet_vif,
-                       struct wifi_mac_key *k, struct sk_buff *skb, int force)
+static __inline int wifi_mac_security_enmic(struct wlan_net_vif *wnet_vif,
+    struct wifi_mac_key *k, struct sk_buff *skb, int force)
 {
     const struct wifi_mac_security *cip = k->wk_cipher;
     return (cip->wm_miclen > 0 ? cip->wm_enmic(k, skb, force) : 1);
 }
 
-
-static __inline void
-wifi_mac_security_resetkey(struct wlan_net_vif *wnet_vif,
-                          struct wifi_mac_key *k, unsigned short ix)
+static __inline void wifi_mac_security_resetkey(struct wlan_net_vif *wnet_vif,
+    struct wifi_mac_key *k, unsigned short ix)
 {
     k->wk_cipher = &wifi_mac_cipher_none;;
     k->wk_private = k->wk_cipher->wm_attach(wnet_vif, k);
@@ -173,7 +153,7 @@ wifi_mac_security_resetkey(struct wlan_net_vif *wnet_vif,
     k->wk_flags = WIFINET_KEY_XMIT | WIFINET_KEY_RECV;
 }
 
-void    wifi_mac_notify_mic_fail(struct wlan_net_vif *, const struct wifi_frame *, unsigned int key_index);
+void wifi_mac_notify_mic_fail(struct wlan_net_vif *, const struct wifi_frame *, unsigned int key_index);
 #endif /* defined(__KERNEL__) || defined(_KERNEL) */
 
 int wifi_mac_key_delete(struct wlan_net_vif *wnet_vif, const struct wifi_mac_key *k, struct wifi_station *stanfo);

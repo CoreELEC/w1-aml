@@ -12,14 +12,12 @@ ARCH ?= arm64
 CROSS_COMPILE ?= aarch64-linux-gnu-
 EXTRA_CFLAGS += -DSYSTEM64
 #SRCTOP ?= /mnt/fileroot2/vlsi.wifi/p-amlogic
-#SRCTOP ?= /mnt/fileroot2/vlsi.wifi/l_p212
-#SRCTOP ?= /mnt/fileroot2/vlsi.wifi/yeke
-SRCTOP ?= /mnt/fileroot02/yuan.wang/ipc_prj
+SRCTOP ?= /mnt/fileroot2/vlsi.wifi/yeke_64bit
+#SRCTOP ?= /mnt/fileroot02/yuan.wang/ipc_prj
 else
 ARCH ?= arm
 CROSS_COMPILE ?= arm-linux-gnueabihf-
 EXTRA_CFLAGS += -DSYSTEM32
-#SRCTOP ?= /mnt/fileroot2/vlsi.wifi/yeke_32bit
 SRCTOP ?= /mnt/fileroot2/vlsi.wifi/p212_32bit
 endif
 
@@ -75,7 +73,7 @@ EXTRA_CFLAGS += -DSDIO_BUILD_IN
 #EXTRA_CFLAGS += -DCONFIG_DPD_ENABLE
 EXTRA_CFLAGS += -DFW_RF_CALIBRATION
 #EXTRA_CFLAGS += -DPOWER_SAVE_NO_SDIO
-EXTRA_CFLAGS += -DSUPPORT_80211W
+EXTRA_CFLAGS += -DAML_WPA3
 
 ifeq ($(UNOENV),$(UNO_GXL))
 EXTRA_CFLAGS += -DCONFIG_GXL
@@ -93,7 +91,7 @@ aml_sdio-objs += w1_sdio/w1_sdio.o
 
 obj-m += $(TARGET).o
 DISCARD :=
-SRC_FILE := $(wildcard $(CUR_DIR)/*.c $(CUR_DIR)/rf_t9026/*.c)
+SRC_FILE := $(wildcard $(CUR_DIR)/*.c $(CUR_DIR)/rf_t9026/*.c $(CUR_DIR)/crypto/*.c)
 TARGET_FILE = $(subst $(CUR_DIR)/,, $(SRC_FILE:%.c=%.o))
 
 ifneq ($(CONFIG_SDIO),)

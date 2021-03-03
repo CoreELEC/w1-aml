@@ -188,13 +188,14 @@ struct sk_buff *_wifi_mac_beacon_alloc(struct wifi_station *sta, struct wifi_mac
                + sizeof(struct wifi_mac_ie_vht_txpwr_env)
                + sizeof(struct wifi_mac_ie_vht_ch_sw_wrp);
 
-    skb = wifi_mac_get_mgmt_frm(wifimac, &frm, pktlen);
+    skb = wifi_mac_get_mgmt_frm(wifimac, pktlen);
     if (skb == NULL)
     {
         WIFINET_DPRINTF_STA( AML_DEBUG_ANY, sta, "cannot get buf; size %u", pktlen);
         wnet_vif->vif_sts.sts_tx_no_buf++;
         return NULL;
     }
+    frm = os_skb_put(skb, pktlen);
 
     frm = wifi_mac_beacon_init(sta, bo, frm);
     os_skb_trim(skb, frm - os_skb_data(skb));

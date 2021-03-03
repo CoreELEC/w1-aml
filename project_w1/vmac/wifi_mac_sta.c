@@ -50,7 +50,6 @@ void wifi_mac_station_init(struct wlan_net_vif *wnet_vif)
     rsn->rsn_mcastkeylen = 128 / NBBY;
 
     rsn->rsn_keymgmtset = WPA_ASE_8021X_UNSPEC | WPA_ASE_8021X_PSK;
-    rsn->rsn_keymgmt = WPA_ASE_8021X_PSK;
 }
 
 void
@@ -281,8 +280,11 @@ int wifi_mac_connect(struct wlan_net_vif *wnet_vif, struct wifi_scan_info *se)
     sta->sta_capinfo = se->SI_capinfo;
     sta->sta_rsn = wnet_vif->vm_mainsta->sta_rsn;
     sta->sta_listen_intval = DEFAULT_LISTEN_INTERVAL;
-#ifdef SUPPORT_80211W
+#ifdef AML_WPA3
     sta->sta_flags_ext = (wnet_vif->vm_mainsta->sta_flags_ext & WIFINET_NODE_MFP);
+    if (sta->sta_flags_ext & WIFINET_NODE_MFP) {
+        wifi_mac_disable_hw_mgmt_decrypt();
+    }
 #endif
     if (se->ie_vht_opt_md_ntf[1]) {
         sta->sta_opt_mode = se->ie_vht_opt_md_ntf[2];
@@ -694,6 +696,7 @@ wifi_mac_get_sta_node(struct wifi_station_tbl *nt,
     sta->sta_authmode = WIFINET_AUTH_OPEN;
     sta->sta_txpower = wifimac->wm_txpowlimit;
     wifi_mac_security_resetkey(wnet_vif, &sta->sta_ucastkey, WIFINET_KEYIX_NONE);
+    wifi_mac_security_resetkey(wnet_vif, &sta->pmf_key, WIFINET_KEYIX_NONE);
     sta->sta_inact_reload = nt->nt_inact_init;
     sta->sta_inact = sta->sta_inact_reload;
     WIFINET_SAVEQ_INIT(&(sta->sta_pstxqueue), "unknown");
@@ -1091,8 +1094,7 @@ struct wifi_station * wifi_mac_find_mgmt_tx_sta(struct wlan_net_vif *wnet_vif, c
         if (sta->sta_wnet_vif != wnet_vif)
         {
             vm_StaAtomicDec(&sta);
-            WIFINET_DPRINTF_MACADDR( AML_DEBUG_XMIT, mac,
-                                     "no nsta, discard frame (%s)", __func__);
+            WIFINET_DPRINTF_MACADDR(AML_DEBUG_XMIT, mac, "no nsta, discard frame (%s)", __func__);
             wnet_vif->vif_sts.sts_tx_no_sta++;
             return NULL;
         }
@@ -1704,8 +1706,7 @@ void wifi_mac_sta_deauth(void *arg, struct wifi_station *sta)
     if (sta->sta_wnet_vif == wnet_vif)
     {
         printk("<running> %s %d \n",__func__,__LINE__);
-        wifi_mac_send_mgmt(sta, WIFINET_FC0_SUBTYPE_DEAUTH,
-                          (void *)&mgmt_arg);
+        wifi_mac_send_mgmt(sta, WIFINET_FC0_SUBTYPE_DEAUTH, (void *)&mgmt_arg);
     }
 }
 void wifi_mac_func_to_task(struct wifi_station_tbl *nt, wifi_mac_IterFunc *f, void *arg,unsigned char btask)
@@ -1727,7 +1728,7 @@ void wifi_mac_func_to_task(struct wifi_station_tbl *nt, wifi_mac_IterFunc *f, vo
                 (void) vm_StaAtomicInc(sta, __func__);
                 //WIFINET_SCAN_UNLOCK(nt);
                 wifi_mac_add_work_task(nt->nt_wmac,wifi_mac_func_to_task_cb,
-                                      NULL,(SYS_TYPE)f,(SYS_TYPE)arg,(SYS_TYPE)sta,(SYS_TYPE)sta->sta_wnet_vif,(SYS_TYPE)sta->sta_wnet_vif->wnet_vif_replaycounter);
+                    NULL,(SYS_TYPE)f,(SYS_TYPE)arg,(SYS_TYPE)sta,(SYS_TYPE)sta->sta_wnet_vif,(SYS_TYPE)sta->sta_wnet_vif->wnet_vif_replaycounter);
             }
             else
             {
@@ -2116,9 +2117,7 @@ wifi_mac_StationDetach(struct wifi_mac *wifimac)
     os_timer_ex_del(&wifimac->wm_inact_timer, CANCEL_SLEEP);
 }
 
-
-
-struct sk_buff *wifi_mac_get_mgmt_frm(struct wifi_mac *wifimac, unsigned char **frm, unsigned int pktlen)
+struct sk_buff *wifi_mac_get_mgmt_frm(struct wifi_mac *wifimac, unsigned int pktlen)
 {
     const unsigned int align = sizeof(unsigned int);
     struct wifi_skb_callback *cb;
@@ -2138,7 +2137,6 @@ struct sk_buff *wifi_mac_get_mgmt_frm(struct wifi_mac *wifimac, unsigned char **
         cb->flags = 0;
         cb->hdrsize = sizeof(struct wifi_frame);
         skb_reserve(skb, sizeof(struct wifi_frame));
-        *frm = os_skb_put(skb, pktlen);
     }
     return skb;
 }
