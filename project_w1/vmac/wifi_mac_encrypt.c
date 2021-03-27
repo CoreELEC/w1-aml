@@ -95,16 +95,15 @@ static int wifi_mac_security_delkey(struct wlan_net_vif *wnet_vif, struct wifi_m
     unsigned short key_index;
 
     KASSERT(key->wk_cipher != NULL, ("No cipher!"));
-    DPRINTF( AML_DEBUG_KEY, "%s: delete key sta %p\n", __func__,sta);
+    DPRINTF(AML_DEBUG_KEY, "%s: delete key sta %p\n", __func__,sta);
 
     key_index = key->wk_keyix;
-    if((key_index != WIFINET_KEYIX_NONE)/*||(vmac->vm_opmode == WIFINET_M_STA)*/)
-    {
-
+    if (key_index != WIFINET_KEYIX_NONE) {
         wifi_mac_key_delete(wnet_vif, key, sta);
     }
     key->wk_cipher->wm_detach(key);
     memset(key, 0, sizeof(*key));
+
     wifi_mac_security_resetkey(wnet_vif, key, WIFINET_KEYIX_NONE);
     return 1;
 }
@@ -866,37 +865,16 @@ const struct wifi_mac_security wifi_mac_cipher_tkip  =
 };
 
 int wifi_mac_key_delete(struct wlan_net_vif *wnet_vif, const struct wifi_mac_key *k,
-                       struct wifi_station *stanfo)
+    struct wifi_station *stanfo)
 {
     struct wifi_mac *wifimac = wnet_vif->vm_wmac;
     int staid = 0;
-    DPRINTF( AML_DEBUG_KEY, "%s: delete key \n", __func__);
+    DPRINTF(AML_DEBUG_WARNING, "%s: delete key stanfo->sta_associd:%d\n", __func__, stanfo->sta_associd);
 
-    if (stanfo == NULL)
-    {
-        printk("<running> %s %d \n",__func__,__LINE__);
-        wifimac->drv_priv->drv_ops.key_delete(wifimac->drv_priv, wnet_vif->wnet_vif_id,
-                k->wk_keyix, 0);
-    }
-    else
-    {
-        staid = stanfo->sta_associd_bk &0xff;
-        if((staid <=0)||(staid>=wnet_vif->vm_max_aid))
-        {
-            DPRINTF( AML_DEBUG_WARNING, "%s: delete key sta_associd_bk ERROR!!! %x\n",
-                    __func__,stanfo->sta_associd_bk);
-            return 0;
-        }
-        printk("<running> %s %d stanfo->sta_associd_bk=%d\n",
-                __func__,__LINE__,staid);
-        wifimac->drv_priv->drv_ops.key_delete(wifimac->drv_priv,wnet_vif->wnet_vif_id,
-                k->wk_keyix, staid);
-        stanfo->sta_associd_bk = 0;
-    }
+    staid = stanfo->sta_associd & 0xff;
+    wifimac->drv_priv->drv_ops.key_delete(wifimac->drv_priv,wnet_vif->wnet_vif_id, k->wk_keyix, staid);
     return 1;
 }
-
-
 
 int wifi_mac_key_set(struct wlan_net_vif *wnet_vif, const struct wifi_mac_key *k,
     const unsigned char peermac[WIFINET_ADDR_LEN])

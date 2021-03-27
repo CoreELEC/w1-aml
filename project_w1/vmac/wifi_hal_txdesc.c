@@ -766,36 +766,43 @@ void hal_tx_desc_build(struct hi_agg_tx_desc* HiTxDesc,
     }
 
     wh =( struct wifi_qos_frame* ) pTxDPape->txdata;
-    if ((IS_VHT_RATE( DESC_RATE))
-        &&((wh->i_fc[0] & WIFINET_FC0_TYPE_MASK) == WIFINET_FC0_TYPE_MGT)){
+    if ((IS_VHT_RATE( DESC_RATE)) && !(HiTxDesc->FLAG & WIFI_IS_AGGR)) {
         TxVector_Bit->tv_single_ampdu = ((pTxDPape->MPDUBufFlag & (HW_LAST_AGG_FLAG|HW_FIRST_AGG_FLAG))
                                                         == (HW_LAST_AGG_FLAG|HW_FIRST_AGG_FLAG)); //:1,
         if (TxVector_Bit->tv_single_ampdu) {
             TxVector_Bit->tv_ack_policy =  ACK;
             wh->i_qos[0] &= ~( 0x3<<5 );  //change to Normal ack
         }
-    }else{
-    TxVector_Bit->tv_single_ampdu = 0;
+
+    } else {
+        TxVector_Bit->tv_single_ampdu = 0;
     }
-    TxVector_Bit->tv_wnet_vif_id=DESC_VID;
-    TxVector_Bit->tv_ack_to_en=((DESC_FLAG & WIFI_IS_NOACK) == 0);
-    TxVector_Bit->tv_ack_timeout=Hal_TxDescriptor_GetAckTimeout(DESC_RATE,DESC_PREMBLETYPE);
+
+    TxVector_Bit->tv_wnet_vif_id = DESC_VID;
+    TxVector_Bit->tv_ack_to_en = ((DESC_FLAG & WIFI_IS_NOACK) == 0);
+    TxVector_Bit->tv_ack_timeout = Hal_TxDescriptor_GetAckTimeout(DESC_RATE,DESC_PREMBLETYPE);
 
     TxVector_Bit->tv_ht.htbit.tv_format = hw_rate2tv_format(DESC_RATE);
     TxVector_Bit->tv_ht.htbit.tv_nonht_mod  = (hal_tx_desc_nonht_mode(DESC_RATE,bw));
     TxVector_Bit->tv_ht.htbit.tv_tx_pwr = hal_tx_desc_get_power(DESC_RATE);
     TxVector_Bit->tv_ht.htbit.tv_tx_rate = DESC_RATE;
-    TxVector_Bit->tv_ht.htbit.tv_Channel_BW= bw&0x3;
-    TxVector_Bit->tv_ht.htbit.tv_preamble_type=DESC_PREMBLETYPE;
-    TxVector_Bit->tv_ht.htbit.tv_GI_type= (!!(DESC_FLAG & WIFI_IS_SHORTGI));
+    TxVector_Bit->tv_ht.htbit.tv_Channel_BW = bw&0x3;
+    TxVector_Bit->tv_ht.htbit.tv_preamble_type = DESC_PREMBLETYPE;
+    TxVector_Bit->tv_ht.htbit.tv_GI_type = (!!(DESC_FLAG & WIFI_IS_SHORTGI));
     TxVector_Bit->tv_ht.htbit.tv_antenna_set = 0;
 
-    TxVector_Bit->tv_L_length= hal_tx_desc_get_len(DESC_RATE,DESC_LEN,
+    TxVector_Bit->tv_L_length = hal_tx_desc_get_len(DESC_RATE,DESC_LEN,
         DESC_IS_SHORTGI,DESC_BANDWIDTH,DESC_IS_GREEN);
-    TxVector_Bit->tv_sounding= 0;
-    TxVector_Bit->tv_ampdu_flag = DESC_IS_AMPDU;
+    TxVector_Bit->tv_sounding = 0;
 
-    TxVector_Bit->tv_length = DESC_LEN;
+    if (IS_VHT_RATE( DESC_RATE) && !(HiTxDesc->FLAG & WIFI_IS_AGGR)) {
+        TxVector_Bit->tv_length = DESC_LEN + 4; //add ampdu delimiter length
+        TxVector_Bit->tv_ampdu_flag = 1;
+    }
+    else {
+        TxVector_Bit->tv_length = DESC_LEN;
+        TxVector_Bit->tv_ampdu_flag = DESC_IS_AMPDU;
+    }
 
 #ifdef TX_STBC_TEST
     TxVector_Bit->tv_STBC = 1;
@@ -856,16 +863,11 @@ void hal_tx_desc_build(struct hi_agg_tx_desc* HiTxDesc,
 
     //mac3 add
     TxVector_Bit->tv_txcsum_enbale = 1;
-#ifdef TYPE_MGT_TX
-    /*shijie.chen add, Broadcast/multicast management frame are encrypted by driver.*/
-    if (((HiTxDesc->FLAG & WIFI_IS_Group)== WIFI_IS_Group)
-        && ((TxVector_Bit->tv_FrameControl & FRAME_TYPE_MASK)== 0))
+
+    if (HiTxDesc->FLAG & WIFI_IS_PMF)
         TxVector_Bit->tv_encrypted_disable = 1;
     else
         TxVector_Bit->tv_encrypted_disable = 0;
-#else
-    TxVector_Bit->tv_encrypted_disable = 0;
-#endif
 
     TxVector_Bit->tv_tkip_mic_enable = 1;
     TxVector_Bit->tv_dyn_bw_nonht = 0;
@@ -889,44 +891,43 @@ void hal_tx_desc_build(struct hi_agg_tx_desc* HiTxDesc,
         TxVector_Bit->tv_ch_bw_nonht = bw&0x3;
     }
 
+    PN_LOCK();
 #if defined (HAL_FPGA_VER)
     if (HiTxDesc->EncryptType !=  WIFI_NO_WEP)
     {
         pTxDPape->TxOption.KeyIdex = HiTxDesc->KeyId;
-        if ( HiTxDesc->FLAG & WIFI_IS_Group)
-        {
+        if (HiTxDesc->FLAG & WIFI_IS_Group) {
             PN  = (unsigned long long *)hal_priv->mRepCnt[HiTxDesc->vid].txPN;
             ASSERT( HiTxDesc->FLAG & WIFI_IS_NOACK);
-        }
-        else
-        {
+
+        } else {
             PN = (unsigned long long *)hal_priv->uRepCnt[HiTxDesc->vid][HiTxDesc->StaId].txPN[TX_UNICAST_REPCNT_ID];
         }
         switch (HiTxDesc->EncryptType)
         {
-            case   WIFI_WEP64:
+            case WIFI_WEP64:
                 break;
-            case   WIFI_TKIP:
+
+            case WIFI_TKIP:
                 memcpy(&pTxDPape->TxOption.PN[0],(unsigned char *)PN,8);
-                *PN = (*PN)+HiTxDesc->MpduNum;
+                *PN = (*PN) + HiTxDesc->MpduNum;
                 break;
-            case   WIFI_AES:
+
+            case WIFI_AES:
                 memcpy(&pTxDPape->TxOption.PN[0],(unsigned char *)PN,8);
-                *PN = (*PN)+HiTxDesc->MpduNum;
+                *PN = (*PN) + HiTxDesc->MpduNum;
                 break;
-            case   WIFI_WEP128:
-                //    PRINT("WIFI_WEP128 keyid = %d \n",HiTxDesc->KeyId);
+
+            case WIFI_WEP128:
                 break;
-            case   WIFI_WPI:
+
+            case WIFI_WPI:
                 memcpy(&pTxDPape->TxOption.PN[0],(unsigned char *)PN,MAX_PN_LEN);
-                for (i=0; i<HiTxDesc->MpduNum; i++)
-                {
-                    if ( HiTxDesc->FLAG & WIFI_IS_Group)
-                    {
+                for (i = 0; i < HiTxDesc->MpduNum; i++) {
+                    if ( HiTxDesc->FLAG & WIFI_IS_Group) {
                         hal_wpi_pn_self_plus(PN);
-                    }
-                    else
-                    {
+
+                    } else {
                         hal_wpi_pn_self_plus_plus(PN);
                     }
                 }
@@ -934,6 +935,7 @@ void hal_tx_desc_build(struct hi_agg_tx_desc* HiTxDesc,
         }
     }
 #endif
+    PN_UNLOCK();
 
     pTxDPape->TxPriv.AggrLen  = HiTxDesc->AGGR_len;
     pTxDPape->TxPriv.aggr_page_num =  HiTxDesc->aggr_page_num;

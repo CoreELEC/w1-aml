@@ -5,12 +5,26 @@ struct drv_txdesc *wifi_mac_alloc_txdesc(struct wifi_mac *wifimac)
 {
     struct drv_txdesc *ptxdesc = NULL;
     struct hal_private *hal_priv = hal_get_priv();
+    static unsigned char last_free_page_count = 0;
+    static unsigned char free_page_hold_count = 0;
 
     TX_DESC_BUF_LOCK(wifimac);
     if (list_empty(&wifimac->txdesc_freequeue)) {
         TX_DESC_BUF_UNLOCK(wifimac);
         DPRINTF(AML_DEBUG_WARNING, "%s no tx_desc, bhaltxdrop:%d, bhalPowerSave:%d, page:%d, drv_ps_status:%d, fw_ps_status:%d\n",
             __func__, hal_priv->bhaltxdrop, hal_priv->bhalPowerSave, hal_priv->txPageFreeNum, hal_priv->hal_drv_ps_status, hal_priv->hal_fw_ps_status);
+
+        if (last_free_page_count == hal_priv->txPageFreeNum) {
+            free_page_hold_count++;
+
+        } else {
+            last_free_page_count = hal_priv->txPageFreeNum;
+            free_page_hold_count = 0;
+        }
+
+        if (free_page_hold_count >= 50) {
+            printk("free_page_hold_count lager than 50, maybe we can reboot here\n");
+        }
         return NULL;
     }
 
@@ -28,7 +42,7 @@ void wifi_mac_recycle_txdesc(struct sk_buff *skbbuf)
     struct wifi_mac *wifimac = NULL;
     struct wifi_station *sta = txinfo->cb.sta;
 
-    if (sta == NULL) {
+    if ((sta == NULL) || (sta->sta_wnet_vif == NULL)) {
         printk("%s sta is NULL\n");
         return;
     }

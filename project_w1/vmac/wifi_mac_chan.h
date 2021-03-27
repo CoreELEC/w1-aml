@@ -23,4 +23,7 @@ struct wifi_channel *wifi_mac_get_main_vmac_channel(struct wifi_mac *wifimac);
 struct wifi_channel *wifi_mac_get_p2p_vmac_channel(struct wifi_mac *wifimac);
 void chan_dbg(struct wifi_channel *chan,  char* str, int line);
 void  wifi_mac_update_chan_list_by_country(int country_code, int support_opt[],int opt_num,struct wifi_mac *wifimac);
+void wifi_mac_enable_dfs_channel(struct wlan_net_vif *wnet_vif, int chan_num);
+void wifi_mac_disable_dfs_channel(struct wlan_net_vif *wnet_vif, int chan_num);
+
 #endif//__NET80211_CHAN_H__

@@ -36,5 +36,27 @@ typedef struct wifi_arp_pkt {
     unsigned char dst_ip_addr[IPV4_LEN];
 } wifi_arp_pkt;
 
+typedef struct wifi_mac_iphdr {
+    unsigned char version;
+    unsigned char tos;
+    unsigned short tot_len;
+    unsigned short id;
+    unsigned short frag_off;
+    unsigned char ttl;
+    unsigned char protocol;
+    unsigned short check;
+    unsigned int saddr;
+    unsigned int daddr;
+} wifi_ip_header;
+
+typedef struct wifi_udp_pkt {
+    unsigned short src_port;
+    unsigned short dst_port;
+    unsigned short len;
+    unsigned short checksum;
+    unsigned char data[0];
+} wifi_udp_pkt;
+
+
 #endif//_WIFI_MAC_ARP_H_
 

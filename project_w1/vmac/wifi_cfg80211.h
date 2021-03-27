@@ -12,8 +12,8 @@
  ****************************************************************************************
  */
 
-#ifndef __IOCTL_CFG80211_H__
-#define __IOCTL_CFG80211_H__
+#ifndef __WIFI_CFG80211_H__
+#define __WIFI_CFG80211_H__
 
 #include <linux/wireless.h>
 #include <linux/ieee80211.h>
@@ -21,23 +21,22 @@
 #include <net/rtnetlink.h>
 #include "wifi_mac_p2p.h"
 
-
 #define AMLOGIC_VENDOR_ID 0x8899
-#define AML_SCAN_IE_LEN_MAX      sizeof(struct wifi_scan_info)
+#define AML_SCAN_IE_LEN_MAX sizeof(struct wifi_scan_info)
 #define AML_MAX_NUM_PMKIDS 4
 #define AML_MAX_REMAIN_ON_CHANNEL_DURATION 3000
 
 #define AML_A_RATES_NUM 8
 #define AML_G_RATES_NUM 12
 
-#define CFG_CH_MAX_2G_CHANNEL               14
-#define AML_MAX_NUM_BANDS			2
+#define CFG_CH_MAX_2G_CHANNEL 14
+#define AML_MAX_NUM_BANDS 2
 
 #define AML_2G_CHANNELS_NUM ((sizeof(aml_2ghz_channels) / sizeof(struct ieee80211_channel)))
 #define AML_5G_CHANNELS_NUM ((sizeof(aml_5ghz_a_channels) / sizeof(struct ieee80211_channel)))
 
-#define aml_a_rates     (aml_rates + 4)
-#define aml_g_rates     (aml_rates + 0)
+#define aml_a_rates (aml_rates + 4)
+#define aml_g_rates (aml_rates + 0)
 #define BE_MAP 0x0009
 #define BK_MAP 0x0006
 #define VI_MAP 0x0030
@@ -210,10 +209,10 @@ struct vendor_sptr_snr_cmd
 
 union vendor_if
 {
-	char buf[0];
-	struct vendor_reg_cmd vnd_reg_cmd;
-	struct vendor_com_cmd vnd_com_cmd;
-	struct vendor_chn_bw_cmd vnd_chn_bw_cmd;
+    char buf[0];
+    struct vendor_reg_cmd vnd_reg_cmd;
+    struct vendor_com_cmd vnd_com_cmd;
+    struct vendor_chn_bw_cmd vnd_chn_bw_cmd;
     struct vendor_sptr_snr_cmd vendor_sptr_snr_cmd;
 };
 #pragma pack()

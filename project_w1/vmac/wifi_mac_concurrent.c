@@ -62,14 +62,14 @@ void concurrent_channel_protection(struct wlan_net_vif *wnet_vif, int times)
 {
     struct wifi_mac *wifimac = wnet_vif->vm_wmac;
 
-    DPRINTF(AML_DEBUG_CFG80211|AML_DEBUG_P2P, "%s wm_p2p_connection_protect_period:%d\n", __func__, times);
+    DPRINTF(AML_DEBUG_CFG80211, "%s wm_p2p_connection_protect_period:%d\n", __func__, times);
 
     wifimac->wm_p2p_connection_protect = 1;
     wifimac->wm_p2p_connection_protect_period = jiffies + times * HZ / 1000;
 }
 
 static void concurrent_vsdb_do_channel_change_ex(SYS_TYPE param1,
-                                            SYS_TYPE param2,SYS_TYPE param3, SYS_TYPE param4,SYS_TYPE param5)
+    SYS_TYPE param2,SYS_TYPE param3, SYS_TYPE param4,SYS_TYPE param5)
 {
     struct wifi_mac *wifimac = (struct wifi_mac *)param1;
     struct drv_private *drv_priv = wifimac->drv_priv;
@@ -211,6 +211,32 @@ unsigned char concurrent_check_is_vmac_same_pri_channel(struct wifi_mac *wifimac
         return (main_vmac->vm_curchan->chan_pri_num == p2p_vmac->vm_curchan->chan_pri_num);
     }
 }
+
+#ifdef AML_APSTA_CONCURRENT
+unsigned char concurrent_check_vmac_is_AP(struct wifi_mac *wifimac)
+{
+    struct drv_private *drv_priv = wifimac->drv_priv;
+    struct wlan_net_vif *p2p_vmac = drv_priv->drv_wnet_vif_table[NET80211_P2P_VMAC];
+    //DPRINTF(AML_DEBUG_P2P, "%s\n", __func__);
+    if (p2p_vmac->vm_opmode == WIFINET_M_HOSTAP)
+        return 1;
+    else
+        return 0;
+}
+
+struct wlan_net_vif *wifi_mac_running_main_wnet_vif(struct wifi_mac *wifimac)
+{
+    struct drv_private *drv_priv = wifimac->drv_priv;
+    struct wlan_net_vif *main_vmac = drv_priv->drv_wnet_vif_table[NET80211_MAIN_VMAC];
+
+    if (main_vmac->vm_state == WIFINET_S_CONNECTED)
+    {
+        return main_vmac;
+    }
+
+    return NULL;
+}
+#endif
 
 struct wlan_net_vif *wifi_mac_running_wnet_vif(struct wifi_mac *wifimac)
 {

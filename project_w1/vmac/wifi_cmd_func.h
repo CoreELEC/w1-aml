@@ -22,6 +22,22 @@ typedef struct cmd_to_func_table
      cmd_func_ptr cmd_proc_func;
 } cmd_to_func_table_t;
 
+struct udp_info
+{
+    struct os_timer_ext udp_send_timeout;
+    unsigned short dst_port;
+    unsigned short src_port;
+    unsigned int dst_ip;
+    unsigned int src_ip;
+    unsigned int seq;
+    unsigned short pkt_len;
+    unsigned char out;
+    unsigned char udp_timer_stop;
+    unsigned int tx;
+    unsigned int rx;
+};
+
+extern struct udp_info aml_udp_info;
 extern cmd_to_func_table_t cmd_to_func[];
 
 extern int aml_set_chip_id(struct wlan_net_vif *wnet_vif, char* buf, int len);
@@ -49,5 +65,17 @@ extern int aml_set_eat_count_max(struct wlan_net_vif *wnet_vif, char* buf, int l
 extern int aml_set_aggr_thresh(struct wlan_net_vif *wnet_vif, char* buf, int len);
 extern int aml_set_hrtimer_interval(struct wlan_net_vif *wnet_vif, char* buf, int len);
 extern int aml_get_ap_ip(struct wlan_net_vif *wnet_vif, char* buf, int len);
-
+extern int aml_set_roaming_threshold_2g(struct wlan_net_vif *wnet_vif, char* buf, int len);
+extern int aml_set_roaming_threshold_5g(struct wlan_net_vif *wnet_vif, char* buf, int len);
+extern int aml_get_roaming_candidate_chans(struct wlan_net_vif *wnet_vif, char* buf, int len);
+extern int aml_set_roaming_candidate_chans(struct wlan_net_vif *wnet_vif, char* buf, int len);
+extern int aml_set_roaming_mode(struct wlan_net_vif *wnet_vif, char* buf, int len);
+extern int wifi_mac_set_udp_info(char** buf);
+extern int aml_set_udp_info(struct wlan_net_vif *wnet_vif, char* buf, int len);
+extern int aml_get_udp_info(struct wlan_net_vif *wnet_vif, char* buf, int len);
+extern int aml_enable_dfs_channel(struct wlan_net_vif *wnet_vif, char* buf, int len);
+extern int aml_disable_dfs_channel(struct wlan_net_vif *wnet_vif, char* buf, int len);
+extern void wifi_mac_ap_set_country_code(char* arg);
+extern void wifi_mac_ap_set_11h(char** buf);
+extern void wifi_mac_ap_set_arp_rx(char** buf);
 #endif

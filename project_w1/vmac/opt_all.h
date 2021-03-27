@@ -42,29 +42,20 @@ extern struct hal_private g_hal_priv;
 #define POWER_END_LOCK()  OS_MUTEX_UNLOCK(&g_hal_priv.power_mutex);
 #define POWER_LOCK_DESTROY() mutex_destroy(&g_hal_priv.power_mutex);
 
-#define COMMON_LOCK_INIT()              \
-        spin_lock_init(&(g_hal_priv).com_spinlock)
-
+#define COMMON_LOCK_INIT() spin_lock_init(&(g_hal_priv).com_spinlock)
 #define COMMON_LOCK_DESTROY()
+#define COMMON_LOCK() do { OS_SPIN_LOCK_IRQ(&(g_hal_priv).com_spinlock, g_hal_priv.com_spinlock_flag); } while (0)
+#define COMMON_UNLOCK() do { OS_SPIN_UNLOCK_IRQ(&(g_hal_priv).com_spinlock, g_hal_priv.com_spinlock_flag); } while (0)
 
-#define COMMON_LOCK() do {              \
-                unsigned long __ilockflags;             \
-                OS_SPIN_LOCK_IRQ(&(g_hal_priv).com_spinlock, __ilockflags);
-
-#define COMMON_UNLOCK()                 \
-        OS_SPIN_UNLOCK_IRQ(&(g_hal_priv).com_spinlock, __ilockflags);    \
-        } while (0)
-
-#define AML_TXLOCK_INIT()           spin_lock_init(&(g_hal_priv).tx_spinlock)
+#define AML_TXLOCK_INIT() spin_lock_init(&(g_hal_priv).tx_spinlock)
 #define AML_TXLOCK_DESTROY()
-#define AML_TXLOCK_LOCK()           OS_SPIN_LOCK_IRQ(&(g_hal_priv).tx_spinlock, (g_hal_priv).__ilockflags);
-#define AML_TXLOCK_UNLOCK()      	OS_SPIN_UNLOCK_IRQ(&(g_hal_priv).tx_spinlock, (g_hal_priv).__ilockflags);
+#define AML_TXLOCK_LOCK() OS_SPIN_LOCK_IRQ(&(g_hal_priv).tx_spinlock, (g_hal_priv).tx_spinlock_flag);
+#define AML_TXLOCK_UNLOCK() OS_SPIN_UNLOCK_IRQ(&(g_hal_priv).tx_spinlock, (g_hal_priv).tx_spinlock_flag);
 
-#define AML_RXLOCK_INIT()           spin_lock_init(&(g_hal_priv).rx_spinlock)
-#define AML_RXLOCK_DESTROY()
-#define AML_RXLOCK_LOCK()           OS_SPIN_LOCK_BH(&(g_hal_priv).rx_spinlock);
-#define AML_RXLOCK_UNLOCK()     	OS_SPIN_UNLOCK_BH(&(g_hal_priv).rx_spinlock);
-
+#define PN_LOCK_INIT() spin_lock_init(&g_hal_priv.pn_spinlock)
+#define PN_LOCK_DESTROY()
+#define PN_LOCK() do {OS_SPIN_LOCK_IRQ(&g_hal_priv.pn_spinlock, g_hal_priv.pn_spinlock_flag); }while(0)
+#define PN_UNLOCK() do{OS_SPIN_UNLOCK_IRQ(&g_hal_priv.pn_spinlock, g_hal_priv.pn_spinlock_flag); }while(0)
 
 #define KILL_PROC(nr, sig) \
         { \
@@ -154,12 +145,6 @@ struct tasklet_struct{
 #define	AML_TXLOCK_DESTROY()
 #define	AML_TXLOCK_LOCK() 			//spin_lock_bh(&(g_hal_priv).tx_spinlock);
 #define	AML_TXLOCK_UNLOCK()		//spin_unlock_bh(&(g_hal_priv).tx_spinlock);
-
-#define	AML_RXLOCK_INIT()			//spin_lock_init(&(g_hal_priv).rx_spinlock)
-#define	AML_RXLOCK_DESTROY()
-#define	AML_RXLOCK_LOCK() 			//spin_lock_bh(&(g_hal_priv).rx_spinlock);
-#define	AML_RXLOCK_UNLOCK()		//spin_unlock_bh(&(g_hal_priv).rx_spinlock);
-
 
 #ifndef _LINUX_IRQRETURN_H
 #define _LINUX_IRQRETURN_H

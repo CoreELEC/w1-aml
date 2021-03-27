@@ -69,6 +69,12 @@ enum WIFI_countryenum
     WIFI_Japan,
     WIFI_Israel,//G channel->ch3-9;
     WIFI_Mexico, //G channel->ch10,11;
+    WIFI_Canada,
+    WIFI_India,
+    WIFI_Australia,
+    WIFI_NewZealand,
+    WIFI_Brazil,
+    WIFI_WW,
     WIFI_country_MAX, //G channel->ch10,11;
 };
 
@@ -362,7 +368,7 @@ drv_hal_put_bcn_buf(unsigned char wnet_vif_id,unsigned char *pBeacon,
 {
     struct hal_private* hal_priv = hal_get_priv();
     DPRINTF(AML_DEBUG_HAL|AML_DEBUG_BEACON,"<running> %s %d\n",__func__,__LINE__);
-    hal_priv->hal_ops.phy_set_bcn_buf(wnet_vif_id,pBeacon,len,Rate,Flag);
+    hal_priv->hal_ops.phy_set_bcn_buf(wnet_vif_id, pBeacon, len, Rate, Flag);
 }
 
 

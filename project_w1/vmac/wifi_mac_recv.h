@@ -5,6 +5,7 @@
 #include "wifi_mac_action.h"
 
 #define UNSUPPORTED_AUTH_ALGORITHM 13
+#define STATUS_INVALID_PMKID 53
 #define SUCCESS 0
 
 #define HAS_SEQ(type)   ((type & 0x4) == 0)
@@ -26,7 +27,7 @@
 
 #define WIFINET_VERIFY_LENGTH(_len, _minlen) do {         \
                 if ((_len) < (_minlen)) {                   \
-                        WIFINET_DPRINTF( AML_DEBUG_ELEMID,        \
+                        WIFINET_DPRINTF( AML_DEBUG_WARNING,        \
                                           "%s", "ie too short");              \
                         wnet_vif->vif_sts.sts_rx_elem_too_short++;            \
                         return;                         \
@@ -44,7 +45,7 @@
         } while (0)
 
 
-#define WAI_OUI_BE                 0x0050f201
+#define WAI_OUI_BE 0x0050f201
 #define WPA_SEL(x)  (((x)<<24)|WPA_OUI)
 #define RSN_SEL(x)  (((x)<<24)|RSN_OUI)
 
@@ -55,6 +56,7 @@ int iswpsoui(const unsigned char *frm);
 int iswfdoui(const unsigned char *frm);
 int isp2poui(const unsigned char *frm);
 
+void wifi_mac_forward_data(struct sk_buff *skb, struct wlan_net_vif *wnet_vif);
 int wifi_mac_rx_get_wnet_vifid(struct wifi_mac *wifimac,struct wifi_frame *wh);
 int wifi_mac_input(void *, struct sk_buff *, struct wifi_mac_rx_status *);
 int wifi_mac_input_all(struct wifi_mac *wifimac,struct sk_buff *skb, struct wifi_mac_rx_status *rs);
@@ -64,7 +66,9 @@ int rsn_cipher(unsigned char *sel, unsigned char *keylen);
 int rsn_keymgmt(unsigned char *sel);
 void wifi_mac_savenie(unsigned char **, const unsigned char *, size_t, char *name);
 void wifi_mac_saveie(unsigned char **, const unsigned char *, char *name);
-int wifi_mac_parse_rsn(struct wifi_station *sta, unsigned char *frm);
+int wifi_mac_parse_wpa(struct wifi_mac_Rsnparms *rsn, unsigned char *frm, unsigned char own);
+int wifi_mac_parse_own_rsn(struct wifi_station *sta, unsigned char *frm);
+int wifi_mac_parse_counterpart_rsn(struct wifi_mac_Rsnparms *rsn, unsigned char *frm, unsigned char is_judge);
 void wifi_mac_parse_htcap(struct wifi_station *sta, unsigned char *ie);
 void wifi_mac_parse_htinfo(struct wifi_station *sta, unsigned char *ie);
 void wifi_mac_parse_vht_cap(struct wifi_station *sta, unsigned char *ie);
@@ -90,5 +94,6 @@ void wifi_mac_parse_group_id_mgmt(struct wlan_net_vif *wnet_vif, struct wifi_sta
 void wifi_mac_parse_operate_mode_notification_mgmt(struct wlan_net_vif *wnet_vif, struct wifi_station *sta, unsigned char *frame);
 void wifi_mac_check_mic(struct wifi_station *, struct sk_buff *);
 int wifi_mac_send_arp_req(struct wlan_net_vif *wnet_vif);
+int wifi_mac_set_arp_rsp(struct wlan_net_vif *wnet_vif) ;
 
 #endif

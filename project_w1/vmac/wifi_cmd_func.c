@@ -7,6 +7,7 @@
 #include "wifi_cfg80211.h"
 #include "wifi_mac_if.h"
 
+struct udp_info aml_udp_info;
 extern struct _B2B_Test_Case_Packet gB2BTestCasePacket;
 
 cmd_to_func_table_t cmd_to_func[] =
@@ -36,6 +37,15 @@ cmd_to_func_table_t cmd_to_func[] =
     {"set_aggr_thresh", aml_set_aggr_thresh},
     {"set_hrt_int", aml_set_hrtimer_interval},
     {"get_ap_ip", aml_get_ap_ip},
+    {"set_roam_thr_2g", aml_set_roaming_threshold_2g},//wpa_cli driver set_roam_thr_2g -80
+    {"set_roam_thr_5g", aml_set_roaming_threshold_5g},
+    {"get_roam_chan", aml_get_roaming_candidate_chans},
+    {"set_roam_chan", aml_set_roaming_candidate_chans},
+    {"set_roam_mode", aml_set_roaming_mode},
+    {"set_udp_info", aml_set_udp_info},
+    {"get_udp_info", aml_get_udp_info},
+    {"enable_dfs",aml_enable_dfs_channel},
+    {"disable_dfs",aml_disable_dfs_channel},
     {"", NULL},
 };
 
@@ -447,6 +457,101 @@ int aml_set_mac_amsdu(struct wlan_net_vif *wnet_vif, char* buf, int len)
     return 0;
 }
 
+void wifi_mac_ap_set_country_code(char* arg)
+{
+    struct wifi_mac *wifimac = wifi_mac_get_mac_handle();
+    struct drv_private* drv_priv = wifimac->drv_priv;
+    struct wlan_net_vif *selected_wnet_vif = NULL;
+
+    if (wifimac->wm_nrunning == 1) {
+        if (drv_priv->drv_wnet_vif_table[NET80211_P2P_VMAC]->vm_state == WIFINET_S_CONNECTED) {
+            selected_wnet_vif = drv_priv->drv_wnet_vif_table[NET80211_P2P_VMAC];
+        } else {
+            selected_wnet_vif = drv_priv->drv_wnet_vif_table[NET80211_MAIN_VMAC];
+        }
+    } else {
+        printk("%s, no sta connected\n", __func__);
+        return;
+    }
+
+    printk("%s,%d, arg=%s\n", __func__, __LINE__, arg);
+    if (arg && (arg[0] == wifimac->wm_country.iso[0]) && (arg[1] == wifimac->wm_country.iso[1])) {
+        printk("%s no need to set country code due to the same country code\n", __func__);
+        return;
+    }
+
+    preempt_scan(selected_wnet_vif->vm_ndev, 100, 100);
+
+    WIFI_CHANNEL_LOCK(wifimac);
+    wifi_mac_set_country(wifimac, arg);
+    WIFI_CHANNEL_UNLOCK(wifimac);
+
+    return;
+}
+
+void wifi_mac_ap_set_11h(char** buf)
+{
+    struct wifi_mac *wifimac = wifi_mac_get_mac_handle();
+    struct drv_private* drv_priv = wifimac->drv_priv;
+    struct wlan_net_vif *selected_wnet_vif = NULL;
+
+    if (wifimac->wm_nrunning == 1) {
+        if (drv_priv->drv_wnet_vif_table[NET80211_P2P_VMAC]->vm_state == WIFINET_S_CONNECTED) {
+            selected_wnet_vif = drv_priv->drv_wnet_vif_table[NET80211_P2P_VMAC];
+        } else {
+            selected_wnet_vif = drv_priv->drv_wnet_vif_table[NET80211_MAIN_VMAC];
+        }
+    } else {
+        printk("%s, no sta connected\n", __func__);
+        return;
+    }
+
+    wifimac->wm_doth_tbtt = 255; //simple_strtoul(*buf, NULL, 0);
+    wifimac->wm_doth_channel = simple_strtoul(*(buf + 1), NULL, 0);
+    printk("%s, wm_dott_tbtt=%d, wm_doth_channel=%d\n", __func__, wifimac->wm_doth_tbtt, wifimac->wm_doth_channel);
+    wifimac->wm_flags |= WIFINET_F_CHANSWITCH;
+    wifimac->wm_flags |= WIFINET_F_DOTH;
+    selected_wnet_vif->vm_chanchange_count = 0;
+
+    return;
+}
+
+void wifi_mac_ap_set_arp_rx(char** buf)
+{
+    struct wifi_mac *wifimac = wifi_mac_get_mac_handle();
+    struct drv_private* drv_priv = wifimac->drv_priv;
+    struct wlan_net_vif *selected_wnet_vif = NULL;
+
+    if (wifimac->wm_nrunning == 1) {
+        if (drv_priv->drv_wnet_vif_table[NET80211_P2P_VMAC]->vm_state == WIFINET_S_CONNECTED) {
+            selected_wnet_vif = drv_priv->drv_wnet_vif_table[NET80211_P2P_VMAC];
+        } else {
+            selected_wnet_vif = drv_priv->drv_wnet_vif_table[NET80211_MAIN_VMAC];
+        }
+    } else {
+        printk("%s, no sta connected\n", __func__);
+        return;
+    }
+    selected_wnet_vif->vm_arp_rx.src_mac_addr[0] = simple_strtoul(*buf, NULL, 0);
+    selected_wnet_vif->vm_arp_rx.src_mac_addr[1] = simple_strtoul(*(buf+1), NULL, 0);
+    selected_wnet_vif->vm_arp_rx.src_mac_addr[2] = simple_strtoul(*(buf+2), NULL, 0);
+    selected_wnet_vif->vm_arp_rx.src_mac_addr[3] = simple_strtoul(*(buf+3), NULL, 0);
+    selected_wnet_vif->vm_arp_rx.src_mac_addr[4] = simple_strtoul(*(buf+4), NULL, 0);
+    selected_wnet_vif->vm_arp_rx.src_mac_addr[5] = simple_strtoul(*(buf+5), NULL, 0);
+    selected_wnet_vif->vm_arp_rx.src_ip_addr[0] = simple_strtoul(*(buf+6), NULL, 0);
+    selected_wnet_vif->vm_arp_rx.src_ip_addr[1] = simple_strtoul(*(buf+7), NULL, 0);
+    selected_wnet_vif->vm_arp_rx.src_ip_addr[2] = simple_strtoul(*(buf+8), NULL, 0);
+    selected_wnet_vif->vm_arp_rx.src_ip_addr[3] = simple_strtoul(*(buf+9), NULL, 0);
+
+    printk("set mac=%02x:%02x:%02x:%02x:%02x:%02x\n", selected_wnet_vif->vm_arp_rx.src_mac_addr[0],selected_wnet_vif->vm_arp_rx.src_mac_addr[1],
+           selected_wnet_vif->vm_arp_rx.src_mac_addr[2], selected_wnet_vif->vm_arp_rx.src_mac_addr[3], selected_wnet_vif->vm_arp_rx.src_mac_addr[4], selected_wnet_vif->vm_arp_rx.src_mac_addr[5]);
+    printk("set ip=%d.%d.%d.%d\n", selected_wnet_vif->vm_arp_rx.src_ip_addr[0], selected_wnet_vif->vm_arp_rx.src_ip_addr[1],
+           selected_wnet_vif->vm_arp_rx.src_ip_addr[2],selected_wnet_vif->vm_arp_rx.src_ip_addr[3]);
+    wifi_mac_set_arp_rsp(selected_wnet_vif);
+    return;
+}
+
+
 int aml_set_drv_ampdu(struct wlan_net_vif *wnet_vif, char* buf, int len)
 {
     char **arg;
@@ -664,3 +769,244 @@ int aml_get_ap_ip(struct wlan_net_vif *wnet_vif, char* buf, int len)
     return 0;
 }
 
+
+int aml_set_roaming_threshold_2g(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    char **arg;
+    char sep = ' ';
+    int cmd_arg;
+    int data = 0;
+
+    arg = aml_cmd_char_prase(sep, buf, &cmd_arg);
+    if ((wnet_vif != NULL)&& (wnet_vif->vm_wmac != NULL) && (arg[1] != NULL)) {
+        data = simple_strtol(arg[1], NULL, 0);
+        wnet_vif->vm_wmac->roaming_threshold_2g = data;
+        printk("vm_wmac->roaming_threshold_2g:%d\n", wnet_vif->vm_wmac->roaming_threshold_2g);
+
+    } else {
+        printk("Parameter is error.\n");
+    }
+
+    kfree(arg);
+    return 0;
+}
+
+int aml_set_roaming_threshold_5g(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    char **arg;
+    char sep = ' ';
+    int cmd_arg;
+    int data = 0;
+
+    arg = aml_cmd_char_prase(sep, buf, &cmd_arg);
+    if ((wnet_vif != NULL) && (wnet_vif->vm_wmac != NULL) && (arg[1] != NULL)) {
+        data = simple_strtol(arg[1], NULL, 0);
+        wnet_vif->vm_wmac->roaming_threshold_5g = data;
+        printk("vm_wmac->roaming_threshold_5g:%d\n", wnet_vif->vm_wmac->roaming_threshold_5g);
+
+    } else {
+        printk("Parameter is error.\n");
+    }
+
+    kfree(arg);
+    return 0;
+}
+
+
+
+int aml_get_roaming_candidate_chans(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    int i = 0;
+    struct wifi_channel * chan = NULL;
+    int chan_cnt = wnet_vif->vm_wmac->wm_scan->roaming_candidate_chans_cnt;
+
+    printk("get roaming candidate chans [%d]:\n", chan_cnt);
+
+    for (i=0; i < chan_cnt; i++) {
+        chan = wnet_vif->vm_wmac->wm_scan->roaming_candidate_chans[i].channel;
+
+        if (chan == NULL) {
+            printk("erro pointer \n");
+            return 0;
+        }
+        printk("chan_cfreq1:%d chan_flags:%d chan_pri_num:%d chan_maxpower:%d chan_minpower:%d chan_bw:%d global_operating_class %d Rssi:%d\n",
+            chan->chan_cfreq1, chan->chan_flags, chan->chan_pri_num, chan->chan_maxpower,
+            chan->chan_minpower, chan->chan_bw, chan->global_operating_class,
+            (wnet_vif->vm_wmac->wm_scan->roaming_candidate_chans[i].avg_rssi - 256));
+    }
+
+    return 0;
+}
+
+int aml_set_roaming_candidate_chans(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    char **arg;
+    char sep = ' ';
+    int cmd_arg;
+    int data = 0;
+    int i = 0;
+    int j = 0;
+    struct wifi_channel *c;
+    struct wifi_mac *wifimac = wnet_vif->vm_wmac;
+    struct wifi_mac_scan_state *ss = wifimac->wm_scan;
+
+    if ((wnet_vif == NULL) || (wifimac == NULL)) {
+        return 0;
+    }
+
+    WIFI_ROAMING_CHANNLE_LOCK(wnet_vif->vm_wmac->wm_scan);
+
+    wnet_vif->vm_wmac->wm_scan->roaming_candidate_chans_cnt = 0;
+    memset(wnet_vif->vm_wmac->wm_scan->roaming_candidate_chans, 0, sizeof(wnet_vif->vm_wmac->wm_scan->roaming_candidate_chans));
+
+    arg = aml_cmd_char_prase(sep, buf, &cmd_arg);
+    for (i = 1; i < ROAMING_CANDIDATE_CHAN_MAX; i++) {
+        if (arg[i] != NULL) {
+            data = simple_strtoul(arg[i], NULL, 0);
+            printk("get channel:%d \n",data);
+            WIFI_CHANNEL_LOCK(wifimac);
+            for (j = 0; j < wifimac->wm_nchans; j++) {
+                c = &wifimac->wm_channels[j];
+                if (c->chan_bw == WIFINET_BWC_WIDTH20 && c->chan_pri_num == data) {
+                    ss->roaming_candidate_chans[ss->roaming_candidate_chans_cnt].channel = c;
+                    ss->roaming_candidate_chans[ss->roaming_candidate_chans_cnt].avg_rssi = 156;
+                    ss->roaming_candidate_chans_cnt++;
+                }
+            }
+            WIFI_CHANNEL_UNLOCK(wifimac);
+        } else {
+           WIFI_ROAMING_CHANNLE_UNLOCK(wnet_vif->vm_wmac->wm_scan);
+           return 0;
+        }
+    }
+    WIFI_ROAMING_CHANNLE_UNLOCK(wnet_vif->vm_wmac->wm_scan);
+
+    return 0;
+}
+
+
+int aml_set_roaming_mode(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    char **arg;
+    char sep = ' ';
+    int cmd_arg;
+    int data = 0;
+
+    arg = aml_cmd_char_prase(sep, buf, &cmd_arg);
+    if ((wnet_vif != NULL) && (wnet_vif->vm_wmac != NULL) && (arg[1] != NULL)) {
+        data = simple_strtoul(arg[1], NULL, 0);
+        wnet_vif->vm_wmac->wm_roaming = data;
+        printk("vm_wmac->wm_roaming:%d\n", wnet_vif->vm_wmac->wm_roaming);
+    } else {
+        printk("Parameter is error.\n");
+    }
+
+    return 0;
+}
+
+int wifi_mac_set_udp_info(char** buf)
+{
+    struct wifi_mac *wifimac = wifi_mac_get_mac_handle();
+    struct drv_private* drv_priv = wifimac->drv_priv;
+    struct wlan_net_vif *selected_wnet_vif = NULL;
+
+    if (wifimac->wm_nrunning == 1) {
+        if (drv_priv->drv_wnet_vif_table[NET80211_P2P_VMAC]->vm_state == WIFINET_S_CONNECTED) {
+            selected_wnet_vif = drv_priv->drv_wnet_vif_table[NET80211_P2P_VMAC];
+        } else {
+            selected_wnet_vif = drv_priv->drv_wnet_vif_table[NET80211_MAIN_VMAC];
+        }
+    } else {
+        printk("%s, no sta connected\n", __func__);
+        return -1;
+    }
+
+    aml_udp_info.dst_port = simple_strtoul(*buf, NULL, 0);
+    aml_udp_info.src_port = simple_strtoul(*(buf + 1), NULL, 0);
+    aml_udp_info.dst_ip = simple_strtoul(*(buf + 2), NULL, 0);
+    aml_udp_info.src_ip = simple_strtoul(*(buf + 3), NULL, 0);
+    aml_udp_info.pkt_len = simple_strtoul(*(buf + 4), NULL, 0);
+    aml_udp_info.out = simple_strtoul(*(buf + 5), NULL, 0);
+    aml_udp_info.seq = 1000;
+    aml_udp_info.udp_timer_stop = 0;
+    aml_udp_info.rx = 0;
+    aml_udp_info.tx = 0;
+
+    DPRINTF(AML_DEBUG_WARNING,"dst_port=%04x, src_port=%04x, dst_ip=%08x, src_ip:%08x, pkt_len:%d, out:%d\n",
+        aml_udp_info.dst_port, aml_udp_info.src_port, aml_udp_info.dst_ip, aml_udp_info.src_ip,
+        aml_udp_info.pkt_len, aml_udp_info.out);
+
+    if (aml_udp_info.out) {
+        os_timer_ex_initialize(&aml_udp_info.udp_send_timeout, 0, wifi_mac_udp_send_timeout_ex, selected_wnet_vif);
+        os_timer_ex_start_period(&aml_udp_info.udp_send_timeout, 20);
+    }
+
+    return 0;
+}
+
+//set_udp_info dst_port src_port dst_ip in/out
+int aml_set_udp_info(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    int skip = 0, cmd_arg;
+    char **arg;
+    char sep = ' ';
+    skip = strlen("set_udp_info") + 1;
+    arg = aml_cmd_char_prase(sep, buf + skip, &cmd_arg);
+    wifi_mac_set_udp_info(arg);
+    return 0;
+}
+
+int aml_get_udp_info(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    printk("%s tx is %d, rx is %d\n", __func__, aml_udp_info.tx, aml_udp_info.rx);
+
+    aml_udp_info.udp_timer_stop = 1;
+    os_timer_ex_del(&aml_udp_info.udp_send_timeout, CANCEL_SLEEP);
+    return 0;
+}
+
+int aml_enable_dfs_channel(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    char **arg;
+    char sep = ' ';
+    int cmd_arg;
+    int data = 0;
+
+    arg = aml_cmd_char_prase(sep, buf, &cmd_arg);
+    if ((wnet_vif != NULL) && (wnet_vif->vm_wmac != NULL)) {
+        if (arg[1] != NULL) {
+            data = simple_strtoul(arg[1], NULL, 0);
+        }
+
+        printk("enable dfs channel :%d\n",data);
+        wifi_mac_enable_dfs_channel(wnet_vif, data);
+
+   } else {
+        printk("Parameter is error.\n");
+   }
+
+    return 0;
+}
+
+int aml_disable_dfs_channel(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+     char **arg;
+     char sep = ' ';
+     int cmd_arg;
+     int data = 0;
+
+     arg = aml_cmd_char_prase(sep, buf, &cmd_arg);
+     if ((wnet_vif != NULL) && (wnet_vif->vm_wmac != NULL)) {
+         if (arg[1] != NULL) {
+             data = simple_strtoul(arg[1], NULL, 0);
+         }
+
+         printk("enable dfs channel :%d\n",data);
+         wifi_mac_disable_dfs_channel(wnet_vif, data);
+
+    } else {
+         printk("Parameter is error.\n");
+    }
+
+     return 0;
+}

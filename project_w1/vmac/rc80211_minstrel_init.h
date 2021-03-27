@@ -13,16 +13,16 @@ struct aml_rate_adaptation_dev {
 };
 
 /* HT Capabilities*/
-#define WMI_HT_CAP_ENABLED                0x0001   /* HT Enabled/ disabled */
-#define WMI_HT_CAP_HT20_SGI       0x0002   /* Short Guard Interval with HT20 */
-#define WMI_HT_CAP_DYNAMIC_SMPS           0x0004   /* Dynamic MIMO powersave */
-#define WMI_HT_CAP_TX_STBC                0x0008   /* B3 TX STBC */
-#define WMI_HT_CAP_RX_STBC                0x0030   /* B4-B5 RX STBC */
 #define WMI_HT_CAP_RX_STBC_MASK_SHIFT     4
-#define WMI_HT_CAP_LDPC                   0x0040   /* LDPC supported */
+#define WMI_HT_CAP_ENABLED                0x0001   /* HT Enabled/ disabled */
+#define WMI_HT_CAP_TX_STBC                0x0002   /* B1 TX STBC */
+#define WMI_HT_CAP_DYNAMIC_SMPS           0x0004   /* Dynamic MIMO powersave */
+#define WMI_HT_CAP_HT20_SGI               0x0020   /* Short Guard Interval with HT20 */
+#define WMI_HT_CAP_HT40_SGI               0x0040
 #define WMI_HT_CAP_L_SIG_TXOP_PROT        0x0080   /* L-SIG TXOP Protection */
-#define WMI_HT_CAP_MPDU_DENSITY           0x0700   /* MPDU Density */
-#define WMI_HT_CAP_HT40_SGI               0x0800
+#define WMI_HT_CAP_LDPC                   0x0200   /* LDPC supported */
+#define WMI_HT_CAP_RX_STBC                0x0C00   /* B10-B11 RX STBC */
+#define WMI_HT_CAP_MPDU_DENSITY           0x7000   /* MPDU Density */
 
 /*
  * WMI_VHT_CAP_* these maps to ieee 802.11ac vht capability information

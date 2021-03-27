@@ -616,11 +616,11 @@ int wifi_mac_alloc_amsdu_node(struct wifi_mac *wifimac, unsigned char vid, struc
     sta->sta_amsdu->amsdu_max_sub = DEFAULT_TXAMSDU_SUB_MAX_BW80;
 
     /*init amsdu max length capablity */
-    if (wnet_vif->vm_vhtcap & WIFINET_VHTCAP_MAX_MPDU_LEN_11454)
+    if (wifimac->wm_flags_ext2 & WIFINET_VHTCAP_MAX_MPDU_LEN_11454)
     {
         sta->sta_amsdu->amsdu_max_length = MIN(sta->sta_amsdu->amsdu_max_length, VHT_MPDU_SIZE_11451);
 
-    } else if (wnet_vif->vm_vhtcap & WIFINET_VHTCAP_MAX_MPDU_LEN_7991) {
+    } else if (wifimac->wm_flags_ext2 & WIFINET_VHTCAP_MAX_MPDU_LEN_7991) {
         sta->sta_amsdu->amsdu_max_length = MIN(sta->sta_amsdu->amsdu_max_length, VHT_MPDU_SIZE_7991);
 
     } else {

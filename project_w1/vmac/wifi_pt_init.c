@@ -570,6 +570,10 @@ static int b2b_tx_thread_function(void *param)
         {
             if(gB2BTestCasePacket.send_frame_num > loop)
             {
+                if (FiOpt2Driver->hal_get_priv_cnt == NULL) {
+                    printk("===>>> %s ==>> hal_get_priv_cnt is NULL\n", __func__);
+                    break;
+                }
                 if ((FiOpt2Driver->hal_get_priv_cnt(TrcConfMib.tid) < TrcConfMib.testmpdunum ))//+1
                 {
                     if(hal_full == 0)
@@ -749,6 +753,7 @@ void driver_open(void)
     callback.intr_dtim_send = Driver_intr_dtim_send;
     callback.intr_ba_recv = Driver_intr_ba_recv;
     callback.dev_remove = drv_dev_remove;
+    callback.drv_intr_bt_info_change = drv_intr_bt_info_change;
     FiOpt2Driver = &hal_priv->hal_ops;
 
     hal_priv->hal_call_back = &callback;

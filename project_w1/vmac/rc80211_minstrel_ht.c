@@ -405,10 +405,10 @@ minstrel_ht_update_stats(struct minstrel_priv *mp, struct minstrel_ht_sta *mi)
     mi->sample_slow = 0;
     mi->sample_count = 0;
 
-    /* Initialize global rate indexes */
     for (j = 0; j < MAX_THR_RATES; j++) {
         tmp_mcs_tp_rate[j] = 0;
         tmp_cck_tp_rate[j] = 0;
+        tmp_group_tp_rate[j] = 0;
     }
 
     /* Find best rate sets within all MCS groups*/
@@ -418,10 +418,6 @@ minstrel_ht_update_stats(struct minstrel_priv *mp, struct minstrel_ht_sta *mi)
             continue;
 
         mi->sample_count++;
-
-        /* (re)Initialize group rate indexes */
-        for (j = 0; j < MAX_THR_RATES; j++)
-            tmp_group_tp_rate[j] = group;
 
         for (i = 0; i < MCS_GROUP_RATES; i++) {
             if (!(mi->supported[group] & BIT(i)))
@@ -1012,7 +1008,7 @@ minstrel_ht_update_caps(void *priv, struct ieee80211_supported_band *sband,
 			continue;
 		}
 
-		if (gflags & IEEE80211_TX_RC_SHORT_GI) {
+		if ((!(gflags & IEEE80211_TX_RC_80_MHZ_WIDTH)) && (gflags & IEEE80211_TX_RC_SHORT_GI)) {
 			if (gflags & IEEE80211_TX_RC_40_MHZ_WIDTH) {
 				if (!(sta_cap & IEEE80211_HT_CAP_SGI_40))
 					continue;
@@ -1054,8 +1050,7 @@ minstrel_ht_update_caps(void *priv, struct ieee80211_supported_band *sband,
 
 		if (gflags & IEEE80211_TX_RC_80_MHZ_WIDTH) {
 			if (sta->bandwidth < IEEE80211_STA_RX_BW_80 ||
-				((gflags & IEEE80211_TX_RC_SHORT_GI) &&
-				!(vht_cap->cap & IEEE80211_VHT_CAP_SHORT_GI_80))) {
+				!(vht_cap->cap & IEEE80211_VHT_CAP_SHORT_GI_80)) {
 				continue;
 			}
 		}

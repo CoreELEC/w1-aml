@@ -19,6 +19,7 @@
 #include "wifi_mac_encrypt.h"
 
 #define WEP_KEYS 4
+//#define PMF_PKT_PRINT 1
 
 #define SET_ICE_IV_LEN(iv_len, icv_len, encrypt)\
     do {\
@@ -59,6 +60,10 @@ struct wifi_mac_ie_mmic
 #define MME_IE_LENGTH 26
 #define MME_IE_LENGTH_CMAC 18
 
+#define MFP_MASK 0xc0
+#define MFP_ENABLED 0x80
+#define MFP_REQUIRED 0x40
+
 #define clear_retry(pbuf) \
     do { \
         *(unsigned short *)(pbuf) &= (~cpu_to_le16(BIT(11))); \
@@ -74,11 +79,13 @@ struct wifi_mac_ie_mmic
         *(unsigned short *)(pbuf) &= (~cpu_to_le16(BIT(13))); \
     } while (0)
 
-int wifi_mac_send_sa_query(struct wifi_station *sta, unsigned char *frm, void *arg, int *result);
+int wifi_mac_send_sa_query(struct wifi_station *sta, unsigned char action, unsigned short seq);
 int wifi_mac_parse_mmie(struct wifi_station *sta, struct sk_buff *skb, unsigned char subtype);
-int wifi_mac_add_mmie(struct wifi_station *sta, struct sk_buff *skb, unsigned char subtype);
+unsigned char is_robust_management_frame(struct wifi_frame *wh);
+int wifi_mac_add_mmie(struct wifi_station *sta, struct sk_buff *skb);
 int wifi_mac_sw_encrypt(struct wifi_station *sta, struct sk_buff *skb);
 void wifi_mac_disable_hw_mgmt_decrypt(void);
+int wifi_mac_unprotected_mgmt_pkt_handle(struct wifi_station *sta, struct sk_buff *skb, unsigned char subtype);
 int wifi_mac_mgmt_validate(struct wifi_station *sta, struct sk_buff *skb, unsigned char subtype);
 
 #endif//_WIFI_MAC_PMF_H_
