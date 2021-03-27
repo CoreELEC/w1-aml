@@ -15,8 +15,7 @@
 #include "wifi_mac_com.h"
 
 static unsigned char *
-wifi_mac_beacon_init(struct wifi_station *sta, struct wifi_mac_beacon_offsets *bo,
-                    unsigned char *frm)
+wifi_mac_beacon_init(struct wifi_station *sta, struct wifi_mac_beacon_offsets *bo, unsigned char *frm)
 {
     struct wlan_net_vif *wnet_vif = sta->sta_wnet_vif;
     struct wifi_mac *wifimac = sta->sta_wmac;
@@ -25,6 +24,7 @@ wifi_mac_beacon_init(struct wifi_station *sta, struct wifi_mac_beacon_offsets *b
 
     KASSERT(wnet_vif->vm_curchan != WIFINET_CHAN_ERR, ("no bss chan"));
     printk("%s(%d)\n", __func__, __LINE__);
+
     memset(frm, 0, 8);
     frm += 8;
     *(unsigned short *)frm = htole16(wnet_vif->vm_bcn_intval);
@@ -34,47 +34,51 @@ wifi_mac_beacon_init(struct wifi_station *sta, struct wifi_mac_beacon_offsets *b
         capinfo = WIFINET_CAPINFO_IBSS;
     else
         capinfo = WIFINET_CAPINFO_ESS;
+
     if (wnet_vif->vm_flags & WIFINET_F_PRIVACY)
         capinfo |= WIFINET_CAPINFO_PRIVACY;
-    if ((wifimac->wm_flags & WIFINET_F_SHPREAMBLE) &&
-        WIFINET_IS_CHAN_2GHZ(wnet_vif->vm_curchan))
+
+    if ((wnet_vif->vm_flags & WIFINET_F_SHPREAMBLE) && WIFINET_IS_CHAN_2GHZ(wnet_vif->vm_curchan))
         capinfo |= WIFINET_CAPINFO_SHORT_PREAMBLE;
+
     if (wifimac->wm_flags & WIFINET_F_SHSLOT)
         capinfo |= WIFINET_CAPINFO_SHORT_SLOTTIME;
+
     if (wifimac->wm_flags & WIFINET_F_DOTH)
         capinfo |= WIFINET_CAPINFO_SPECTRUM_MGMT;
+
     bo->bo_caps = (unsigned short *)frm;
     *(unsigned short *)frm = htole16(capinfo);
 
     frm += 2;
     *frm++ = WIFINET_ELEMID_SSID;
-    if ((wnet_vif->vm_flags & WIFINET_F_HIDESSID) == 0)
-    {
+    if ((wnet_vif->vm_flags & WIFINET_F_HIDESSID) == 0) {
         *frm++ = sta->sta_esslen;
         memcpy(frm, sta->sta_essid, sta->sta_esslen);
         frm += sta->sta_esslen;
-    }
-    else
+
+    } else {
         *frm++ = 0;
+    }
 
     bo->bo_rates = frm;
     frm = wifi_mac_add_rates(frm, rs);
+
     /*VHT mode ,non-support DSSS Parameter Set*/
     *frm++ = WIFINET_ELEMID_DSPARMS;
     *frm++ = 1;
-    bo->bo_channel=frm;
+    bo->bo_channel = frm;
     *frm++ = wifi_mac_chan2ieee(wifimac, wnet_vif->vm_curchan);
+
     bo->bo_tim = frm;
-    if (wnet_vif->vm_opmode == WIFINET_M_IBSS)
-    {
+    if (wnet_vif->vm_opmode == WIFINET_M_IBSS) {
         *frm++ = WIFINET_ELEMID_IBSSPARMS;
         *frm++ = 2;
         *frm++ = 0;
         *frm++ = 0;
         bo->bo_tim_len = 0;
-    }
-    else
-    {
+
+    } else {
         struct wifi_mac_tim_ie *tie = (struct wifi_mac_tim_ie *) frm;
 
         tie->tim_ie = WIFINET_ELEMID_TIM;
@@ -87,41 +91,42 @@ wifi_mac_beacon_init(struct wifi_station *sta, struct wifi_mac_beacon_offsets *b
         bo->bo_tim_len = 1;
     }
     bo->bo_tim_trailer = frm;
-    if (wnet_vif->vm_opmode == WIFINET_M_HOSTAP && ((wifimac->wm_flags & WIFINET_F_DOTH) ||
-            (wifimac->wm_flags_ext & WIFINET_FEXT_COUNTRYIE)))
-    {
+
+    if ((wnet_vif->vm_opmode == WIFINET_M_HOSTAP)
+        && ((wifimac->wm_flags & WIFINET_F_DOTH) || (wifimac->wm_flags_ext & WIFINET_FEXT_COUNTRYIE))) {
         frm = wifi_mac_add_country(frm, wifimac);
     }
-    if (wnet_vif->vm_opmode == WIFINET_M_HOSTAP && (wifimac->wm_flags & WIFINET_F_DOTH))
-    {
+
+    if ((wnet_vif->vm_opmode == WIFINET_M_HOSTAP) && (wifimac->wm_flags & WIFINET_F_DOTH)) {
         *frm++ = WIFINET_ELEMID_PWRCNSTR;
         *frm++ = 1;
         *frm++ = WIFINET_PWRCONSTRAINT_VAL(wnet_vif);
     }
     bo->bo_chanswitch = frm;
-    if (WIFINET_INCLUDE_11G(wnet_vif->vm_mac_mode))
-    {
+
+    if (WIFINET_INCLUDE_11G(wnet_vif->vm_mac_mode)) {
         bo->bo_erp = frm;
         frm = wifi_mac_add_erp(frm, wifimac);
     }
+
     if (wnet_vif->vm_flags & WIFINET_F_WPA)
         frm = wifi_mac_add_wpa(frm, wnet_vif);
+
     frm = wifi_mac_add_xrates(frm, rs);
-   if (wnet_vif->vm_flags & WIFINET_F_WME)
-    {
+    if (wnet_vif->vm_flags & WIFINET_F_WME) {
         bo->bo_wme = frm;
         frm = wifi_mac_add_wme_param(frm, &wifimac->wm_wme[wnet_vif->wnet_vif_id], WIFINET_VMAC_UAPSD_ENABLED(wnet_vif));
         wnet_vif->vm_flags &= ~WIFINET_F_WMEUPDATE;
     }
 
-   if (WIFINET_INCLUDE_11N(wnet_vif->vm_mac_mode) && wifi_mac_IsHTEnable(wnet_vif))
-    {
+    if (WIFINET_INCLUDE_11N(wnet_vif->vm_mac_mode) && wifi_mac_is_ht_enable(wnet_vif->vm_mainsta)) {
         bo->bo_htcap = frm;
         frm = wifi_mac_add_htcap(frm, sta);
+
         bo->bo_htinfo = frm;
         frm = wifi_mac_add_htinfo(frm, sta);
-        if (!(wifimac->wm_flags_ext & WIFINET_FEXT_COEXT_DISABLE))
-        {
+
+        if (!(wifimac->wm_flags_ext & WIFINET_FEXT_COEXT_DISABLE)) {
             bo->bo_obss_scan = frm;
             frm = wifi_mac_add_obss_scan(frm, sta);
             bo->bo_extcap = frm;
@@ -129,17 +134,17 @@ wifi_mac_beacon_init(struct wifi_station *sta, struct wifi_mac_beacon_offsets *b
         }
     }
 
-    if(wifi_mac_is_vht_enable(wnet_vif))
-    {
+    if (wifi_mac_is_vht_enable(wnet_vif)) {
         bo->bo_vhtcap = frm;
         frm = wifi_mac_add_vht_cap(frm, sta);
+
         bo->bo_vhtop = frm;
         frm = wifi_mac_add_vht_opt(frm, sta, WIFINET_FC0_SUBTYPE_BEACON);
-        frm = wifi_mac_add_vht_txpw(frm, sta);
-        frm = wifi_mac_add_vht_ch_sw_wrp(frm, sta);
-    	//frm = wifi_mac_add_vht_ext_bss_ld(frm, sta);
-    	//frm = wifi_mac_add_vht_quiet_ch(frm, sta);
-    	//frm = wifi_mac_add_vht_op_md_ntf(frm, sta);
+        //frm = wifi_mac_add_vht_txpw(frm, sta);
+        //frm = wifi_mac_add_vht_ch_sw_wrp(frm, sta);
+        //frm = wifi_mac_add_vht_ext_bss_ld(frm, sta);
+        //frm = wifi_mac_add_vht_quiet_ch(frm, sta);
+        //frm = wifi_mac_add_vht_op_md_ntf(frm, sta);
     }
 
     bo->bo_appie_buf = frm;
@@ -151,6 +156,7 @@ wifi_mac_beacon_init(struct wifi_station *sta, struct wifi_mac_beacon_offsets *b
     bo->bo_bcn_seq = 0;
     return frm;
 }
+
 struct sk_buff *_wifi_mac_beacon_alloc(struct wifi_station *sta, struct wifi_mac_beacon_offsets *bo)
 {
     struct wlan_net_vif *wnet_vif = sta->sta_wnet_vif;
@@ -163,42 +169,31 @@ struct sk_buff *_wifi_mac_beacon_alloc(struct wifi_station *sta, struct wifi_mac
 
     htcaplen += sizeof(struct wifi_mac_ie_htcap);
     htinfolen += sizeof(struct wifi_mac_ie_htinfo);
-    pktlen = 8
-               + sizeof(unsigned short)
-               + sizeof(unsigned short)
-               + 2 + sta->sta_esslen
-               + 2 + WIFINET_RATE_SIZE
-               /*VHT mode ,non-support DSSS Parameter Set*/
-               + 2 + 1 //DSSS Parameter Set Len = 3Byte
-               + 2 + 4 + wnet_vif->vm_tim_len
-               + wifimac->wm_countryinfo.country_len + 2
-               + 3
-               + 5
-               + 2 + 1
-               + 2 + (WIFINET_RATE_MAXSIZE - WIFINET_RATE_SIZE)
-               + (wnet_vif->vm_caps & WIFINET_C_WME ? sizeof(struct wifi_mac_wme_param) : 0)
-               + (wnet_vif->vm_caps & WIFINET_C_WPA ? (2 * sizeof(struct wifi_mac_ie_wpa)) : 0)
-               + htcaplen
-               + htinfolen
-               + sizeof(struct wifi_mac_ie_obss_scan)
-               + sizeof(struct wifi_mac_ie_ext_cap)
-               + WIFINET_APPIE_MAX
-               + sizeof(struct wifi_mac_ie_vht_cap)
-               + sizeof(struct wifi_mac_ie_vht_opt)
-               + sizeof(struct wifi_mac_ie_vht_txpwr_env)
-               + sizeof(struct wifi_mac_ie_vht_ch_sw_wrp);
+    pktlen = 8 + sizeof(unsigned short) + sizeof(unsigned short)
+        + 2 + sta->sta_esslen + 2 + WIFINET_RATE_SIZE
+        /*VHT mode ,non-support DSSS Parameter Set*/
+        + 2 + 1 //DSSS Parameter Set Len = 3Byte
+        + 2 + 4 + wnet_vif->vm_tim_len
+        + wifimac->wm_countryinfo.country_len + 2 + 3 + 5 + 2 + 1
+        + 2 + (WIFINET_RATE_MAXSIZE - WIFINET_RATE_SIZE)
+        + (wnet_vif->vm_caps & WIFINET_C_WME ? sizeof(struct wifi_mac_wme_param) : 0)
+        + (wnet_vif->vm_caps & WIFINET_C_WPA ? (2 * sizeof(struct wifi_mac_ie_wpa)) : 0)
+        + htcaplen + htinfolen + sizeof(struct wifi_mac_ie_obss_scan) + sizeof(struct wifi_mac_ie_ext_cap)
+        + WIFINET_APPIE_MAX + sizeof(struct wifi_mac_ie_vht_cap) + sizeof(struct wifi_mac_ie_vht_opt)
+        + sizeof(struct wifi_mac_ie_vht_txpwr_env) + sizeof(struct wifi_mac_ie_vht_ch_sw_wrp);
 
     skb = wifi_mac_get_mgmt_frm(wifimac, pktlen);
-    if (skb == NULL)
-    {
-        WIFINET_DPRINTF_STA( AML_DEBUG_ANY, sta, "cannot get buf; size %u", pktlen);
+    if (skb == NULL) {
+        WIFINET_DPRINTF_STA(AML_DEBUG_ANY, sta, "cannot get buf; size %u", pktlen);
         wnet_vif->vif_sts.sts_tx_no_buf++;
         return NULL;
     }
     frm = os_skb_put(skb, pktlen);
 
+
     frm = wifi_mac_beacon_init(sta, bo, frm);
     os_skb_trim(skb, frm - os_skb_data(skb));
+
     wh = (struct wifi_frame *)os_skb_push(skb, sizeof(struct wifi_frame));
     wh->i_fc[0] = WIFINET_FC0_VERSION_0 | WIFINET_FC0_TYPE_MGT | WIFINET_FC0_SUBTYPE_BEACON;
     wh->i_fc[1] = WIFINET_FC1_DIR_NODS;
@@ -218,6 +213,10 @@ int _wifi_mac_beacon_update(struct wifi_station *sta,
     struct wifi_mac *wifimac = sta->sta_wmac;
     int len_changed = 0;
     unsigned short capinfo;
+#ifdef AML_APSTA_CONCURRENT
+    struct wifi_channel *main_vmac_chan = NULL;
+    unsigned char concurrent_set_channel = 1;
+#endif
 
     if (bo->bo_initial != 1)
     {
@@ -254,10 +253,70 @@ int _wifi_mac_beacon_update(struct wifi_station *sta,
             printk("%s:%d, not support bandwidth %d yet\n", __func__, __LINE__, wnet_vif->vm_bandwidth);
         }
 
+#ifdef AML_APSTA_CONCURRENT
+        if (wifi_mac_is_others_wnet_vif_running(wnet_vif) == true) {
+            main_vmac_chan = wifi_mac_get_main_vmac_channel(wifimac);
+
+            if ((main_vmac_chan != WIFINET_CHAN_ERR)
+                && (main_vmac_chan->chan_pri_num == wnet_vif->vm_curchan->chan_pri_num)
+                && (main_vmac_chan->chan_bw == wnet_vif->vm_bandwidth)
+                && (center_chan == wifi_mac_Mhz2ieee(main_vmac_chan->chan_cfreq1, 0))) {
+
+                concurrent_set_channel = 0;//no need set channel again due to bw
+            }
+        } else {
+            /*no other vmac running, no need set concurrent channel*/
+            concurrent_set_channel = 0;
+        }
+
+
+        if (concurrent_set_channel) { /*need think if system want to change channel*/
+
+            printk("set to ap %s(%d) pri chan %d, band %d, center_chan %d\n",__func__,__LINE__,
+                                  main_vmac_chan->chan_pri_num, main_vmac_chan->chan_bw, wifi_mac_Mhz2ieee(main_vmac_chan->chan_cfreq1, 0));
+
+            if ((main_vmac_chan != WIFINET_CHAN_ERR) && WIFINET_IS_CHAN_2GHZ(main_vmac_chan)) {
+                /*sta connect to 40M ap, softap need limit to 20M. */
+                wnet_vif->vm_bandwidth = WIFINET_BWC_WIDTH20;
+                if (wifi_mac_set_wnet_vif_channel(wnet_vif, wifimac->wm_doth_channel, wnet_vif->vm_bandwidth, wifimac->wm_doth_channel) == true) {
+                    DPRINTF(AML_DEBUG_CFG80211|AML_DEBUG_ERROR, "%s  %d change to new channel %d\n", __func__, __LINE__, wifimac->wm_doth_channel);
+                } else {
+                    DPRINTF(AML_DEBUG_CFG80211|AML_DEBUG_ERROR, "%s  %d chan not supported\n", __func__, __LINE__);
+                    return 0;
+                }
+            } else {
+                /*sta connect to 5G ap, softap need update channel/band/mac_mode as  sta*/
+                struct wlan_net_vif *main_wnet_vif = wifi_mac_running_main_wnet_vif(wifimac);
+                if (main_wnet_vif != NULL) {
+                    wnet_vif->vm_curchan = main_vmac_chan;
+                    wnet_vif->vm_bandwidth = main_vmac_chan->chan_bw;
+                    wnet_vif->vm_mac_mode = main_wnet_vif->vm_mac_mode;
+                    sta->sta_chbw = main_vmac_chan->chan_bw;
+
+                    if (wnet_vif->vm_curchan->chan_bw >= WIFINET_BWC_WIDTH40) {
+                        wnet_vif->vm_htcap |= WIFINET_HTCAP_SUPPORTCBW40;
+                    }
+
+                    if (main_vmac_chan->chan_pri_num < wifi_mac_Mhz2ieee(main_vmac_chan->chan_cfreq1, 0)) {
+                        wnet_vif->scnd_chn_offset = WIFINET_HTINFO_EXTOFFSET_ABOVE;
+                    } else if (main_vmac_chan->chan_pri_num > wifi_mac_Mhz2ieee(main_vmac_chan->chan_cfreq1, 0)) {
+                        wnet_vif->scnd_chn_offset = WIFINET_HTINFO_EXTOFFSET_BELOW;
+                    } else{
+                        wnet_vif->scnd_chn_offset = WIFINET_HTINFO_EXTOFFSET_NA;
+                    }
+
+                    wifi_mac_set_wnet_vif_channel(wnet_vif, main_vmac_chan->chan_pri_num, main_vmac_chan->chan_bw, wifi_mac_Mhz2ieee(main_vmac_chan->chan_cfreq1, 0));
+                    printk("set ap %s(%d) chan %d, mac mode %d, band %d\n",__func__,__LINE__,
+                          wnet_vif->vm_curchan->chan_pri_num, wnet_vif->vm_mac_mode, wnet_vif->vm_bandwidth);
+                }
+            }
+        }
+#else
         if (wifi_mac_set_wnet_vif_channel(wnet_vif, wifimac->wm_doth_channel, wnet_vif->vm_bandwidth, center_chan) == false)
         {
             return 0;
         }
+#endif
         WIFINET_BEACON_LOCK(wifimac);
         wnet_vif->vm_chanchange_count = 0;
         wnet_vif->vm_flags &= ~WIFINET_F_CHANSWITCH;
@@ -293,7 +352,7 @@ int _wifi_mac_beacon_update(struct wifi_station *sta,
 
     if (wnet_vif->vm_flags & WIFINET_F_PRIVACY)
         capinfo |= WIFINET_CAPINFO_PRIVACY;
-    if ((wifimac->wm_flags & WIFINET_F_SHPREAMBLE) &&
+    if ((wnet_vif->vm_flags & WIFINET_F_SHPREAMBLE) &&
         WIFINET_IS_CHAN_2GHZ(wnet_vif->vm_curchan))
         capinfo |= WIFINET_CAPINFO_SHORT_PREAMBLE;
     if (wifimac->wm_flags & WIFINET_F_SHSLOT)
@@ -366,7 +425,7 @@ int _wifi_mac_beacon_update(struct wifi_station *sta,
         }
     }
 
-    if (WIFINET_INCLUDE_11N(wnet_vif->vm_mac_mode) && wifi_mac_IsHTEnable(wnet_vif))
+    if (WIFINET_INCLUDE_11N(wnet_vif->vm_mac_mode) && wifi_mac_is_ht_enable(wnet_vif->vm_mainsta))
     {
         struct wifi_mac_ie_htinfo_cmn *htinfo;
 
@@ -374,7 +433,7 @@ int _wifi_mac_beacon_update(struct wifi_station *sta,
                     || (wnet_vif->vm_bandwidth == WIFINET_BWC_WIDTH80))
                     ? WIFINET_HTINFO_TXWIDTH_2040 : WIFINET_HTINFO_TXWIDTH_20;
 
-        if (wifi_mac_IsHTEnable(wnet_vif) )
+        if (wifi_mac_is_ht_enable(wnet_vif->vm_mainsta) )
         {
             if(bo->bo_htinfo == NULL)
             {
@@ -533,6 +592,9 @@ int _wifi_mac_beacon_update(struct wifi_station *sta,
         if ((wifimac->wm_flags & WIFINET_F_DOTH) && (wifimac->wm_flags & WIFINET_F_CHANSWITCH))
         {
             wnet_vif->vm_chanchange_count++;
+            if (wnet_vif->vm_chanchange_count == wifimac->wm_doth_tbtt) {
+                wnet_vif->vm_flags |= WIFINET_F_CHANSWITCH;
+            }
         }
         if (((jiffies - wifimac->wm_time_noht_present) >=
              WIFINET_INACT_HT * HZ) &&
@@ -542,7 +604,7 @@ int _wifi_mac_beacon_update(struct wifi_station *sta,
             wifi_mac_ht_prot(wifimac, sta, WIFINET_BEACON_UPDATE);
         }
 
-        if (WIFINET_INCLUDE_11N(wnet_vif->vm_mac_mode) && wifi_mac_IsHTEnable(wnet_vif))
+        if (WIFINET_INCLUDE_11N(wnet_vif->vm_mac_mode) && wifi_mac_is_ht_enable(wnet_vif->vm_mainsta))
         {
             if (wifimac->wm_flags_ext & WIFINET_FEXT_HTUPDATE)
             {
@@ -572,6 +634,9 @@ int _wifi_mac_beacon_update(struct wifi_station *sta,
     WIFINET_BEACON_UNLOCK(wifimac);
 #ifdef  CONFIG_P2P
     if (wnet_vif->app_ie[WIFINET_APPIE_FRAME_BEACON].length &&
+#ifdef AML_APSTA_CONCURRENT
+        (wnet_vif->vm_opmode == WIFINET_M_P2P_DEV)&&
+#endif
         (wnet_vif->vm_p2p->p2p_flag & P2P_NOA_START_FLAG_HI))
     {
         printk("%s(%d) noa_len %d\n",__func__,__LINE__,
@@ -625,15 +690,14 @@ int wifi_mac_beacon_alloc(void * ieee, int wnet_vif_id)
     WIFINET_BEACONBUF_LOCK(wifimac);
 
     skbbuf = wnet_vif->vm_beaconbuf;
-    if (skbbuf != NULL)
-    {
+    if (skbbuf != NULL) {
         wifi_mac_beacon_free(ieee,  wnet_vif_id);
         skbbuf = NULL;
     }
     sta = wnet_vif->vm_mainsta;
+
     skbbuf = _wifi_mac_beacon_alloc(sta, &wnet_vif->vm_beaconbuf_offset);
-    if (skbbuf == NULL)
-    {
+    if (skbbuf == NULL) {
         DPRINTF(AML_DEBUG_ANY,"%s %d wifi_mac_beacon_alloc ERROR\n",__func__,__LINE__);
         WIFINET_BEACONBUF_UNLOCK(wifimac);
         return -ENOMEM;
@@ -641,7 +705,7 @@ int wifi_mac_beacon_alloc(void * ieee, int wnet_vif_id)
     wnet_vif->vm_beaconbuf = skbbuf;
     len = os_skb_get_pktlen(skbbuf);
 
-    DPRINTF(AML_DEBUG_BEACON,"%s %d Put beacon to HW;  wnet_vif_id %d len %d Bcn init rate 0x%x flag %x\n",
+    DPRINTF(AML_DEBUG_WARNING,"%s %d Put beacon to HW;  wnet_vif_id %d len %d Bcn init rate 0x%x flag %x\n",
             __func__,__LINE__,wnet_vif_id,len,bcn_rate,CHAN_BW_20M);
 
     wifimac->drv_priv->drv_ops.Phy_PutBeaconBuf(wifimac->drv_priv,wnet_vif_id,os_skb_data(skbbuf),len,bcn_rate,CHAN_BW_20M);
@@ -764,6 +828,11 @@ void wifi_mac_process_beacon_miss_ex(SYS_TYPE arg)
     * beacuse 'vm_swbmiss' timeout is 2500ms.
     */
     if (wnet_vif->vm_bmiss_count++ < WIFINET_BMISS_COUNT_MAX) {
+        /*if not in roaming mode, triger roaming */
+        if (wifimac->wm_roaming == WIFINET_ROAMING_BASIC && wnet_vif->vm_chan_roaming_scan_flag != 1) {
+            printk("Miss beacon trigger roaming\n");
+            wifi_mac_roaming_trigger(wnet_vif);
+         }
         //should exit power save here
         return;
     }
@@ -773,14 +842,15 @@ void wifi_mac_process_beacon_miss_ex(SYS_TYPE arg)
     * otherwise 2) sta lost ap totally then do scan again
     */
     wnet_vif->vm_bmiss_count = 0;
-    if (wifimac->wm_roaming == WIFINET_ROAMING_AUTO)
-    {
+    if (wifimac->wm_roaming == WIFINET_ROAMING_FAST) {
         DPRINTF(AML_DEBUG_WARNING,"roaming bcn lost...\n");
         wifi_mac_top_sm(wnet_vif, WIFINET_S_ASSOC, 1);
     }
-    else
-    {
+    else {
         DPRINTF(AML_DEBUG_WARNING,"bcn lost...re-scan\n");
+
+        wnet_vif->vm_chan_roaming_scan_flag = 0;
+
         wifi_mac_top_sm(wnet_vif, WIFINET_S_SCAN, 0);
     }
 }

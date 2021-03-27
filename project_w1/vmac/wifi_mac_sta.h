@@ -44,12 +44,16 @@ struct wifi_mac_Rsnparms
     unsigned char rsn_ucastcipherset;
     unsigned char rsn_ucastcipher;
     unsigned char rsn_ucastkeylen;
-    unsigned char rsn_keymgmtset;
+    unsigned short rsn_keymgmtset;
     unsigned short rsn_caps;
+    unsigned char rsn_caps_offset;
     unsigned char rsn_pmkid_count;
     unsigned char rsn_pmkid_offset;
     unsigned char rsn_pmkid[16];
     unsigned char rsn_gmcipher;
+    unsigned char sa_valid;
+    unsigned char gtksa;
+    unsigned char ptksa;
 };
 
 struct wifi_station_tbl;
@@ -76,10 +80,11 @@ struct wifi_scan_info;
 #define WIFINET_NODE_NOAMPDU 0x1000
 #define WIFINET_NODE_VHT 0x2000
 #define WIFINET_NODE_TKIPCIPHER 0x4000
-#define WIFINET_NODE_P2P_REQ 0x8000
 
 //sta ext flag
 #define WIFINET_NODE_MFP 0x0001
+#define WIFINET_NODE_MFP_CONFIRM_DEAUTH 0x0002
+#define WIFINET_NODE_REASSOC 0x0004
 #define WIFINET_NODE_RDG 0x0008
 
 #define WIFINET_NODE_40_INTOLERANT 0x0400
@@ -160,6 +165,7 @@ struct wifi_station
     struct wifi_mac_amsdu *sta_amsdu;
     enum wifi_mac_macmode sta_bssmode; /* current phy mode */
 
+    unsigned char wnet_vif_id;
     unsigned char sta_esslen;
     unsigned char sta_essid[WIFINET_NWID_LEN];
     unsigned char sta_macaddr[WIFINET_ADDR_LEN];
@@ -184,7 +190,6 @@ struct wifi_station
     unsigned short sta_flags_ext;
 
     unsigned short sta_associd;
-    unsigned short sta_associd_bk;
     unsigned char sta_txpower;
     unsigned short sta_vlan;
     unsigned int *sta_challenge;
@@ -196,9 +201,7 @@ struct wifi_station
 
     unsigned long sta_rxfragstamp;
     struct sk_buff *sta_rxfrag[3];
-    struct wifi_mac_Rsnparms sta_rsn;
-    struct wifi_mac_key sta_ucastkey;
-    unsigned char sta_encrypt_flag;
+    int8_t sta_tmp_nsta;
 
     unsigned short sta_htcap;
     unsigned short sta_maxampdu;
@@ -207,10 +210,9 @@ struct wifi_station
     unsigned char sta_update_rate_flag;
     unsigned long sta_rstamp;
 
-    union
-    {
-        unsigned char  data[8];
-        u_int64_t   tsf;
+    union {
+        unsigned char data[8];
+        u_int64_t tsf;
     } sta_tstamp;
 
     unsigned char sta_erp;
@@ -229,15 +231,17 @@ struct wifi_station
     unsigned char sta_uapsd_ac_delivena[WME_NUM_AC];
 
     unsigned char *sta_rsn_ie;
-    int8_t sta_tmp_nsta;
+    struct wifi_mac_Rsnparms sta_rsn;
+    struct wifi_mac_key sta_ucastkey;
     struct wifi_mac_key pmf_key;
+    unsigned char sta_encrypt_flag;
     unsigned short sa_query_seq;
+    unsigned short sa_query_try_count;
 
     int32_t sta_avg_bcn_rssi;    // dbm =  Rssi-256
     int32_t sta_avg_rssi;
     unsigned int sta_last_txrate;  //kbps
     unsigned int sta_last_rxrate;  //kbps
-    int wnet_vif_id;
 
     unsigned char sta_maxrate_vht; /* b0-b3: mcs idx; b4-b7: # streams */
     unsigned int sta_vhtcap;        /* VHT capability */
@@ -407,7 +411,7 @@ struct wifi_station *wifi_mac_tmp_nsta(struct wlan_net_vif *, const unsigned cha
 struct wifi_station *wifi_mac_bup_bss(struct wlan_net_vif *, const unsigned char *);
 void wifi_mac_FreeNsta(struct wifi_station *);
 void wifi_mac_free_sta_no_lock(struct wifi_station *sta);
-void wifi_mac_free_sta_when_disconnect(struct wifi_station *sta);
+void wifi_mac_free_main_sta(struct wifi_station *sta);
 struct wifi_station *wifi_mac_get_sta(struct wifi_station_tbl *, const unsigned char *,int);
 struct wifi_station * wifi_mac_find_rx_sta(struct wifi_mac *, const struct wifi_mac_frame_min *,int);
 struct wifi_station *wifi_mac_find_tx_sta(struct wlan_net_vif *, const unsigned char *);

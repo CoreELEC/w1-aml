@@ -313,6 +313,45 @@ unsigned int support_legacy_rate_init( struct wifi_station *sta ,  struct ieee80
     return 0;
 }
 
+void aml_rate_adaptation_dev_init(struct wifi_station *sta, int rate_mode, unsigned int channel_band, struct ieee80211_sta *p_ieee_sta)
+{
+    g_aml_rate_adaptation_dev.num_rf_chains = 1;
+
+    g_aml_rate_adaptation_dev.ht_cap_info = 0;
+    g_aml_rate_adaptation_dev.vht_cap_info = sta->sta_vhtcap;
+
+    if (rate_mode) {
+        g_aml_rate_adaptation_dev.ht_cap_info |= WMI_HT_CAP_ENABLED;
+
+    if (sta->sta_htcap & WMI_HT_CAP_HT20_SGI)
+        g_aml_rate_adaptation_dev.ht_cap_info |= WMI_HT_CAP_HT20_SGI;
+
+    if (sta->sta_htcap & WMI_HT_CAP_HT40_SGI)
+        g_aml_rate_adaptation_dev.ht_cap_info |= WMI_HT_CAP_HT40_SGI;
+
+    if (sta->sta_htcap & WMI_HT_CAP_DYNAMIC_SMPS)
+        g_aml_rate_adaptation_dev.ht_cap_info |= WMI_HT_CAP_DYNAMIC_SMPS;
+
+    if (sta->sta_htcap & WMI_HT_CAP_LDPC)
+        g_aml_rate_adaptation_dev.ht_cap_info |= WMI_HT_CAP_LDPC;
+    }
+
+    if (channel_band == IEEE80211_BAND_2GHZ) {
+        int i = 0;
+        g_aml_rate_adaptation_dev.sband = &aml_band_24ghz;
+
+        printk("support rate start\n");
+        for (i = 0; i < sta->sta_rates.dot11_rate_num; i++)
+        {
+            printk("%02x  ",sta->sta_rates.dot11_rate[i]);
+        }
+        printk("\n");
+    } else {
+        g_aml_rate_adaptation_dev.sband = &aml_band_5ghz;
+        g_aml_rate_adaptation_dev.sband->vht_cap = aml_create_vht_cap(&g_aml_rate_adaptation_dev, rate_mode);
+    }
+
+}
 void aml_minstrel_init( 
 #ifdef AUTO_RATE_SIM    
     void
@@ -355,8 +394,6 @@ void aml_minstrel_init(
         rate_mode = 2;
     } else if ( sta->sta_flags & WIFINET_NODE_HT) {
         rate_mode = 1;
-    } else {
-        rate_mode = 0;
     }
 
     if (WIFINET_IS_CHAN_2GHZ(sta->sta_wnet_vif->vm_curchan)) {
@@ -366,38 +403,23 @@ void aml_minstrel_init(
     }
 #endif
 
-    g_aml_rate_adaptation_dev.vht_cap_info = 0;
-    g_aml_rate_adaptation_dev.ht_cap_info = 0;
-
     /*0: legacy rate, 1:ht rate, 2:vht rate*/
-    if (rate_mode >= 1) {
-        g_aml_rate_adaptation_dev.ht_cap_info = WMI_HT_CAP_ENABLED;
+    if (rate_mode) {
         g_mcs_rate_support = mcs_rate_support = true;
 
     } else {
         g_mcs_rate_support = mcs_rate_support = false;
     }
-    g_aml_rate_adaptation_dev.num_rf_chains = 1;
 
     DPRINTF(AML_DEBUG_WARNING, "%s(%d): channel_band=%d, rate_mode=%d\n", __func__, __LINE__, channel_band, rate_mode);
 
     support_legacy_rate_init(sta, p_ieee_sta, channel_band);
-    if (channel_band == IEEE80211_BAND_2GHZ) {
-        int i = 0;
-        g_aml_rate_adaptation_dev.sband = &aml_band_24ghz;
 
-        printk("support rate start\n");
-        for (i = 0; i < sta->sta_rates.dot11_rate_num; i++)
-        {
-            printk("%02x  ",sta->sta_rates.dot11_rate[i]);
-        }
-        printk("\n");
+    aml_rate_adaptation_dev_init(sta, rate_mode, channel_band, p_ieee_sta);
 
-    } else {
-        g_aml_rate_adaptation_dev.sband = &aml_band_5ghz;
-        p_ieee_sta->vht_cap = aml_create_vht_cap(&g_aml_rate_adaptation_dev, rate_mode);
+    if (channel_band == IEEE80211_BAND_5GHZ) {
+        p_ieee_sta->vht_cap = g_aml_rate_adaptation_dev.sband->vht_cap;
         DPRINTF(AML_DEBUG_RATE, "%s(%d):vht_supported = %d\n", __func__, __LINE__, p_ieee_sta->vht_cap.vht_supported);
-        g_aml_rate_adaptation_dev.sband->vht_cap =  p_ieee_sta->vht_cap;
     }
 
     aml_get_ht_cap(&g_aml_rate_adaptation_dev, &(g_aml_rate_adaptation_dev.sband->ht_cap));
@@ -684,6 +706,7 @@ unsigned char minstrel_find_rate(
 
     for (i = 0; i < ARRAY_SIZE(info->control.rates); i++) {
         ratectrl[i].rate_index = info->control.rates[i].idx;
+        ratectrl[i].shortgi_en = info->control.rates[i].flags & IEEE80211_TX_RC_SHORT_GI ? 1: 0;
         ratectrl[i].vendor_rate_code = minsstrel_rate_index_to_vendor_rate_code(ratectrl[i].rate_index, p_ieee_sta);
         ratectrl[i].trynum = info->control.rates[i].count;
         ratectrl[i].flags = info->control.rates[i].flags;

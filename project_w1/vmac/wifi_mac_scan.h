@@ -78,8 +78,11 @@ struct wifi_mac_scan_state
     struct wifi_channel *ss_chans[WIFINET_CHAN_MAX];
 
     struct wifi_mac_ScanSSID roaming_ssid;
-    struct wifi_channel *roaming_candidate_chans[ROAMING_CANDIDATE_CHAN_MAX];
+    struct wifi_candidate_channel roaming_candidate_chans[ROAMING_CANDIDATE_CHAN_MAX];
+    int roaming_candidate_chans_cnt;
     unsigned char roaming_full_scan;
+    spinlock_t  roaming_chan_lock;
+    unsigned long roaming_chan_lock_flag;
 
     unsigned short scan_next_chan_index;
     unsigned short scan_last_chan_index;
@@ -99,28 +102,34 @@ struct wifi_mac_scan_state
 #define WIFI_SCAN_LOCK(_ss) OS_SPIN_LOCK_IRQ(&(_ss)->scan_lock, (_ss)->scan_lock_flag)
 #define WIFI_SCAN_UNLOCK(_ss) OS_SPIN_UNLOCK_IRQ(&(_ss)->scan_lock, (_ss)->scan_lock_flag)
 
+#define WIFI_ROAMING_CHANNLE_LOCK(_ss)OS_SPIN_LOCK_IRQ(&(_ss)->roaming_chan_lock, (_ss)->roaming_chan_lock_flag)
+#define WIFI_ROAMING_CHANNLE_UNLOCK(_ss)OS_SPIN_UNLOCK_IRQ(&(_ss)->roaming_chan_lock, (_ss)->roaming_chan_lock_flag)
+
 struct wifi_mac_scan_param
 {
     unsigned short capinfo;
-    unsigned char  chan;
-    unsigned char  erp;
-    unsigned char  bintval;
-    unsigned char  timoff;
-    unsigned char  *tim;
-    unsigned char  *tstamp;
-    unsigned char  *country;
-    unsigned char  *ssid;
-    unsigned char  *rates;
-    unsigned char  *xrates;
-    unsigned char  *doth;
-    unsigned char  *wpa;
-    unsigned char  *wme;
-    unsigned char  *htcap;
-    unsigned char  *htinfo;
-    unsigned char  *tpc;
-    unsigned char  *quiet;
+    unsigned short status_code;
+    unsigned short assoc_id;
+    unsigned char chan;
+    unsigned char erp;
+    unsigned char bintval;
+    unsigned char timoff;
+    unsigned char *tim;
+    unsigned char *tstamp;
+    unsigned char *country;
+    unsigned char *ssid;
+    unsigned char *rates;
+    unsigned char *xrates;
+    unsigned char *doth;
+    unsigned char *wpa;
+    unsigned char *wme;
+    unsigned char *htcap;
+    unsigned char *htinfo;
+    unsigned char *tpc;
+    unsigned char *quiet;
     unsigned char *rsn;
     unsigned char *wps;
+    unsigned char *timeout_ie;
 #ifdef CONFIG_P2P
     unsigned char *p2p[MAX_P2PIE_NUM];
     unsigned char *p2p_noa;
@@ -130,13 +139,13 @@ struct wifi_mac_scan_param
 #ifdef CONFIG_WAPI
     unsigned char *wai;
 #endif //#ifdef CONFIG_WAPI
-    unsigned char* vht_cap;
-    unsigned char* vht_opt;
-    unsigned char* vht_tx_pwr;
-    unsigned char* vht_ch_sw;
-    unsigned char* vht_ext_bss_ld;
-    unsigned char* vht_quiet_ch;
-    unsigned char* vht_opt_md_ntf;
+    unsigned char *vht_cap;
+    unsigned char *vht_opt;
+    unsigned char *vht_tx_pwr;
+    unsigned char *vht_ch_sw;
+    unsigned char *vht_ext_bss_ld;
+    unsigned char *vht_quiet_ch;
+    unsigned char *vht_opt_md_ntf;
 };
 
 #define SCANINFO_IE_LENGTH     260
@@ -158,15 +167,16 @@ struct wifi_scan_info
     struct wifi_channel *SI_chan;
     unsigned short SI_timoff;
     unsigned char  SI_erp;
-    int     SI_rssi;
+    int SI_rssi;
     unsigned char  SI_dtimperiod;
     unsigned char  SI_wpa_ie[SCANINFO_IE_LENGTH];
     unsigned char  SI_wme_ie[SCANINFO_IE_LENGTH];
     unsigned char  SI_htcap_ie[SCANINFO_IE_LENGTH];
     unsigned char  SI_htinfo_ie[SCANINFO_IE_LENGTH];
     unsigned char  SI_country_ie[SCANINFO_IE_LENGTH];
-    unsigned int     SI_age;
+    unsigned int SI_age;
     unsigned char  SI_rsn_ie[SCANINFO_IE_LENGTH];
+    unsigned short si_rsn_capa;
     unsigned char  SI_wps_ie[SCANINFO_IE_LENGTH];
 
 #ifdef CONFIG_WAPI
@@ -261,5 +271,7 @@ void wifi_mac_notify_pkt_clear(struct wifi_mac *wifimac);
 void quiet_all_intf (struct wifi_mac *wifimac, unsigned char enable);
 void wifi_mac_scan_notify_leave_or_back(struct wlan_net_vif *wnet_vif, unsigned char enable);
 void wifi_mac_process_tx_error(struct wlan_net_vif *wnet_vif);
+void wifi_mac_update_roaming_candidate_chan(struct wlan_net_vif *wnet_vif,const struct wifi_mac_scan_param *sp, int rssi);
+
 
 #endif /* _WIFI_NET_SCAN_H_ */

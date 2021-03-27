@@ -41,6 +41,7 @@ void wifi_mac_pmkid_detach(struct wlan_net_vif *wnet_vif);
 int aml_cfg80211_set_pmksa(struct wiphy *wiphy, struct net_device *dev, struct cfg80211_pmksa *pmksa);
 int aml_pmkid_cache_index(struct wlan_net_vif *wnet_vif, const unsigned char *bssid);
 int aml_cfg80211_del_pmksa(struct wiphy *wiphy, struct net_device *dev, struct cfg80211_pmksa *pmksa);
+void aml_del_pmksa_by_index(struct wlan_net_vif *wnet_vif, const unsigned char *bssid);
 int aml_cfg80211_flush_pmksa(struct wiphy *wiphy, struct net_device *dev);
 void wifi_mac_trigger_sae(struct wifi_station *sta);
 

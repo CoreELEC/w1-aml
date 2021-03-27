@@ -66,18 +66,17 @@ struct wifi_mac_key
 #define WIFINET_KEY_COMMON      \
         (WIFINET_KEY_XMIT | WIFINET_KEY_RECV | WIFINET_KEY_GROUP)
 
-
-#define WIFINET_CIPHER_WEP      0
-#define WIFINET_CIPHER_TKIP     1
-#define WIFINET_CIPHER_AES_OCB  2
-#define WIFINET_CIPHER_AES_CCM  3
-#define WIFINET_CIPHER_WPI      4
+#define WIFINET_CIPHER_WEP 0
+#define WIFINET_CIPHER_TKIP 1
+#define WIFINET_CIPHER_AES_OCB 2
+#define WIFINET_CIPHER_AES_CCM 3
+#define WIFINET_CIPHER_WPI 4
 #define WIFINET_CIPHER_AES_CMAC 5
-#define WIFINET_CIPHER_NONE 6
-
+#define WIFINET_CIPHER_AES_PSK_256 6
+#define WIFINET_CIPHER_AES_SAE 8
+#define WIFINET_CIPHER_NONE 9
 #define WIFINET_CIPHER_MAX      (WIFINET_CIPHER_NONE+1)
-
-#define WIFINET_KEYIX_NONE  ((unsigned short) -1)
+#define WIFINET_KEYIX_NONE  ((unsigned char) -1)
 
 struct wifi_mac_rekey_data
 {

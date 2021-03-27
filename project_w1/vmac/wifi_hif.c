@@ -90,7 +90,9 @@ void hif_init_ops(void)
 }
 
 #ifdef DRV_PT_SUPPORT
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 20, 0))
 extern void do_gettimeofday(struct timeval *tv);
+#endif
 void b2b_rx_throughput_calc(HW_RxDescripter_bit *RxPrivHdr)
 {
     static int rx_count=0;
@@ -100,8 +102,10 @@ void b2b_rx_throughput_calc(HW_RxDescripter_bit *RxPrivHdr)
     static long start = 0;
     long end = 0;
     long time_cost = 0;
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 20, 0))
     struct timeval t_start;
     struct timeval  t_end;
+#endif
 
    /*
     * Update with the dst mac address later to void broadcast or multicast,
@@ -112,16 +116,24 @@ void b2b_rx_throughput_calc(HW_RxDescripter_bit *RxPrivHdr)
         rx_count++;
         if (rx_count == 1)
         {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 20, 0))
+            start = ktime_to_ms(ktime_get_boottime());
+#else
             do_gettimeofday(&t_start);
             start = ((long)t_start.tv_sec)*1000+(long)t_start.tv_usec/1000;
+#endif
             printk("Rx side:Got the first packet and the start time is :%ld ms.\n",start);
             length_start += RxPrivHdr->RxLength;
             length_end += RxPrivHdr->RxLength;
         }
         else
         {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 20, 0))
+            end = ktime_to_ms(ktime_get_boottime());
+#else
             do_gettimeofday(&t_end);
             end = ((long)t_end.tv_sec)*1000+(long)t_end.tv_usec/1000;
+#endif
             time_cost = end - start;
             length_end += RxPrivHdr->RxLength;
             if ( time_cost >= THROUGHPUT_GET_INTERVAL )

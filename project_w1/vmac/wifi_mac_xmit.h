@@ -38,8 +38,7 @@ int wifi_mac_send_nulldata(struct wifi_station *sta, unsigned char pwr_save, uns
 int wifi_mac_send_qosnulldata(struct wifi_station *, int);
 struct sk_buff *wifi_mac_skbhdr_adjust(struct wlan_net_vif *wnet_vif, int hdrsize, struct wifi_mac_key *key, struct sk_buff *skb, int ismulticast);
 struct sk_buff *wifi_mac_encap(struct wifi_station *, struct sk_buff *);
-int8_t *wifi_mac_add_rates(unsigned char *, const struct wifi_mac_rateset *);
-
+unsigned char *wifi_mac_add_rates(unsigned char *, const struct wifi_mac_rateset *);
 unsigned char *wifi_mac_add_xrates(unsigned char *, const struct wifi_mac_rateset *);
 unsigned char *wifi_mac_add_wpa(unsigned char *, struct wlan_net_vif *);
 unsigned char *wifi_mac_add_erp(unsigned char *, struct wifi_mac *);
@@ -59,6 +58,8 @@ unsigned char *wifi_mac_add_vht_op_md_ntf(unsigned char *, struct wifi_station *
 unsigned char *wifi_mac_add_obss_scan(unsigned char *, struct wifi_station *);
 unsigned char *wifi_mac_add_extcap(unsigned char *, struct wifi_station *);
 
+unsigned char *wifi_mac_add_timeout_interval(unsigned char *, struct wifi_station *);
+
 int wifi_mac_send_probereq(struct wifi_station *, const unsigned char sa[WIFINET_ADDR_LEN], const unsigned char da[WIFINET_ADDR_LEN],
     const unsigned char bssid[WIFINET_ADDR_LEN], const unsigned char *ssid, size_t ssidlen, const void *optie, size_t optielen);
 
@@ -70,5 +71,6 @@ int wifi_mac_send_assoc_rsp(struct wlan_net_vif *wnet_vif, struct wifi_station *
 int wifi_mac_send_disassoc(struct wlan_net_vif *wnet_vif, struct wifi_station *sta,void *arg);
 int wifi_mac_send_actionframe(struct wlan_net_vif *wnet_vif, struct wifi_station *sta,void *arg);
 int wifi_mac_send_mgmt(struct wifi_station *, int, void *);
+int wifi_mac_udp_send_timeout_ex(void *arg);
 
 #endif

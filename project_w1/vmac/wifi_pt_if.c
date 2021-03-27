@@ -101,6 +101,12 @@ void Driver_intr_ba_recv(void *dev,unsigned char vid)
     DBG_HAL_THR_EXIT();
 }
 
+void drv_intr_bt_info_change(void * dpriv, unsigned char wnet_vif_id,unsigned char bt_lk_change)
+{
+    DBG_HAL_THR_ENTER();
+    DBG_HAL_THR_EXIT();
+}
+
 int Do_HI_AGG_TxPriv_TYPE_AMSDU(struct _HI_TxPrivDescripter_chain* HI_TxPriv[],
     unsigned char* skbptr[],int length[],int packetNum)
 {

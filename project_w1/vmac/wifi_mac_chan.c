@@ -13,6 +13,29 @@ int support_idx[WIFI_country_MAX +1][20] = {
     {15,1,7,32,34,36,37,39,41,42,44,46,56,57,58,128,0,0,0,0},//WIFI_Japan
     {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},//WIFI_Israel
     {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},//WIFI_Mexico
+    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},//WIFI_Canada
+    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},//WIFI_India
+    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},//WIFI_Australia
+    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},//WIFI_NewZealand
+    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},//WIFI_Brazil
+    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}, //WIFI_WW
+    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}//WIFI_country_MAX
+};
+
+int dfs_channel_list[WIFI_country_MAX +1][20] = {
+    {4,52,56,60,64,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},//WIFI_China -0
+    {15,52,56,60,64,100,104,108,112,116,120,124,128,132,136,140,0,0,0,0},//WIFI_NorthAmerica
+    {15,52,56,60,64,100,104,108,112,116,120,124,128,132,136,140,0,0,0,0},//WIFI_Europe
+    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},//WIFI_France
+    {15,52,56,60,64,100,104,108,112,116,120,124,128,132,136,140,0,0,0,0},//WIFI_Japan
+    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},//WIFI_Israel
+    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},//WIFI_Mexico
+    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},//WIFI_Canada
+    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},//WIFI_India
+    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},//WIFI_Australia
+    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},//WIFI_NewZealand
+    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},//WIFI_Brazil
+    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},//WIFI_WW
     {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}//WIFI_country_MAX
 };
 
@@ -449,7 +472,95 @@ void  wifi_mac_select_chan_from_global(int sub_set[], int num,struct wifi_mac *w
 #endif
 }
 
-void  wifi_mac_update_chan_list_by_country(int country_code, int support_opt[],int support_num,struct wifi_mac *wifimac )
+void wifi_mac_mark_dfs_channel(int country_code, struct wifi_mac *wifimac, int chan_num)
+{
+    int i = 0;
+    int j = 0;
+    int support_num  = dfs_channel_list[country_code][0];
+
+    /* if chan mun==0 mark all dfs channel*/
+    if (chan_num == 0) {
+        for (i = 0; i < support_num; i++) {
+            for (j = 0; j < wifimac->wm_nchans; j++) {
+                if (dfs_channel_list[country_code][i+1] == wifimac->wm_channels[j].chan_pri_num) {
+//                    printk("%s mark channel %d \n", __func__,dfs_channel_list[country_code][i+1]);
+                    wifimac->wm_channels[j].chan_flags |= WIFINET_CHAN_DFS;
+                }
+            }
+         }
+
+    } else {
+        for (i = 0; i <  wifimac->wm_nchans; i++) {
+            if (wifimac->wm_channels[i].chan_pri_num == chan_num) {
+//                printk("%s mark channel %d \n", __func__,wifimac->wm_channels[i].chan_pri_num);
+                wifimac->wm_channels[i].chan_flags |= WIFINET_CHAN_DFS;
+            }
+        }
+    }
+}
+
+void wifi_mac_unmark_dfs_channel(int country_code, struct wifi_mac *wifimac, int chan_num)
+{
+    int i = 0;
+
+    for (i = 0; i < wifimac->wm_nchans; i++) {
+        if (( chan_num == 0 && (wifimac->wm_channels[i].chan_flags | WIFINET_CHAN_DFS) )
+            || (chan_num != 0 && (wifimac->wm_channels[i].chan_pri_num == chan_num)) ){
+//            printk("%s UNmark channel %d \n", __func__,wifimac->wm_channels[i].chan_pri_num);
+            wifimac->wm_channels[i].chan_flags &= ~WIFINET_CHAN_DFS;
+        }
+    }
+}
+
+int wifi_mac_if_dfs_channel(struct wifi_mac *wifimac,int chan_num)
+{
+    int i = 0;
+
+    WIFI_CHANNEL_LOCK(wifimac);
+
+    for (i = 0; i <  wifimac->wm_nchans; i++) {
+        if (wifimac->wm_channels[i].chan_pri_num == chan_num && (wifimac->wm_channels[i].chan_flags & WIFINET_CHAN_DFS)) {
+            printk("%s is dfs channel %d \n", __func__,wifimac->wm_channels[i].chan_pri_num);
+            WIFI_CHANNEL_UNLOCK(wifimac);
+            return 1;
+        }
+    }
+
+    WIFI_CHANNEL_UNLOCK(wifimac);
+    return 0;
+}
+
+void wifi_mac_enable_dfs_channel(struct wlan_net_vif *wnet_vif, int chan_num)
+{
+    struct wifi_mac *wifimac = wnet_vif->vm_wmac;
+    struct drv_private* drv_priv =  wifimac->drv_priv;
+    int country_code = drv_priv->drv_config.cfg_countrycode;
+
+    WIFI_CHANNEL_LOCK(wifimac);
+    wifi_mac_unmark_dfs_channel(country_code,wifimac,chan_num);
+    WIFI_CHANNEL_UNLOCK (wifimac);
+}
+
+void wifi_mac_disable_dfs_channel(struct wlan_net_vif *wnet_vif, int chan_num)
+{
+    struct wifi_mac *wifimac = wnet_vif->vm_wmac;
+    struct drv_private* drv_priv =  wifimac->drv_priv;
+    int country_code = drv_priv->drv_config.cfg_countrycode;
+
+    WIFI_CHANNEL_LOCK(wifimac);
+    wifi_mac_mark_dfs_channel(country_code, wifimac,chan_num);
+    WIFI_CHANNEL_UNLOCK(wifimac);
+
+    if (wnet_vif->vm_opmode == WIFINET_M_STA && wifimac->wm_nrunning == 1) {
+        if (wifi_mac_if_dfs_channel(wifimac, wnet_vif->vm_curchan->chan_pri_num) == 1) {
+            printk("current channel %d is dfs channel \n", wnet_vif->vm_curchan->chan_pri_num);
+            wnet_vif->vm_chan_roaming_scan_flag = 0;
+            wifi_mac_top_sm(wnet_vif, WIFINET_S_SCAN, 0);
+        }
+    }
+}
+
+void  wifi_mac_update_chan_list_by_country(int country_code, int support_opt[], int support_num, struct wifi_mac *wifimac )
 {
     int opt_idx[32] = {0};
     int opt_num = 0;
@@ -464,6 +575,7 @@ void  wifi_mac_update_chan_list_by_country(int country_code, int support_opt[],i
 
     wifi_mac_get_opt_set_by_country(country_code, support_opt, support_num, opt_idx, &opt_num);
     wifi_mac_select_chan_from_global(opt_idx, opt_num,wifimac);
+    wifi_mac_mark_dfs_channel(country_code, wifimac, 0);
 }
 
 unsigned char wifi_mac_chan_num_availd (struct wifi_mac *wifimac, unsigned char channum)
@@ -838,8 +950,8 @@ int wifi_mac_set_wnet_vif_channel(struct wlan_net_vif *wnet_vif,  int chan, int 
     c = wifi_mac_find_chan(wifimac, chan, bw, center_chan);
 
     if (c == NULL) {
-        DPRINTF(AML_DEBUG_ERROR, "WARNING<%s>:: %s %d can't support set this channel\n",
-            (wnet_vif)->vm_ndev->name, __func__, __LINE__);
+        DPRINTF(AML_DEBUG_ERROR, "WARNING<%s>:: %s %d can't support set this channel, chan %d, bw %d, c_chan %d\n",
+            (wnet_vif)->vm_ndev->name, __func__, __LINE__, chan, bw, center_chan);
         return false;
     }
 

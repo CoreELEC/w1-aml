@@ -992,7 +992,9 @@ int hal_is_empty_tx_id(struct hal_private * hal_priv)
 }
 
 #ifdef DRV_PT_SUPPORT
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 20, 0))
 extern void do_gettimeofday(struct timeval *tv);
+#endif
 static void b2b_tx_throughput_calc(struct Tx_FrameDesc*  pTxFrameDesc,
                              struct txdonestatus * txstatus )
 {
@@ -1003,8 +1005,10 @@ static void b2b_tx_throughput_calc(struct Tx_FrameDesc*  pTxFrameDesc,
     static long start = 0;
     long end = 0;
     long time_cost = 0;
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 20, 0))
     struct timeval t_start;
     struct timeval  t_end;
+#endif
     struct hi_tx_desc *pTxDPape = NULL;
 
     if ( TX_DESCRIPTOR_STATUS_SUCCESS == txstatus->txstatus )
@@ -1018,16 +1022,24 @@ static void b2b_tx_throughput_calc(struct Tx_FrameDesc*  pTxFrameDesc,
             rx_count++;
             if (rx_count == 1)
             {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 20, 0))
+                start = ktime_to_ms(ktime_get_boottime());
+#else
                 do_gettimeofday(&t_start);
                 start = ((long)t_start.tv_sec)*1000+(long)t_start.tv_usec/1000;
+#endif
                 printk("Tx side: Got the first packet and the start time is :%ld ms.\n",start);
                 length_start += HW_MPDU_LEN_GET(pTxDPape->MPDUBufFlag);
                 length_end += HW_MPDU_LEN_GET(pTxDPape->MPDUBufFlag);
             }
             else
             {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 20, 0))
+                end = ktime_to_ms(ktime_get_boottime());
+#else
                 do_gettimeofday(&t_end);
                 end = ((long)t_end.tv_sec)*1000+(long)t_end.tv_usec/1000;
+#endif
                 time_cost = end - start;
                 length_end += HW_MPDU_LEN_GET(pTxDPape->MPDUBufFlag);
                 if ( time_cost >= 2000 )
@@ -1786,12 +1798,6 @@ int hal_open(void *drv_priv)
     hal_priv->bRfInit = 1;
 #endif
 
-    if(hal_priv->bCalbrationok == 1)
-    {
-        //phy_register_set();
-        hal_priv->bCalbrationok = 1;
-    }    // can not call phy_init_hmac because for power mode ,
-
     hal_priv->bhalOpen =1;
     PRINT("%s(%d) bhalOpen 0x%x\n",__func__,__LINE__, hal_priv->bhalOpen);
 
@@ -2189,15 +2195,13 @@ int hal_init_priv(void)
     hif_init_ops();
 
     memset(hal_priv , 0, sizeof( struct hal_private));
-    hal_priv->bCalbrationok = 1;
-
     hal_priv->hif = hif_get_hw_interface();
 
     HAL_LOCK_INIT();
     POWER_LOCK_INIT();
     COMMON_LOCK_INIT();
     AML_TXLOCK_INIT();
-    AML_RXLOCK_INIT();
+    PN_LOCK_INIT();
 
     //tx and rx complete status buffer allocation
     hal_alloc_txcmp_buf(hal_priv);
@@ -2341,9 +2345,9 @@ void hal_exit_priv(void)
 
     HAL_LOCK_DESTROY();
     POWER_LOCK_DESTROY();
-
-    AML_RXLOCK_DESTROY();
     AML_TXLOCK_DESTROY();
+    COMMON_LOCK_DESTROY();
+    PN_LOCK_DESTROY();
 
 #if defined (HAL_FPGA_VER)
 

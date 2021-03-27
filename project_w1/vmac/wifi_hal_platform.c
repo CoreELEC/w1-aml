@@ -10,6 +10,7 @@ namespace FW_NAME
 #include "fucode_em4.h"
 #include "wifi_hif.h"
 #include "wifi_common.h"
+#include "version.h"
 #include "wifi_drv_reg_ops.h"
 #if defined (HAL_FPGA_VER)
 #include <linux/amlogic/aml_gpio_consumer.h>
@@ -941,10 +942,10 @@ static void aml_rmmod(void)
     unsigned char i;
 #endif
 
-    aml_insmod_flag = 0;
     printk("===================aml_rmmod start====================\n");
     hal_exit_priv();
     printk("===================aml_rmmod end====================\n");
+    aml_insmod_flag = 0;
 
 #ifdef DEBUG_MALLOC
     printk("kmalloc_count:%d\n", kmalloc_count);

@@ -104,7 +104,7 @@ wifi_macwnet_vif_get_opmode(struct wlan_net_vif *wnet_vif)
 }
 
 #define WIFINET_NODE_USEAMPDU(_sta)                         \
-        (wifi_mac_IsHTEnable(_sta->sta_wnet_vif) && \
+        (wifi_mac_is_ht_enable(_sta) && \
          (((_sta)->sta_flags & WIFINET_NODE_HT) != 0) && \
          (((_sta)->sta_wnet_vif->vm_flags_ext & WIFINET_FEXT_AMPDU) != 0)&& \
          (((_sta)->sta_flags & WIFINET_NODE_NOAMPDU)== 0))
@@ -386,5 +386,7 @@ void wifi_mac_pt_rx_start(unsigned int qos);
 void wifi_mac_pt_rx_stop(void);
 struct wifi_mac* wifi_mac_get_mac_handle(void);
 void wifi_mac_restore_wnet_vif_channel_task(struct wlan_net_vif *wnet_vif);
+void wifi_mac_roaming_trigger(struct wlan_net_vif * wnet_vif);
 
-#endif 
+
+#endif

@@ -33,7 +33,6 @@ namespace FW_NAME
 #include "wifi_drv_statistic.h"
 #endif
 
-static char *cali_cfg_path = "/vendor/etc/wifi/w1/aml_wifi_rf.txt";
 
 
 //set cmd to firmware
@@ -1668,8 +1667,8 @@ unsigned char parse_cali_param(char *varbuf, int len, struct Cali_Param *cali_pa
     get_s8_item(varbuf, len, "tssi_5g_offset_5400", &cali_param->tssi_5g_offset[1]);
     get_s8_item(varbuf, len, "tssi_5g_offset_5600", &cali_param->tssi_5g_offset[2]);
     get_s8_item(varbuf, len, "tssi_5g_offset_5800", &cali_param->tssi_5g_offset[3]);
-    get_s8_item(varbuf, len, "hdmi_enable", &cali_param->hdmi_enable);
-    get_s16_item(varbuf, len, "hdmi_freq", &cali_param->hdmi_freq);
+    get_s8_item(varbuf, len, "wf2g_spur_rmen", &cali_param->wf2g_spur_rmen);
+    get_s16_item(varbuf, len, "spur_freq", &cali_param->spur_freq);
     get_s8_item(varbuf, len, "rf_count", &cali_param->rf_num);
 
     return 0;
@@ -1684,17 +1683,36 @@ unsigned char get_cali_param(struct Cali_Param *cali_param)
     char *content =  NULL;
     mm_segment_t fs;
 
+    unsigned int chip_id_l = 0;
+    unsigned char chip_id_buf[100];
+
+    chip_id_l = efuse_manual_read(0xf);
+    chip_id_l = chip_id_l & 0xffff;
+    switch ((chip_id_l & 0xff00) >> 8) {
+        case MODULE_ITON:
+            sprintf(chip_id_buf, "vendor/etc/wifi/w1/aml_wifi_rf_iton.txt");
+            break;
+        case MODULE_AMPAK:
+            sprintf(chip_id_buf, "vendor/etc/wifi/w1/aml_wifi_rf_ampak.txt");
+            break;
+        case MODULE_FN_LINK:
+            sprintf(chip_id_buf, "vendor/etc/wifi/w1/aml_wifi_rf_fn_link.txt");
+            break;
+        default:
+            sprintf(chip_id_buf, "vendor/etc/wifi/w1/aml_wifi_rf.txt");
+    }
+    printk("aml wifi module SN:%04x  the rf config: %s\n", chip_id_l, chip_id_buf);
     fs = get_fs();
     set_fs(KERNEL_DS);
 
-    fp = filp_open(cali_cfg_path, O_RDONLY, 0);
+    fp = filp_open(chip_id_buf, O_RDONLY, 0);
 
     if (IS_ERR(fp)) {
         fp = NULL;
         goto err;
     }
 
-    error = vfs_stat(cali_cfg_path, &stat);
+    error = vfs_stat(chip_id_buf, &stat);
     if (error) {
         filp_close(fp, NULL);
         goto err;
@@ -1721,7 +1739,13 @@ unsigned char get_cali_param(struct Cali_Param *cali_param)
 
     len = process_cali_content(content, size);
     parse_cali_param(content, len, cali_param);
-
+    if (chip_id_l & 0xf0) {
+        if (chip_id_l & BIT(5))
+            cali_param->rf_num = 2;
+        else
+            cali_param->rf_num = 1;
+        printk("rf_cout is: %d\n", cali_param->rf_num);
+    }
     FREE(content, "wifi_cali_param");
     filp_close(fp, NULL);
     set_fs(fs);

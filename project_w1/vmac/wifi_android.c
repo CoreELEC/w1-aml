@@ -203,7 +203,6 @@ static int aml_android_cmdstr_to_num(char *cmdstr)
     int i = 0;
     int is_found = 0;
 
-    printk("%s\n", __func__);
     if (!IS_RUNNING(wnet_vif->vm_ndev))
     {
         DPRINTF(AML_DEBUG_ANDROID,"%s %d flags %x cmd abort\n", __func__, __LINE__, wnet_vif->vm_ndev->flags);
@@ -378,7 +377,7 @@ static int aml_android_cmdstr_to_num(char *cmdstr)
         {
             skip = strlen(android_wifi_cmd_str[ANDROID_WIFI_CMD_SET_AP_WPS_P2P_IE]) + 3;
             bytes_written = vm_p2p_set_wpsp2pie(wnet_vif->vm_ndev, command + skip,
-                                                priv_cmd.total_len - skip, *(command + skip - 2) - '0');
+                priv_cmd.total_len - skip, *(command + skip - 2) - '0');
             DPRINTF(AML_DEBUG_ANDROID,"%s %d bytes_written=%d\n", __func__, __LINE__, bytes_written);
             break;
         }

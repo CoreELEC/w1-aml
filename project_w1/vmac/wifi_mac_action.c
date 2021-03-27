@@ -1,4 +1,5 @@
 #include "wifi_mac_com.h"
+#include "wifi_cmd_func.h"
 
 extern bool aml_char_is_hex_digit(char chTmp);
 

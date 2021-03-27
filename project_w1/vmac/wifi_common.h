@@ -19,7 +19,7 @@
 #ifdef CONFIG_AML_USE_STATIC_BUF
 void *wifi_mem_prealloc(int section, unsigned long size);
 #endif
-#define DRIVERVERSION    "v1.0.20210322-bate"
+
 int aml_is_file_readable(const char *path);
 int aml_is_file_readable_with_size(const char *path, u32 *sz);
 int aml_readable_file_sz_chk(const char *path, u32 sz);

@@ -452,6 +452,7 @@ void Driver_intr_rx_handle(void *  drv_prv,struct sk_buff *skb,unsigned char Rss
 void Driver_intr_dtim_send(void *dev,unsigned char vid);
 void Driver_intr_bcn_send(void *dev,unsigned char vid);
 void Driver_intr_ba_recv(void *dev,unsigned char vid);
+void drv_intr_bt_info_change(void * dpriv, unsigned char wnet_vif_id,unsigned char bt_lk_change);
 void Driver_intr_tx_handle(void *  drv_priv,struct txdonestatus* tx_done_status,SYS_TYPE callback, unsigned char queue_id);
 void Driver_ListInit(struct _HI_AGG_TxDescripter_chain  *HI_AGG_TxDp );
 struct _HI_TxPrivDescripter_chain *  Driver_GetTxPriv(void);

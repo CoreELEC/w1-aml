@@ -314,9 +314,8 @@ drv_set_bcn_start( struct drv_private *drv_priv, unsigned char wnet_vif_id,
 }
 
 static void
-drv_put_bcn_buf( struct drv_private *drv_priv,
-                unsigned char wnet_vif_id,unsigned char *pBeacon,
-                unsigned short len,unsigned char Rate,unsigned short Flag)
+drv_put_bcn_buf( struct drv_private *drv_priv, unsigned char wnet_vif_id,
+    unsigned char *pBeacon, unsigned short len,unsigned char Rate,unsigned short Flag)
 {
     //printk("<running> %s %d \n",__func__,__LINE__);
     driv_ps_wakeup(drv_priv);
@@ -991,15 +990,13 @@ drv_key_rst_ex(SYS_TYPE param1,SYS_TYPE param2,
     unsigned short key_index = (unsigned short )param3;
     int staid = (int)param4;
     driv_ps_wakeup(drv_priv);
-    if (staid==0)
-    {
-        printk("<running> %s %d wnet_vif_id=%d\n",__func__,__LINE__,wnet_vif_id);
-        drv_hal_keyreset(wnet_vif_id,  key_index);
-    }
-    else
-    {
-        printk("<running> %s %d wnet_vif_id=%d\n",__func__,__LINE__,wnet_vif_id);
-        drv_hal_keyclear( wnet_vif_id, staid);
+
+    printk("<running> %s %d wnet_vif_id=%d\n",__func__,__LINE__,wnet_vif_id);
+    if (staid == 0) {
+        drv_hal_keyreset(wnet_vif_id, key_index);
+
+    } else {
+        drv_hal_keyclear(wnet_vif_id, staid);
     }
     driv_ps_sleep(drv_priv);
 }
@@ -1506,6 +1503,16 @@ static void drv_tx_ok_timeout(void *drv_priv)
         drv_private->wait_mpdu_timeout = 1;
         __D(BIT(17), "%s, waiting_pkt_timeout:%d\n", __func__, drv_private->wait_mpdu_timeout);
         DRV_TX_TIMEOUT_UNLOCK(drv_private);
+    }
+}
+
+void drv_tx_lock_timeout(void *drv_priv)
+{
+    struct drv_private *drv_private = (struct drv_private *)(drv_priv);
+
+    if (drv_private != NULL) {
+        drv_private->wait_mpdu_timeout = 1;
+        tasklet_schedule(&drv_private->ampdu_tasklet);
     }
 }
 
@@ -2095,6 +2102,12 @@ static void drv_intr_fw_event(void *dpriv, void *event)
             break;
 
         case TX_ERROR_EVENT:
+            {
+                struct tx_error_event *error_event = (struct tx_error_event *)fw_event;
+
+                printk("%s:%d, frame type %x, error type %x \n", __func__, __LINE__,
+                    error_event->frame_type, error_event->error_type);
+            }
             drv_priv->net_ops->wifi_mac_process_tx_error(wnet_vif);
             break;
 
@@ -2267,11 +2280,8 @@ drv_dev_probe(void)
     /*1, init sdio, here we are in initialization process of sdio. */
 
     /*2 init hal, download fw, host init */
-    if ((hal_priv->hal_ops.hal_probe != NULL)
-        && (!hal_priv->hal_ops.hal_probe()))
-    {
-        DPRINTF(AML_DEBUG_INIT|AML_DEBUG_ERROR,"init hal error %s %d \n",
-                __func__,__LINE__);
+    if ((hal_priv->hal_ops.hal_probe != NULL) && (!hal_priv->hal_ops.hal_probe())) {
+        DPRINTF(AML_DEBUG_ERROR,"init hal error %s %d \n", __func__,__LINE__);
         goto err_ret;
     }
 
@@ -2281,18 +2291,17 @@ drv_dev_probe(void)
     wifi_mac_init_ops(wm_mac);
 
     aml_wifi_set_mac_addr();
-    printk("%s(%d) mac_addr "MAC_FMT" set done.\n\n", __func__,__LINE__,
-           mac_addr0,mac_addr1,mac_addr2, mac_addr3,mac_addr4,mac_addr5);
+    printk("%s(%d) mac_addr set done."MAC_FMT"", __func__,__LINE__,
+        mac_addr0,mac_addr1,mac_addr2, mac_addr3,mac_addr4,mac_addr5);
+
     /*3 init driver */
-    if(aml_driv_attach(drv_priv, wm_mac))
-    {
-        DPRINTF(AML_DEBUG_INIT|AML_DEBUG_ERROR,"init driver error %s %d \n",
-                __func__,__LINE__);
+    if(aml_driv_attach(drv_priv, wm_mac)) {
+        DPRINTF(AML_DEBUG_ERROR,"init driver error %s %d \n", __func__,__LINE__);
         goto err_ret;
     }
+
     /*4 init wifimac */
-    if (wifi_mac_mac_entry(wm_mac, drv_priv) != 0)
-    {
+    if (wifi_mac_mac_entry(wm_mac, drv_priv) != 0) {
         DPRINTF(AML_DEBUG_INIT|AML_DEBUG_ERROR,"init wifimac error %s %d \n",
                 __func__,__LINE__);
         goto err_ret;

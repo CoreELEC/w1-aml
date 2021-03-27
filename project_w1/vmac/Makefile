@@ -12,8 +12,9 @@ ARCH ?= arm64
 CROSS_COMPILE ?= aarch64-linux-gnu-
 EXTRA_CFLAGS += -DSYSTEM64
 #SRCTOP ?= /mnt/fileroot2/vlsi.wifi/p-amlogic
-SRCTOP ?= /mnt/fileroot2/vlsi.wifi/yeke_64bit
+#SRCTOP ?= /mnt/fileroot2/vlsi.wifi/yeke_64bit
 #SRCTOP ?= /mnt/fileroot02/yuan.wang/ipc_prj
+SRCTOP ?= /mnt/fileroot2/vlsi.wifi/9-xiaomi
 else
 ARCH ?= arm
 CROSS_COMPILE ?= arm-linux-gnueabihf-
@@ -21,10 +22,11 @@ EXTRA_CFLAGS += -DSYSTEM32
 SRCTOP ?= /mnt/fileroot2/vlsi.wifi/p212_32bit
 endif
 
-#KERNELDIR ?=$(SRCTOP)/out/target/product/p281/obj/KERNEL_OBJ
-KERNELDIR ?=$(SRCTOP)/out/target/product/ampere/obj/KERNEL_OBJ
-#KERNELDIR ?=$(SRCTOP)/out/target/product/newton/obj/KERNEL_OBJ
-#KERNELDIR ?=$(SRCTOP)/output/c1_ae402_a64_release/build/linux-amlogic-4.19-dev
+#KERNELDIR ?= $(SRCTOP)/out/target/product/newton/obj/KERNEL_OBJ
+#KERNELDIR ?= $(SRCTOP)/out/target/product/p281/obj/KERNEL_OBJ
+#KERNELDIR ?= $(SRCTOP)/output/c1_ae402_a64_release/build/linux-amlogic-4.19-dev
+#KERNELDIR ?= $(SRCTOP)/out/target/product/aquaman/obj/KERNEL_OBJ
+KERNELDIR ?= $(SRCTOP)/out/target/product/ampere/obj/KERNEL_OBJ
 
 CC        = $(CROSS_COMPILE)gcc
 STRIP     = $(CROSS_COMPILE)strip
@@ -66,6 +68,7 @@ EXTRA_CFLAGS += -DHAL_FPGA_VER
 EXTRA_CFLAGS += -DPROJECT_W1
 #EXTRA_CFLAGS += -DINTER_BEACON
 EXTRA_CFLAGS += -DSRAM_CONCURRENT
+EXTRA_CFLAGS += -DCTS_VERIFIER_GAS
 #EXTRA_CFLAGS += -DCONFIG_COMPAT
 EXTRA_CFLAGS += -DCONFIG_AML_USE_STATIC_BUF
 EXTRA_CFLAGS += -DSDIO_BUILD_IN
@@ -74,6 +77,7 @@ EXTRA_CFLAGS += -DSDIO_BUILD_IN
 EXTRA_CFLAGS += -DFW_RF_CALIBRATION
 #EXTRA_CFLAGS += -DPOWER_SAVE_NO_SDIO
 EXTRA_CFLAGS += -DAML_WPA3
+#EXTRA_CFLAGS += -DAML_APSTA_CONCURRENT
 
 ifeq ($(UNOENV),$(UNO_GXL))
 EXTRA_CFLAGS += -DCONFIG_GXL
@@ -171,7 +175,8 @@ endif
 
 clean:
 	rm -rf *.o *~ core .depend .*.cmd *.ko *.mod.c .tmp_versions *.order *.symvers
-	rm -rf ./rf_t9026/*.o ./rf_t9026/.*.cmd ./w1_sdio/*.o ./w1_sdio/.*.cmd
+	rm -rf ./rf_t9026/*.o ./rf_t9026/.*.cmd ./w1_sdio/*.o ./w1_sdio/.*.cmd ./w1_sdio/.*.o.d
+	rm -rf ./crypto/*.o ./crypto/.*.cmd
 	rm -rf ./print_version.c
 
 depend .depend dep:

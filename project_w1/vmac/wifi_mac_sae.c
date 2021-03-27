@@ -65,9 +65,16 @@ int aml_pmkid_cache_index(struct wlan_net_vif *wnet_vif, const unsigned char *bs
 {
     int i;
     unsigned char *pmkid;
+    unsigned char zero_mac[6] = { 0x00 };
 
     /* check the bssid is null or not */
-    if (!bssid) return -1;
+    if (!bssid) {
+        goto not_found;
+    }
+
+    if (!memcmp(bssid, zero_mac, ETHER_ADDR_LEN)) {
+        goto not_found;
+    }
 
     DPRINTF(AML_DEBUG_CFG80211, "%s BSSID:%02x:%02x:%02x:%02x:%02x:%02x\n", __func__, bssid[0],
         bssid[1], bssid[2], bssid[3], bssid[4], bssid[5]);
@@ -82,6 +89,7 @@ int aml_pmkid_cache_index(struct wlan_net_vif *wnet_vif, const unsigned char *bs
         }
     }
 
+not_found:
     DPRINTF(AML_DEBUG_CFG80211, "pmkid not found\n");
     return -1;
 }
@@ -134,6 +142,22 @@ int aml_cfg80211_del_pmksa(struct wiphy *wiphy, struct net_device *dev, struct c
     } else {
         return -EINVAL;
     }
+}
+
+void aml_del_pmksa_by_index(struct wlan_net_vif *wnet_vif, const unsigned char *bssid)
+{
+    int pmkid_index;
+
+    pmkid_index = aml_pmkid_cache_index(wnet_vif, bssid);
+    if (pmkid_index == -1) {
+        return;
+
+    } else {
+        memset(wnet_vif->pmk_list->pmkid_cache[pmkid_index].pmkid, 0, sizeof(aml_pmkid_cache));
+        wnet_vif->pmk_list->pmkid_count--;
+    }
+
+    return;
 }
 
 int aml_cfg80211_flush_pmksa(struct wiphy *wiphy, struct net_device *dev)

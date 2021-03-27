@@ -20,7 +20,7 @@ static void ccmp_aad_nonce(const struct ieee80211_hdr *hdr, const u8 *data,
 
 	nonce[0] = 0;
 
-	fc = __constant_htons(hdr->frame_control);
+	fc = (hdr->frame_control);
 	stype = WLAN_FC_GET_STYPE(fc);
 	if ((fc & (WLAN_FC_TODS | WLAN_FC_FROMDS)) ==
 	    (WLAN_FC_TODS | WLAN_FC_FROMDS))
@@ -46,7 +46,7 @@ static void ccmp_aad_nonce(const struct ieee80211_hdr *hdr, const u8 *data,
 	pos = aad + 2;
 	os_memcpy(pos, hdr->addr1, 3 * ETH_ALEN);
 	pos += 3 * ETH_ALEN;
-	seq = __constant_htons(hdr->seq_ctrl);
+	seq = (hdr->seq_ctrl);
 	seq &= ~0xfff0; /* Mask Seq#; do not modify Frag# */
 	WPA_PUT_LE16(pos, seq);
 	pos += 2;
@@ -155,7 +155,7 @@ u8 * ccmp_decrypt(const u8 *tk, const struct ieee80211_hdr *hdr,
 
 	if (aes_ccm_ad(tk, 16, nonce, 8, data + 8, mlen, aad, aad_len,
 		       data + 8 + mlen, plain) < 0) {
-		u16 seq_ctrl = __constant_htons(hdr->seq_ctrl);
+		u16 seq_ctrl = (hdr->seq_ctrl);
 		wpa_printf(_MSG_INFO_, "Invalid CCMP MIC in frame: A1=" MACSTR
 			   " A2=" MACSTR " A3=" MACSTR " seq=%u frag=%u",
 			   MAC2STR(hdr->addr1), MAC2STR(hdr->addr2),
@@ -202,13 +202,13 @@ u8 * ccmp_encrypt(const u8 *tk, u8 *frame, size_t len, size_t hdrlen, u8 *qos,
 	if (pn == NULL) {
 		os_memcpy(crypt, frame, hdrlen + 8);
 		hdr = (struct ieee80211_hdr *) crypt;
-		hdr->frame_control |= __constant_htons(WLAN_FC_ISWEP);
+		hdr->frame_control |= (WLAN_FC_ISWEP);
 		pos = crypt + hdrlen + 8;
 		pdata = frame + hdrlen + 8;
 	} else {
 		os_memcpy(crypt, frame, hdrlen);
 		hdr = (struct ieee80211_hdr *) crypt;
-		hdr->frame_control |= __constant_htons(WLAN_FC_ISWEP);
+		hdr->frame_control |= (WLAN_FC_ISWEP);
 		pos = crypt + hdrlen;
 		*pos++ = pn[5]; /* PN0 */
 		*pos++ = pn[4]; /* PN1 */
@@ -260,7 +260,7 @@ u8 * ccmp_encrypt_pv1(const u8 *tk, const u8 *a1, const u8 *a2, const u8 *a3,
 
 	os_memcpy(crypt, frame, hdrlen);
 	hdr = (struct ieee80211_hdr *) crypt;
-	hdr->frame_control |= __constant_htons(BIT(12)); /* Protected Frame */
+	hdr->frame_control |= (BIT(12)); /* Protected Frame */
 	pos = crypt + hdrlen;
 
 	os_memset(aad, 0, sizeof(aad));
@@ -306,7 +306,7 @@ u8 * ccmp_256_decrypt(const u8 *tk, const struct ieee80211_hdr *hdr,
 
 	if (aes_ccm_ad(tk, 32, nonce, 16, data + 8, mlen, aad, aad_len,
 		       data + 8 + mlen, plain) < 0) {
-		u16 seq_ctrl = __constant_htons(hdr->seq_ctrl);
+		u16 seq_ctrl = (hdr->seq_ctrl);
 		wpa_printf(_MSG_INFO_, "Invalid CCMP-256 MIC in frame: A1=" MACSTR
 			   " A2=" MACSTR " A3=" MACSTR " seq=%u frag=%u",
 			   MAC2STR(hdr->addr1), MAC2STR(hdr->addr2),
@@ -342,13 +342,13 @@ u8 * ccmp_256_encrypt(const u8 *tk, u8 *frame, size_t len, size_t hdrlen,
 	if (pn == NULL) {
 		os_memcpy(crypt, frame, hdrlen + 8);
 		hdr = (struct ieee80211_hdr *) crypt;
-		hdr->frame_control |= __constant_htons(WLAN_FC_ISWEP);
+		hdr->frame_control |= (WLAN_FC_ISWEP);
 		pos = crypt + hdrlen + 8;
 		pdata = frame + hdrlen + 8;
 	} else {
 		os_memcpy(crypt, frame, hdrlen);
 		hdr = (struct ieee80211_hdr *) crypt;
-		hdr->frame_control |= __constant_htons(WLAN_FC_ISWEP);
+		hdr->frame_control |= (WLAN_FC_ISWEP);
 		pos = crypt + hdrlen;
 		*pos++ = pn[5]; /* PN0 */
 		*pos++ = pn[4]; /* PN1 */

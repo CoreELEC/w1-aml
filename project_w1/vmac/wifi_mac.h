@@ -34,17 +34,16 @@ enum wifi_mac_phytype
 
 enum wifi_mac_macmode
 {
-    WIFINET_MODE_AUTO   = 0,
-    WIFINET_MODE_11B        = 1,
-    WIFINET_MODE_11G        = 2,
-    WIFINET_MODE_11BG      = 3,
-    WIFINET_MODE_11N    = 4,
-    WIFINET_MODE_11GN   = 5,
-    WIFINET_MODE_11BGN  = 6,
-    WIFINET_MODE_11AC   = 7,
-    WIFINET_MODE_11NAC  = 8,
-    WIFINET_MODE_11GNAC  = 9,
-
+    WIFINET_MODE_AUTO = 0,
+    WIFINET_MODE_11B = 1,
+    WIFINET_MODE_11G = 2,
+    WIFINET_MODE_11BG = 3,
+    WIFINET_MODE_11N = 4,
+    WIFINET_MODE_11GN = 6,
+    WIFINET_MODE_11BGN = 7,
+    WIFINET_MODE_11AC = 8,
+    WIFINET_MODE_11NAC = 0xc,
+    WIFINET_MODE_11GNAC = 0xe,
     WIFINET_MODE_MAX,
 };
 
@@ -160,10 +159,15 @@ enum wifi_mac_authmode
 
 enum wifi_mac_roamingmode
 {
-    WIFINET_ROAMING_DEVICE= 0,
-    WIFINET_ROAMING_AUTO    = 1,
-    WIFINET_ROAMING_MANUAL= 2,
+    WIFINET_ROAMING_DISABLE = 0,
+    WIFINET_ROAMING_BASIC   = 1,
+    WIFINET_ROAMING_FAST    = 2,
 };
+
+#define DEFAULT_ROAMING_THRESHOLD_2G -72
+#define DEFAULT_ROAMING_THRESHOLD_5G -76
+#define ROAMING_TRIGER_COUNT         5
+
 
 enum wifi_mac_tx_status_mode
 {
@@ -191,7 +195,11 @@ struct wifi_channel
     unsigned char global_operating_class;
 };
 
-
+struct wifi_candidate_channel
+{
+    struct wifi_channel * channel;
+    int avg_rssi;
+};
 
 struct class_chan_set
 {
@@ -326,30 +334,30 @@ struct wifi_mac_wme_state
 struct wifi_mac_beacon_offsets
 {
     unsigned short *bo_caps;
-    unsigned char  *bo_rates;
-    unsigned char  *bo_channel;
-    unsigned char  *bo_tim;
-    unsigned char  *bo_wme;
-    unsigned char  *bo_tim_trailer;
+    unsigned char *bo_rates;
+    unsigned char *bo_channel;
+    unsigned char *bo_tim;
+    unsigned char *bo_wme;
+    unsigned char *bo_tim_trailer;
     unsigned short bo_tim_len;
     unsigned short bo_tim_trailerlen;
-    unsigned char  *bo_chanswitch;
-    unsigned char  *bo_extchanswitch;
-    unsigned char  *bo_erp;
-    unsigned char  *bo_appie_buf;
+    unsigned char *bo_chanswitch;
+    unsigned char *bo_extchanswitch;
+    unsigned char *bo_erp;
+    unsigned char *bo_appie_buf;
     unsigned short bo_appie_buf_len;
-    unsigned char  *bo_wsc;
-    unsigned char  *bo_htinfo;
-    unsigned char  *bo_htcap;
-    unsigned char  *bo_vhtop;
-    unsigned char  *bo_vhtcap;
-    unsigned char  *bo_obss_scan;
-    unsigned char  *bo_extcap;
-    unsigned short  bo_chanswitch_trailerlen;
-    unsigned short  bo_extchanswitch_trailerlen;
-    unsigned char    bo_initial;
+    unsigned char *bo_wsc;
+    unsigned char *bo_htinfo;
+    unsigned char *bo_htcap;
+    unsigned char *bo_vhtop;
+    unsigned char *bo_vhtcap;
+    unsigned char *bo_obss_scan;
+    unsigned char *bo_extcap;
+    unsigned short bo_chanswitch_trailerlen;
+    unsigned short bo_extchanswitch_trailerlen;
+    unsigned char bo_initial;
     /* beacon sequence number */
-    unsigned short  bo_bcn_seq;
+    unsigned short bo_bcn_seq;
 };
 
 #define WME_NUM_AC      4
@@ -564,6 +572,46 @@ struct WIFINET_S_FRAME_ADDR2
 #define WIFINET_TX_4_SPATIAL_STREAMS 0x30
 
 #define WIFINET_TX_MCS_SET 0xf8
+
+enum wifi_mac_reason_code {
+    WIFINET_REASON_UNSPECIFIED = 1,
+    WIFINET_REASON_AUTH_EXPIRE = 2,
+    WIFINET_REASON_AUTH_LEAVE = 3,
+    WIFINET_REASON_ASSOC_EXPIRE = 4,
+    WIFINET_REASON_ASSOC_TOOMANY = 5,
+    WIFINET_REASON_NOT_AUTHED = 6,
+    WIFINET_REASON_NOT_ASSOCED = 7,
+    WIFINET_REASON_ASSOC_LEAVE = 8,
+    WIFINET_REASON_ASSOC_NOT_AUTHED = 9,
+    WIFINET_REASON_RSN_REQUIRED = 11,
+    WIFINET_REASON_RSN_INCONSISTENT = 12,
+    WIFINET_REASON_IE_INVALID = 13,
+    WIFINET_REASON_MIC_FAILURE = 14,
+};
+
+enum wifi_mac_status_code {
+    WIFINET_STATUS_SUCCESS = 0,
+    WIFINET_STATUS_UNSPECIFIED = 1,
+    WIFINET_STATUS_CAPINFO = 10,
+    WIFINET_STATUS_NOT_ASSOCED = 11,
+    WIFINET_STATUS_OTHER = 12,
+    WIFINET_STATUS_ALG = 13,
+    WIFINET_STATUS_SEQUENCE = 14,
+    WIFINET_STATUS_CHALLENGE = 15,
+    WIFINET_STATUS_TIMEOUT = 16,
+    WIFINET_STATUS_TOOMANY = 17,
+    WIFINET_STATUS_BASIC_RATE = 18,
+    WIFINET_STATUS_SP_REQUIRED = 19,
+    WIFINET_STATUS_PBCC_REQUIRED = 20,
+    WIFINET_STATUS_CA_REQUIRED = 21,
+    WIFINET_STATUS_TOO_MANY_STATIONS = 22,
+    WIFINET_STATUS_RATES = 23,
+    WIFINET_STATUS_SHORTSLOT_REQUIRED = 25,
+    WIFINET_STATUS_DSSSOFDM_REQUIRED = 26,
+    WIFINET_STATUS_REFUSED_TEMPORARILY = 30,
+    WIFINET_STATUS_REFUSED = 37,
+    WIFINET_STATUS_INVALID_PARAM = 38,
+};
 
 #define WIFINET_COUNTRY_MAX_TRIPLETS (83)
 struct wifi_mac_ie_country
@@ -825,12 +873,11 @@ struct wifi_mac_ie_htcap_cmn
     unsigned char  hc_antenna;
 } __packed;
 
-
 struct wifi_mac_ie_htcap
 {
-    unsigned char                      hc_id;
-    unsigned char                      hc_len;
-    struct wifi_mac_ie_htcap_cmn   hc_ie;
+    unsigned char hc_id;
+    unsigned char hc_len;
+    struct wifi_mac_ie_htcap_cmn hc_ie;
 } __packed;
 
 
@@ -913,12 +960,14 @@ struct wifi_mac_ie_htinfo_cmn
 
     unsigned char  hi_basicmcsset[16];
 } __packed;
+
 struct wifi_mac_ie_htinfo
 {
-    unsigned char                      hi_id;
-    unsigned char                      hi_len;
-    struct wifi_mac_ie_htinfo_cmn  hi_ie;
+    unsigned char hi_id;
+    unsigned char hi_len;
+    struct wifi_mac_ie_htinfo_cmn hi_ie;
 } __packed;
+
 enum
 {
     WIFINET_HTINFO_EXTOFFSET_NA  = 0,
@@ -961,50 +1010,50 @@ enum
 
 enum
 {
-    WIFINET_ELEMID_SSID     = 0,
-    WIFINET_ELEMID_RATES        = 1,
-    WIFINET_ELEMID_FHPARMS  = 2,
-    WIFINET_ELEMID_DSPARMS  = 3,
-    WIFINET_ELEMID_CFPARMS  = 4,
-    WIFINET_ELEMID_TIM      = 5,
-    WIFINET_ELEMID_IBSSPARMS    = 6,
-    WIFINET_ELEMID_COUNTRY  = 7,
-    WIFINET_ELEMID_REQINFO  = 10,
-    WIFINET_ELEMID_CHALLENGE    = 16,
+    WIFINET_ELEMID_SSID = 0,
+    WIFINET_ELEMID_RATES = 1,
+    WIFINET_ELEMID_FHPARMS = 2,
+    WIFINET_ELEMID_DSPARMS = 3,
+    WIFINET_ELEMID_CFPARMS = 4,
+    WIFINET_ELEMID_TIM = 5,
+    WIFINET_ELEMID_IBSSPARMS = 6,
+    WIFINET_ELEMID_COUNTRY = 7,
+    WIFINET_ELEMID_REQINFO = 10,
+    WIFINET_ELEMID_CHALLENGE = 16,
     WIFINET_ELEMID_PWRCNSTR = 32,
-    WIFINET_ELEMID_PWRCAP       = 33,
-    WIFINET_ELEMID_TPCREQ       = 34,
-    WIFINET_ELEMID_TPCREP       = 35,
+    WIFINET_ELEMID_PWRCAP = 33,
+    WIFINET_ELEMID_TPCREQ = 34,
+    WIFINET_ELEMID_TPCREP = 35,
     WIFINET_ELEMID_SUPPCHAN = 36,
-    WIFINET_ELEMID_CHANSWITCHANN    = 37,
-    WIFINET_ELEMID_MEASREQ  = 38,
-    WIFINET_ELEMID_MEASREP  = 39,
-    WIFINET_ELEMID_QUIET        = 40,
-    WIFINET_ELEMID_IBSSDFS  = 41,
-    WIFINET_ELEMID_ERP      = 42,
-    WIFINET_ELEMID_HTCAP    = 45,
-    WIFINET_ELEMID_RSN      = 48,
-    WIFINET_ELEMID_XRATES       = 50,
+    WIFINET_ELEMID_CHANSWITCHANN = 37,
+    WIFINET_ELEMID_MEASREQ = 38,
+    WIFINET_ELEMID_MEASREP = 39,
+    WIFINET_ELEMID_QUIET = 40,
+    WIFINET_ELEMID_IBSSDFS = 41,
+    WIFINET_ELEMID_ERP = 42,
+    WIFINET_ELEMID_HTCAP = 45,
+    WIFINET_ELEMID_RSN = 48,
+    WIFINET_ELEMID_XRATES = 50,
+    WIFINET_ELEMID_TIMEOUT = 56,
     WIFINET_ELEMID_EXTCHANSWITCHANN = 60,
-    WIFINET_ELEMID_HTINFO   = 61,
-    WIFINET_ELEMID_2040_COEXT      = 72,
-    WIFINET_ELEMID_2040_INTOL      = 73,
-    WIFINET_ELEMID_OBSS_SCAN      = 74,
-    WIFINET_ELEMID_EXTCAP       = 127,
-    WIFINET_ELEMID_TPC      = 150,
-    WIFINET_ELEMID_CCKM     = 156,
+    WIFINET_ELEMID_HTINFO = 61,
+    WIFINET_ELEMID_2040_COEXT = 72,
+    WIFINET_ELEMID_2040_INTOL = 73,
+    WIFINET_ELEMID_OBSS_SCAN = 74,
+    WIFINET_ELEMID_EXTCAP = 127,
+    WIFINET_ELEMID_TPC = 150,
+    WIFINET_ELEMID_CCKM = 156,
 
-    WIFINET_ELEMID_VHTCAP           = 191,  /* VHT Capabilities */
-    WIFINET_ELEMID_VHTOP            = 192,  /* VHT Operation */
-    WIFINET_ELEMID_EXT_BSS_LOAD     = 193,  /* Extended BSS Load */
+    WIFINET_ELEMID_VHTCAP = 191,  /* VHT Capabilities */
+    WIFINET_ELEMID_VHTOP = 192,  /* VHT Operation */
+    WIFINET_ELEMID_EXT_BSS_LOAD = 193,  /* Extended BSS Load */
     WIFINET_ELEMID_WIDE_BAND_CHAN_SWITCH = 194,  /* Wide Band Channel Switch */
     WIFINET_ELEMID_VHT_TX_PWR_ENVLP = 195,  /* VHT Transmit Power Envelope */
     WIFINET_ELEMID_CHAN_SWITCH_WRAP = 196,  /* Channel Switch Wrapper */
-    WIFINET_ELEMID_AID              = 197,  /* AID */
-    WIFINET_ELEMID_QUIET_CHANNEL    = 198,  /* Quiet Channel */
-    WIFINET_ELEMID_OP_MODE_NOTIFY   = 199,  /* Operating Mode Notification */
-
-    WIFINET_ELEMID_VENDOR       = 221,
+    WIFINET_ELEMID_AID = 197,  /* AID */
+    WIFINET_ELEMID_QUIET_CHANNEL = 198,  /* Quiet Channel */
+    WIFINET_ELEMID_OP_MODE_NOTIFY = 199,  /* Operating Mode Notification */
+    WIFINET_ELEMID_VENDOR = 221,
 
 #ifdef CONFIG_WAPI
     WIFINET_ELEMID_WAI = 68,
@@ -1087,30 +1136,32 @@ struct wifi_mac_erp_ie
 #define WPA_VERSION     1
 
 
-#define WPA_CSE_NULL        0x00
-#define WPA_CSE_WEP40       0x01
-#define WPA_CSE_TKIP        0x02
-#define WPA_CSE_CCMP        0x04
-#define WPA_CSE_WEP104      0x05
+#define WPA_CSE_NULL 0x00
+#define WPA_CSE_WEP40 0x01
+#define WPA_CSE_TKIP 0x02
+#define WPA_CSE_CCMP 0x04
+#define WPA_CSE_WEP104 0x05
 
-#define WPA_ASE_NONE        0x00
-#define WPA_ASE_8021X_UNSPEC    0x01
-#define WPA_ASE_8021X_PSK   0x02
-#define WPA_ASE_8021X_SAE   0x08
+#define WPA_ASE_NONE 0x00
+#define WPA_ASE_8021X_UNSPEC 0x01
+#define WPA_ASE_8021X_PSK 0x02
 
 #define RSN_OUI         0xac0f00
 #define RSN_VERSION     1
 
-#define RSN_CSE_NULL        0x00
-#define RSN_CSE_WEP40       0x01
-#define RSN_CSE_TKIP        0x02
-#define RSN_CSE_WRAP        0x03
-#define RSN_CSE_CCMP        0x04
-#define RSN_CSE_WEP104      0x05
+#define RSN_CSE_NULL 0x00
+#define RSN_CSE_WEP40 0x01
+#define RSN_CSE_TKIP 0x02
+#define RSN_CSE_WRAP 0x03
+#define RSN_CSE_CCMP 0x04
+#define RSN_CSE_WEP104 0x05
+#define RSN_CSE_PSK_256 0x06
+#define RSN_CSE_SAE 0x08
 
 #define RSN_ASE_NONE        0x00
 #define RSN_ASE_8021X_UNSPEC    0x01
 #define RSN_ASE_8021X_PSK   0x02
+#define RSN_ASE_8021X_PSK_SHA256 0x06
 #define RSN_ASE_8021X_SAE   0x08
 
 #define RSN_CAP_PREAUTH     0x01
@@ -1141,50 +1192,10 @@ enum
 
 enum
 {
-    WIFINET_AUTH_SHARED_REQUEST     = 1,
-    WIFINET_AUTH_SHARED_CHALLENGE       = 2,
-    WIFINET_AUTH_SHARED_RESPONSE        = 3,
-    WIFINET_AUTH_SHARED_PASS        = 4,
-};
-
-
-enum
-{
-    WIFINET_REASON_UNSPECIFIED      = 1,
-    WIFINET_REASON_AUTH_EXPIRE      = 2,
-    WIFINET_REASON_AUTH_LEAVE       = 3,
-    WIFINET_REASON_ASSOC_EXPIRE     = 4,
-    WIFINET_REASON_ASSOC_TOOMANY        = 5,
-    WIFINET_REASON_NOT_AUTHED       = 6,
-    WIFINET_REASON_NOT_ASSOCED      = 7,
-    WIFINET_REASON_ASSOC_LEAVE      = 8,
-    WIFINET_REASON_ASSOC_NOT_AUTHED = 9,
-
-    WIFINET_REASON_RSN_REQUIRED     = 11,
-    WIFINET_REASON_RSN_INCONSISTENT = 12,
-    WIFINET_REASON_IE_INVALID       = 13,
-    WIFINET_REASON_MIC_FAILURE      = 14,
-
-    WIFINET_STATUS_SUCCESS      = 0,
-    WIFINET_STATUS_UNSPECIFIED      = 1,
-    WIFINET_STATUS_CAPINFO      = 10,
-    WIFINET_STATUS_NOT_ASSOCED      = 11,
-    WIFINET_STATUS_OTHER            = 12,
-    WIFINET_STATUS_ALG          = 13,
-    WIFINET_STATUS_SEQUENCE     = 14,
-    WIFINET_STATUS_CHALLENGE        = 15,
-    WIFINET_STATUS_TIMEOUT      = 16,
-    WIFINET_STATUS_TOOMANY      = 17,
-    WIFINET_STATUS_BASIC_RATE       = 18,
-    WIFINET_STATUS_SP_REQUIRED      = 19,
-    WIFINET_STATUS_PBCC_REQUIRED        = 20,
-    WIFINET_STATUS_CA_REQUIRED      = 21,
-    WIFINET_STATUS_TOO_MANY_STATIONS    = 22,
-    WIFINET_STATUS_RATES            = 23,
-    WIFINET_STATUS_SHORTSLOT_REQUIRED   = 25,
-    WIFINET_STATUS_DSSSOFDM_REQUIRED    = 26,
-    WIFINET_STATUS_REFUSED      = 37,
-    WIFINET_STATUS_INVALID_PARAM        = 38,
+    WIFINET_AUTH_SHARED_REQUEST = 1,
+    WIFINET_AUTH_SHARED_CHALLENGE = 2,
+    WIFINET_AUTH_SHARED_RESPONSE = 3,
+    WIFINET_AUTH_SHARED_PASS = 4,
 };
 
 #define WIFINET_WEP_IVLEN       3
@@ -1243,14 +1254,6 @@ struct wifi_mac_ie_ext_cap
     unsigned char ext3_capflags[4];
 } __packed;
 
-struct wifi_mac_txparam
-{
-    uint8_t     ucastrate;
-    uint8_t     mgmtrate;
-    uint8_t     mcastrate;
-    uint8_t     maxretry;
-};
-
 #define SET_HT_CAP_INFO_LGSIG_TXOP_PRCT(dst, val) do {(dst) &= ~(0x1 <<15) ; (dst) |= (val) << 15;}while(0)
 	#define HT_CAP_INFO_NOT_SPT_LGSIG_TXOP_PRCT	(0)
 
@@ -1288,63 +1291,54 @@ struct wifi_mac_txparam
  * 802.11ac VHT Capability IE
  */
 struct wifi_mac_ie_vht_cap {
-        unsigned char    elem_id;
-        unsigned char    elem_len;
-        unsigned int   vht_cap_info;
-        unsigned short   rx_mcs_map;          /* B0-B15 Max Rx MCS for each SS */
-        unsigned short   rx_high_data_rate;   /* B16-B28 Max Rx data rate,
+    unsigned char elem_id;
+    unsigned char elem_len;
+    unsigned int vht_cap_info;
+    unsigned short rx_mcs_map;          /* B0-B15 Max Rx MCS for each SS */
+    unsigned short rx_high_data_rate;   /* B16-B28 Max Rx data rate,
                                             Note:  B29-B31 reserved */
-        unsigned short   tx_mcs_map;          /* B32-B47 Max Tx MCS for each SS */
-        unsigned short   tx_high_data_rate;   /* B48-B60 Max Tx data rate,
+    unsigned short tx_mcs_map;          /* B32-B47 Max Tx MCS for each SS */
+    unsigned short tx_high_data_rate;   /* B48-B60 Max Tx data rate,
                                             Note: B61-B63 reserved */
 } __packed;
 
-
 /* VHT Operation  */
-#define WIFINET_VHTOP_CHWIDTH_2040      0 /* 20/40 MHz Operating Channel */
-#define WIFINET_VHTOP_CHWIDTH_80        1 /* 80 MHz Operating Channel */
-#define WIFINET_VHTOP_CHWIDTH_160       2 /* 160 MHz Operating Channel */
-#define WIFINET_VHTOP_CHWIDTH_80_80     3 /* 80 + 80 MHz Operating Channel */
-
-
-
-
-/*VHT capability MSC map for per space stream */
-
+#define WIFINET_VHTOP_CHWIDTH_2040 0 /* 20/40 MHz Operating Channel */
+#define WIFINET_VHTOP_CHWIDTH_80 1 /* 80 MHz Operating Channel */
+#define WIFINET_VHTOP_CHWIDTH_160 2 /* 160 MHz Operating Channel */
+#define WIFINET_VHTOP_CHWIDTH_80_80 3 /* 80 + 80 MHz Operating Channel */
 
 /*
  * 802.11ac VHT Operation IE
  */
 struct wifi_mac_ie_vht_opt {
-        unsigned char    elem_id;
-        unsigned char    elem_len;
-        unsigned char    vht_op_chwidth;              /* BSS Operational Channel width */
-        unsigned char    vht_op_ch_freq_seg1;         /* Channel Center frequency */
-        unsigned char    vht_op_ch_freq_seg2;         /* Channel Center frequency applicable
+    unsigned char elem_id;
+    unsigned char elem_len;
+    unsigned char vht_op_chwidth;              /* BSS Operational Channel width */
+    unsigned char vht_op_ch_freq_seg1;         /* Channel Center frequency */
+    unsigned char vht_op_ch_freq_seg2;         /* Channel Center frequency applicable
                                                   * for 80+80MHz mode of operation */ 
-        unsigned short   vhtop_basic_mcs_set;         /* Basic MCS set */
+    unsigned short vhtop_basic_mcs_set;         /* Basic MCS set */
 } __packed;
 
 
 /*
  * 802.11n Secondary Channel Offset element
  */
-
 struct wifi_mac_ie_sec_chan_offset {
-     unsigned char    elem_id;
-     unsigned char    len;
-     unsigned char    sec_chan_offset;
+    unsigned char elem_id;
+    unsigned char len;
+    unsigned char sec_chan_offset;
 } __packed;
 
 /*
  * 802.11ac Transmit Power Envelope element
  */
-
 struct wifi_mac_ie_vht_txpwr_env {
-        unsigned char    elem_id;
-        unsigned char    elem_len;
-        unsigned char    txpwr_info;       /* Transmit Power Information */
-        unsigned char    local_max_txpwr[4]; /* Local Max TxPower for 20,40,80,160MHz */
+    unsigned char elem_id;
+    unsigned char elem_len;
+    unsigned char txpwr_info;       /* Transmit Power Information */
+    unsigned char local_max_txpwr[4]; /* Local Max TxPower for 20,40,80,160MHz */
 } __packed;
 
 #define SET_LMAX_TXPW_CNT(dst, val) do {(dst) &= ~(0x7 <<0) ; (dst) |= (val) << 0;}while(0)
@@ -1353,58 +1347,68 @@ struct wifi_mac_ie_vht_txpwr_env {
 #define GET_LMAX_TXPW_UNIT_INIT_CNT(dst)  ( ((dst)>>3) &0x7 )
 #define LC_MAX_TXPW_LEN   (4)
 
-
-
-#define SUB_IE_MAX_LEN		(32)
+#define SUB_IE_MAX_LEN (32)
 struct wifi_mac_ie_vht_ch_sw_wrp
 {
-        unsigned char    elem_id;
-        unsigned char    elem_len;
-	 unsigned char    new_country_sub_ie[SUB_IE_MAX_LEN];
-	 unsigned char	  wide_bw_ch_sw_sub_ie[SUB_IE_MAX_LEN];
-	 unsigned char	  new_vht_tx_pw_sub_ie[SUB_IE_MAX_LEN];
-}__packed;
+    unsigned char elem_id;
+    unsigned char elem_len;
+    unsigned char new_country_sub_ie[SUB_IE_MAX_LEN];
+    unsigned char wide_bw_ch_sw_sub_ie[SUB_IE_MAX_LEN];
+    unsigned char new_vht_tx_pw_sub_ie[SUB_IE_MAX_LEN];
+} __packed;
 /*
  * 802.11ac Wide Bandwidth Channel Switch Element
  */
 
 
 struct wifi_mac_ie_vht_wide_bw_switch {
-        unsigned char    elem_id;
-        unsigned char    elem_len;
-        unsigned char    new_ch_width;       /* New channel width */
-        unsigned char    new_ch_freq_seg1;   /* Channel Center frequency 1 */
-        unsigned char    new_ch_freq_seg2;   /* Channel Center frequency 2 */ 
+    unsigned char    elem_id;
+    unsigned char    elem_len;
+    unsigned char    new_ch_width;       /* New channel width */
+    unsigned char    new_ch_freq_seg1;   /* Channel Center frequency 1 */
+    unsigned char    new_ch_freq_seg2;   /* Channel Center frequency 2 */ 
 } __packed;
 
 struct wifi_mac_ie_vht_ext_bss_ld{
-	unsigned char 	 elem_id;
-	unsigned char    elem_len;
-	unsigned short  mu_mimo_sta_cnt;
-	unsigned char    ss_ult;
-	unsigned char    obs_scnd_20mhz;
-	unsigned char    obs_scnd_40mhz;
-	unsigned char    obs_scnd_80mhz;
+    unsigned char 	 elem_id;
+    unsigned char    elem_len;
+    unsigned short  mu_mimo_sta_cnt;
+    unsigned char    ss_ult;
+    unsigned char    obs_scnd_20mhz;
+    unsigned char    obs_scnd_40mhz;
+    unsigned char    obs_scnd_80mhz;
 }__packed;
 
 
 struct wifi_mac_ie_vht_quiet_chn{
-	unsigned char 	 elem_id;
-	unsigned char    elem_len;
-	unsigned char    ap_quiet_md;
-	unsigned char    quiet_cnt;
-	unsigned char	 quiet_prd;
-	unsigned short   quiet_drt;
-	unsigned short   quiet_offset;
-}__packed;
+    unsigned char elem_id;
+    unsigned char elem_len;
+    unsigned char ap_quiet_md;
+    unsigned char quiet_cnt;
+    unsigned char quiet_prd;
+    unsigned short quiet_drt;
+    unsigned short quiet_offset;
+} __packed;
 
 struct wifi_mac_ie_vht_opt_md_ntf{
-	unsigned char 	 elem_id;
-	unsigned char    elem_len;
-	unsigned char    opt_mode;
-}__packed;
+    unsigned char elem_id;
+    unsigned char elem_len;
+    unsigned char opt_mode;
+} __packed;
 
+struct wifi_mac_ie_timeout {
+    unsigned char elem_id;
+    unsigned char elem_len;
+    unsigned char timeout_interval_type;
+    unsigned int timeout_val;
+} __packed;
 
+enum wifi_mac_ie_timeout_type {
+    REASSOC_DEDLINE_INTERVAL = 1,
+    KEY_LIFETIME_INTERVAL = 2,//seconds
+    ASSOC_COMEBACK_TIME = 3,
+    TIME_TO_START = 4,
+};
 
 #define SET_OPMD_RX_NSS(dst, val) do {(dst) &= ~(0x7 <<4) ; (dst) |= (val) << 4;}while(0)
 #define GET_OPMD_RX_NSS(dst) ( ((dst)>>4) &0x7 )
@@ -1413,39 +1417,39 @@ struct wifi_mac_ie_vht_opt_md_ntf{
 
 /*VHT capability maximum MPDU length 0:3895B; 1:7991B; 2:11454B;3:RSV*/
 #define SET_VHT_CAP_MAX_MPDU(dst, val) do {(dst) &= ~(0x3 <<0) ; (dst) |= (val) << 0;}while(0)
-	#define VHT_CAP_MAX_MPDU_LEN_3895 	(0)
-	#define VHT_CAP_MAX_MPDU_LEN_7991 	(1)
-	#define VHT_CAP_MAX_MPDU_LEN_11454 	(2)
+#define VHT_CAP_MAX_MPDU_LEN_3895 (0)
+#define VHT_CAP_MAX_MPDU_LEN_7991 (1)
+#define VHT_CAP_MAX_MPDU_LEN_11454 (2)
 
 
 /*VHT capability support channel width set*/
-	#define VHT_CAP_160M					(1)   //only 160M
-	
+#define VHT_CAP_160M (1)   //only 160M
+
 /*rx ldpc*/
 #define SET_VHT_CAP_RX_LPDC(dst, val) do {(dst) &= ~(0x1 <<4) ; (dst) |= (val) << 4;}while(0)
 #define GET_VHT_CAP_RX_LPDC(dst) (((dst) >>4) & 0x1)
-	#define VHT_CAP_RX_LDPC_SUPPORTED		(1)
+#define VHT_CAP_RX_LDPC_SUPPORTED (1)
 
 
 /*short gi for 80MHZ*/
 #define SET_VHT_CAP_80M_SGI(dst, val) do {(dst) &= ~(0x1 <<5) ; (dst) |= (val) << 5;}while(0)
-	#define VHT_CAP_SUPPORT_80M_SGI		(1)
+#define VHT_CAP_SUPPORT_80M_SGI (1)
 
 
 /*short gi for 160M and 80+80 MHz*/
-	
-	
+
+
 /*TX STBC*/
 #define SET_VHT_CAP_TX_STBC(dst, val) do {(dst) &= ~(0x1 <<7) ; (dst) |= (val) << 7;}while(0)
 #define GET_VHT_CAP_TX_STBC(dst) (((dst) >> 7) & 0x1 )
-	#define VHT_CAP_NOT_SUPPORT_TX_STBC		(0)
+#define VHT_CAP_NOT_SUPPORT_TX_STBC (0)
 
 
 /*RX STBC*/
 #define SET_VHT_CAP_RX_STBC(dst, val) do {(dst) &= ~(0x7 <<8) ; (dst) |= (val) << 8;}while(0)
 #define GET_VHT_CAP_RX_STBC(dst) (((dst) >>8) & 0x7)
-	#define VHT_CAP_RX_STBC_MAX_1SS			(1)   // 1 SS
-	
+#define VHT_CAP_RX_STBC_MAX_1SS (1)   // 1 SS
+
 /*su beamformer capable*/
 #define SET_VHT_CAP_SU_BFMER(dst, val) do {(dst) &= ~(0x1 <<11) ; (dst) |= (val) << 11;}while(0)
 #define VHT_CAP_NOT_SUPPORT_SU_BFMER    (0)
@@ -1469,7 +1473,7 @@ struct wifi_mac_ie_vht_opt_md_ntf{
 #define SET_VHT_CAP_MU_BFMER(dst, val) do {(dst) &= ~(0x1 <<19) ; (dst) |= (val) << 19;}while(0)
 #define VHT_CAP_NOT_SUPPORT_MU_BFMER    (0)
 #define VHT_CAP_SUPPORT_MU_BFMER            (1)
-	
+
 
 /*mu beaformee capable*/
 #define SET_VHT_CAP_MU_BFMEE(dst, val) do {(dst) &= ~(0x1 <<20) ; (dst) |= (val) << 20;}while(0)
@@ -1486,30 +1490,29 @@ struct wifi_mac_ie_vht_opt_md_ntf{
 
 /*MAX-AMPDU length exponet*/
 #define SET_VHT_CAP_MAX_APMDU_LEN_EXP(dst, val) do {(dst) &= ~(0x7 <<23) ; (dst) |= (val) << 23;}while(0)
-enum 
+enum
 {
-	MAX_VHT_AMPDU_8K =0,   	
-	MAX_VHT_AMPDU_16K, 	
-	MAX_VHT_AMPDU_32K, 	
-	MAX_VHT_AMPDU_64K, 	
-	MAX_VHT_AMPDU_128K,  
-	MAX_VHT_AMPDU_256K,  
-	MAX_VHT_AMPDU_512K,  
-	MAX_VHT_AMPDU_1024K,
-	
+    MAX_VHT_AMPDU_8K =0,
+    MAX_VHT_AMPDU_16K,
+    MAX_VHT_AMPDU_32K,
+    MAX_VHT_AMPDU_64K,
+    MAX_VHT_AMPDU_128K,
+    MAX_VHT_AMPDU_256K,
+    MAX_VHT_AMPDU_512K,
+    MAX_VHT_AMPDU_1024K,
 };
 
 /*VHT link adaptation capable*/
 #define SET_VHT_CAP_LK_ADP(dst, val) do {(dst) &= ~(0x3 <<26) ; (dst) |= (val) << 26;}while(0)
-	#define VHT_CAP_LK_ADP_NO_FB			(0)
+#define VHT_CAP_LK_ADP_NO_FB (0)
 
 /*RX Antena pattern consistency*/
 #define SET_VHT_CAP_RX_ATN_CONSTN(dst, val) do {(dst) &= ~(0x1 <<28) ; (dst) |= (val) << 28;}while(0)
-	#define VHT_CAP_RX_ATN_CONSTN_NOT_CHANGE		(1)
+#define VHT_CAP_RX_ATN_CONSTN_NOT_CHANGE (1)
 
 /*TX Antena pattern consistency*/
 #define SET_VHT_CAP_TX_ATN_CONSTN(dst, val) do {(dst) &= ~(0x1 <<29) ; (dst) |= (val) << 29;}while(0)
-	#define 	VHT_CAP_TX_ATN_CONSTN_NOT_CHANGE		(1)
+#define VHT_CAP_TX_ATN_CONSTN_NOT_CHANGE (1)
 
 /*VHT  CAP RSV*/
 #define SET_VHT_CAP_RSV(dst, val) do {(dst) &= ~(0x3 <<30) ; (dst) |= (val) << 30;}while(0)

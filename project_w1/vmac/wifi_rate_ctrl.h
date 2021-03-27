@@ -15,6 +15,7 @@ struct aml_ratecontrol
     signed char rate_index;
     unsigned char vendor_rate_code;/* hardware rate code */
     unsigned char trynum;
+    unsigned char shortgi_en;
     unsigned short flags;
     unsigned int maxampdulen;
 };

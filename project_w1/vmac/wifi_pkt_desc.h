@@ -22,6 +22,9 @@ enum tx_frame_flag
     TX_P2P_GO_NEGO_REQ_GO_NEGO_CONF = 1,
     TX_P2P_OTHER_GO_NEGO_FRAME = 2,
     TX_P2P_PRESENCE_REQ = 3,
+#ifdef CTS_VERIFIER_GAS
+    TX_P2P_GAS = 4,
+#endif
 };
 
 struct wifi_mac_pkt_info

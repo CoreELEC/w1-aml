@@ -1482,6 +1482,10 @@ int aml_sdio_init(void)
 
     /*set parent dev for net dev. */
     vm_cfg80211_set_parent_dev(&func->dev);
+    if (!(hif->hif_ops.hi_bottom_write8)) {
+        printk("%s %d not found w1 wifi\n", __func__, __LINE__);
+        goto create_thread_error;
+    }
     aml_sdio_calibration();
     config_pmu_reg(AML_W1_WIFI_POWER_ON);
 

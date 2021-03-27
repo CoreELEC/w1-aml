@@ -140,6 +140,11 @@ enum {
         hirq_max_idx		,
     };
 
+enum wifi_module_sn {
+      MODULE_ITON = 0X1,
+      MODULE_AMPAK,
+      MODULE_FN_LINK,
+};
 
 #define MAC_FCTRL_PROTOCOLVERSION_MASK 0x0003
 #define MAC_FCTRL_TYPE_MASK            0x000C
@@ -949,7 +954,7 @@ struct hal_layer_ops
 
     void *drv_priv;
     struct aml_hal_call_backs * hal_call_back;
-    void * Hi_TxAgg[WIFI_MAX_TXQUEUE_ID];  //save the pointer of TxPageInfo
+    void *Hi_TxAgg[WIFI_MAX_TXQUEUE_ID];  //save the pointer of TxPageInfo
     struct tx_complete_status * txcompletestatus;
     struct Tx_FrameDesc tx_frames[WIFI_MAX_TXFRAME];
     unsigned long tx_frames_map[BITS_TO_LONGS(WIFI_MAX_TXFRAME)];
@@ -961,17 +966,17 @@ struct hal_layer_ops
     OS_MUTEX hal_phy_mutex;
     OS_MUTEX power_mutex;
 
-    OS_LOCK hal_spinlock;
     OS_LOCK tx_spinlock;
-    OS_LOCK rx_spinlock;
     OS_LOCK com_spinlock;
-    
-    unsigned long __ilockflags;
+    OS_LOCK pn_spinlock;
+
+    unsigned long tx_spinlock_flag;
+    unsigned long com_spinlock_flag;
+    unsigned long pn_spinlock_flag;
     
     unsigned char hst_if_init_ok; // shared for DMA & SDIO
     unsigned char hst_if_irq_en; //shared for DMA & SDIO
     unsigned char bhalOpen;
-    unsigned char bCalbrationok;
     unsigned char bhalProbelok;
     unsigned char bhalMKeySet[4]; //for all vmac_id, now for mkey reset
     unsigned char bhalUKeySet[4]; //for all vmac_id, now for ukey reset
@@ -1006,8 +1011,7 @@ struct hal_layer_ops
     unsigned int sts_en_bcn[2];
     unsigned int sts_dis_bcn[2];
 #endif
-} ;
-
+};
 
 /*** aml platform***/
 struct platform_wifi_gpio
@@ -1269,9 +1273,12 @@ enum
 #define WIFI_IS_RTSEN               BIT(2)
 #define WIFI_IS_CTSEN               BIT(3)
 #define WIFI_IS_SHORTGI             BIT(4)
+#define WIFI_IS_PMF                 BIT(5)
 #define WIFI_IS_BURST               BIT(6)
 #define WIFI_IS_Group               BIT(7)
 #define WIFI_CHANNEL_BW_MASK        (BIT(8)|BIT(9))
+#define WIFI_IS_SHORTGI1            BIT(10)
+#define WIFI_IS_SHORTGI2            BIT(11)
 #define WIFI_CHANNEL_BW_OFFSET      8
 #define WIFI_IS_FRAGMENT            BIT(13)
 #define WIFI_IS_BLOCKACK            BIT(14)

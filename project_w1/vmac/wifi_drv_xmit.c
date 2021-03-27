@@ -28,6 +28,8 @@ static void drv_txlist_flush_for_sta_tid(struct drv_private *drv_priv, struct dr
 static void drv_txampdu_tasklet(unsigned long arg);
 static void drv_tx_sched_aggr(struct drv_private *drv_priv, struct drv_txlist *txlist, struct drv_tx_scoreboard *tid);
 extern struct tasklet_struct amsdu_tasklet;
+extern void wifi_mac_tx_lock_timer_attach(void);
+extern void wifi_mac_tx_lock_timer_cancel(void);
 
 static unsigned int
 drv_tx_ack_optimize(struct drv_private *drv_priv, struct drv_tx_scoreboard *tid, struct drv_txdesc *ptxdesc_last)
@@ -252,35 +254,30 @@ void aml_prepare_agg_tx_priv_param(struct drv_private *drv_priv,
     agg_content->TID = aml_convert_tid(ptxdesc);
     agg_content->queue_id = ptxdesc->txinfo->queue_id;
 
-    if (ptxdesc->txinfo->b_noack )
-    {
-        agg_content->FLAG |=WIFI_IS_NOACK;
+    if (ptxdesc->txinfo->b_noack) {
+        agg_content->FLAG |= WIFI_IS_NOACK;
     }
 
-    if (ptxdesc->txinfo->b_mcast)
-    {
-        agg_content->FLAG |= WIFI_IS_Group;
+    if (ptxdesc->txinfo->b_pmf) {
+	agg_content->FLAG |= WIFI_IS_PMF;
     }
-    else
-    {
-        if (ptxdesc->txinfo->b_Ampdu)
-        {
+
+    if (ptxdesc->txinfo->b_mcast) {
+        agg_content->FLAG |= WIFI_IS_Group;
+
+    } else {
+        if (ptxdesc->txinfo->b_Ampdu) {
             agg_content->FLAG |= WIFI_IS_BLOCKACK ;
             agg_content->FLAG |= WIFI_IS_AGGR;
-            if (drv_priv->drv_config.cfg_burst_ack)
-            {
-                agg_content->FLAG |=   WIFI_IS_BURST;
+            if (drv_priv->drv_config.cfg_burst_ack) {
+                agg_content->FLAG |= WIFI_IS_BURST;
             }
-        }
-        else
-        {
-            if (!IS_11B_RATE(agg_content->CurrentRate)
-                && (drv_priv->drv_config.cfg_burst_ack)
-                &&(ptxdesc->txinfo->b_datapkt)
+
+        } else {
+            if (!IS_11B_RATE(agg_content->CurrentRate) && (drv_priv->drv_config.cfg_burst_ack) &&(ptxdesc->txinfo->b_datapkt)
                 && !(M_PWR_SAV_GET((ptxdesc->txdesc_mpdu)) || M_FLAG_GET((ptxdesc->txdesc_mpdu), M_UAPSD))
-                && !(ptxdesc->txinfo->b_mcast))
-            {
-                agg_content->FLAG |=   WIFI_IS_BURST;
+                && !(ptxdesc->txinfo->b_mcast)) {
+                agg_content->FLAG |= WIFI_IS_BURST;
             }
         }
     }
@@ -308,7 +305,14 @@ void aml_prepare_agg_tx_priv_param(struct drv_private *drv_priv,
 
         if ((sta->sta_vhtcap & WIFINET_VHTCAP_SHORTGI_80) && (ptxdesc->txdesc_chanbw == CHAN_BW_80M))
         {
-            agg_content->FLAG |= WIFI_IS_SHORTGI;
+            if (ptxdesc->txdesc_rateinfo[0].shortgi_en)
+                agg_content->FLAG |= WIFI_IS_SHORTGI;
+
+            if (ptxdesc->txdesc_rateinfo[1].shortgi_en)
+                agg_content->FLAG |= WIFI_IS_SHORTGI1;
+
+            if (ptxdesc->txdesc_rateinfo[2].shortgi_en)
+                agg_content->FLAG |= WIFI_IS_SHORTGI2;
         }
     }
 
@@ -732,7 +736,7 @@ static int drv_tx_prepare(struct drv_private *drv_priv, struct sk_buff *skbbuf,s
     }
 
     //seq not assign
-    if ((!seq_assign_flag) && (!txinfo->b_PsPoll)) {
+    if ((!seq_assign_flag) && (!txinfo->b_PsPoll) && !txinfo->b_pmf) {
         if (!txinfo->b_txfrag) {
             *(unsigned short *)&wh->i_seq[0] = htole16(sta->sta_txseqs[txinfo->tid_index] << WIFINET_SEQ_SEQ_SHIFT);
             sta->sta_txseqs[txinfo->tid_index]++;
@@ -744,6 +748,11 @@ static int drv_tx_prepare(struct drv_private *drv_priv, struct sk_buff *skbbuf,s
     //printk("%s vid:%d, sta:%p, tid:%d, sn:%04x, ampdu:%d, qos:%d, rate_code:%02x, frame_control:%04x, mcast:%d, data:%d, dhcp:%d, eap:%d\n",
     //    __func__, wnet_vif->wnet_vif_id, sta, txinfo->tid_index, txinfo->seqnum, txinfo->b_Ampdu, txinfo->b_qosdata,
     //    ratectrl->vendor_rate_code, *((unsigned short *)&(wh->i_fc[0])), txinfo->b_mcast, txinfo->b_datapkt, mac_pkt_info->b_EAP, mac_pkt_info->b_dhcp);
+
+    if (txinfo->b_pmf) {
+        printk("%s vid:%d, sta:%p, sn:%04x, frame_control:%04x, mcast:%d\n",
+            __func__, wnet_vif->wnet_vif_id, sta, txinfo->seqnum, *((unsigned short *)&(wh->i_fc[0])), txinfo->b_mcast);
+    }
     return 1;
 }
 
@@ -901,6 +910,12 @@ enum tx_frame_flag drv_set_tx_frame_flag(char* buf)
     else if (p2p_act && (p2p_act->category == AML_CATEGORY_P2P) && (p2p_act->subtype == P2P_PRESENCE_REQ)) {
         ret = TX_P2P_PRESENCE_REQ;
     }
+#ifdef CTS_VERIFIER_GAS
+    else if (p2p_pub_act && (p2p_pub_act->category == AML_CATEGORY_PUBLIC)
+             && (p2p_pub_act->action == WIFINET_ACT_PUBLIC_GAS_REQ || p2p_pub_act->action == WIFINET_ACT_PUBLIC_GAS_RSP)) {
+        ret = TX_P2P_GAS;
+    }
+#endif
     return ret;
 }
 
@@ -1165,7 +1180,26 @@ static int drv_tx_complete_task(struct drv_private *drv_priv, struct drv_txlist 
             os_timer_ex_start_period(&sta->sta_wnet_vif->vm_actsend, sta->sta_wnet_vif->vm_p2p->action_retry_time);
         }
     }
+#ifdef CTS_VERIFIER_GAS
+    if (ptxdesc->txdesc_frame_flag == TX_P2P_GAS) {
 
+        printk("%s, txdesc_frame_flag=%d, status=%d\n", __func__, ptxdesc->txdesc_frame_flag, status);
+        if ((sta->sta_wnet_vif->vm_p2p->action_code == WIFINET_ACT_PUBLIC_GAS_REQ && sta->sta_wnet_vif->vm_p2p->p2p_flag & P2P_GAS_RSP) ||
+            (sta->sta_wnet_vif->vm_p2p->action_code == WIFINET_ACT_PUBLIC_GAS_RSP && txok)) {
+
+            sta->sta_wnet_vif->vm_p2p->tx_status_flag = WIFINET_TX_STATUS_SUCC;
+            sta->sta_wnet_vif->vm_p2p->send_tx_status_flag = 1;
+            cfg80211_mgmt_tx_status(sta->sta_wnet_vif->vm_wdev, sta->sta_wnet_vif->vm_p2p->cookie,
+            sta->sta_wnet_vif->vm_p2p->raw_action_pkt, sta->sta_wnet_vif->vm_p2p->raw_action_pkt_len, txok, GFP_KERNEL);
+
+        } else {
+            sta->sta_wnet_vif->vm_p2p->action_retry_time = 150;// DEFAULT_MGMT_RETRY_INTERVAL;
+            sta->sta_wnet_vif->vm_p2p->tx_status_flag = WIFINET_TX_STATUS_FAIL;
+            os_timer_ex_start_period(&sta->sta_wnet_vif->vm_actsend, sta->sta_wnet_vif->vm_p2p->action_retry_time);
+
+        }
+    }
+#endif
     if (txlist == drv_priv->drv_uapsdqueue) {
         uapsdq = 1;
     }
@@ -1348,7 +1382,9 @@ static int drv_tx_complete_task(struct drv_private *drv_priv, struct drv_txlist 
     }
     while(0);
 
-    tasklet_schedule(&drv_priv->ampdu_tasklet);
+    if(cnt % 5 == 0) {
+        tasklet_schedule(&drv_priv->ampdu_tasklet);
+    }
 
     if (drv_txq_backup_qcnt(txlist) > 0)
     {
@@ -1379,7 +1415,7 @@ void drv_tx_irq_tasklet( struct drv_private *drv_priv, struct txdonestatus *tx_d
 #endif
 
     if (ptxdesc == NULL) {
-        printk("%s: callback txds is null\n", __func__);
+        //printk("%s: callback txds is null\n", __func__);
         return;
     }
 
@@ -1885,7 +1921,7 @@ drv_addba_rsp_process(
 
         if (drv_priv->drv_config.cfg_txamsdu && baparamset->amsdusupported) {
             tid->addba_amsdusupported = 1;
-            drv_priv->drv_config.cfg_ampdu_subframes = 8;
+            drv_priv->drv_config.cfg_ampdu_subframes = 16;
 
         } else {
             tid->addba_amsdusupported = 0;
@@ -2002,7 +2038,7 @@ static void drv_tx_update_ba_win(struct drv_private *drv_priv, struct drv_tx_sco
     __D(AML_DBG_TX_FLOW, "%s:%d, head:%d, tail:%d, ssn:%d, sn:%d, index:%d\n",
         __func__, __LINE__, tid->baw_head, tid->baw_tail, tid->seq_start, seqnum, index);
 
-    if (((tid->baw_tail - tid->baw_head) & (DRV_TID_MAX_BUFS - 1)) >= tid->baw_size)
+    if (((tid->baw_tail - tid->baw_head) & (DRV_TID_MAX_BUFS - 1)) >= tid->baw_size - 1 - MIN(tid->baw_size/2, drv_priv->drv_config.cfg_ampdu_subframes))
     {
         if (tid->tx_desc[tid->baw_head] != NULL)
         {
@@ -2283,8 +2319,9 @@ static int drv_tx_send_ampdu(struct drv_private *drv_priv, struct drv_txlist *tx
     ptxdesc = list_first_entry(txdesc_list_head, struct drv_txdesc, txdesc_queue);
     drv_priv->drv_stats.tx_pkts_cnt++;
 
+    /*
     counts = drv_tx_ack_optimize(drv_priv, tid, ptxdesc);
-    txlist->txds_pending_cnt -= counts;
+    txlist->txds_pending_cnt -= counts;*/
 
     __D(BIT(24), "mpdu pending cnt:%d, counts:%d, drv_priv->wait_mpdu_timeout:%d\n", txlist->txds_pending_cnt, counts, drv_priv->wait_mpdu_timeout);
 
@@ -2300,8 +2337,11 @@ static int drv_tx_send_ampdu(struct drv_private *drv_priv, struct drv_txlist *tx
 
     if ((++txlist->txds_pending_cnt < drv_priv->drv_config.cfg_ampdu_subframes) && (!drv_priv->wait_mpdu_timeout)) {
         //pending pkts not enough, wait more pkts or scheduled by TX_OK.
+        wifi_mac_tx_lock_timer_cancel();
+        wifi_mac_tx_lock_timer_attach();
         return 0;
     }
+    wifi_mac_tx_lock_timer_cancel();
 
 #if 0// 1 schedule; 0 direct call
     tasklet_schedule(&drv_priv->ampdu_tasklet);

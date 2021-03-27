@@ -326,6 +326,7 @@ struct wifi_mac
     unsigned int wm_syncbeacon;
     unsigned int wm_flags;
     unsigned int wm_flags_ext;
+    unsigned int wm_flags_ext2;
     unsigned int wm_caps;
     unsigned char wm_nopened;
     unsigned char wm_nrunning;
@@ -349,7 +350,10 @@ struct wifi_mac
     unsigned long wm_scanplayercnt;
     struct wifi_mac_scan_state *wm_scan;
     unsigned long wm_lastscan;
+    unsigned long wm_lastroaming;
     enum wifi_mac_roamingmode wm_roaming;
+    int roaming_threshold_5g;
+    int roaming_threshold_2g;
 
     /* 11g rates for p2p GO and vht mode */
     struct wifi_mac_rateset wm_11b_rates;
@@ -465,6 +469,11 @@ struct conn_chan_list
     unsigned num;
 };
 
+struct wifi_arp_info
+{
+    unsigned char  src_mac_addr[WIFINET_ADDR_LEN];
+    unsigned char  src_ip_addr[IPV4_LEN];
+};
 
 struct wifi_mac_wmm_ac_params
 {
@@ -523,9 +532,14 @@ struct wlan_net_vif
     struct conn_chan_list vm_connchan;
     enum wifi_mac_bwc_width vm_bandwidth;
     unsigned char vm_scan_before_connect_flag;
+    struct wifi_scan_info *vm_connect_scaninfo;
+    unsigned char vm_chan_simulate_scan_flag;
     unsigned char vm_chan_switch_scan_flag;
     unsigned char vm_chan_switch_scan_count;
+    unsigned char vm_chan_roaming_scan_flag;
+    unsigned char vm_chan_roaming_scan_count;
 
+    struct wifi_arp_info  vm_arp_rx;
     void *vm_aclpriv;
     const struct wifi_mac_aclator *vm_aclop;
 
@@ -535,6 +549,7 @@ struct wlan_net_vif
     unsigned int vm_caps;
 
     struct os_timer_ext vm_mgtsend;
+    struct os_timer_ext vm_sm_switch;
     struct os_timer_ext vm_actsend;
     int vm_inact_init;
     int vm_inact_auth;
@@ -594,7 +609,8 @@ struct wlan_net_vif
     int vm_mqueue_flag_send;
 #endif
 
-    unsigned short vm_def_txkey;
+    unsigned char vm_def_txkey;
+    unsigned char vm_def_mgmt_txkey;
     struct wifi_mac_key vm_nw_keys[WIFINET_WEP_NKID];
     unsigned int current_keytype;
     /* wpa2 pmk list */
@@ -819,9 +835,8 @@ wifi_mac_anyhdrspace(struct wifi_mac *wifimac, const void *data)
 
 
 static __inline int
-wifi_mac_IsHTEnable(struct wlan_net_vif *wnet_vif)
+wifi_mac_is_ht_enable(struct wifi_station *sta)
 {
-    struct wifi_station *sta = wnet_vif->vm_mainsta;
     struct wifi_mac_key *k = NULL;
 
     if (sta == NULL) {
@@ -829,46 +844,44 @@ wifi_mac_IsHTEnable(struct wlan_net_vif *wnet_vif)
     }
 
     //wep
-    if (sta->sta_ucastkey.wk_cipher == &wifi_mac_cipher_none &&
-        wnet_vif->vm_def_txkey != WIFINET_KEYIX_NONE)
-    {
-        k = &wnet_vif->vm_nw_keys[wnet_vif->vm_def_txkey];
-        if (k && k->wk_cipher->wm_cipher == WIFINET_CIPHER_WEP)
-        {
+    if ((sta->sta_ucastkey.wk_cipher == &wifi_mac_cipher_none)
+        && (sta->sta_wnet_vif->vm_def_txkey != WIFINET_KEYIX_NONE)) {
+        k = &sta->sta_wnet_vif->vm_nw_keys[sta->sta_wnet_vif->vm_def_txkey];
+
+        if (k && k->wk_cipher->wm_cipher == WIFINET_CIPHER_WEP) {
             return 0;
         }
     }
 
     //tkip, check sta's & ap's cipher capability
-    if ((wnet_vif->vm_flags & WIFINET_F_WPA) &&
-        (sta->sta_rsn.rsn_ucastcipherset == (1<<WIFINET_CIPHER_TKIP)))
-    {
+    if ((sta->sta_wnet_vif->vm_flags & WIFINET_F_WPA)
+        && (sta->sta_rsn.rsn_ucastcipherset == (1 << WIFINET_CIPHER_TKIP))) {
         return 0;
     }
 
     //check current connection's unicast cipher
-    if ((wnet_vif->vm_opmode == WIFINET_M_STA) &&
-        (sta->sta_rsn.rsn_ucastcipher == WIFINET_CIPHER_TKIP)) {
+    if (sta->sta_rsn.rsn_ucastcipher == WIFINET_CIPHER_TKIP) {
         return 0;
     }
 
     //mode
-    if (wnet_vif->vm_mac_mode < WIFINET_MODE_11N) {
+    if (sta->sta_wnet_vif->vm_mac_mode < WIFINET_MODE_11N) {
         return 0;
     }
+
     return 1;
 }
 
 static __inline int
 wifi_mac_is_vht_enable(struct wlan_net_vif *wnet_vif)
 {
-  /*judge sequence: first HT then VHT*/
-  if(wifi_mac_IsHTEnable(wnet_vif)
-    && (wnet_vif->vm_mac_mode >= WIFINET_MODE_11AC)
-    && (wnet_vif->vm_mac_mode <= WIFINET_MODE_11GNAC))
-    {
+    /*judge sequence: first HT then VHT*/
+    if (wifi_mac_is_ht_enable(wnet_vif->vm_mainsta)
+        && (wnet_vif->vm_mac_mode >= WIFINET_MODE_11AC)
+        && (wnet_vif->vm_mac_mode <= WIFINET_MODE_11GNAC)) {
         return 1;
     }
+
     return 0;
 }
 
@@ -894,7 +907,7 @@ struct wifi_mac_aclator
         wifi_mac_send_mgmt((_sta), WIFINET_FC0_SUBTYPE_ACTION, (void *)(_arg))
 
 #define wifi_mac_send_qosnulldata_as_trigger(sta, qosinfo)\
-	wifi_mac_send_qosnulldata((sta), wme_sta_uapsd_get_triggered_ac((qosinfo)))
+    wifi_mac_send_qosnulldata((sta), wme_sta_uapsd_get_triggered_ac((qosinfo)))
 
 #define VMAC_DEV_NAME(wnet_vif)    ((wnet_vif)->vm_ndev->name)
 #define DEV_NAME(dev)    ((dev)->name)

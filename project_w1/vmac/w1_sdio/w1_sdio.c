@@ -807,7 +807,7 @@ static int aml_sdio_pm_suspend(struct device *device)
     if (host_suspend_req != NULL)
         return host_suspend_req(device);
     else
-        return 0;
+        return aml_w1_sdio_suspend(1);
 }
 
 static int aml_sdio_pm_resume(struct device *device)
