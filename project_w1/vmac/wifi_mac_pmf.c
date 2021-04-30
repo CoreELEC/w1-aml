@@ -301,6 +301,7 @@ int wifi_mac_unprotected_mgmt_pkt_handle(struct wifi_station *sta, struct sk_buf
     unsigned char *frm;
     int reason = 0;
     unsigned char is_bmc;
+    unsigned char category;
     struct wifi_station *remote_sta = NULL;
     struct wlan_net_vif *wnet_vif = sta->sta_wnet_vif;
 
@@ -315,14 +316,27 @@ int wifi_mac_unprotected_mgmt_pkt_handle(struct wifi_station *sta, struct sk_buf
                 return 0;
             }
 
-            if (((subtype == WIFINET_FC0_SUBTYPE_DEAUTH) || (subtype == WIFINET_FC0_SUBTYPE_DISASSOC))
-                && !(sta->sta_flags_ext & WIFINET_NODE_MFP_CONFIRM_DEAUTH)) {
-                reason = le16toh(*(unsigned short *)frm);
-                printk("%s recv deauthenticate (reason %d)\n", __func__, reason);
+            if ((subtype == WIFINET_FC0_SUBTYPE_DEAUTH) || (subtype == WIFINET_FC0_SUBTYPE_DISASSOC)) {
+                if (!(sta->sta_flags_ext & WIFINET_NODE_MFP_CONFIRM_DEAUTH)) {
+                    reason = le16toh(*(unsigned short *)frm);
+                    printk("%s recv deauthenticate (reason %d)\n", __func__, reason);
 
-                wifi_mac_send_sa_query(sta, WIFINET_ACTION_SA_QUERY_REQ, sta->sa_query_seq++);
-                os_timer_ex_start_period(&wnet_vif->vm_actsend, 100);
-                sta->sta_flags_ext |= WIFINET_NODE_MFP_CONFIRM_DEAUTH;
+                    wifi_mac_send_sa_query(sta, WIFINET_ACTION_SA_QUERY_REQ, sta->sa_query_seq++);
+                    os_timer_ex_start_period(&wnet_vif->vm_actsend, 100);
+                    sta->sta_flags_ext |= WIFINET_NODE_MFP_CONFIRM_DEAUTH;
+                }
+
+            } else if (subtype == WIFINET_FC0_SUBTYPE_ACTION) {
+                category = *((unsigned char *)wh + sizeof(struct wifi_frame));
+                if (CATEGORY_IS_NON_ROBUST(category)) {
+                    return 1;
+
+                } else {
+                    return 0;
+                }
+
+            } else {
+                return 1;
             }
             break;
 

@@ -1723,6 +1723,6 @@ void wifi_mac_process_tx_error(struct wlan_net_vif *wnet_vif)
         }
     }
 
-    wnet_vif->vm_chan_simulate_scan_flag = 1;
+//    wnet_vif->vm_chan_simulate_scan_flag = 1;
     wifi_mac_start_scan(wnet_vif, flag, wnet_vif->vm_des_nssid, wnet_vif->vm_des_ssid);
 }

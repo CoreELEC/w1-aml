@@ -2651,6 +2651,8 @@ static int vm_cfg80211_connect(struct wiphy *wiphy, struct net_device *dev,
     struct cfg80211_connect_params *lsme = sme;
 
     int ret = 0;
+    unsigned char *rsn_ie = NULL;
+    unsigned int rsn_ie_len = 0;
     struct wifi_mac *wifimac = wnet_vif->vm_wmac;
     struct wifi_mac_scan_state *ss = wifimac->wm_scan;
     struct drv_private* drv_priv = wifimac->drv_priv;
@@ -2883,9 +2885,10 @@ static int vm_cfg80211_connect(struct wiphy *wiphy, struct net_device *dev,
             goto exit;
         }
 
+        rsn_ie = vm_get_ie(lsme->ie, lsme->ie_len, NULL, (unsigned int *)&rsn_ie_len, WIFINET_ELEMID_RSN, 0);
         memcpy(wnet_vif->vm_opt_ie, lsme->ie, lsme->ie_len);
         wnet_vif->vm_opt_ie_len = lsme->ie_len;
-        if (wnet_vif->vm_mainsta->sta_flags_ext & WIFINET_NODE_MFP) {
+        if ((wnet_vif->vm_mainsta->sta_flags_ext & WIFINET_NODE_MFP) && rsn_ie) {
             if (wifi_mac_parse_own_rsn(wnet_vif->vm_mainsta, wnet_vif->vm_opt_ie)) {
                 goto exit;;
             }
