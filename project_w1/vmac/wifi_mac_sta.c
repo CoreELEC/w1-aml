@@ -566,7 +566,7 @@ void wifi_mac_sta_leave(struct wifi_station *sta, int reassoc)
             wifimac->wm_scan->scan_StateFlags &= SCANSTATE_F_DISCONNECT_REQ_CANCEL;
         }
         sta->sta_opt_mode = 0;
-        wnet_vif->vm_mainsta->sta_flags_ext |= ~WIFINET_NODE_MFP;
+        wnet_vif->vm_mainsta->sta_flags_ext &= ~WIFINET_NODE_MFP;
         wifi_mac_reset_tspecs(wnet_vif);
         wifi_mac_reset_vmac(wnet_vif);
         wifi_mac_rate_disassoc(sta);
