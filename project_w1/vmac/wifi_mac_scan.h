@@ -272,6 +272,7 @@ void quiet_all_intf (struct wifi_mac *wifimac, unsigned char enable);
 void wifi_mac_scan_notify_leave_or_back(struct wlan_net_vif *wnet_vif, unsigned char enable);
 void wifi_mac_process_tx_error(struct wlan_net_vif *wnet_vif);
 void wifi_mac_update_roaming_candidate_chan(struct wlan_net_vif *wnet_vif,const struct wifi_mac_scan_param *sp, int rssi);
+int wifi_mac_scan_chk_11g_bss(struct wifi_mac_scan_state *ss, struct wlan_net_vif *wnet_vif);
 
 
 #endif /* _WIFI_NET_SCAN_H_ */

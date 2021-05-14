@@ -100,10 +100,6 @@ extern struct hal_private g_hal_priv;
 #define  module_init(a);
 #define  module_exit(a);
 
-#ifndef howmany
-#define howmany(x, y)   (((x)+((y)-1))/(y))
-#endif
-
 #define OS_TQ_STRUCT 				tasklet_struct
 #define OS_INIT_TQUEUE(a,b,c)		//tasklet_init((a), (b), (unsigned long)(c))
 #define OS_SCHEDULE_TQUEUE(a)		hi_top_task((unsigned long)hal_get_priv() );//tasklet_schedule((a))

@@ -51,7 +51,7 @@ struct drv_rate_table
         unsigned char controlRate;/* index of next lower basic* rate; used for dur. calcs */
         unsigned short lpAckDuration;/* long preamble ACK duration */
         unsigned short spAckDuration;/* short preamble ACK duration*/
-    } info[58];
+    } info[102];
 };
 
 enum

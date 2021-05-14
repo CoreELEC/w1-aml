@@ -349,7 +349,6 @@ struct sk_buff *wifi_mac_amsdu_aggr(struct wifi_mac *wifimac, struct wifi_mac_am
             amsdutx->amsdu_tx_buf = wifi_mac_alloc_skb(wifimac, skblen);
             if (amsdutx->amsdu_tx_buf == NULL)
             {
-                WIFINET_AMSDU_UNLOCK(wifimac);
                 printk("%s:%d, alloc skb fail\n", __func__, __LINE__);
                 return NULL;
             }
@@ -360,7 +359,7 @@ struct sk_buff *wifi_mac_amsdu_aggr(struct wifi_mac *wifimac, struct wifi_mac_am
             wifi_mac_amsdu_encap(amsdu_wbuf, amsdutx->msdu_tmp_buf[i], 1);
             os_skb_set_priority(amsdu_wbuf, os_skb_get_priority(amsdutx->msdu_tmp_buf[i]));
             os_skb_set_tid(amsdu_wbuf, tid_index);
-            os_skb_set_nsta(amsdu_wbuf, vm_StaAtomicInc(sta, __func__));
+            os_skb_set_nsta(amsdu_wbuf, sta);
             os_skb_set_amsdu(amsdu_wbuf);
             amsdu_wbuf->dev = amsdutx->msdu_tmp_buf[i]->dev;
 

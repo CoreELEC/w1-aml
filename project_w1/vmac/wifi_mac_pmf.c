@@ -159,7 +159,7 @@ int wifi_mac_parse_mmie(struct wifi_station *sta, struct sk_buff *skb, unsigned 
     }
 
     /* save packet number */
-    memcpy(&pkt_ipn, mme + 4, 6);
+    memcpy(&pkt_ipn, mme + 4, sizeof(unsigned long));
     pkt_ipn = le64_to_cpu(pkt_ipn);
     local_ipn = (unsigned long *)(sta->pmf_key.wk_keyrsc);
     /* BIP packet number should bigger than previous BIP packet */
@@ -312,7 +312,7 @@ int wifi_mac_unprotected_mgmt_pkt_handle(struct wifi_station *sta, struct sk_buf
     //printk("%s recv :%d\n", __func__, subtype);
     switch (wnet_vif->vm_opmode) {
         case WIFINET_M_STA:
-            if (is_bmc) {
+            if ((is_bmc) && (subtype != WIFINET_FC0_SUBTYPE_BEACON)) {
                 return 0;
             }
 

@@ -300,9 +300,12 @@ int wifi_mac_setup_rates(struct wifi_station *sta, const unsigned char *rates, c
 
     memset(&rrs, 0, sizeof(rrs));
     memset(rs, 0, sizeof(*rs));
-    rrs.dot11_rate_num = rates[1];
-    /* rrs save rates of peer STA/AP */
-    memcpy(rrs.dot11_rate, rates + 2, rrs.dot11_rate_num);
+
+    if (rates) {
+        rrs.dot11_rate_num = rates[1];
+        /* rrs save rates of peer STA/AP */
+        memcpy(rrs.dot11_rate, rates + 2, rrs.dot11_rate_num);
+    }
 
     if (xrates != NULL)
     {

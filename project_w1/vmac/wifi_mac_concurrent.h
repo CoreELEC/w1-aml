@@ -52,10 +52,8 @@ void concurrent_vsdb_do_channel_change(void * data);
 void concurrent_vsdb_init(struct wifi_mac *wifimac);
 #endif
 unsigned char concurrent_check_is_vmac_same_pri_channel(struct wifi_mac *wifimac);
-#ifdef AML_APSTA_CONCURRENT
 unsigned char concurrent_check_vmac_is_AP(struct wifi_mac *wifimac);
 struct wlan_net_vif *wifi_mac_running_main_wnet_vif(struct wifi_mac *wifimac);
-#endif
 struct wlan_net_vif *wifi_mac_running_wnet_vif(struct wifi_mac *wifimac);
 
 #endif //NET80211_CONCURRENT_H

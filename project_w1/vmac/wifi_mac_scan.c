@@ -162,6 +162,35 @@ static void wifi_mac_save_ssid(struct wlan_net_vif *wnet_vif, struct wifi_mac_sc
     ss->ss_nssid = nssid;
 }
 
+
+int wifi_mac_scan_chk_11g_bss(struct wifi_mac_scan_state *ss, struct wlan_net_vif *wnet_vif)
+{
+        struct scaninfo_table *st = ss->ScanTablePriv;
+        struct scaninfo_entry *se;
+        enum wifi_mac_macmode macmode = WIFINET_MODE_AUTO;
+        int ret = 0;
+
+        WIFI_SCAN_SE_LIST_LOCK(st);
+        list_for_each_entry(se,&st->st_entry,se_list) {
+        macmode = wifi_mac_get_sta_mode(&se->scaninfo);
+        /*a 5G 11g only found, ignore it*/
+        if((macmode == WIFINET_MODE_11G) && WIFINET_IS_CHAN_2GHZ((&se->scaninfo)->SI_chan)) {
+
+            ret = 1;
+            DPRINTF(AML_DEBUG_WARNING, "<running> %s %d mac mode %d addr:%x:%x:%x:%x:%x:%x\n",__func__,__LINE__, macmode,
+                se->scaninfo.SI_macaddr[0],se->scaninfo.SI_macaddr[1],se->scaninfo.SI_macaddr[2],
+                se->scaninfo.SI_macaddr[3],se->scaninfo.SI_macaddr[4],se->scaninfo.SI_macaddr[5]);
+            break;
+        } else {
+
+            ret = 0;
+        }
+    }
+    WIFI_SCAN_SE_LIST_UNLOCK(st);
+    return ret;
+}
+
+
 static struct scaninfo_entry *
 wifi_mac_scan_get_best_node(struct wifi_mac_scan_state *ss, struct wlan_net_vif *wnet_vif)
 {
@@ -347,15 +376,30 @@ static int wifi_mac_chk_ap_chan(struct wifi_mac_scan_state *ss, struct wlan_net_
     channum = DEFAULT_CHANNEL;
     DPRINTF(AML_DEBUG_SCAN|AML_DEBUG_CONNECT,
         "<%s> :  %s %d ++ vm_opmode %d\n",wnet_vif->vm_ndev->name,__func__,__LINE__,wnet_vif->vm_opmode);
-    c = wifi_mac_find_chan(wifimac, channum, WIFINET_BWC_WIDTH80, channum + 6);
+
+    if (wnet_vif->vm_curchan != WIFINET_CHAN_ERR)
+        c = wnet_vif->vm_curchan;
+    else
+        c = wifi_mac_find_chan(wifimac, channum, WIFINET_BWC_WIDTH80, channum + 6);
+
     if(c == NULL)
     {
         DPRINTF(AML_DEBUG_ERROR, "%s (%d) error channum=%d,  c=%p\n",
             __func__, __LINE__, channum, c);
         c  = ss->ss_chans[0];
     }
+
     DPRINTF(AML_DEBUG_SCAN|AML_DEBUG_CONNECT, "%s %d channel=%d  chan_flags = 0x%x\n",
         __func__, __LINE__,  channum, c->chan_flags);
+
+    if (WIFINET_IS_CHAN_2GHZ(c)) {
+        if (wifi_mac_scan_chk_11g_bss(ss, wnet_vif)) {
+            wnet_vif->vm_htcap &= ~WIFINET_HTCAP_SUPPORTCBW40;
+            wnet_vif->scnd_chn_offset = WIFINET_HTINFO_EXTOFFSET_NA;
+            wnet_vif->vm_bandwidth = WIFINET_BWC_WIDTH20;
+            c = wifi_mac_find_chan(wifimac, c->chan_pri_num, WIFINET_BWC_WIDTH20, c->chan_pri_num);
+        }
+    }
 
     wifi_mac_create_wifi(wnet_vif, c);
     return 0;
@@ -387,7 +431,7 @@ void wifi_mac_scan_flush(struct wifi_mac *wifimac)
     struct scaninfo_table *st = ss->ScanTablePriv;
     struct scaninfo_entry *se=NULL, *next=NULL;
 
-    DPRINTF(AML_DEBUG_SCAN, "<running> %s %d \n",__func__,__LINE__);
+    DPRINTF(AML_DEBUG_WARNING, "<running> %s %d \n",__func__,__LINE__);
 
     WIFI_SCAN_SE_LIST_LOCK(st);
     list_for_each_entry_safe(se,next,&st->st_entry,se_list)
@@ -456,7 +500,7 @@ void wifi_mac_update_roaming_candidate_chan(struct wlan_net_vif *wnet_vif,const 
     if ((sp->ssid[2] != 0) && ss->ss_ssid->len && nssid
         && !(memcmp(sp->ssid+2, ss->roaming_ssid.ssid, nssid))) {
         update_roaming_candidate_chan(ss, apchan, rssi);
-//        printk("[Roaming ssid:%s] chan:%d\n",ss->roaming_ssid.ssid,apchan->chan_pri_num);
+//        printk("\n\n[Roaming ssid:%s] len:%d chan:%d\n\n", ssidie_sprintf(sp->ssid), nssid, apchan->chan_pri_num);
     }
 
 }
@@ -514,8 +558,10 @@ void wifi_mac_scan_rx(struct wlan_net_vif *wnet_vif, const struct wifi_mac_scan_
     if ((sp->ssid[1] != 0) && (WIFINET_IS_PROBERSP(wh) || ise->SI_ssid[1] == 0))
         memcpy(ise->SI_ssid, sp->ssid, 2 + sp->ssid[1]);
 
-    KASSERT(sp->rates[1] <= WIFINET_RATE_MAXSIZE, ("rate set too large: %u", sp->rates[1]));
-    memcpy(ise->SI_rates, sp->rates, 2 + sp->rates[1]);
+    if (sp->rates) {
+        KASSERT(sp->rates[1] <= WIFINET_RATE_MAXSIZE, ("rate set too large: %u", sp->rates[1]));
+        memcpy(ise->SI_rates, sp->rates, 2 + sp->rates[1]);
+    }
 
     if (sp->xrates != NULL) {
         KASSERT(sp->xrates[1] <= WIFINET_RATE_MAXSIZE, ("xrate set too large: %u", sp->xrates[1]));
@@ -830,8 +876,15 @@ void wifi_mac_scan_channel(struct wifi_mac *wifimac)
     ss->scan_StateFlags &= ~SCANSTATE_F_CHANNEL_SWITCH_COMPLETE;
     ss->scan_StateFlags &= ~SCANSTATE_F_DISCARD;
 
+    chan = ss->ss_chans[ss->scan_next_chan_index++];
+
     if (!((wifimac->wm_nrunning == 2) && (!concurrent_check_is_vmac_same_pri_channel(wifimac)))) {
-        os_timer_ex_start_period(&ss->ss_scan_timer, ss->scan_chan_wait);
+        if (chan->chan_flags & WIFINET_CHAN_DFS) {
+            os_timer_ex_start_period(&ss->ss_scan_timer, WIFINET_SCAN_DEFAULT_INTERVAL);
+
+        } else {
+            os_timer_ex_start_period(&ss->ss_scan_timer, ss->scan_chan_wait);
+        }
     }
 
     if ((wifimac->wm_nrunning == 1)
@@ -840,7 +893,6 @@ void wifi_mac_scan_channel(struct wifi_mac *wifimac)
         ss->scan_StateFlags &= ~SCANSTATE_F_NOTIFY_AP;
     }
 
-    chan = ss->ss_chans[ss->scan_next_chan_index++];
     /* vm_mac_mode default is 11GNAC */
     last_mac_mode = wnet_vif->vm_mac_mode;
     if (chan->chan_pri_num >= 1 && chan->chan_pri_num <= 14) {
@@ -988,8 +1040,7 @@ void scan_next_chan(struct wifi_mac *wifimac)
     DPRINTF(AML_DEBUG_SCAN, "%s OS_SET_TIMER = %d next_chn\n", __func__, ss->scan_chan_wait);
 }
 
-static void
-wifi_mac_scan_timeout(SYS_TYPE param1,SYS_TYPE param2,
+void wifi_mac_scan_timeout(SYS_TYPE param1,SYS_TYPE param2,
     SYS_TYPE param3,SYS_TYPE param4,SYS_TYPE param5)
 {
     struct wifi_mac_scan_state *ss = (struct wifi_mac_scan_state *) param1;
@@ -1634,6 +1685,7 @@ void wifi_mac_scan_attach(struct wifi_mac *wifimac)
     wifimac->roaming_threshold_2g = DEFAULT_ROAMING_THRESHOLD_2G;
     wifimac->roaming_threshold_5g = DEFAULT_ROAMING_THRESHOLD_5G;
 
+    printk("wifi_mac_scan_timeout is %p\n", wifi_mac_scan_timeout);
     ss = (struct wifi_mac_scan_state *)NET_MALLOC(sizeof(struct wifi_mac_scan_state),
         GFP_KERNEL, "wifi_mac_scan_attach.ss");
     if (ss != NULL)

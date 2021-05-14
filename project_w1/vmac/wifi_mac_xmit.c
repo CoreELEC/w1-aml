@@ -157,7 +157,7 @@ void wifi_mac_xmit_pkt_parse(struct sk_buff *skb, struct wifi_mac *wifimac)
     struct wifi_station *sta = cb->sta;
     struct wifi_mac_pkt_info *mac_pkt_info = &txinfo->ptxdesc->drv_pkt_info.pkt_info[0];
 
-    unsigned char i = 0;
+    unsigned char i = 0, j = 0;
     unsigned char *src_ip = NULL;
     unsigned char src_ip_valid = 0;
     char *rtsp = NULL;
@@ -168,8 +168,8 @@ void wifi_mac_xmit_pkt_parse(struct sk_buff *skb, struct wifi_mac *wifimac)
 
     static unsigned char start_flag = 0;
     static unsigned long in_time;
-    unsigned long now_time;
-    static unsigned int tcp_payload_total = 0;
+    static unsigned long tcp_tx_payload_total = 0;
+    unsigned long tcp_tx_payload = 0;
 
     if ((eh->ether_type == __constant_htons(ETHERTYPE_PAE))
         ||(eh->ether_type == __constant_htons(ETHERTYPE_WPI))) {
@@ -190,8 +190,9 @@ void wifi_mac_xmit_pkt_parse(struct sk_buff *skb, struct wifi_mac *wifimac)
                 mac_pkt_info->b_tcp_push = 1;
             }
 
+            tcp_tx_payload = (unsigned long)(skb->data + skb->len) - (unsigned long)((unsigned char *)th + (th->doff << 2));
             if ((th->ack) && (!th->psh) && (!th->fin) && (!th->syn)) {
-                if (!((unsigned long)(skb->data + skb->len) - (unsigned long)((unsigned char *)th + 20)))
+                if ((!tcp_tx_payload) && (th->doff == 5))
                     mac_pkt_info->b_tcp_ack_del = 1;
             }
 
@@ -199,21 +200,25 @@ void wifi_mac_xmit_pkt_parse(struct sk_buff *skb, struct wifi_mac *wifimac)
                 start_flag = 1;
                 in_time = jiffies;
             }
-            else {
-                tcp_payload_total += (unsigned long)(skb->data + skb->len) - (unsigned long)((unsigned char *)th + th->doff * 4);
-            }
-            now_time = jiffies;
-            if (time_after(now_time, in_time + (1000 * HZ / 1000))) {
+
+            tcp_tx_payload_total += tcp_tx_payload;
+
+            if (time_after(jiffies, in_time + HZ)) {
+                sta->sta_wnet_vif->vm_tx_speed = tcp_tx_payload_total >> 17;
                 start_flag = 0;
-                wifimac->wm_tx_speed = tcp_payload_total >> 17;
-                tcp_payload_total = 0;
+                tcp_tx_payload_total = 0;
             }
-            if (!mac_pkt_info->b_tcp_ack_del && (wifimac->wm_tx_speed < wifimac->drv_priv->drv_config.cfg_aggr_thresh)) {
-                wifimac->drv_priv->always_mpdu_timeout = 1;
+
+            wifimac->drv_priv->drv_config.cfg_ampdu_subframes = DEFAULT_TXAMPDU_SUB_MAX;
+
+            if (tcp_tx_payload && (sta->sta_wnet_vif->vm_tx_speed < wifimac->drv_priv->drv_config.cfg_aggr_thresh)) {
+                wifimac->drv_priv->drv_config.cfg_ampdu_subframes = DEFAULT_TXAMPDU_SUB_MAX_FOR_HT;
+
+                if (sta->sta_wnet_vif->vm_tx_speed < wifimac->drv_priv->drv_config.cfg_no_aggr_thresh) {
+                    wifimac->drv_priv->drv_config.cfg_ampdu_subframes = DEFAULT_TXAMPDU_SUB_MIN;
+                }
             }
-            else {
-                wifimac->drv_priv->always_mpdu_timeout = 0;
-            }
+
             mac_pkt_info->tcp_seqnum = th->seq;
             mac_pkt_info->tcp_ack_seqnum = th->ack_seq;
             mac_pkt_info->tcp_src_port = th->source;
@@ -234,9 +239,13 @@ void wifi_mac_xmit_pkt_parse(struct sk_buff *skb, struct wifi_mac *wifimac)
                     offset += dhcp_p[offset + 1] + 2;
                 }
                 mac_pkt_info->b_dhcp = 1;
-            } else if ((uh->source == __constant_htons(aml_udp_info.src_port)) && (uh->dest == __constant_htons(aml_udp_info.dst_port)) && (aml_udp_info.out)) {
-                if (aml_udp_info.dst_ip == __constant_htonl(iphdrp->daddr)) {
-                    aml_udp_info.tx += 1;
+            } else {
+                for (j = 0; j < udp_cnt; j++) {
+                    if ((uh->source == __constant_htons(aml_udp_info[j].src_port)) && (uh->dest == __constant_htons(aml_udp_info[j].dst_port)) && (aml_udp_info[j].out)) {
+                        if (aml_udp_info[j].dst_ip == __constant_htonl(iphdrp->daddr)) {
+                            aml_udp_info[j].tx += 1;
+                        }
+                    }
                 }
             }
         }
@@ -253,7 +262,9 @@ void wifi_mac_xmit_pkt_parse(struct sk_buff *skb, struct wifi_mac *wifimac)
         if ((src_ip_valid == 1) && (sta->connect_status != DHCP_GET_ACK)) {
             printk("parse pkt get ip, set dhcp complete\n");
             sta->connect_status = DHCP_GET_ACK;
-            set_p2p_negotiation_status(sta, NET80211_P2P_STATE_GO_COMPLETE);
+            if (sta->sta_wnet_vif->vm_p2p->p2p_enable) {
+                set_p2p_negotiation_status(sta, NET80211_P2P_STATE_GO_COMPLETE);
+            }
         }
         mac_pkt_info->b_arp = 1;
     }
@@ -490,9 +501,6 @@ bad:
         os_skb_free(skb);
     }
 
-    if (sta != NULL) {
-        wifi_mac_FreeNsta(sta);
-    }
     return 0;
 }
 
@@ -738,7 +746,6 @@ int wifi_mac_send_testdata(struct wifi_station *sta, int length)
     }
 
     memset(skb->data + sizeof(struct wifi_qos_frame), senddata, len);
-    vm_StaAtomicInc(sta, __func__);
     cb = (struct wifi_skb_callback *)skb->cb;
     cb->sta = sta;
     cb->flags = 0;
@@ -969,11 +976,7 @@ struct sk_buff *wifi_mac_encap(struct wifi_station *sta, struct sk_buff *skb)
                     struct wifi_station *sta_wds=NULL;
                     nt = &wnet_vif->vm_sta_tbl;
                     sta_wds = wifi_mac_find_wds_sta(nt,eh.ether_shost);
-                    if (sta_wds)
-                    {
-                        wifi_mac_FreeNsta(sta_wds);
-                    }
-                    else
+                    if (!sta_wds)
                     {
                         wifi_mac_add_wds_addr(nt, sta, eh.ether_shost);
                     }
@@ -1167,7 +1170,6 @@ struct sk_buff *wifi_mac_encap(struct wifi_station *sta, struct sk_buff *skb)
             framelist = tskb;
 
             tcb = (struct wifi_skb_callback *)tskb->cb;
-            vm_StaAtomicInc(sta, __func__);
             tcb->sta = sta;
             tcb->flags = cb->flags;
             tcb->u_tid = cb->u_tid;
@@ -1256,7 +1258,6 @@ struct sk_buff *wifi_mac_encap(struct wifi_station *sta, struct sk_buff *skb)
 
     return skb;
 bad:
-    wifi_mac_FreeNsta(sta);
     if (framelist != NULL)
     {
         struct sk_buff *temp;
@@ -1329,8 +1330,10 @@ wifi_mac_add_erp(unsigned char *frm, struct wifi_mac *wifimac)
     erp = 0;
     if (wifimac->wm_nonerpsta != 0)
         erp |= WIFINET_ERP_NON_ERP_PRESENT;
-    if (wifimac->wm_flags & WIFINET_F_USEPROT)
-        erp |= WIFINET_ERP_USE_PROTECTION;
+
+    //if (wifimac->wm_flags & WIFINET_F_USEPROT)
+    //    erp |= WIFINET_ERP_USE_PROTECTION;
+
     if (wifimac->wm_flags & WIFINET_F_USEBARKER)
         erp |= WIFINET_ERP_LONG_PREAMBLE;
     *frm++ = erp;
@@ -1544,8 +1547,6 @@ unsigned char *
 wifi_mac_add_wme_param(unsigned char *frm,
     struct wifi_mac_wme_state *wme,int uapsd_enable)
 {
-
-
     static const unsigned char oui[4] = { WME_OUI_BYTES, WME_OUI_TYPE };
     struct wifi_mac_wme_param *ie = (struct wifi_mac_wme_param *) frm;
     int i;
@@ -1813,20 +1814,16 @@ wifi_mac_add_htinfo(unsigned char *frm, struct wifi_station *sta)
 
     ie->hi_ctrlchannel = wifi_mac_chan2ieee(wifimac, wifimac->wm_curchan);
     ie->hi_extchoff = sta->sta_wnet_vif->scnd_chn_offset;
-
-   /*802.11-2016.pdf   9.4.2.57 HT Operation element  new add*/
-    ie->hi_chan_center_freq_seg2 = wifimac->wm_curchan->chan_cfreq1;
-
     ie->hi_txchwidth = ((sta->sta_wnet_vif->vm_bandwidth == WIFINET_BWC_WIDTH40)
         || (sta->sta_wnet_vif->vm_bandwidth == WIFINET_BWC_WIDTH80))
         ? WIFINET_HTINFO_TXWIDTH_2040 : WIFINET_HTINFO_TXWIDTH_20;
 
-    ie->hi_nongfpresent = 1; /*Nongreenfield HT STAs Present*/
-    ie->hi_opmode = wifimac->wm_ht_prot_sm;
-    if (wifimac->wm_flags_ext & WIFINET_FEXT_HTPROT)
-        ie->hi_opmode = WIFINET_HTINFO_OPMODE_MIXED_PROT_ALL;
+    /*802.11-2016.pdf   9.4.2.57 HT Operation element  new add*/
+    //ie->hi_chan_center_freq_seg2 = wifimac->wm_curchan->chan_cfreq1;
 
-    ie->hi_txburstlimit = WIFINET_HTINFO_TXBURST_LIMITED;
+    ie->hi_nongfpresent = 1; /*Nongreenfield HT STAs Present*/
+
+    ie->hi_opmode = wifimac->wm_ht_prot_sm;
     if ((wifimac->wm_ht_prot_sm == WIFINET_HTINFO_OPMODE_MIXED_PROT_OPT)
         || (wifimac->wm_ht_prot_sm == WIFINET_HTINFO_OPMODE_MIXED_PROT_ALL)) {
         ie->hi_obssnonhtpresent = WIFINET_HTINFO_OBBSS_NONHT_PRESENT;
@@ -2239,11 +2236,9 @@ int wifi_mac_send_probereq(struct wifi_station *sta, const unsigned char sa[WIFI
                 + wnet_vif->app_ie[WIFINET_APPIE_FRAME_PROBE_REQ].length
                 + sizeof(struct wifi_mac_ie_vht_cap);
 
-    vm_StaAtomicInc(sta, __func__);
     skb = wifi_mac_get_mgmt_frm(wifimac, skb_len);
     if (skb == NULL) {
         wnet_vif->vif_sts.sts_tx_no_buf++;
-        wifi_mac_FreeNsta(sta);
         return ENOMEM;
     }
     frm = os_skb_put(skb, skb_len);
@@ -3280,7 +3275,6 @@ int wifi_mac_send_mgmt(struct wifi_station *sta, int type, void *arg)
     unsigned char retry_count;
 
     KASSERT(sta != NULL, ("null nsta"));
-    vm_StaAtomicInc(sta, __func__);
     switch (type) {
         case WIFINET_FC0_SUBTYPE_PROBE_RESP:
             ret = wifi_mac_send_probe_rsp(wnet_vif,sta,arg);
@@ -3331,9 +3325,6 @@ int wifi_mac_send_mgmt(struct wifi_station *sta, int type, void *arg)
             break;
     }
 
-    if (ret) {
-        wifi_mac_FreeNsta(sta);
-    }
     return ret;
 }
 
@@ -3406,50 +3397,57 @@ int wifi_mac_send_udp_pkt(struct wlan_net_vif *wnet_vif) {
     struct ether_header *eh = NULL;
     wifi_ip_header *ip_hdr = NULL;
     wifi_udp_pkt *udp_pkt = NULL;
-    unsigned int pkt_len = aml_udp_info.pkt_len + 14 + 20 + 8;
+    unsigned int pkt_len = 0;
     struct wifi_station *sta = wnet_vif->vm_mainsta;
     unsigned char mcast_dst[WIFINET_ADDR_LEN] = { 0x01, 0x00, 0x5e, 0x00, 0x00, 0x05 };
-
+    //unsigned char marvell_dst[WIFINET_ADDR_LEN] = { 0x00, 0x50, 0x43, 0x22, 0x33, 0x6e};
+    unsigned char intel_dst[WIFINET_ADDR_LEN] = { 0xac, 0xfd, 0xce, 0x8a, 0x78, 0x7f};
+    int i = 0;
     if (wnet_vif->vm_state != WIFINET_S_CONNECTED) {
         printk("%s, not connected\n", __func__);
         return 0;
     }
+    for (i = 0; i < udp_cnt; i++) {
+        pkt_len = aml_udp_info[i].pkt_len + 14 + 20 + 8;
+        skb = os_skb_alloc(pkt_len + 64 + HI_TXDESC_DATAOFFSET);
+        if (skb == NULL) {
+            printk("%s, fail to alloc frm\n", __func__);
+            return -ENOMEM;
+        }
+        skb_reserve(skb, HI_TXDESC_DATAOFFSET + 32);
+        eh = (struct ether_header *)(os_skb_put(skb, pkt_len));
 
-    skb = os_skb_alloc(pkt_len + 64 + HI_TXDESC_DATAOFFSET);
-    if (skb == NULL) {
-        printk("%s, fail to alloc frm\n", __func__);
-        return -ENOMEM;
+        if (aml_udp_info[i].dst_ip == 0xe0000005) {
+            memcpy(eh->ether_dhost, mcast_dst, WIFINET_ADDR_LEN);
+
+        } else if (wnet_vif->vm_opmode == WIFINET_M_STA) {
+            memcpy(eh->ether_dhost, sta->sta_bssid, WIFINET_ADDR_LEN);
+
+        } else {
+            memcpy(eh->ether_dhost, intel_dst, WIFINET_ADDR_LEN);
+        }
+        memcpy(eh->ether_shost, wnet_vif->vm_myaddr, WIFINET_ADDR_LEN);
+        eh->ether_type = 0x0008;
+
+        ip_hdr = (wifi_ip_header *)((unsigned char *)eh + 14);
+        ip_hdr->version = 0x45;
+        ip_hdr->tos = 0x00;
+        ip_hdr->tot_len = __constant_htons(aml_udp_info[i].pkt_len + 20 + 8);
+        ip_hdr->id = aml_udp_info[i].seq++;
+        ip_hdr->frag_off = 0x0040;
+        ip_hdr->ttl = 0x40;
+        ip_hdr->protocol = 0x11;
+        ip_hdr->saddr = __constant_htonl(aml_udp_info[i].src_ip);
+        ip_hdr->daddr = __constant_htonl(aml_udp_info[i].dst_ip);
+
+        udp_pkt = (wifi_udp_pkt *)((unsigned char *)ip_hdr + 20);
+        udp_pkt->src_port = __constant_htons(aml_udp_info[i].src_port);
+        udp_pkt->dst_port = __constant_htons(aml_udp_info[i].dst_port);
+        udp_pkt->len =  __constant_htons(aml_udp_info[i].pkt_len + 8);
+        udp_pkt->checksum = 0;
+
+        wifi_mac_hardstart(skb, wnet_vif->vm_ndev);
     }
-    skb_reserve(skb, HI_TXDESC_DATAOFFSET + 32);
-    eh = (struct ether_header *)(os_skb_put(skb, pkt_len));
-
-    if (aml_udp_info.dst_ip == 0xe0000005) {
-        memcpy(eh->ether_dhost, mcast_dst, WIFINET_ADDR_LEN);
-
-    } else {
-        memcpy(eh->ether_dhost, sta->sta_bssid, WIFINET_ADDR_LEN);
-    }
-    memcpy(eh->ether_shost, wnet_vif->vm_myaddr, WIFINET_ADDR_LEN);
-    eh->ether_type = 0x0008;
-
-    ip_hdr = (wifi_ip_header *)((unsigned char *)eh + 14);
-    ip_hdr->version = 0x45;
-    ip_hdr->tos = 0x00;
-    ip_hdr->tot_len = __constant_htons(aml_udp_info.pkt_len + 20 + 8);
-    ip_hdr->id = aml_udp_info.seq++;
-    ip_hdr->frag_off = 0x0040;
-    ip_hdr->ttl = 0x40;
-    ip_hdr->protocol = 0x11;
-    ip_hdr->saddr = __constant_htonl(aml_udp_info.src_ip);
-    ip_hdr->daddr = __constant_htonl(aml_udp_info.dst_ip);
-
-    udp_pkt = (wifi_udp_pkt *)((unsigned char *)ip_hdr + 20);
-    udp_pkt->src_port = __constant_htons(aml_udp_info.src_port);
-    udp_pkt->dst_port = __constant_htons(aml_udp_info.dst_port);
-    udp_pkt->len =  __constant_htons(aml_udp_info.pkt_len + 8);
-    udp_pkt->checksum = 0;
-
-    wifi_mac_hardstart(skb, wnet_vif->vm_ndev);
     return 0;
 }
 extern unsigned short
@@ -3465,6 +3463,7 @@ int wifi_mac_set_arp_rsp(struct wlan_net_vif *wnet_vif) {
     __be32 ipv4;
     __be32 *dip;
     unsigned char i = 0;
+    unsigned char addr[6] = {0, 0, 0, 0, 0, 0};
     struct net_device *dev = wnet_vif->vm_ndev;
 
     if (wnet_vif->vm_state != WIFINET_S_CONNECTED) {
@@ -3506,10 +3505,15 @@ int wifi_mac_set_arp_rsp(struct wlan_net_vif *wnet_vif) {
         arp->proto_type = 0x0008;
         arp->hw_len = ARP_HW_ADDR_LEN;
         arp->proto_len = ARP_PROTO_ADDR_LEN;
-        arp->op = __constant_htons(ARP_RESPONSE);
+        if (wnet_vif->vm_arp_rx.out == 0) {
+            arp->op = __constant_htons(ARP_REQUEST);
+            memcpy(arp->dst_mac_addr, addr, WIFINET_ADDR_LEN);
+        } else if (wnet_vif->vm_arp_rx.out == 1) {
+            arp->op = __constant_htons(ARP_RESPONSE);
+            memcpy(arp->dst_mac_addr, wnet_vif->vm_myaddr, WIFINET_ADDR_LEN);
+        }
         memcpy(arp->src_mac_addr, wnet_vif->vm_arp_rx.src_mac_addr, WIFINET_ADDR_LEN);
         memcpy(arp->src_ip_addr, wnet_vif->vm_arp_rx.src_ip_addr, IPV4_LEN);
-        memcpy(arp->dst_mac_addr, wnet_vif->vm_myaddr, WIFINET_ADDR_LEN);
         dip = (__be32 *)(arp->dst_ip_addr);
         *dip = ipv4;
 
@@ -3548,8 +3552,8 @@ int wifi_mac_udp_send_timeout_ex(void *arg)
         wifi_mac_send_udp_pkt(wnet_vif);
     }
 
-    if (!aml_udp_info.udp_timer_stop) {
-        os_timer_ex_start(&aml_udp_info.udp_send_timeout);
+    if (!aml_udp_timer.udp_timer_stop) {
+        os_timer_ex_start(&aml_udp_timer.udp_send_timeout);
     }
     return OS_TIMER_NOT_REARMED;
 }
@@ -3572,9 +3576,5 @@ void wifi_mac_complete_wbuf(struct sk_buff *skbbuf, int errcode)
 
     if (errcode == 0) {
         wifi_mac_free_skb(skbbuf);
-    }
-
-    if (sta != NULL) {
-        wifi_mac_FreeNsta(sta);
     }
 }

@@ -115,6 +115,7 @@ struct vm_wlan_net_vif_params
     unsigned short vm_param_opmode;
 };
 
+#define WIFINET_SIGNAL_POWER_WEAK_THRESH -70
 #define WIFINET_TXPOWER_MAX  100
 
 #define WIFINET_TXSTREAM  1
@@ -297,12 +298,12 @@ struct wifi_mac_ops
     void(* wifi_mac_pwrsave_wakeup_for_tx) (struct wlan_net_vif *wnet_vif);
     int (*wifi_mac_pwrsave_wkup_and_NtfyAp) (struct wlan_net_vif *wnet_vif,enum wifinet_ps_wk_reason reason);
     void (*wifi_mac_notify_ap_success) (struct wlan_net_vif *wnet_vif);
-    void (*wifi_mac_FreeNsta)(struct wifi_station *sta);
     struct wifi_station * (*wifi_mac_get_sta)(struct wifi_station_tbl *nt, const unsigned char *macaddr,int wnet_vif_id);
     void (*wifi_mac_sta_attach)(struct wifi_mac *wifimac);
     int (*wifi_mac_beacon_miss)(struct wlan_net_vif *wnet_vif);
     void(*wifi_mac_get_sts)(struct wifi_mac *wifimac,unsigned int op_code, unsigned int ctrl_code);
     void (*wifi_mac_process_tx_error)(struct wlan_net_vif *wnet_vif);
+    int (*wifi_mac_forward_txq_enqueue) (struct sk_buff_head *fwdtxqueue, struct sk_buff *skb);
 };
 
 enum
@@ -330,8 +331,9 @@ struct wifi_mac
     unsigned int wm_caps;
     unsigned char wm_nopened;
     unsigned char wm_nrunning;
-    unsigned short wm_tx_speed;
     unsigned int wm_runningmask;
+
+    short wm_signal_power_weak_thresh;
 
     struct wifi_mac_ops wmac_ops;
     struct drv_private *drv_priv;
@@ -473,6 +475,14 @@ struct wifi_arp_info
 {
     unsigned char  src_mac_addr[WIFINET_ADDR_LEN];
     unsigned char  src_ip_addr[IPV4_LEN];
+    unsigned char  out;
+};
+
+struct wifi_mac_forward
+{
+    struct sk_buff *skb;
+    int hdrspace;
+    unsigned char fwd_flag;
 };
 
 struct wifi_mac_wmm_ac_params
@@ -604,6 +614,8 @@ struct wlan_net_vif
     unsigned short vm_pstxqueue_flags;
     unsigned short vm_legacyps_txframes;
 
+    struct sk_buff_head vm_forward_buffer_queue;
+    struct wifi_mac_forward vm_forward;
     enum hal_op_mode vm_hal_opmode;
 #ifdef  AML_MCAST_QUEUE
     int vm_mqueue_flag_send;
@@ -643,6 +655,9 @@ struct wlan_net_vif
     struct wifinet_vht_mcs_set vm_vhtcap_max_mcs;
     /* VHT Basic MCS set */
     unsigned short vm_vhtop_basic_mcs;
+
+    unsigned short vm_tx_speed;
+    unsigned short vm_rx_speed;
 
 #ifdef CONFIG_P2P
     struct wifi_mac_p2p* vm_p2p;
@@ -701,7 +716,6 @@ struct wlan_net_vif
 #define WIFINET_FEXT_APPIE_UPDATE 0x00001000
 #define WIFINET_FEXT_AMPDU 0x00004000
 #define WIFINET_FEXT_AMSDU 0x00008000
-#define WIFINET_FEXT_HTPROT 0x00010000
 #define WIFINET_F_NONHT_AP 0x00040000
 #define WIFINET_FEXT_HTUPDATE 0x00080000
 #define WIFINET_C_WDS_AUTODETECT 0x00100000

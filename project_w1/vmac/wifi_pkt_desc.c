@@ -1,5 +1,6 @@
 #include "wifi_drv_main.h"
 #include "wifi_pkt_desc.h"
+#include "wifi_mac_if.h"
 
 struct drv_txdesc *wifi_mac_alloc_txdesc(struct wifi_mac *wifimac)
 {
@@ -40,13 +41,8 @@ void wifi_mac_recycle_txdesc(struct sk_buff *skbbuf)
     struct wifi_mac_tx_info *txinfo = (struct wifi_mac_tx_info *)os_skb_cb(skbbuf);
     struct list_head tx_queue;
     struct wifi_mac *wifimac = NULL;
-    struct wifi_station *sta = txinfo->cb.sta;
 
-    if ((sta == NULL) || (sta->sta_wnet_vif == NULL)) {
-        printk("%s sta is NULL\n");
-        return;
-    }
-    wifimac = sta->sta_wnet_vif->vm_wmac;
+    wifimac = wifi_mac_get_mac_handle();
 
     //printk("%s ptxdesc:%p, txinfo:%p\n", __func__, txinfo->ptxdesc, txinfo);
     INIT_LIST_HEAD(&tx_queue);

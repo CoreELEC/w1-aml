@@ -34,6 +34,11 @@ namespace FW_NAME
 #endif
 
 
+#define WIFI_CONF_PATH "vendor/etc/wifi/w1"
+
+static char * conf_path = WIFI_CONF_PATH;
+module_param(conf_path, charp, S_IRUGO);
+
 
 //set cmd to firmware
 unsigned int phy_set_param_cmd(unsigned char cmd,unsigned char vid,unsigned int data)
@@ -276,14 +281,12 @@ unsigned int phy_set_preamble_type( unsigned char PreambleType)
 }
 
 unsigned int phy_set_bcn_buf(unsigned char wnet_vif_id,unsigned char *pBeacon,
-        unsigned short len,unsigned short Rate,unsigned short Flag)
+    unsigned short len,unsigned short Rate,unsigned short Flag)
 {
     unsigned char buffer[1024] = {0};
     struct hal_private * hal_priv = hal_get_priv();
     struct  hw_interface* hif = hif_get_hw_interface();
-
     struct hw_tx_vector_bits *TxVector_Bit = NULL;
-    unsigned short tmp = 0;
     unsigned int BcnAddr = hif->hw_config.beaconframeaddress;
     struct TxDescPage *pbeacon_s = (struct TxDescPage *)buffer;
     struct OtherTxPage  *other_page = NULL;
@@ -293,38 +296,33 @@ unsigned int phy_set_bcn_buf(unsigned char wnet_vif_id,unsigned char *pBeacon,
 
     ASSERT(len < (sizeof(buffer) - sizeof(struct TxDescPage) - sizeof(struct HW_TxBufferInfo)));
     /* get beacon frame address in firmware */
-    if(hal_priv->beaconaddr[wnet_vif_id] == 0)
-    {
+    if (hal_priv->beaconaddr[wnet_vif_id] == 0) {
         hal_priv->beaconaddr[wnet_vif_id] = phy_get_param_cmd_ul(Bcn_Frm_Addr_Cmd, wnet_vif_id);
     }
     BcnAddr = hal_priv->beaconaddr[wnet_vif_id];
     memcpy(pbeacon_s->txdata,  pBeacon,  len);
 
     /* build page flag */
-    if (total_len <= PAGE_LEN)
-    {
+    if (total_len <= PAGE_LEN) {
         /* set firstpagelen and otherpagelen to 0 to be flag */
         firstpagelen = otherpagelen = 0;
         pbeacon_s->BufferInfo.MPDUBufFlag = 0;
         pbeacon_s->BufferInfo.MPDUBufFlag =  HW_FIRST_MPDUBUF_FLAG
-                                                            |HW_FIRST_AGG_FLAG
-                                                            |HW_LAST_MPDUBUF_FLAG
-                                                            |HW_LAST_AGG_FLAG;
+            |HW_FIRST_AGG_FLAG | HW_LAST_MPDUBUF_FLAG | HW_LAST_AGG_FLAG;
         pbeacon_s->BufferInfo.MPDUBufFlag |= HW_MPDU_LEN_SET(len);
         pbeacon_s->BufferInfo.MPDUBufFlag |= HW_BUFFER_LEN_SET(firstpagelen);
         pbeacon_s->BufferInfo.MPDUBufNext = 0;
 
         pbeacon_s->BufferInfo.MPDUBufAddr =
-                    (unsigned int)(SYS_TYPE)((struct TxDescPage*)(SYS_TYPE)BcnAddr)->txdata;
+            (unsigned int)(SYS_TYPE)((struct TxDescPage*)(SYS_TYPE)BcnAddr)->txdata;
         pbeacon_s->TxPriv.PageNum = 1;
-    }
-    else
-    {
+
+    } else {
         firstpagelen = PAGE_LEN - (sizeof(struct TxDescPage) - 1);
         otherpagelen = len - firstpagelen;
         other_page = (struct OtherTxPage *)(buffer + PAGE_LEN);
-        if (otherpagelen > 0)
-        {
+
+        if (otherpagelen > 0) {
             /* move or push the beacon data to later position to prepare BufferInfo of 'other_page' */
             memmove((void *)(other_page->txdata), (void *)other_page, otherpagelen);
             memset((void *)other_page, 0, sizeof(struct HW_TxBufferInfo));
@@ -332,8 +330,7 @@ unsigned int phy_set_bcn_buf(unsigned char wnet_vif_id,unsigned char *pBeacon,
         /*first page */
         pbeacon_s->BufferInfo.MPDUBufFlag = 0;
         pbeacon_s->BufferInfo.MPDUBufFlag = HW_FIRST_MPDUBUF_FLAG
-                                                            |HW_FIRST_AGG_FLAG
-                                                            |HW_LAST_AGG_FLAG;
+            | HW_FIRST_AGG_FLAG | HW_LAST_AGG_FLAG;
         pbeacon_s->BufferInfo.MPDUBufFlag |= HW_MPDU_LEN_SET(len);
         pbeacon_s->BufferInfo.MPDUBufFlag |= HW_BUFFER_LEN_SET(firstpagelen);
         pbeacon_s->BufferInfo.MPDUBufAddr =
@@ -344,8 +341,7 @@ unsigned int phy_set_bcn_buf(unsigned char wnet_vif_id,unsigned char *pBeacon,
         /* other page */
         other_page->BufferInfo.MPDUBufFlag = 0;
         other_page->BufferInfo.MPDUBufFlag = HW_LAST_MPDUBUF_FLAG
-                                                            |HW_FIRST_AGG_FLAG
-                                                            |HW_LAST_AGG_FLAG;
+            |HW_FIRST_AGG_FLAG | HW_LAST_AGG_FLAG;
         other_page->BufferInfo.MPDUBufFlag |= HW_MPDU_LEN_SET(len);
         other_page->BufferInfo.MPDUBufFlag |= HW_BUFFER_LEN_SET(0);
         other_page->BufferInfo.MPDUBufNext = 0;
@@ -365,15 +361,14 @@ unsigned int phy_set_bcn_buf(unsigned char wnet_vif_id,unsigned char *pBeacon,
     TxVector_Bit->tv_wnet_vif_id = wnet_vif_id;
     TxVector_Bit->tv_ack_to_en = 0;
     TxVector_Bit->tv_ack_timeout = 0;
-    tmp = (Flag & WIFI_CHANNEL_BW_MASK)>>WIFI_CHANNEL_BW_OFFSET;
 
     TxVector_Bit->tv_ht.htbit.tv_format = hw_rate2tv_format(Rate);
-    TxVector_Bit->tv_ht.htbit.tv_nonht_mod  = (hal_tx_desc_nonht_mode(Rate,tmp));
+    TxVector_Bit->tv_ht.htbit.tv_nonht_mod  = (hal_tx_desc_nonht_mode(Rate, Flag));
     TxVector_Bit->tv_ht.htbit.tv_tx_pwr = hal_tx_desc_get_power(Rate);
     TxVector_Bit->tv_ht.htbit.tv_tx_rate = Rate;
-    TxVector_Bit->tv_ht.htbit.tv_Channel_BW = tmp&0x3;
+    TxVector_Bit->tv_ht.htbit.tv_Channel_BW = Flag;
     TxVector_Bit->tv_ht.htbit.tv_preamble_type = wifi_conf_mib.dot11PreambleType;
-    TxVector_Bit->tv_ht.htbit.tv_GI_type = (!!(Flag & WIFI_IS_SHORTGI));
+    TxVector_Bit->tv_ht.htbit.tv_GI_type = 0;
     TxVector_Bit->tv_ht.htbit.tv_antenna_set = 0;
     TxVector_Bit->tv_ht.htbit.tv_cfend_flag = 0;
     TxVector_Bit->tv_ht.htbit.tv_bar_flag = 0;
@@ -381,9 +376,7 @@ unsigned int phy_set_bcn_buf(unsigned char wnet_vif_id,unsigned char *pBeacon,
     TxVector_Bit->tv_ht.htbit.tv_rts_flag = 0;
     TxVector_Bit->tv_ht.htbit.tv_cts_flag = 0;
 
-    TxVector_Bit->tv_L_length =
-                        hal_tx_desc_get_len(Rate, len + FCS_LEN, (!!(Flag & WIFI_IS_SHORTGI)),
-                        (Flag & WIFI_CHANNEL_BW_MASK) >> WIFI_CHANNEL_BW_OFFSET, 0);
+    TxVector_Bit->tv_L_length = hal_tx_desc_get_len(Rate, len + FCS_LEN, 0, Flag, 0);
     TxVector_Bit->tv_sounding = 0;
     TxVector_Bit->tv_ampdu_flag = 0;
     TxVector_Bit->tv_length = len + FCS_LEN;
@@ -410,7 +403,7 @@ unsigned int phy_set_bcn_buf(unsigned char wnet_vif_id,unsigned char *pBeacon,
     TxVector_Bit->tv_partial_id = 0;
     TxVector_Bit->tv_num_users = 0;
     TxVector_Bit->tv_num_sts = 0;
-    TxVector_Bit->tv_ch_bw_nonht = SW_CBW20;
+    TxVector_Bit->tv_ch_bw_nonht = Flag;
 
     TxVector_Bit->tv_MPDUInfoAddr  = BcnAddr;
     TxVector_Bit->tv_tid_num = 0;
@@ -423,7 +416,7 @@ unsigned int phy_set_bcn_buf(unsigned char wnet_vif_id,unsigned char *pBeacon,
     /* build firmware private data */
     pbeacon_s->TxPriv.TID = QUEUE_BEACON;
     pbeacon_s->TxPriv.StaId = 1;
-    pbeacon_s->TxPriv.Flag = WIFI_IS_Group|WIFI_IS_NOACK|(Flag & WIFI_CHANNEL_BW_MASK);
+    pbeacon_s->TxPriv.Flag = WIFI_IS_Group|WIFI_IS_NOACK|(Flag << 8);
     pbeacon_s->TxPriv.vid = wnet_vif_id;
     pbeacon_s->TxPriv.TxCurrentRate = Rate;
     pbeacon_s->TxPriv.AggrNum = 1;
@@ -1495,30 +1488,39 @@ unsigned int phy_interface_enable(unsigned char enable, unsigned char vid)
     return 0;
 }
 
-unsigned int hal_set_fwlog_cmd(unsigned char enable)
+unsigned int hal_set_fwlog_cmd(unsigned char mode)
 {
+    struct hw_interface* hif = hif_get_hw_interface();
     struct Fwlog_Mode_Control fwlog_mode;
     memset(&fwlog_mode, 0, sizeof(struct Fwlog_Mode_Control));
+    printk("%s:%d, mode %d \n", __func__, __LINE__, mode);
 
     fwlog_mode.Cmd = FWLOG_MODE_CMD;
-    if ((enable & 0x01) != 0)
+    if (mode == 0)
     {
-        fwlog_mode.mode= 1;
+        fwlog_mode.mode = 0;
+        fwlog_mode.fwlog_print = 0;
+        /* reset ram share */
+        hif->hif_ops.hi_write_word(0x00a0d0e4, 0x0000007f);
     }
     else
     {
-        fwlog_mode.mode= 0;
+        fwlog_mode.mode = mode;
+        fwlog_mode.fwlog_print = 1;
+        if (mode == 1)
+        {
+            /* set ram share */
+            hif->hif_ops.hi_write_word(0x00a0d0e4, 0x8000007f);
+        }
+        else if (mode == 3)
+        {
+            hal_get_fwlog();
+        }      
     }
 
     HAL_BEGIN_LOCK();
     hi_set_cmd((unsigned char *)&fwlog_mode, sizeof(struct Fwlog_Mode_Control));
     HAL_END_LOCK();
-    printk("%s:%d, enable %d \n", __func__, __LINE__, enable);
-
-    if ((enable & 0x02) != 0)
-    {
-        hal_print_fwlog();
-    }
 
     return 0;
 }
@@ -1662,6 +1664,7 @@ unsigned char parse_cali_param(char *varbuf, int len, struct Cali_Param *cali_pa
     get_s8_item(varbuf, len, "version", &cali_param->version);
     get_s16_item(varbuf, len, "cali_config", &cali_param->cali_config);
     get_s8_item(varbuf, len, "freq_offset", &cali_param->freq_offset);
+    get_s8_item(varbuf, len, "htemp_freq_offset", &cali_param->htemp_freq_offset);
     get_s8_item(varbuf, len, "tssi_2g_offset", &cali_param->tssi_2g_offset);
     get_s8_item(varbuf, len, "tssi_5g_offset_5200", &cali_param->tssi_5g_offset[0]);
     get_s8_item(varbuf, len, "tssi_5g_offset_5400", &cali_param->tssi_5g_offset[1]);
@@ -1670,11 +1673,53 @@ unsigned char parse_cali_param(char *varbuf, int len, struct Cali_Param *cali_pa
     get_s8_item(varbuf, len, "wf2g_spur_rmen", &cali_param->wf2g_spur_rmen);
     get_s16_item(varbuf, len, "spur_freq", &cali_param->spur_freq);
     get_s8_item(varbuf, len, "rf_count", &cali_param->rf_num);
+    get_s8_item(varbuf, len, "wftx_pwrtbl_en", &cali_param->wftx_pwrtbl_en);
+
+    printk("======>>>>>> version = %d\n", cali_param->version);
+    printk("======>>>>>> cali_config = %d\n", cali_param->cali_config);
+    printk("======>>>>>> freq_offset = %d\n", cali_param->freq_offset);
+    printk("======>>>>>> htemp_freq_offset = %d\n", cali_param->htemp_freq_offset);
+    printk("======>>>>>> tssi_2g_offset = 0x%x\n", cali_param->tssi_2g_offset);
+    printk("======>>>>>> tssi_5g_offset_5200 = 0x%x\n", cali_param->tssi_5g_offset[0]);
+    printk("======>>>>>> tssi_5g_offset_5400 = 0x%x\n", cali_param->tssi_5g_offset[1]);
+    printk("======>>>>>> tssi_5g_offset_5600 = 0x%x\n", cali_param->tssi_5g_offset[2]);
+    printk("======>>>>>> tssi_5g_offset_5800 = 0x%x\n", cali_param->tssi_5g_offset[3]);
+    printk("======>>>>>> wf2g_spur_rmen = %d\n", cali_param->wf2g_spur_rmen);
+    printk("======>>>>>> spur_freq = %d\n", cali_param->spur_freq);
+    printk("======>>>>>> rf_count = %d\n", cali_param->rf_num);
+    printk("======>>>>>> wftx_pwrtbl_en = %d\n", cali_param->wftx_pwrtbl_en);
 
     return 0;
 }
 
-unsigned char get_cali_param(struct Cali_Param *cali_param)
+unsigned char set_tx_power_param_default(struct WF2G_Txpwr_Param *wf2g_txpwr_param, struct WF5G_Txpwr_Param *wf5g_txpwr_param)
+{
+    unsigned char wf2g_pwr_tbl_dft[2][16] = {{0xBA,0xBA,0xCB,0xCB,0xB5,0xB5,0xC0,0xB5,0xA1,0xA1,0x84,0x7C,0x6C,0x6C,0x63,0x58},
+                                                                  {0xBA,0xBA,0xCB,0xCB,0xB5,0xB5,0xA6,0xA1,0x94,0x94,0x7C,0x75,0x6C,0x66,0x5D,0x58}};
+    unsigned char wf5g_pwr_tbl_dft[3][16] = {{0xBA,0xBA,0x84,0x84,0x75,0x75,0x84,0x7C,0x6C,0x6C,0x84,0x7C,0x6C,0x6C,0x63,0x58},
+                                                                  {0xBA,0xBA,0x84,0x84,0x75,0x75,0x7C,0x75,0x6C,0x6C,0x7C,0x75,0x6C,0x66,0x5D,0x58},
+                                                                  {0xBA,0xBA,0x84,0x84,0x75,0x75,0x7C,0x75,0x6C,0x6C,0x6F,0x6F,0x60,0x60,0x60,0x58}};
+
+    memcpy(&wf2g_txpwr_param->wf2g_pwr_tbl, wf2g_pwr_tbl_dft, sizeof(wf2g_txpwr_param->wf2g_pwr_tbl));
+    memcpy(&wf5g_txpwr_param->wf5g_pwr_tbl, wf5g_pwr_tbl_dft, sizeof(wf5g_txpwr_param->wf5g_pwr_tbl));
+    return 0;
+}
+unsigned char parse_tx_power_param(char *varbuf, int len, struct WF2G_Txpwr_Param *wf2g_txpwr_param, 
+                                                           struct WF5G_Txpwr_Param *wf5g_txpwr_param)
+{
+    get_s8_item(varbuf, len, "wf2g_20M_pwr_tbl", &wf2g_txpwr_param->wf2g_pwr_tbl[0][0]);
+    get_s8_item(varbuf, len, "wf2g_40M_pwr_tbl", &wf2g_txpwr_param->wf2g_pwr_tbl[1][0]);
+    get_s8_item(varbuf, len, "wf5g_20M_pwr_tbl", &wf5g_txpwr_param->wf5g_pwr_tbl[0][0]);
+    get_s8_item(varbuf, len, "wf5g_40M_pwr_tbl", &wf5g_txpwr_param->wf5g_pwr_tbl[1][0]);
+    get_s8_item(varbuf, len, "wf5g_80M_pwr_tbl", &wf5g_txpwr_param->wf5g_pwr_tbl[2][0]);
+
+    printk("======>>>>>> %s ===>>> aml_wifi_rf txt => 2g 20/40 5g 20/40/80\n", __func__);
+
+    return 0;
+}
+
+unsigned char get_cali_param(struct Cali_Param *cali_param, struct WF2G_Txpwr_Param *wf2g_txpwr_param, 
+                                                             struct WF5G_Txpwr_Param *wf5g_txpwr_param)
 {
     struct file *fp;
     struct kstat stat;
@@ -1690,16 +1735,16 @@ unsigned char get_cali_param(struct Cali_Param *cali_param)
     chip_id_l = chip_id_l & 0xffff;
     switch ((chip_id_l & 0xff00) >> 8) {
         case MODULE_ITON:
-            sprintf(chip_id_buf, "vendor/etc/wifi/w1/aml_wifi_rf_iton.txt");
+            sprintf(chip_id_buf, "%s/aml_wifi_rf_iton.txt", conf_path);
             break;
         case MODULE_AMPAK:
-            sprintf(chip_id_buf, "vendor/etc/wifi/w1/aml_wifi_rf_ampak.txt");
+            sprintf(chip_id_buf, "%s/aml_wifi_rf_ampak.txt", conf_path);
             break;
         case MODULE_FN_LINK:
-            sprintf(chip_id_buf, "vendor/etc/wifi/w1/aml_wifi_rf_fn_link.txt");
+            sprintf(chip_id_buf, "%s/aml_wifi_rf_fn_link.txt", conf_path);
             break;
         default:
-            sprintf(chip_id_buf, "vendor/etc/wifi/w1/aml_wifi_rf.txt");
+            sprintf(chip_id_buf, "%s/aml_wifi_rf.txt", conf_path);
     }
     printk("aml wifi module SN:%04x  the rf config: %s\n", chip_id_l, chip_id_buf);
     fs = get_fs();
@@ -1739,6 +1784,16 @@ unsigned char get_cali_param(struct Cali_Param *cali_param)
 
     len = process_cali_content(content, size);
     parse_cali_param(content, len, cali_param);
+
+    if (cali_param->wftx_pwrtbl_en == 0)
+    {
+        set_tx_power_param_default(wf2g_txpwr_param, wf5g_txpwr_param);
+    }
+    else
+    {
+        parse_tx_power_param(content, len, wf2g_txpwr_param, wf5g_txpwr_param);
+    }
+
     if (chip_id_l & 0xf0) {
         if (chip_id_l & BIT(5))
             cali_param->rf_num = 2;
@@ -1759,20 +1814,29 @@ err:
 unsigned int hal_cfg_cali_param(void)
 {
     struct Cali_Param cali_param;
+    struct WF2G_Txpwr_Param wf2g_txpwr_param;
+    struct WF5G_Txpwr_Param wf5g_txpwr_param;
     unsigned char err = 0;
 
     memset((void *)&cali_param, 0, sizeof(struct Cali_Param));
-    cali_param.Cmd = CALI_PARAM_CMD;
-    err = get_cali_param(&cali_param);
+    memset((void *)&wf2g_txpwr_param, 0, sizeof(struct WF2G_Txpwr_Param));
+    memset((void *)&wf5g_txpwr_param, 0, sizeof(struct WF5G_Txpwr_Param));
 
-    printk("calibration parameter: version %d, config %d, freq_offset %d, tssi_2g %d, tssi_5g %d %d %d %d\n",
+    cali_param.Cmd = CALI_PARAM_CMD;
+    wf2g_txpwr_param.Cmd = WF2G_TXPWR_PARAM_CMD;
+    wf5g_txpwr_param.Cmd = WF5G_TXPWR_PARAM_CMD;
+    err = get_cali_param(&cali_param, &wf2g_txpwr_param, &wf5g_txpwr_param);
+
+    printk("calibration parameter: version %d, config %d, freq_offset %d, tssi_2g %d, tssi_5g %d %d %d %d tx_en %d\n",
             cali_param.version, cali_param.cali_config, cali_param.freq_offset, cali_param.tssi_2g_offset,
-            cali_param.tssi_5g_offset[0], cali_param.tssi_5g_offset[1], cali_param.tssi_5g_offset[2], cali_param.tssi_5g_offset[3]);
+            cali_param.tssi_5g_offset[0], cali_param.tssi_5g_offset[1], cali_param.tssi_5g_offset[2], cali_param.tssi_5g_offset[3], cali_param.wftx_pwrtbl_en);
 
     if (err == 0) {
         printk("%s:%d, set calibration parameter \n", __func__, __LINE__);
         HAL_BEGIN_LOCK();
         hi_set_cmd((unsigned char *)&cali_param, sizeof(struct Cali_Param));
+        hi_set_cmd((unsigned char *)&wf2g_txpwr_param, sizeof(struct WF2G_Txpwr_Param));
+        hi_set_cmd((unsigned char *)&wf5g_txpwr_param, sizeof(struct WF5G_Txpwr_Param));
         HAL_END_LOCK();
     }
     else {

@@ -26,6 +26,7 @@
 #include "wifi_mac_chan.h"
 #include "wifi_hal_platform.h"
 #include "wifi_mac_action.h"
+#include "wifi_mac_main_reg.h"
 
 static char *version = "(Amlogic) 2018-06-01 v1.00" ;
 static char *dev_info = "aml_sdio";
@@ -197,6 +198,27 @@ drv_scan_end( struct drv_private *drv_priv)
         NULL, (SYS_TYPE)drv_priv, 0, 0, 0, 0);
 }
 
+static void drv_print_fwlog_ex( SYS_TYPE param1,SYS_TYPE param2,SYS_TYPE param3,
+    SYS_TYPE param4,SYS_TYPE param5)
+{
+    unsigned char* logbuf_ptr = (unsigned char *)param1;
+    int databyte = (int)param2;
+    /* print process */
+    printk("logbuf_ptr 0x%x\n", logbuf_ptr);
+    printk("fw_log:\n");
+    while (databyte--)
+    {
+        printk("%c", *logbuf_ptr);
+        logbuf_ptr++;
+    }
+    printk("\nfwlog_print end\n");
+}
+
+static void drv_print_fwlog(unsigned char *logbuf_ptr, int databyte)
+{
+    drv_hal_add_workitem((WorkHandler)drv_print_fwlog_ex,
+        NULL, (SYS_TYPE)logbuf_ptr, (SYS_TYPE)databyte, 0, 0, 0);
+}
 
 static void
 drv_connect_start_ex( SYS_TYPE param1,SYS_TYPE param2,
@@ -1030,9 +1052,9 @@ drv_key_set(struct drv_private * drv_priv, unsigned char wnet_vif_id,
         if (hk->kv_pad == WIFINET_M_HOSTAP)   //ap mode , send staid
         {
             sta = drv_priv->net_ops->wifi_mac_get_sta(&wnet_vif->vm_sta_tbl, mac,wnet_vif_id);
-            status = drv_hal_keyset(wnet_vif_id, key_index, hk, (unsigned char *)mac,sta->sta_associd); vm_StaAtomicDec(&sta);
+            status = drv_hal_keyset(wnet_vif_id, key_index, hk, (unsigned char *)mac,sta->sta_associd);
         }
-        else                                  //station mode 1
+        else
         {
             status = drv_hal_keyset(wnet_vif_id,key_index, hk, (unsigned char *)mac,1);
         }
@@ -1302,12 +1324,23 @@ static void drv_init_ops(struct drv_private *drv_priv)
     drv_priv->drv_ops.drv_set_bmfm_info = drv_set_bmfm_info;
     drv_priv->drv_ops.drv_interface_enable = drv_interface_enable;
     drv_priv->drv_ops.drv_cfg_cali_param = drv_cfg_cali_param;
+    drv_priv->drv_ops.drv_print_fwlog = drv_print_fwlog;
+}
+
+void aml_set_mac_control_register(void)
+{
+    unsigned int read_tmp = 0;
+    read_tmp = drv_read_word(MAC_CONTROL);
+    read_tmp |= BIT(20); //enable qos null frame not update bitmap
+    drv_write_word(MAC_CONTROL, read_tmp);
 }
 
 int aml_driv_attach( struct drv_private *drv_priv, struct wifi_mac* wmac)
 {
     int i ;
     int error;
+    char *country_code = NULL;
+    int country_index = DEFAULT_CONTRY;
 
     DPRINTF(AML_DEBUG_INIT, "enter Here %s %d \n",__func__,__LINE__);
 
@@ -1332,7 +1365,16 @@ int aml_driv_attach( struct drv_private *drv_priv, struct wifi_mac* wmac)
     drv_pwrsave_init(drv_priv);
     driv_ps_wakeup(drv_priv);
 
-    drv_priv->drv_config.cfg_countrycode    = DEFAULT_CONTRY;
+    country_code = aml_wifi_get_country_code();
+
+    printk("<running> %s %d insmod country: %s\n", __func__, __LINE__,country_code);
+
+    country_index = find_country_code((unsigned char *)country_code);
+    if (country_index != 0xff) {
+      drv_priv->drv_config.cfg_countrycode  = country_index;
+    }
+
+    drv_priv->drv_config.cfg_countrycode    = country_index;
     drv_priv->drv_config.cfg_ampduackpolicy     = DEFAULT_AMPDUACKPOLICY;
     drv_priv->drv_config.cfg_htsupport      = DEFAULT_HT_ENABLE;
     drv_priv->drv_config.cfg_vhtsupport      = DEFAULT_VHT_ENABLE;
@@ -1385,6 +1427,7 @@ int aml_driv_attach( struct drv_private *drv_priv, struct wifi_mac* wmac)
     drv_priv->drv_config.cfg_dssupport       = DEFAULT_DSSUPPORT;
     drv_priv->drv_config.cfg_eat_count_max = DEFAULT_EAT_COUNT_MAX;
     drv_priv->drv_config.cfg_aggr_thresh = DEFAULT_AGGR_THRESH;
+    drv_priv->drv_config.cfg_no_aggr_thresh = DEFAULT_NO_AGGR_THRESH;
     drv_priv->drv_config.cfg_hrtimer_interval = DEFAULT_HRTIMER_INTERVAL;
     drv_priv->drv_config.cfg_mfp = DEFAULT_MFP_EN;//support mfp
 
@@ -1418,6 +1461,7 @@ int aml_driv_attach( struct drv_private *drv_priv, struct wifi_mac* wmac)
     drv_rate_setup(drv_priv, WIFINET_MODE_11GNAC);
     drv_txlist_setup(drv_priv);
     driv_ps_sleep(drv_priv);
+    aml_set_mac_control_register();
     return 0;
 
 bad:
@@ -1503,16 +1547,6 @@ static void drv_tx_ok_timeout(void *drv_priv)
         drv_private->wait_mpdu_timeout = 1;
         __D(BIT(17), "%s, waiting_pkt_timeout:%d\n", __func__, drv_private->wait_mpdu_timeout);
         DRV_TX_TIMEOUT_UNLOCK(drv_private);
-    }
-}
-
-void drv_tx_lock_timeout(void *drv_priv)
-{
-    struct drv_private *drv_private = (struct drv_private *)(drv_priv);
-
-    if (drv_private != NULL) {
-        drv_private->wait_mpdu_timeout = 1;
-        tasklet_schedule(&drv_private->ampdu_tasklet);
     }
 }
 
@@ -1626,8 +1660,7 @@ static int pmf_encrypt_pkt_handle(void *dpriv, struct sk_buff *skb, unsigned cha
 }
 
 #ifdef CONFIG_P2P
-void p2p_noa_start_irq (struct wifi_mac_p2p *p2p,
-    struct drv_private *drv_priv)
+void p2p_noa_start_irq (struct wifi_mac_p2p *p2p, struct drv_private *drv_priv)
 {
     unsigned short HiP2pNoaCountNow;
     struct wlan_net_vif *wnet_vif = p2p->wnet_vif;
@@ -1638,22 +1671,17 @@ void p2p_noa_start_irq (struct wifi_mac_p2p *p2p,
     struct wlan_net_vif *main_vmac = drv_priv->drv_wnet_vif_table[NET80211_MAIN_VMAC];
     struct wlan_net_vif *p2p_vmac = drv_priv->drv_wnet_vif_table[NET80211_P2P_VMAC];
 
-    if (!(p2p->p2p_flag & P2P_NOA_START_FLAG_HI)
-        || !p2p->HiP2pNoaCountNow)
-    {
+    if (!(p2p->p2p_flag & P2P_NOA_START_FLAG_HI) || !p2p->HiP2pNoaCountNow) {
         return;
     }
 
     p2p->HiP2pNoaCountNow --;
-    if ((p2p->HiP2pNoaCountNow == 0)
-        && (p2p->noa.count == NET80211_P2P_SCHED_REPEAT))
-    {
+    if ((p2p->HiP2pNoaCountNow == 0) && (p2p->noa.count == NET80211_P2P_SCHED_REPEAT)) {
         p2p->HiP2pNoaCountNow = (p2p->noa.count << 1);
     }
     HiP2pNoaCountNow = p2p->HiP2pNoaCountNow;
 
-    if (P2P_NoA_START_FLAG(HiP2pNoaCountNow))
-    {
+    if (P2P_NoA_START_FLAG(HiP2pNoaCountNow)) {
         /* if noa start */
         DPRINTF(AML_DEBUG_PWR_SAVE, "%s %d noa start HiP2pNoaCountNow=%d\n",
             __func__,__LINE__, HiP2pNoaCountNow);
@@ -1665,9 +1693,7 @@ void p2p_noa_start_irq (struct wifi_mac_p2p *p2p,
             4. Lowest: Absence for a periodic Notice of Absence (Count > 1).
         */
         if  ((p2p->noa.count > 1) && (p2p->p2p_flag & P2P_OPPPS_START_FLAG_HI)
-                && (!(p2p->p2p_flag & P2P_OPPPS_CWEND_FLAG_HI)
-                    || (wnet_vif->vm_pstxqueue_flags & WIFINET_PSQUEUE_OPPS)))
-        {
+            && (!(p2p->p2p_flag & P2P_OPPPS_CWEND_FLAG_HI) || (wnet_vif->vm_pstxqueue_flags & WIFINET_PSQUEUE_OPPS))) {
             /*noa count != 1,  opps is already start and sleep, just return; */
             return;
         }
@@ -1740,12 +1766,10 @@ void p2p_noa_start_irq (struct wifi_mac_p2p *p2p,
 
             if (wnet_vif->vm_opmode == WIFINET_M_HOSTAP)
             {
-                WIFINET_NODE_LOCK(nt);
-                list_for_each_entry_safe(sta,sta_next,&nt->nt_nsta,sta_list)
+                list_for_each_entry_safe(sta, sta_next, &nt->nt_nsta, sta_list)
                 {
                     if (sta->sta_wnet_vif == wnet_vif)
                     {
-                        WIFINET_NODE_UNLOCK(nt);
                         if (sta->sta_flags_ext & WIFINET_NODE_PS_FLUSH_WAIT_NOA_END)
                         {
                             if ( drv_priv->net_ops->wifi_mac_pwrsave_psqueue_flush(sta) <= 0)
@@ -1764,10 +1788,8 @@ void p2p_noa_start_irq (struct wifi_mac_p2p *p2p,
                                 sta->sta_flags_ext &= ~WIFINET_NODE_UAPSD_FLUSH_WAIT_NOA_END;
                             }
                         }
-                        WIFINET_NODE_LOCK(nt);
                     }
                 }
-                WIFINET_NODE_UNLOCK(nt);
             }
             drv_priv->net_ops->wifi_mac_buffer_txq_send_pre(wnet_vif);
 
@@ -1821,11 +1843,11 @@ static void p2p_opps_ctw_start_irq (struct wifi_mac_p2p *p2p)
 
 static void drv_intr_bcn_send_ok(void * dpriv,unsigned char vma_id)
 {
-    struct drv_private *drv_priv= (struct drv_private *)dpriv;
-    struct wlan_net_vif  *wnet_vif=NULL;
+    struct drv_private *drv_priv = (struct drv_private *)dpriv;
+    struct wlan_net_vif  *wnet_vif = NULL;
     struct wifi_mac *wifimac;
     struct sk_buff *skb ;
-    unsigned char  rate=0;
+    unsigned char rate = 0;
     unsigned short flag;
 
     wnet_vif  = drv_priv->drv_wnet_vif_table[vma_id];
@@ -1836,39 +1858,38 @@ static void drv_intr_bcn_send_ok(void * dpriv,unsigned char vma_id)
     if ((wnet_vif->vm_opmode == WIFINET_M_HOSTAP)||
         (wnet_vif->vm_opmode == WIFINET_M_IBSS))
     {
-        drv_tx_get_mgmt_frm_rate(drv_priv,wnet_vif,
-            WIFINET_FC0_TYPE_MGT|WIFINET_FC0_SUBTYPE_BEACON,&rate,&flag);
+        drv_tx_get_mgmt_frm_rate(drv_priv, wnet_vif,
+            WIFINET_FC0_TYPE_MGT | WIFINET_FC0_SUBTYPE_BEACON, &rate, &flag);
 
         WIFINET_BEACONBUF_LOCK(wifimac);
-        skb  = wnet_vif->vm_beaconbuf;
+        skb = wnet_vif->vm_beaconbuf;
         if(skb)
         {
             drv_priv->net_ops->wifi_mac_update_beacon(drv_priv->wmac, vma_id,skb, 0);
-            drv_hal_put_bcn_buf(vma_id,os_skb_data(skb),os_skb_get_pktlen(skb),rate,flag);
+            drv_hal_put_bcn_buf(vma_id, os_skb_data(skb), os_skb_get_pktlen(skb), rate, wnet_vif->vm_bandwidth);
         }
         else
         {
             printk("Enter %s Function ERROR \n",__func__);
         }
         WIFINET_BEACONBUF_UNLOCK(wifimac);
+
 #ifdef CONFIG_P2P
-        if ((drv_priv->net_ops->wifi_mac_pwrsave_is_wnet_vif_fullsleep(wnet_vif)==0)
+        if ((drv_priv->net_ops->wifi_mac_pwrsave_is_wnet_vif_fullsleep(wnet_vif) == 0)
             && (wnet_vif->vm_p2p->p2p_flag & P2P_OPPPS_START_FLAG_HI))
         {
             //drv_priv->net_ops->wifi_mac_pwrsave_networksleep(wnet_vif, NETSLEEP_AFTER_BEACON_SEND);
         }
+
         p2p_opps_ctw_start_irq(wnet_vif->vm_p2p);
-        if (wnet_vif->vm_p2p->p2p_flag & (P2P_NOA_START_MATCH_BEACON_HI|P2P_NOA_END_MATCH_BEACON_HI))
-        {
+        if (wnet_vif->vm_p2p->p2p_flag & (P2P_NOA_START_MATCH_BEACON_HI|P2P_NOA_END_MATCH_BEACON_HI)) {
             p2p_noa_start_irq(wnet_vif->vm_p2p, drv_priv);
-        }
-        else if (wnet_vif->vm_pstxqueue_flags & WIFINET_PSQUEUE_NOA)
-        {
+
+        } else if (wnet_vif->vm_pstxqueue_flags & WIFINET_PSQUEUE_NOA) {
              drv_priv->net_ops->wifi_mac_pwrsave_fullsleep(wnet_vif, SLEEP_AFTER_NOA_START);
         }
 #endif
     }
-
 }
 
 
@@ -1898,20 +1919,16 @@ drv_get_sta_id(void * dpriv,unsigned char *mac,
     nt = &wnet_vif->vm_sta_tbl;
 
     sta = drv_priv->net_ops->wifi_mac_get_sta(nt, mac,wnet_vif_id);
-    if (sta == NULL)
-    {
+    if (sta == NULL) {
         return -1;
     }
 
-    if (sta->sta_wnet_vif->vm_opmode == WIFINET_M_STA)
-    {
+    if (sta->sta_wnet_vif->vm_opmode == WIFINET_M_STA) {
         *staid =  1;
-    }
-    else
-    {
+    } else {
         *staid =  sta->sta_associd&0xff;
     }
-    drv_priv->net_ops->wifi_mac_FreeNsta(sta);
+
     return 0;
 }
 
@@ -2111,6 +2128,10 @@ static void drv_intr_fw_event(void *dpriv, void *event)
             drv_priv->net_ops->wifi_mac_process_tx_error(wnet_vif);
             break;
 
+        case FWLOG_PRINT_EVENT:
+            drv_priv->hal_priv->hal_ops.hal_set_fwlog_cmd(3); //3: print fwlog
+            break;
+
         default:
             break;
     }
@@ -2158,13 +2179,14 @@ static void drv_intr_beacon_miss(void * dpriv, unsigned char wnet_vif_id)
 
 
 static void drv_trigger_send_delba(SYS_TYPE param1,
-                                            SYS_TYPE param2,SYS_TYPE param3, SYS_TYPE param4,SYS_TYPE param5)
+    SYS_TYPE param2,SYS_TYPE param3, SYS_TYPE param4,SYS_TYPE param5)
 {
     struct drv_private *drv_priv = drv_get_drv_priv();
     unsigned int vid = 0;
     struct wlan_net_vif *wnet_vif = drv_priv->drv_wnet_vif_table[vid];   /*vmac 0*/
     struct hw_interface* hif = hif_get_hw_interface();
     struct wifi_station* sta = NULL;
+    struct wifi_station* sta_next = NULL;
     struct aml_driver_nsta *drv_sta  = NULL;
     unsigned int reg_val = 0;
     struct wifi_mac_action_mgt_args actionargs;
@@ -2174,6 +2196,7 @@ static void drv_trigger_send_delba(SYS_TYPE param1,
     struct drv_rx_scoreboard *RxTidState = NULL;
     struct wifi_station_tbl *vm_sta_tbl = &(wnet_vif->vm_sta_tbl);
     unsigned int i = 0;
+    unsigned int j = 0;
 
     memset(&actionargs, 0, sizeof( struct wifi_mac_action_mgt_args));
 
@@ -2188,40 +2211,38 @@ static void drv_trigger_send_delba(SYS_TYPE param1,
     }
 
    /*two vid need consider*/
-   WIFINET_NODE_LOCK(vm_sta_tbl);
-   /*traverse all hash value*/
-   for (i = 0; i < WIFINET_NODE_HASHSIZE; i++) {
-        /*traverse all staion in  one hash value*/
-        list_for_each_entry(sta, &(vm_sta_tbl->nt_hash[i]), sta_hash) {
-            drv_sta = DRIVER_NODE(sta->drv_sta);
+   for (j = 0; j < 2; ++j) {
+      vm_sta_tbl = &drv_priv->drv_wnet_vif_table[j]->vm_sta_tbl;
 
-            /*traverse all tid */
-            for (tid_index = 0; tid_index < WME_NUM_TID; tid_index++) {
-                RxTidState = &drv_sta->rx_scb[tid_index];
+       /*traverse all hash value*/
+       for (i = 0; i < WIFINET_NODE_HASHSIZE; i++) {
+            /*traverse all staion in  one hash value*/
+            list_for_each_entry_safe(sta, sta_next, &vm_sta_tbl->nt_nsta, sta_list) {
+                drv_sta = DRIVER_NODE(sta->drv_sta);
 
-                if (RxTidState->rx_addba_exchangecomplete) {
-                    actionargs.category = AML_CATEGORY_BACK;
-                    actionargs.action = WIFINET_ACTION_BA_DELBA;
-                    actionargs.arg1 = tid_index;
-                    /*
-                    The Initiator subfield indicates if the originator or the recipient of the data is sending this frame. It is set to 1
-                    to indicate the originator and is set to 0 to indicate the recipient. The TID subfield indicates the TSID or the
-                    UP for which the block ack has been originally set up.
-                    */
-                    actionargs.arg2 = BA_INITIATOR;  /*reference protocol 802.11-2016.pdf  chapter 9.4.1.16 DELBA Parameter Set field*/
-                    actionargs.arg3 = 1;   /* reference  hornor v9 phone, reference protocol 802.11-2016.pdf  chapter 9.4.1.9 Status Code field*/
-                    wifi_mac_send_action(sta, (void *)&actionargs);
-                    printk("%s:%d, tid_index %d ->sta_macaddr=%s\n", __func__, __LINE__, tid_index, ether_sprintf(sta->sta_macaddr));
+                /*traverse all tid */
+                for (tid_index = 0; tid_index < WME_NUM_TID; tid_index++) {
+                    RxTidState = &drv_sta->rx_scb[tid_index];
+
+                    if (RxTidState->rx_addba_exchangecomplete) {
+                        actionargs.category = AML_CATEGORY_BACK;
+                        actionargs.action = WIFINET_ACTION_BA_DELBA;
+                        actionargs.arg1 = tid_index;
+                        /*
+                        The Initiator subfield indicates if the originator or the recipient of the data is sending this frame. It is set to 1
+                        to indicate the originator and is set to 0 to indicate the recipient. The TID subfield indicates the TSID or the
+                        UP for which the block ack has been originally set up.
+                        */
+                        actionargs.arg2 = BA_INITIATOR;  /*reference protocol 802.11-2016.pdf  chapter 9.4.1.16 DELBA Parameter Set field*/
+                        actionargs.arg3 = 1;   /* reference  hornor v9 phone, reference protocol 802.11-2016.pdf  chapter 9.4.1.9 Status Code field*/
+                        wifi_mac_send_action(sta, (void *)&actionargs);
+                        printk("%s:%d, tid_index %d ->sta_macaddr=%s\n", __func__, __LINE__, tid_index, ether_sprintf(sta->sta_macaddr));
+                    }
                 }
             }
         }
     }
-
-    WIFINET_NODE_UNLOCK(vm_sta_tbl);
 }
-
-
-
 
 /*when BT logic link information change or BT alive status change
 WIFI need to change  aggregate number
@@ -2276,6 +2297,11 @@ drv_dev_probe(void)
     struct drv_private *drv_priv = drv_get_drv_priv();
     struct wifi_mac *wm_mac = wifi_mac_get_mac_handle();
     int ret = 0;
+    int vif0opmode = -1;
+    int vif1opmode = -1;
+    char * vmac0 = NULL;
+    char * vmac1 = NULL;
+
 
     /*1, init sdio, here we are in initialization process of sdio. */
 
@@ -2308,13 +2334,34 @@ drv_dev_probe(void)
     }
 
     /*5 create vmac 'wlan0' and 'p2p0' */
-    memcpy(&vm_param.vm_param_name, "wlan0", sizeof("wlan0"));
-    vm_param.vm_param_opmode = WIFINET_M_STA;
+    vmac0 = aml_wifi_get_vif0_name();
+    if (vmac0 == NULL) {
+        memcpy(&vm_param.vm_param_name, "wlan0", sizeof("wlan0"));
+    } else {
+        memcpy(&vm_param.vm_param_name, vmac0, IFNAMSIZ);
+    }
+    vif0opmode = aml_wifi_get_vif0_opmode();
+    if ((vif0opmode >= WIFINET_M_IBSS) && (vif0opmode <= WIFINET_M_P2P_DEV)) {
+        vm_param.vm_param_opmode = vif0opmode;
+    } else {
+        vm_param.vm_param_opmode = WIFINET_M_STA;
+    }
     ret = drv_priv->net_ops->wifi_mac_create_vmac(wm_mac, &vm_param,0);
 
-    memcpy(&vm_param.vm_param_name, "p2p0", sizeof("p2p0"));
-    vm_param.vm_param_opmode = WIFINET_M_P2P_DEV;
+    vmac1 = aml_wifi_get_vif1_name();
+    if (vmac1 == NULL) {
+        memcpy(&vm_param.vm_param_name, "p2p0", sizeof("p2p0"));
+    } else {
+        memcpy(&vm_param.vm_param_name, vmac1, IFNAMSIZ);
+    }
+    vif1opmode = aml_wifi_get_vif1_opmode();
+    if ((vif1opmode >= WIFINET_M_IBSS) && (vif1opmode <= WIFINET_M_P2P_DEV)) {
+        vm_param.vm_param_opmode = vif1opmode;
+    } else {
+        vm_param.vm_param_opmode = WIFINET_M_P2P_DEV;
+    }
     ret = drv_priv->net_ops->wifi_mac_create_vmac(wm_mac, &vm_param,0);
+
     /*6 init station */
     drv_priv->net_ops->wifi_mac_sta_attach(wm_mac);
 

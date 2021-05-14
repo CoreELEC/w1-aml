@@ -159,7 +159,6 @@ struct wifi_station
     struct wlan_net_vif *sta_wnet_vif;
     struct wifi_mac *sta_wmac;
     struct list_head sta_list;
-    struct list_head sta_hash;
 
     void *drv_sta;
     struct wifi_mac_amsdu *sta_amsdu;
@@ -183,7 +182,6 @@ struct wifi_station
     struct wifi_mac_rateset sta_htrates;
     struct wifi_mac_rateset sta_vhtrates;
 
-    atomic_t sta_AtomicCnt;
     unsigned int sta_scangen;
     unsigned char sta_authmode;
     unsigned short sta_flags;
@@ -321,12 +319,8 @@ struct wifi_station_tbl
     rwlock_t nt_nstalock;
     unsigned long nt_nsta_lock_flags;
     struct list_head nt_nsta;
-    struct list_head nt_hash[WIFINET_NODE_HASHSIZE];
     struct list_head nt_wds_hash[WIFINET_NODE_HASHSIZE];
     const char *nt_name;
-    spinlock_t nt_scanlock;
-    unsigned long nt_scan_lock_flags;
-    unsigned int nt_scangen;
     int nt_inact_init;
 };
 #define WIFINET_NODE_AID(sta)   WIFINET_AID(sta->sta_associd)
@@ -379,22 +373,6 @@ struct wifi_station_tbl
 #define vm_StaClearAid(_wnet_vif, _aid) ((_wnet_vif)->vm_aid_bitmap[WIFINET_AID(_aid) / 32] &= ~(1 << (WIFINET_AID(_aid) % 32)))
 #define vm_StaIsSetAid(_wnet_vif, _aid) ((_wnet_vif)->vm_aid_bitmap[WIFINET_AID(_aid) / 32] & (1 << (WIFINET_AID(_aid) % 32)))
 
-#define vm_StaAtomicInit(_sta) atomic_set(&(_sta)->sta_AtomicCnt, 1)
-#define vm_StaAtomicDecTest(_sta) atomic_dec_and_test(&(_sta)->sta_AtomicCnt)
-#define vm_StaAtomicCnt(_sta) (_sta)->sta_AtomicCnt.counter
-
-static __inline struct wifi_station *vm_StaAtomicInc(struct wifi_station *sta, const char *name)
-{
-    atomic_inc(&sta->sta_AtomicCnt);
-    return sta;
-}
-
-static __inline void vm_StaAtomicDec(struct wifi_station **sta)
-{
-    atomic_dec(&(*sta)->sta_AtomicCnt);
-    *sta = NULL;
-}
-
 void wifi_mac_sta_attach(struct wifi_mac *);
 void wifi_mac_StationDetach(struct wifi_mac *);
 void wifi_mac_sta_vattach(struct wlan_net_vif *);
@@ -404,14 +382,13 @@ void wifi_mac_sta_auth(struct wifi_station *);
 void wifi_mac_StationUnauthorize(struct wifi_station *);
 void wifi_mac_create_wifi(struct wlan_net_vif*, struct wifi_channel *);
 void wifi_mac_rst_bss(struct wlan_net_vif *);
+void wifi_mac_rst_main_sta(struct wlan_net_vif *wnet_vif);
 int wifi_mac_connect(struct wlan_net_vif *, struct wifi_scan_info *);
 void wifi_mac_sta_leave(struct wifi_station *, int reassoc);
 struct wifi_station *wifi_mac_get_sta_node(struct wifi_station_tbl *, struct wlan_net_vif *, const unsigned char *);
 struct wifi_station *wifi_mac_tmp_nsta(struct wlan_net_vif *, const unsigned char *);
 struct wifi_station *wifi_mac_bup_bss(struct wlan_net_vif *, const unsigned char *);
-void wifi_mac_FreeNsta(struct wifi_station *);
-void wifi_mac_free_sta_no_lock(struct wifi_station *sta);
-void wifi_mac_free_main_sta(struct wifi_station *sta);
+void wifi_mac_free_sta(struct wifi_station *sta);
 struct wifi_station *wifi_mac_get_sta(struct wifi_station_tbl *, const unsigned char *,int);
 struct wifi_station * wifi_mac_find_rx_sta(struct wifi_mac *, const struct wifi_mac_frame_min *,int);
 struct wifi_station *wifi_mac_find_tx_sta(struct wlan_net_vif *, const unsigned char *);
@@ -424,7 +401,7 @@ void wifi_mac_func_to_task_cb(SYS_TYPE param1, SYS_TYPE param2, SYS_TYPE param3,
 
 typedef void wifi_mac_IterFunc(void *, struct wifi_station *);
 void wifi_mac_func_to_task(struct wifi_station_tbl *, wifi_mac_IterFunc *, void *,unsigned char btask);
-void wifi_mac_func_to_task_by_vif(struct wlan_net_vif*, wifi_mac_IterFunc*, void*);
+void wifi_mac_disassoc_all_sta(struct wlan_net_vif*, wifi_mac_IterFunc*, void*);
 void wifi_mac_dump_sta(struct wifi_station_tbl *, struct wifi_station *);
 struct wifi_station *wifi_mac_fake_adhos_sta(struct wlan_net_vif *wnet_vif, const unsigned char macaddr[]);
 struct wifi_mac_scan_param;
@@ -463,10 +440,6 @@ int wifi_mac_sta_arp_agent_ex (SYS_TYPE param1, SYS_TYPE param2,SYS_TYPE param3,
 #define WIFINET_PSLOCK(_ic) OS_SPIN_LOCK_IRQ(&(_ic)->wm_pslock, (_ic)->wm_pslock_flags);
 #define WIFINET_PSUNLOCK(_ic) OS_SPIN_UNLOCK_IRQ(&(_ic)->wm_pslock,  (_ic)->wm_pslock_flags);
 
-#define WIFINET_STALOCK_INIT(_ic, _name) spin_lock_init(&(_ic)->wm_stalock)
-#define WIFINET_STALOCK(_ic) OS_SPIN_LOCK(&(_ic)->wm_stalock);
-#define WIFINET_STAUNLOCK(_ic) OS_SPIN_UNLOCK(&(_ic)->wm_stalock);
-
 #if defined(CONFIG_SMP)
 #define WIFINET_LOCK_ASSERT(_ic) KASSERT(spin_is_locked(&(_ic)->wm_comlock),("wifi_mac not locked!"))
 #else
@@ -494,23 +467,6 @@ int wifi_mac_sta_arp_agent_ex (SYS_TYPE param1, SYS_TYPE param2,SYS_TYPE param3,
 #define WIFINET_NODE_LOCK_DESTROY(_nt)
 #define WIFINET_NODE_LOCK(_nt) OS_WRITE_LOCK_IRQ((&(_nt)->nt_nstalock), (_nt)->nt_nsta_lock_flags)
 #define WIFINET_NODE_UNLOCK(_nt) OS_WRITE_UNLOCK_IRQ((&(_nt)->nt_nstalock), (_nt)->nt_nsta_lock_flags)
-
-#if (defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)) && defined(rwlock_is_locked)
-#define WIFINET_NODE_LOCK_ASSERT(_nt) KASSERT(rwlock_is_locked(&(_nt)->nt_nstalock), ("802.11 nsta table not locked!"))
-#else
-#define WIFINET_NODE_LOCK_ASSERT(_nt)
-#endif
-
-#define WIFINET_SCAN_LOCK_INIT(_nt) spin_lock_init(&(_nt)->nt_scanlock)
-#define WIFINET_SCAN_LOCK_DESTROY(_nt)
-#define WIFINET_SCAN_LOCK(_nt) OS_SPIN_LOCK_IRQ((&(_nt)->nt_scanlock), (_nt)->nt_scan_lock_flags)
-#define WIFINET_SCAN_UNLOCK(_nt) OS_SPIN_UNLOCK_IRQ((&(_nt)->nt_scanlock), (_nt)->nt_scan_lock_flags)
-
-#if defined(CONFIG_SMP)
-#define WIFINET_SCAN_LOCK_ASSERT(_nt) KASSERT(spin_is_locked(&(_nt)->nt_scanlock), ("scangen not locked!"))
-#else
-#define WIFINET_SCAN_LOCK_ASSERT(_nt)
-#endif
 
 #define ACL_LOCK_INIT(_as, _name) spin_lock_init(&(_as)->as_lock)
 #define ACL_LOCK_DESTROY(_as)

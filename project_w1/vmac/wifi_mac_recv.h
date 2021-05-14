@@ -11,13 +11,7 @@
 #define HAS_SEQ(type)   ((type & 0x4) == 0)
 
 #define WIFINET_VERIFY_ELEMENT(__elem, __maxlen) do {         \
-                if ((__elem) == NULL) {                     \
-                        WIFINET_DPRINTF( AML_DEBUG_ELEMID,        \
-                                          "%s", "no " #__elem );              \
-                        wnet_vif->vif_sts.sts_rx_elem_miss++;         \
-                        return;                         \
-                }                               \
-                if ((__elem)[1] > (__maxlen)) {                 \
+                if ((__elem) && (__elem)[1] > (__maxlen)) {                 \
                         WIFINET_DPRINTF( AML_DEBUG_ELEMID,        \
                                           "bad " #__elem " len %d", (__elem)[1]);     \
                         wnet_vif->vif_sts.sts_rx_elem_too_long++;          \
@@ -56,7 +50,9 @@ int iswpsoui(const unsigned char *frm);
 int iswfdoui(const unsigned char *frm);
 int isp2poui(const unsigned char *frm);
 
-void wifi_mac_forward_data(struct sk_buff *skb, struct wlan_net_vif *wnet_vif);
+void wifi_mac_forward_data(struct wlan_net_vif *wnet_vif);
+void wifi_mac_forward_init(struct drv_private *drv_priv, struct sk_buff *skb, struct wlan_net_vif *wnet_vif, int hdrspace);
+void drv_forward_tasklet(unsigned long arg);
 int wifi_mac_rx_get_wnet_vifid(struct wifi_mac *wifimac,struct wifi_frame *wh);
 int wifi_mac_input(void *, struct sk_buff *, struct wifi_mac_rx_status *);
 int wifi_mac_input_all(struct wifi_mac *wifimac,struct sk_buff *skb, struct wifi_mac_rx_status *rs);

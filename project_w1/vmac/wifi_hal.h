@@ -100,5 +100,5 @@ int hal_create_thread(void);
 void hal_dpd_memory_download(void);
 void hal_dpd_calibration(void);
 
-void hal_print_fwlog(void);
+void hal_get_fwlog(void);
 #endif

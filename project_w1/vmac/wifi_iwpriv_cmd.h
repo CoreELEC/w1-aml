@@ -3,4 +3,38 @@
 #include <net/iw_handler.h>
 
 extern struct iw_handler_def w1_iw_handle;
+
+enum aml_iwpriv_subcmd
+{
+    AML_IWP_ADDBA_REQ = 1,
+    AML_IWP_AMSDU_STATE,
+    AML_IWP_AMPDU_STATE,
+    AML_IWP_UDP_INFO,
+    AML_IWP_COUNTRY,
+    AML_IWP_11H,
+    AML_IWP_ARP_RX,
+    AML_IWP_CHAN_LIST,
+    AML_IWP_ROAM_THRESH_2G,
+    AML_IWP_ROAM_THRESH_5G,
+    AML_IWP_ROAM_MODE,
+    AML_IWP_MARK_DFS_CHAN,
+    AML_IWP_UNMARK_DFS_CHAN,
+    AML_IWP_WEAK_THRESH,
+    AML_IWP_EAT_COUNT,
+    AML_IWP_AGGR_THRESH,
+    AML_IWP_HEART_INTERVAL,
+    AML_IWP_CHIP_ID,
+    AML_IWP_WIFI_MAC,
+    AML_IWP_AP_IP,
+    AML_IWP_ROAM_CHAN,
+    AML_IWP_BSS_COEX,
+    AML_IWP_TXAGGR_STA,
+    AML_IWP_SESSION,
+    AML_IWP_P2P_DEV_ID,
+    AML_IWP_WMM_AC_DELTS,
+    AML_IWP_SHORT_GI,
+    AML_IWP_DYNAMIC_BW,
+
+};
+
 #endif

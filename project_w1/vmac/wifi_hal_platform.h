@@ -27,9 +27,17 @@ int amlhal_resetmac(void);
 int amlhal_resetsdio(void);
 unsigned char hal_set_sys_clk_for_fpga(void);
 #endif
+#define IS_APSTA_CONCURRENT(x) ((x & (1 << WIFINET_M_STA)) && (x & (1 << WIFINET_M_HOSTAP)))
+
 unsigned char hal_set_sys_clk(int clockdiv);
 unsigned char hal_set_sys_clk_Core(unsigned int addr, unsigned int value);
 unsigned char hal_download_wifi_fw_img(void);
 extern void aml_wifi_set_mac_addr(void);
+extern char * aml_wifi_get_country_code(void);
+extern char * aml_wifi_get_vif0_name(void);
+extern char * aml_wifi_get_vif1_name(void);
+extern int aml_wifi_get_vif0_opmode(void);
+extern int aml_wifi_get_vif1_opmode(void);
+extern unsigned int aml_wifi_get_con_mode(void);
 
 #endif

@@ -31,13 +31,23 @@ struct udp_info
     unsigned int src_ip;
     unsigned int seq;
     unsigned short pkt_len;
+    unsigned char streamid;
     unsigned char out;
     unsigned char udp_timer_stop;
     unsigned int tx;
     unsigned int rx;
 };
 
-extern struct udp_info aml_udp_info;
+struct udp_timer
+{
+    struct os_timer_ext udp_send_timeout;
+    unsigned char udp_timer_stop;
+    unsigned char run_flag;
+};
+
+extern struct udp_info aml_udp_info[];
+extern struct udp_timer aml_udp_timer;
+extern int udp_cnt;
 extern cmd_to_func_table_t cmd_to_func[];
 
 extern int aml_set_chip_id(struct wlan_net_vif *wnet_vif, char* buf, int len);
@@ -73,9 +83,12 @@ extern int aml_set_roaming_mode(struct wlan_net_vif *wnet_vif, char* buf, int le
 extern int wifi_mac_set_udp_info(char** buf);
 extern int aml_set_udp_info(struct wlan_net_vif *wnet_vif, char* buf, int len);
 extern int aml_get_udp_info(struct wlan_net_vif *wnet_vif, char* buf, int len);
-extern int aml_enable_dfs_channel(struct wlan_net_vif *wnet_vif, char* buf, int len);
-extern int aml_disable_dfs_channel(struct wlan_net_vif *wnet_vif, char* buf, int len);
-extern void wifi_mac_ap_set_country_code(char* arg);
-extern void wifi_mac_ap_set_11h(char** buf);
+extern int aml_mark_dfs_channel(struct wlan_net_vif *wnet_vif, char* buf, int len);
+extern int aml_unmark_dfs_channel(struct wlan_net_vif *wnet_vif, char* buf, int len);
+extern void wifi_mac_set_country_code(char* arg);
+extern void wifi_mac_ap_set_11h(unsigned char channel);
 extern void wifi_mac_ap_set_arp_rx(char** buf);
+extern int aml_set_device_sn(struct wlan_net_vif *wnet_vif, char* buf, int len);
+extern int aml_get_device_sn(struct wlan_net_vif *wnet_vif, char* buf, int len);
+extern int aml_set_signal_power_weak_thresh(struct wlan_net_vif *wnet_vif, char* buf, int len);
 #endif

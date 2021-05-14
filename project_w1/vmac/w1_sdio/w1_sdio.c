@@ -7,7 +7,16 @@ struct amlw1_hif_ops g_w1_hif_ops;
 unsigned char w1_sdio_wifi_bt_alive;
 unsigned char w1_sdio_driver_insmoded;
 unsigned char w1_sdio_after_porbe;
+unsigned char wifi_in_insmod;
 static DEFINE_MUTEX(wifi_bt_sdio_mutex);
+
+#define AML_W1_BT_WIFI_MUTEX_ON() do {\
+    mutex_lock(&wifi_bt_sdio_mutex);\
+} while (0)
+
+#define AML_W1_BT_WIFI_MUTEX_OFF() do {\
+    mutex_unlock(&wifi_bt_sdio_mutex);\
+} while (0)
 
 unsigned char (*host_wake_w1_req)(void);
 int (*host_suspend_req)(struct device *device);
@@ -43,38 +52,32 @@ unsigned int aml_w1_bt_hi_read_word(unsigned int addr)
     g_w1_hif_ops.bt_hi_read_sram((unsigned char*)(SYS_TYPE)&regdata,
         /*sdio cmd 52/53 can only take 17 bit address*/
         (unsigned char*)(SYS_TYPE)(addr & 0x1ffff), sizeof(unsigned int));
+
     return regdata;
 }
 
 void aml_w1_bt_hi_write_word(unsigned int addr,unsigned int data)
 {
     unsigned int reg_tmp;
-
-    unsigned char* sdio_kmm = (unsigned char*)kzalloc(sizeof(data), GFP_DMA|GFP_ATOMIC);
-    ASSERT(sdio_kmm);
-
-    memcpy(sdio_kmm, &data, sizeof(data));
     /*
      * make sure function 5 section address-mapping feature is disabled,
      * when this feature is disabled, 
      * all 128k space in one sdio-function use only 
      * one address-mapping: 32-bit AHB Address = BaseAddr + cmdRegAddr 
      */
-    reg_tmp = g_w1_hif_ops.hi_read_word(RG_SDIO_IF_MISC_CTRL);
+    reg_tmp = g_w1_hif_ops.hi_read_word( RG_SDIO_IF_MISC_CTRL);
     
     if((reg_tmp & BIT(23)) != 1)
     {
         reg_tmp |= BIT(23);
-        g_w1_hif_ops.hi_write_word(RG_SDIO_IF_MISC_CTRL , reg_tmp);
+        g_w1_hif_ops.hi_write_word( RG_SDIO_IF_MISC_CTRL, reg_tmp);
     }
     /*config msb 15 bit address in BaseAddr Register*/
     g_w1_hif_ops.hi_write_reg32(RG_SCFG_FUNC5_BADDR_A,addr & 0xfffe0000);
 
-    g_w1_hif_ops.bt_hi_write_sram(sdio_kmm,
+    g_w1_hif_ops.bt_hi_write_sram((unsigned char *)&data,
         /*sdio cmd 52/53 can only take 17 bit address*/
         (unsigned char*)(SYS_TYPE)(addr & 0x1ffff), sizeof(unsigned int));
-
-    kfree(sdio_kmm);
 }
 
 void aml_w1_bt_sdio_read_sram (unsigned char *buf, unsigned char *addr, SYS_TYPE len)
@@ -86,30 +89,14 @@ void aml_w1_bt_sdio_read_sram (unsigned char *buf, unsigned char *addr, SYS_TYPE
 /*For BT use only start */
 void aml_w1_bt_sdio_write_sram (unsigned char *buf, unsigned char *addr, SYS_TYPE len)
 {
-    //struct hal_private *hal_priv = hal_get_priv();
-    unsigned char *sdio_kmm = (unsigned char*)kzalloc(len, GFP_DMA|GFP_ATOMIC);
-    ASSERT(sdio_kmm);
-
-    memcpy(sdio_kmm, buf, len);
     g_w1_hif_ops.hi_bottom_write(SDIO_FUNC5, ((SYS_TYPE)addr & SDIO_ADDR_MASK),
-        sdio_kmm, len, (len > 8 ? SDIO_OPMODE_INCREMENT : SDIO_OPMODE_FIXED));
-
-    kfree(sdio_kmm);
+        buf, len, (len > 8 ? SDIO_OPMODE_INCREMENT : SDIO_OPMODE_FIXED));
 }
 
 int aml_w1_sdio_write_reg32(unsigned long sram_addr, unsigned long sramdata)
 {
-    int ret = 0;
-    unsigned char* sdio_kmm = (unsigned char*)kzalloc(sizeof(unsigned long), GFP_DMA |GFP_ATOMIC);
-    ASSERT(sdio_kmm);
-    memcpy(sdio_kmm, &sramdata, sizeof(unsigned long));
-    
-    ret=  g_w1_hif_ops.hi_bottom_write(SDIO_FUNC1, sram_addr&SDIO_ADDR_MASK,
-        (unsigned char *)sdio_kmm,  sizeof(unsigned long), SDIO_OPMODE_INCREMENT);
-
-    kfree(sdio_kmm);
-
-    return ret;
+    return g_w1_hif_ops.hi_bottom_write(SDIO_FUNC1, sram_addr&SDIO_ADDR_MASK,
+        (unsigned char *)&sramdata,  sizeof(unsigned long), SDIO_OPMODE_INCREMENT);
 }
 
 unsigned int aml_w1_aon_read_reg(unsigned int addr)
@@ -126,13 +113,13 @@ void aml_w1_aon_write_reg(unsigned int addr,unsigned int data)
     g_w1_hif_ops.bt_hi_write_word((addr), data);
 }
 
-static int _aml_w1_sdio_request_byte(unsigned char   func_num,
-                                    unsigned char   write,
-                                    unsigned int      reg_addr,
-                                    unsigned char  *byte)
+static int _aml_w1_sdio_request_byte(unsigned char func_num,
+    unsigned char write, unsigned int reg_addr, unsigned char *byte)
 {
     int err_ret;
     struct sdio_func * func = aml_priv_to_func(func_num);
+    unsigned char *kmalloc_buf = NULL;
+    unsigned char len = sizeof(unsigned char);
 
 #if defined(DBG_PRINT_COST_TIME)
     struct timespec now, before;
@@ -143,12 +130,22 @@ static int _aml_w1_sdio_request_byte(unsigned char   func_num,
     ASSERT(byte != NULL);
     ASSERT(func->num == func_num);
 
+    AML_W1_BT_WIFI_MUTEX_ON();
+    kmalloc_buf =  (unsigned char *)kzalloc(len, GFP_DMA);//virt_to_phys(fwICCM);
+    if (kmalloc_buf == NULL)
+    {
+        printk("kmalloc buf fail\n");
+        AML_W1_BT_WIFI_MUTEX_OFF();
+        return SDIOH_API_RC_FAIL;
+    }
+    memcpy(kmalloc_buf, byte, len);
+
     /* Claim host controller */
     sdio_claim_host(func);
 
     if (write) {
         /* CMD52 Write */
-        sdio_writeb(func, *byte, reg_addr, &err_ret);
+        sdio_writeb(func, *kmalloc_buf, reg_addr, &err_ret);
     }
     else {
         /* CMD52 Read */
@@ -165,15 +162,13 @@ static int _aml_w1_sdio_request_byte(unsigned char   func_num,
         now.tv_sec-before.tv_sec, now.tv_nsec/1000 - before.tv_nsec/1000);
 #endif /* End of DBG_PRINT_COST_TIME */
 
+    kfree(kmalloc_buf);
+    AML_W1_BT_WIFI_MUTEX_OFF();
     return (err_ret == 0) ? SDIOH_API_RC_SUCCESS : SDIOH_API_RC_FAIL;
 }
 
 static int _aml_w1_sdio_request_buffer(unsigned char func_num,
-                                    unsigned int    fix_incr,
-                                    unsigned char write,
-                                    unsigned int    addr,
-                                    void	            *buf,
-                                    unsigned int    nbytes)
+    unsigned int fix_incr, unsigned char write, unsigned int addr, void *buf, unsigned int nbytes)
 {
     int err_ret;
     int align_nbytes = nbytes;
@@ -218,7 +213,7 @@ static int _aml_w1_sdio_request_buffer(unsigned char func_num,
 }
 
 //cmd53
-int aml_w1_sdio_bottom_read(unsigned char  func_num, int addr, void *buf, size_t len,int incr_addr)
+int aml_w1_sdio_bottom_read(unsigned char func_num, int addr, void *buf, size_t len, int incr_addr)
 {
     void *kmalloc_buf = NULL;
     int result;
@@ -235,6 +230,7 @@ int aml_w1_sdio_bottom_read(unsigned char  func_num, int addr, void *buf, size_t
         }
     }
 
+    AML_W1_BT_WIFI_MUTEX_ON();
     /* read block mode */
     if (func_num != SDIO_FUNC6)
     {
@@ -252,9 +248,11 @@ int aml_w1_sdio_bottom_read(unsigned char  func_num, int addr, void *buf, size_t
     {
         kmalloc_buf = buf;
     }
-    if(kmalloc_buf == NULL)
+
+    if (kmalloc_buf == NULL)
     {
         printk("kmalloc buf fail\n");
+        AML_W1_BT_WIFI_MUTEX_OFF();
         return SDIOH_API_RC_FAIL;
     }
 
@@ -265,12 +263,14 @@ int aml_w1_sdio_bottom_read(unsigned char  func_num, int addr, void *buf, size_t
         memcpy(buf, kmalloc_buf, len);
         kfree(kmalloc_buf);
     }
+
+    AML_W1_BT_WIFI_MUTEX_OFF();
     return result;
 }
 
 
 //cmd53
-int aml_w1_sdio_bottom_write(unsigned char  func_num,int addr, void *buf, size_t len,int incr_addr)
+int aml_w1_sdio_bottom_write(unsigned char func_num, int addr, void *buf, size_t len, int incr_addr)
 {
     void *kmalloc_buf;
     int result;
@@ -286,17 +286,20 @@ int aml_w1_sdio_bottom_write(unsigned char  func_num,int addr, void *buf, size_t
         }
     }
 
+    AML_W1_BT_WIFI_MUTEX_ON();
     kmalloc_buf =  (unsigned char *)kzalloc(len, GFP_DMA);//virt_to_phys(fwICCM);
     if(kmalloc_buf == NULL)
     {
         printk("kmalloc buf fail\n");
+        AML_W1_BT_WIFI_MUTEX_OFF();
         return SDIOH_API_RC_FAIL;
     }
     memcpy(kmalloc_buf, buf, len);
-    
+
     result = _aml_w1_sdio_request_buffer(func_num, incr_addr, SDIO_WRITE, addr, kmalloc_buf, len);
 
     kfree(kmalloc_buf);
+    AML_W1_BT_WIFI_MUTEX_OFF();
     return result;
 }
 
@@ -306,17 +309,10 @@ void aml_w1_sdio_read_sram (unsigned char *buf, unsigned char *addr, SYS_TYPE le
         buf, len, (len > 8 ? SDIO_OPMODE_INCREMENT : SDIO_OPMODE_FIXED));
 }
 
-
 void aml_w1_sdio_write_sram (unsigned char *buf, unsigned char *addr, SYS_TYPE len)
 {
-    unsigned char* sdio_kmm = (unsigned char*)kzalloc(len, GFP_DMA |GFP_ATOMIC);
-    ASSERT(sdio_kmm);
-    memcpy(sdio_kmm, buf, len);
-
     g_w1_hif_ops.hi_bottom_write(SDIO_FUNC2, (SYS_TYPE)addr&SDIO_ADDR_MASK,
-        sdio_kmm, len, (len > 8 ? SDIO_OPMODE_INCREMENT : SDIO_OPMODE_FIXED));
-
-    kfree(sdio_kmm);
+        buf, len, (len > 8 ? SDIO_OPMODE_INCREMENT : SDIO_OPMODE_FIXED));
 }
 
 unsigned int aml_w1_sdio_read_word(unsigned int addr)
@@ -343,17 +339,13 @@ unsigned int aml_w1_sdio_read_word(unsigned int addr)
     else
     {
         aml_w1_sdio_read_sram((unsigned char*)(SYS_TYPE)&regdata,
-                                        (unsigned char*)(SYS_TYPE)(addr),
-                                        sizeof(unsigned int));
+            (unsigned char*)(SYS_TYPE)(addr), sizeof(unsigned int));
     }
     return regdata;
 }
 
 void aml_w1_sdio_write_word(unsigned int addr, unsigned int data)
 {
-    unsigned char* sdio_kmm  = (unsigned char*)kzalloc(sizeof(unsigned int), GFP_DMA|GFP_ATOMIC);
-    ASSERT(sdio_kmm);
-    memcpy(sdio_kmm, &data, sizeof(data));
     // for bt access always on reg
     if((addr & 0x00f00000) == 0x00f00000)
     {
@@ -373,26 +365,18 @@ void aml_w1_sdio_write_word(unsigned int addr, unsigned int data)
     }
     else
     {
-        aml_w1_sdio_write_sram(sdio_kmm,
-                                    (unsigned char*)(SYS_TYPE)(addr),
-                                    sizeof(unsigned int));
+        aml_w1_sdio_write_sram((unsigned char *)&data,
+            (unsigned char*)(SYS_TYPE)(addr), sizeof(unsigned int));
     }
-
-    kfree(sdio_kmm);
 }
 
 //cmd52
-int aml_w1_sdio_bottom_write8(unsigned char  func_num,int addr, unsigned char data)
+int aml_w1_sdio_bottom_write8(unsigned char  func_num, int addr, unsigned char data)
 {
     int ret = 0;
-    unsigned char *sdio_kmm = (unsigned char*)kzalloc(sizeof(data), GFP_DMA |GFP_ATOMIC);
 
-    ASSERT(sdio_kmm != NULL);
     ASSERT(func_num != SDIO_FUNC0);
-
-    memcpy(sdio_kmm, &data, sizeof(char));
-    ret =  _aml_w1_sdio_request_byte(func_num, SDIO_WRITE, addr, sdio_kmm);
-    kfree(sdio_kmm);
+    ret =  _aml_w1_sdio_request_byte(func_num, SDIO_WRITE, addr, &data);
 
     return ret;
 }
@@ -401,14 +385,8 @@ int aml_w1_sdio_bottom_write8(unsigned char  func_num,int addr, unsigned char da
 unsigned char aml_w1_sdio_bottom_read8(unsigned char  func_num, int addr)
 {
     unsigned char sramdata;
-    unsigned char* sdio_kmm = (unsigned char*)kmalloc(sizeof(unsigned char), GFP_DMA |GFP_ATOMIC);
-    ASSERT(sdio_kmm);
     
-    _aml_w1_sdio_request_byte(func_num, SDIO_READ, addr, sdio_kmm);
-    
-    memcpy(&sramdata, sdio_kmm, sizeof(unsigned char));
-    kfree(sdio_kmm);
-    
+    _aml_w1_sdio_request_byte(func_num, SDIO_READ, addr, &sramdata);
     return sramdata;
 }
 
@@ -419,30 +397,15 @@ unsigned char aml_w1_sdio_bottom_read8(unsigned char  func_num, int addr)
 */
 void aml_w1_sdio_bottom_write8_func0(unsigned long sram_addr, unsigned char sramdata)
 {
-    unsigned char * sdio_kmm = (unsigned char *)kzalloc(sizeof(unsigned char), GFP_DMA |GFP_ATOMIC);
-    ASSERT(sdio_kmm);
-
-    //__virt_to_phys((unsigned long)&sramdata);
-    //__phys_addr_symbol((unsigned long)&sramdata);
-   
-    memcpy(sdio_kmm, &sramdata, sizeof(unsigned char));
-    _aml_w1_sdio_request_byte(SDIO_FUNC0, SDIO_WRITE, sram_addr, sdio_kmm);
-
-    kfree(sdio_kmm);
+    _aml_w1_sdio_request_byte(SDIO_FUNC0, SDIO_WRITE, sram_addr, &sramdata);
 }
 
 //cmd52
 unsigned char aml_w1_sdio_bottom_read8_func0(unsigned long sram_addr)
 {
     unsigned char sramdata;
-    unsigned char* sdio_kmm = (unsigned char*)kzalloc(sizeof(unsigned char), GFP_DMA |GFP_ATOMIC);
-    ASSERT(sdio_kmm);
-    
-    _aml_w1_sdio_request_byte(SDIO_FUNC0, SDIO_READ, sram_addr, sdio_kmm);
 
-    memcpy( &sramdata, sdio_kmm,sizeof(unsigned char));
-
-    kfree(sdio_kmm);
+    _aml_w1_sdio_request_byte(SDIO_FUNC0, SDIO_READ, sram_addr, &sramdata);
     return sramdata;
 }
 
@@ -452,14 +415,8 @@ void aml_w1_sdio_write_cmd32(unsigned long sram_addr, unsigned long sramdata)
     aml_sdio_read_write(sram_addr&SDIO_ADDR_MASK,	(unsigned char *)&sramdata, 4,
                         SDIO_FUNC3,SDIO_RW_FLAG_WRITE,SDIO_F_SYNCHRONOUS);
 #elif defined (HAL_FPGA_VER)
-   unsigned char* sdio_kmm = (unsigned char*)kzalloc(sizeof(unsigned long), GFP_DMA|GFP_ATOMIC);
-   ASSERT(sdio_kmm != NULL);
-   memcpy(sdio_kmm, &sramdata, sizeof(unsigned long));
-   
-   g_w1_hif_ops.hi_bottom_write(SDIO_FUNC3, sram_addr&SDIO_ADDR_MASK,
-                                                 (unsigned char *)sdio_kmm, sizeof(unsigned long), SDIO_OPMODE_INCREMENT);
-
-   kfree(sdio_kmm);                                              
+    g_w1_hif_ops.hi_bottom_write(SDIO_FUNC3, sram_addr&SDIO_ADDR_MASK,
+        (unsigned char *)&sramdata, sizeof(unsigned long), SDIO_OPMODE_INCREMENT);
 #endif /* End of HAL_SIM_VER */
 }
 
@@ -479,6 +436,7 @@ int aml_w1_sdio_suspend(unsigned int suspend_enable)
     /* just clear sdio clock value for emmc init when resume */
     //amlwifi_set_sdio_host_clk(0);
 
+    AML_W1_BT_WIFI_MUTEX_ON();
     /* we shall suspend all card for sdio. */
     for (i = SDIO_FUNC1; i <= FUNCNUM_SDIO_LAST; i++)
     {
@@ -490,8 +448,10 @@ int aml_w1_sdio_suspend(unsigned int suspend_enable)
         if ((flags & MMC_PM_KEEP_POWER) != 0)
             ret = sdio_set_host_pm_flags(func, MMC_PM_KEEP_POWER);
 
-        if (ret != 0)
+        if (ret != 0) {
+            AML_W1_BT_WIFI_MUTEX_OFF();
             return -1;
+        }
 
         /*
          * if we don't use sdio irq, we can't get functions' capability with
@@ -501,9 +461,13 @@ int aml_w1_sdio_suspend(unsigned int suspend_enable)
         if ((flags & MMC_PM_WAKE_SDIO_IRQ) != 0)
             ret = sdio_set_host_pm_flags(func, MMC_PM_WAKE_SDIO_IRQ);
 
-        if (ret != 0)
+        if (ret != 0) {
+            AML_W1_BT_WIFI_MUTEX_OFF();
             return -1;
+        }
     }
+
+    AML_W1_BT_WIFI_MUTEX_OFF();
     return ret;
 }
 
@@ -517,13 +481,8 @@ unsigned long  aml_w1_sdio_read_reg8(unsigned long sram_addr )
 
 void   aml_w1_sdio_write_reg8(unsigned long sram_addr, unsigned long sramdata)
 {
-    unsigned char* sdio_kmm = (unsigned char*)kzalloc(sizeof(unsigned long), GFP_DMA |GFP_ATOMIC);
-
-    ASSERT(sdio_kmm);
-    memcpy(sdio_kmm, &sramdata, sizeof(unsigned long));
     g_w1_hif_ops.hi_bottom_write(SDIO_FUNC1, sram_addr&SDIO_ADDR_MASK,
-                                                   (unsigned char *)sdio_kmm, sizeof(unsigned long), SDIO_OPMODE_INCREMENT);
-    kfree(sdio_kmm);                                                   
+        (unsigned char *)&sramdata, sizeof(unsigned long), SDIO_OPMODE_INCREMENT);
 }
 
 unsigned long  aml_w1_sdio_read_reg32(unsigned long sram_addr)
@@ -591,7 +550,6 @@ int aml_w1_sdio_enable_scatter(void)
     hif_sdio->scatter_enabled = true;
 
     ret = amlw_w1_sdio_alloc_prep_scat_req(&g_w1_hwif_sdio);
-
     return ret;
 }
 
@@ -604,6 +562,7 @@ int aml_w1_sdio_scat_rw(struct scatterlist *sg_list, unsigned int sg_num, unsign
     struct sdio_func *func = aml_priv_to_func(func_num);
     int ret = 0;
 
+    AML_W1_BT_WIFI_MUTEX_ON();
     memset(&mmc_req, 0, sizeof(struct mmc_request));
     memset(&mmc_cmd, 0, sizeof(struct mmc_command));
     memset(&mmc_dat, 0, sizeof(struct mmc_data));
@@ -637,6 +596,7 @@ int aml_w1_sdio_scat_rw(struct scatterlist *sg_list, unsigned int sg_num, unsign
 	    ret  = mmc_cmd.error;
     }
 
+    AML_W1_BT_WIFI_MUTEX_OFF();
     return ret;
 }
 
@@ -682,7 +642,6 @@ void aml_w1_sdio_cleanup_scatter(void)
 
     /* empty the free list */
     kfree(hif_sdio->scat_req);
-
     printk("[sdio sg cleanup]: exit\n");
 
     return;
@@ -846,6 +805,7 @@ int  aml_w1_sdio_init(void)
 
 	err = sdio_register_driver(&aml_w1_sdio_driver);
 	w1_sdio_driver_insmoded = 1;
+	wifi_in_insmod = 0;
 	PRINT("*****************aml sdio common driver is insmoded********************\n");
 	if (err)
         	PRINT("failed to register sdio driver: %d \n", err);
@@ -863,6 +823,7 @@ void  aml_w1_sdio_exit(void)
     PRINT("*****************aml sdio common driver is rmmoded********************\n");
 }
 EXPORT_SYMBOL(w1_sdio_driver_insmoded);
+EXPORT_SYMBOL(wifi_in_insmod);
 EXPORT_SYMBOL(w1_sdio_after_porbe);
 EXPORT_SYMBOL(host_wake_w1_req);
 EXPORT_SYMBOL(host_suspend_req);
@@ -873,7 +834,7 @@ EXPORT_SYMBOL(host_resume_req);
 */
 void set_wifi_bt_sdio_driver_bit(bool is_register, int shift)
 {
-	mutex_lock(&wifi_bt_sdio_mutex);
+	AML_W1_BT_WIFI_MUTEX_ON();
 	if (is_register) {
 		w1_sdio_wifi_bt_alive |= (1 << shift);
 		PRINT("Insmod %s sdio driver!\n", (shift ? "WiFi":"BT"));
@@ -884,7 +845,7 @@ void set_wifi_bt_sdio_driver_bit(bool is_register, int shift)
 			aml_w1_sdio_exit();
 		}
 	}
-	mutex_unlock(&wifi_bt_sdio_mutex);
+	AML_W1_BT_WIFI_MUTEX_OFF();
 }
 EXPORT_SYMBOL(set_wifi_bt_sdio_driver_bit);
 EXPORT_SYMBOL(g_w1_hwif_sdio);
