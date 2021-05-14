@@ -220,6 +220,7 @@ int wifi_mac_pwrsave_send_nulldata(struct wifi_station *sta, unsigned char pwr_s
 int wifi_mac_pwrsave_is_sta_fullsleep (struct wlan_net_vif *wnet_vif);
 void wifi_mac_buffer_txq_flush(struct sk_buff_head *pstxqueue);
 int wifi_mac_buffer_txq_enqueue (struct sk_buff_head *pstxqueue, struct sk_buff *skb);
+int wifi_mac_forward_txq_enqueue (struct sk_buff_head *fwdtxqueue, struct sk_buff *skb);
 int wifi_mac_pwrsave_is_wnet_vif_sleeping (struct wlan_net_vif *wnet_vif);
 void wifi_mac_pwrsave_sta_trigger (struct wlan_net_vif *wnet_vif);
 int wifi_mac_buffer_txq_send_pre (struct wlan_net_vif *wnet_vif);

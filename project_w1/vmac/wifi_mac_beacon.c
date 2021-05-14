@@ -213,10 +213,8 @@ int _wifi_mac_beacon_update(struct wifi_station *sta,
     struct wifi_mac *wifimac = sta->sta_wmac;
     int len_changed = 0;
     unsigned short capinfo;
-#ifdef AML_APSTA_CONCURRENT
     struct wifi_channel *main_vmac_chan = NULL;
     unsigned char concurrent_set_channel = 1;
-#endif
 
     if (bo->bo_initial != 1)
     {
@@ -253,7 +251,8 @@ int _wifi_mac_beacon_update(struct wifi_station *sta,
             printk("%s:%d, not support bandwidth %d yet\n", __func__, __LINE__, wnet_vif->vm_bandwidth);
         }
 
-#ifdef AML_APSTA_CONCURRENT
+    if (IS_APSTA_CONCURRENT(aml_wifi_get_con_mode())) {
+
         if (wifi_mac_is_others_wnet_vif_running(wnet_vif) == true) {
             main_vmac_chan = wifi_mac_get_main_vmac_channel(wifimac);
 
@@ -311,12 +310,12 @@ int _wifi_mac_beacon_update(struct wifi_station *sta,
                 }
             }
         }
-#else
+    } else {
         if (wifi_mac_set_wnet_vif_channel(wnet_vif, wifimac->wm_doth_channel, wnet_vif->vm_bandwidth, center_chan) == false)
         {
             return 0;
         }
-#endif
+    }
         WIFINET_BEACON_LOCK(wifimac);
         wnet_vif->vm_chanchange_count = 0;
         wnet_vif->vm_flags &= ~WIFINET_F_CHANSWITCH;
@@ -596,10 +595,9 @@ int _wifi_mac_beacon_update(struct wifi_station *sta,
                 wnet_vif->vm_flags |= WIFINET_F_CHANSWITCH;
             }
         }
-        if (((jiffies - wifimac->wm_time_noht_present) >=
-             WIFINET_INACT_HT * HZ) &&
-            (wifimac->wm_flags_ext & WIFINET_F_NONHT_AP))
-        {
+
+        if (((jiffies - wifimac->wm_time_noht_present) >= WIFINET_INACT_HT * HZ)
+            && (wifimac->wm_flags_ext & WIFINET_F_NONHT_AP)) {
             wifimac->wm_flags_ext &= ~(WIFINET_F_NONHT_AP);
             wifi_mac_ht_prot(wifimac, sta, WIFINET_BEACON_UPDATE);
         }
@@ -633,11 +631,9 @@ int _wifi_mac_beacon_update(struct wifi_station *sta,
     }
     WIFINET_BEACON_UNLOCK(wifimac);
 #ifdef  CONFIG_P2P
-    if (wnet_vif->app_ie[WIFINET_APPIE_FRAME_BEACON].length &&
-#ifdef AML_APSTA_CONCURRENT
-        (wnet_vif->vm_opmode == WIFINET_M_P2P_DEV)&&
-#endif
-        (wnet_vif->vm_p2p->p2p_flag & P2P_NOA_START_FLAG_HI))
+    if (wnet_vif->app_ie[WIFINET_APPIE_FRAME_BEACON].length
+        && (wnet_vif->vm_p2p->p2p_enable == 1)
+        && (wnet_vif->vm_p2p->p2p_flag & P2P_NOA_START_FLAG_HI))
     {
         printk("%s(%d) noa_len %d\n",__func__,__LINE__,
             wnet_vif->app_ie[WIFINET_APPIE_FRAME_BEACON].length);
@@ -708,7 +704,7 @@ int wifi_mac_beacon_alloc(void * ieee, int wnet_vif_id)
     DPRINTF(AML_DEBUG_WARNING,"%s %d Put beacon to HW;  wnet_vif_id %d len %d Bcn init rate 0x%x flag %x\n",
             __func__,__LINE__,wnet_vif_id,len,bcn_rate,CHAN_BW_20M);
 
-    wifimac->drv_priv->drv_ops.Phy_PutBeaconBuf(wifimac->drv_priv,wnet_vif_id,os_skb_data(skbbuf),len,bcn_rate,CHAN_BW_20M);
+    wifimac->drv_priv->drv_ops.Phy_PutBeaconBuf(wifimac->drv_priv, wnet_vif_id, os_skb_data(skbbuf), len, bcn_rate, wnet_vif->vm_bandwidth);
     wifimac->drv_priv->drv_ops.Phy_SetBeaconStart(wifimac->drv_priv,wnet_vif_id,wnet_vif->vm_bcn_intval,0,wnet_vif->vm_opmode);
 
     WIFINET_BEACONBUF_UNLOCK(wifimac);
@@ -829,7 +825,8 @@ void wifi_mac_process_beacon_miss_ex(SYS_TYPE arg)
     */
     if (wnet_vif->vm_bmiss_count++ < WIFINET_BMISS_COUNT_MAX) {
         /*if not in roaming mode, triger roaming */
-        if (wifimac->wm_roaming == WIFINET_ROAMING_BASIC && wnet_vif->vm_chan_roaming_scan_flag != 1) {
+        if ((wifimac->wm_roaming == WIFINET_ROAMING_BASIC) && (wnet_vif->vm_chan_roaming_scan_flag != 1)
+             && (wnet_vif->vm_bmiss_count >= 2)) {
             printk("Miss beacon trigger roaming\n");
             wifi_mac_roaming_trigger(wnet_vif);
          }

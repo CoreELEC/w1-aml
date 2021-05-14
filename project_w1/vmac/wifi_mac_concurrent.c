@@ -212,7 +212,6 @@ unsigned char concurrent_check_is_vmac_same_pri_channel(struct wifi_mac *wifimac
     }
 }
 
-#ifdef AML_APSTA_CONCURRENT
 unsigned char concurrent_check_vmac_is_AP(struct wifi_mac *wifimac)
 {
     struct drv_private *drv_priv = wifimac->drv_priv;
@@ -236,7 +235,6 @@ struct wlan_net_vif *wifi_mac_running_main_wnet_vif(struct wifi_mac *wifimac)
 
     return NULL;
 }
-#endif
 
 struct wlan_net_vif *wifi_mac_running_wnet_vif(struct wifi_mac *wifimac)
 {

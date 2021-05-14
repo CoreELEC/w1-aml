@@ -39,8 +39,6 @@ struct wifi_mac_security;
 #define WIFINET_KEY_XMIT 0x01
 #define WIFINET_KEY_RECV 0x02
 #define WIFINET_KEY_GROUP 0x04
-#define WIFINET_KEY_MFP 0x08
-#define WIFINET_KEY_SWCRYPT 0x10
 #define WIFINET_KEY_SWMIC 0x20
 #define WIFINET_KEY_PERSTA 0x80
 #define WIFINET_KEY_NOFREE 0x40

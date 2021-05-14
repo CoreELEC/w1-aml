@@ -606,6 +606,60 @@ static void drv_tx_get_spec_frm_rate(struct drv_private *drv_priv, struct sk_buf
     ratectrl[0].trynum = retry_times;
 }
 
+static void drv_tx_lower_rate_when_signal_weak(struct wlan_net_vif *wnet_vif, struct drv_txdesc *ptxdesc)
+{
+    int i, power;
+    unsigned int rate = 0;
+    unsigned int sta_chbw = wnet_vif->vm_mainsta->sta_chbw;
+
+    power = translate_to_dbm(wnet_vif->vm_mainsta->sta_avg_rssi);
+
+    if (power < wnet_vif->vm_wmac->wm_signal_power_weak_thresh) {
+
+        if (WIFINET_IS_CHAN_2GHZ(wnet_vif->vm_curchan)) {
+
+            if (sta_chbw == WIFINET_BWC_WIDTH20)
+                rate = (power + 75 > 0) ? WIFI_11N_MCS3 : (power + 78 > 0) ? WIFI_11N_MCS2 : (power + 81 >0) ? WIFI_11N_MCS1 : \
+                (power + 95 > 0) ? WIFI_11N_MCS0 : (power + 98 >0) ? WIFI_11B_2M : WIFI_11B_1M;
+
+            else if (sta_chbw == WIFINET_BWC_WIDTH40)
+                rate = (power + 71 > 0) ? WIFI_11N_MCS3 : (power + 74 > 0) ? WIFI_11N_MCS2 : (power + 76 >0) ? WIFI_11N_MCS1 : \
+                (power + 95 > 0) ? WIFI_11N_MCS0 : (power + 97 >0) ? WIFI_11G_9M : (power + 99 > 0) ? WIFI_11B_2M : WIFI_11B_1M;
+
+            else
+                printk("%s, %d, bw-%d not found!\n", __func__, __LINE__, sta_chbw);
+
+        } else if (WIFINET_IS_CHAN_5GHZ(wnet_vif->vm_curchan)) {
+
+            if (sta_chbw == WIFINET_BWC_WIDTH20)
+                rate = (power + 75 > 0) ? WIFI_11AC_MCS3 : (power + 78 > 0) ? WIFI_11AC_MCS2 : (power + 81 >0) ? WIFI_11AC_MCS1 : \
+                (power + 95 > 0) ? WIFI_11AC_MCS0 : WIFI_11G_6M;
+
+            else if (sta_chbw == WIFINET_BWC_WIDTH40)
+                rate = (power + 73 > 0) ? WIFI_11AC_MCS3 : (power + 75 > 0) ? WIFI_11AC_MCS2 : (power + 77 >0) ? WIFI_11AC_MCS1 : \
+                (power + 95 > 0) ? WIFI_11AC_MCS0 : (power + 97 >0) ? WIFI_11G_9M : WIFI_11G_6M;
+
+            else if (sta_chbw == WIFINET_BWC_WIDTH80)
+                rate = (power + 76 > 0) ? WIFI_11AC_MCS8 : (power + 78 > 0) ? WIFI_11AC_MCS7 : (power + 84 >0) ? WIFI_11AC_MCS5 : \
+                (power + 89 > 0) ? WIFI_11AC_MCS4 : (power + 92 >0) ? WIFI_11AC_MCS0 : (power + 96 >0) ? WIFI_11G_12M : (power + 98 > 0) ? WIFI_11G_9M : WIFI_11G_6M;
+
+            else
+                printk("%s, %d, BW-%d not found!\n", __func__, __LINE__, sta_chbw);
+
+        }
+
+        for (i = 0 ; i < DRV_TXDESC_RATE_NUM - 1; i++) {
+            if (IS_MCS_RATE(rate)) {
+                ptxdesc->txdesc_rateinfo[i].vendor_rate_code &= 0xF0;
+                ptxdesc->txdesc_rateinfo[i].vendor_rate_code |= (rate & 0xF);
+                ptxdesc->txdesc_rateinfo[i].shortgi_en = 0;
+                } else {
+                    ptxdesc->txdesc_rateinfo[i].vendor_rate_code = rate;
+                }
+            }
+        }
+}
+
 static int drv_tx_prepare(struct drv_private *drv_priv, struct sk_buff *skbbuf,struct drv_txdesc *ptxdesc)
 {
     struct wifi_frame *wh;
@@ -724,7 +778,15 @@ static int drv_tx_prepare(struct drv_private *drv_priv, struct sk_buff *skbbuf,s
                                 txinfo->packetlen,txinfo->mpdulen);
                     }
                 }
+
+                if (IS_VHT_RATE(ratectrl[0].vendor_rate_code)) {
+                    *(unsigned short*)wh->i_seq = htole16(tid->seq_next << WIFINET_SEQ_SEQ_SHIFT);
+                    CIRCLE_Add_One(tid->seq_next, WIFINET_SEQ_MAX);
+                    seq_assign_flag = 1;
+                }
             }
+            if ((wnet_vif->vm_opmode == WIFINET_M_STA) && (!wnet_vif->vm_fixed_rate.mode))
+                drv_tx_lower_rate_when_signal_weak(wnet_vif, ptxdesc);
         }
     }
     else
@@ -746,8 +808,8 @@ static int drv_tx_prepare(struct drv_private *drv_priv, struct sk_buff *skbbuf,s
     ptxdesc->rate_valid = 1;
     txinfo->seqnum = *(unsigned short *)wh->i_seq >> WIFINET_SEQ_SEQ_SHIFT;   //seqnum
     //printk("%s vid:%d, sta:%p, tid:%d, sn:%04x, ampdu:%d, qos:%d, rate_code:%02x, frame_control:%04x, mcast:%d, data:%d, dhcp:%d, eap:%d\n",
-    //    __func__, wnet_vif->wnet_vif_id, sta, txinfo->tid_index, txinfo->seqnum, txinfo->b_Ampdu, txinfo->b_qosdata,
-    //    ratectrl->vendor_rate_code, *((unsigned short *)&(wh->i_fc[0])), txinfo->b_mcast, txinfo->b_datapkt, mac_pkt_info->b_EAP, mac_pkt_info->b_dhcp);
+        //__func__, wnet_vif->wnet_vif_id, sta, txinfo->tid_index, txinfo->seqnum, txinfo->b_Ampdu, txinfo->b_qosdata,
+       // ratectrl->vendor_rate_code, *((unsigned short *)&(wh->i_fc[0])), txinfo->b_mcast, txinfo->b_datapkt, mac_pkt_info->b_EAP, mac_pkt_info->b_dhcp);
 
     if (txinfo->b_pmf) {
         printk("%s vid:%d, sta:%p, sn:%04x, frame_control:%04x, mcast:%d\n",
@@ -2595,11 +2657,14 @@ static void drv_txampdu_tasklet(unsigned long arg)
     unsigned char i = 0;
     unsigned char wait_mpdu_timeout = drv_priv->wait_mpdu_timeout;
     unsigned char wait_mpdu_timeout_status_change = 0;
+    static int s_txampdu_send_flag = 0;
 
-    if (drv_priv->drv_config.cfg_txaggr == 0)
+    if (drv_priv->drv_config.cfg_txaggr == 0 || s_txampdu_send_flag)
     {
         return;
     }
+
+    s_txampdu_send_flag = 1;
 
     DRV_TX_TIMEOUT_LOCK(drv_priv);
     for (i = 0; i < HAL_WME_NOQOS; i++)
@@ -2618,12 +2683,13 @@ static void drv_txampdu_tasklet(unsigned long arg)
 
         if ((i == HAL_WME_AC_VO) && wait_mpdu_timeout_status_change) {
             /* BYPASS */
-        if (!drv_priv->always_mpdu_timeout)
             drv_priv->wait_mpdu_timeout = 0;
         }
         DRV_TXQ_UNLOCK(txlist);
     }
     DRV_TX_TIMEOUT_UNLOCK(drv_priv);
+
+    s_txampdu_send_flag = 0;
 }
 
 static void drv_tx_sched_aggr(struct drv_private *drv_priv, struct drv_txlist *txlist,
@@ -2656,7 +2722,6 @@ static void drv_tx_sched_aggr(struct drv_private *drv_priv, struct drv_txlist *t
                 if (HI_AGG_TXD_NUM_PER_QUEUE - hal_co_get_cnt >= drv_priv->drv_config.cfg_ampdu_subframes) {
                     __D(BIT(17), "%s wait more mpdu to form ampdu due to hal_co_get_cnt:%d\n",__func__, hal_co_get_cnt);
                     /* BYPASS */
-                    if (!drv_priv->always_mpdu_timeout)
                         drv_priv->wait_mpdu_timeout = 0;//wait another tx_ok or pending enough mpdu
                     break;
                 }
@@ -2696,7 +2761,6 @@ static void drv_tx_sched_aggr(struct drv_private *drv_priv, struct drv_txlist *t
         ptxdesc->txinfo->b_11n = 1;
 
         /* BYPASS */
-        if (!drv_priv->always_mpdu_timeout)
             drv_priv->wait_mpdu_timeout = 0;
 
         if (ptxdesc->txdesc_pktnum == 1)
@@ -3058,11 +3122,10 @@ void drv_set_ampduparams( struct drv_private *drv_priv,
 }
 
 int drv_tx_get_mgmt_frm_rate(struct drv_private *drv_priv,
-                struct wlan_net_vif *wnet_vif,
-                unsigned char fc_type,unsigned char *rate,unsigned short *flag )
+    struct wlan_net_vif *wnet_vif, unsigned char fc_type,unsigned char *rate,unsigned short *flag)
 {
-    if (drv_priv->drv_curchannel.chan_bw == WIFINET_BWC_WIDTH160
-        || drv_priv->drv_curchannel.chan_bw == WIFINET_BWC_WIDTH80P80)
+    if ((drv_priv->drv_curchannel.chan_bw == WIFINET_BWC_WIDTH160)
+        || (drv_priv->drv_curchannel.chan_bw == WIFINET_BWC_WIDTH80P80))
         printk("<running> %s %d, not support bandwidth %d\n",
             __func__, __LINE__, drv_priv->drv_curchannel.chan_bw);
 
@@ -3091,6 +3154,7 @@ int drv_tx_get_mgmt_frm_rate(struct drv_private *drv_priv,
             *rate = WIFI_11G_6M;
             *flag = CHAN_BW_20M;
             break;
+
         default:
             printk("<running> %s %d  vm_mac_mode =%d ERROR\n",__func__,__LINE__, wnet_vif->vm_mac_mode);
             break;

@@ -159,61 +159,61 @@ void hal_tx_desc_init(void)
     control->bit_time   = 262144;// = 2^18 / 1
     control->rts_rate   = WIFI_11B_1M;
     control->ack_rate  = WIFI_11B_1M;
-    control->tx_power = 3;
+    control->tx_power = 0;
 
     control = &our_rate_controls[ WIFI_11B_2M ];
     control->bit_time   = 131072;// = 2^18 / 2
     control->rts_rate   = WIFI_11B_2M;
     control->ack_rate  = WIFI_11B_2M;
-    control->tx_power = 3;
+    control->tx_power = 0;
 
     control = &our_rate_controls[ WIFI_11B_5M ];
     control->bit_time = 47662;// = 2^18/5.5 = 47662.545454...
     control->rts_rate = WIFI_11B_5M;
     control->ack_rate = WIFI_11B_5M;
-    control->tx_power = 3;
+    control->tx_power = 1;
 
     control = &our_rate_controls[ WIFI_11B_11M ];
     control->bit_time = 23831;// = 2^18/11 = 23831.272727...
     control->rts_rate = WIFI_11B_11M;
     control->ack_rate = WIFI_11B_11M;
-    control->tx_power = 3;
+    control->tx_power = 1;
 
     control = &our_rate_controls[ WIFI_11G_6M ];
     control->bit_time = 43690;// = 2^18/6 = 43690.666...
     control->rts_rate = WIFI_11G_6M;
     control->ack_rate = WIFI_11G_6M;
-    control->tx_power = 0;
+    control->tx_power = 2;
 
     control = &our_rate_controls[ WIFI_11G_9M ];
     control->bit_time = 29127;// = 2^18/9 = 29127.111...
     control->rts_rate = WIFI_11G_9M;
     control->ack_rate = WIFI_11G_9M;
-    control->tx_power = 0;
+    control->tx_power = 2;
 
     control = &our_rate_controls[ WIFI_11G_12M ];
     control->bit_time = 21845;// = 2^18/12 = 21845.333...
     control->rts_rate = WIFI_11G_12M;
     control->ack_rate = WIFI_11G_12M;
-    control->tx_power = 0;
+    control->tx_power = 2;
 
     control = &our_rate_controls[ WIFI_11G_18M ];
     control->bit_time = 14563;// = 2^18/18 = 14563.555...
     control->rts_rate = WIFI_11G_12M;
     control->ack_rate = WIFI_11G_12M;
-    control->tx_power = 0;
+    control->tx_power = 3;
 
     control = &our_rate_controls[ WIFI_11G_24M ];
     control->bit_time = 10922;// = 2^18/24 = 10922.666...
     control->rts_rate = WIFI_11G_12M;
     control->ack_rate = WIFI_11G_12M;
-    control->tx_power = 0;
+    control->tx_power = 3;
 
     control = &our_rate_controls[ WIFI_11G_36M ];
     control->bit_time = 7281;// = 2^18/36 = 7281.777...
     control->rts_rate = WIFI_11G_12M;
     control->ack_rate = WIFI_11G_12M;
-    control->tx_power = 0;
+    control->tx_power = 3;
 
     control = &our_rate_controls[ WIFI_11G_48M ];
     control->bit_time = 5461;// = 2^18/48 = 5461.333...
@@ -225,100 +225,100 @@ void hal_tx_desc_init(void)
     control->bit_time = 4854;// = 2^18/54 = 4854.518518518...
     control->rts_rate = WIFI_11G_12M;
     control->ack_rate = WIFI_11G_12M;
-    control->tx_power = 4;
+    control->tx_power = 5;
     //
     ///mcs
     //
     htmcs_control = &our_htmcs_controls[GET_HT_MCS(WIFI_11N_MCS0)];
     htmcs_control->rts_rate = WIFI_11G_6M;
     htmcs_control->ack_rate = WIFI_11N_MCS0;
-    htmcs_control->tx_power = 7;
+    htmcs_control->tx_power = 6;
 
     htmcs_control = &our_htmcs_controls[GET_HT_MCS(WIFI_11N_MCS1)];
     htmcs_control->rts_rate = WIFI_11G_12M;
     htmcs_control->ack_rate = WIFI_11N_MCS1;
-    htmcs_control->tx_power = 7;
+    htmcs_control->tx_power = 6;
 
     htmcs_control = &our_htmcs_controls[GET_HT_MCS(WIFI_11N_MCS2)];
     htmcs_control->rts_rate = WIFI_11G_12M;
     htmcs_control->ack_rate = WIFI_11N_MCS1;
-    htmcs_control->tx_power = 7;
+    htmcs_control->tx_power = 6;
 
     htmcs_control = &our_htmcs_controls[GET_HT_MCS(WIFI_11N_MCS3)];
     htmcs_control->rts_rate = WIFI_11G_24M;
     htmcs_control->ack_rate = WIFI_11N_MCS3;
-    htmcs_control->tx_power = 8;
+    htmcs_control->tx_power = 7;
 
     htmcs_control = &our_htmcs_controls[GET_HT_MCS(WIFI_11N_MCS4)];
     htmcs_control->rts_rate = WIFI_11G_24M;
     htmcs_control->ack_rate = WIFI_11N_MCS3;
-    htmcs_control->tx_power = 8;
+    htmcs_control->tx_power = 7;
 
     htmcs_control = &our_htmcs_controls[GET_HT_MCS(WIFI_11N_MCS5)];
     htmcs_control->rts_rate = WIFI_11G_24M;
     htmcs_control->ack_rate = WIFI_11N_MCS3;
-    htmcs_control->tx_power = 8;
+    htmcs_control->tx_power = 7;
 
     htmcs_control = &our_htmcs_controls[GET_HT_MCS(WIFI_11N_MCS6)];
     htmcs_control->rts_rate = WIFI_11G_24M;
     htmcs_control->ack_rate = WIFI_11N_MCS3;
-    htmcs_control->tx_power = 11;
+    htmcs_control->tx_power = 8;
 
     htmcs_control = &our_htmcs_controls[GET_HT_MCS(WIFI_11N_MCS7)];
     htmcs_control->rts_rate = WIFI_11G_24M;
     htmcs_control->ack_rate = WIFI_11N_MCS3;
-    htmcs_control->tx_power = 11;
+    htmcs_control->tx_power =9;
 
     //vht mcs
     vhtmcs_control = &our_vhtmcs_controls[GET_VHT_MCS(WIFI_11AC_MCS0)];
     vhtmcs_control->rts_rate = WIFI_11G_6M;
     vhtmcs_control->ack_rate = WIFI_11AC_MCS0;
-    vhtmcs_control->tx_power = 7;
+    vhtmcs_control->tx_power = 10;
 
     vhtmcs_control = &our_vhtmcs_controls[GET_VHT_MCS(WIFI_11AC_MCS1)];
     vhtmcs_control->rts_rate = WIFI_11G_12M;
     vhtmcs_control->ack_rate = WIFI_11AC_MCS1;
-    vhtmcs_control->tx_power = 7;
+    vhtmcs_control->tx_power = 10;
 
     vhtmcs_control = &our_vhtmcs_controls[GET_VHT_MCS(WIFI_11AC_MCS2)];
     vhtmcs_control->rts_rate = WIFI_11G_12M;
     vhtmcs_control->ack_rate = WIFI_11AC_MCS1;
-    vhtmcs_control->tx_power = 7;
+    vhtmcs_control->tx_power = 10;
 
     vhtmcs_control = &our_vhtmcs_controls[GET_VHT_MCS(WIFI_11AC_MCS3)];
     vhtmcs_control->rts_rate = WIFI_11G_24M;
     vhtmcs_control->ack_rate = WIFI_11AC_MCS3;
-    vhtmcs_control->tx_power = 8;
+    vhtmcs_control->tx_power = 11;
 
     vhtmcs_control = &our_vhtmcs_controls[GET_VHT_MCS(WIFI_11AC_MCS4)];
     vhtmcs_control->rts_rate = WIFI_11G_24M;
     vhtmcs_control->ack_rate = WIFI_11AC_MCS3;
-    vhtmcs_control->tx_power = 8;
+    vhtmcs_control->tx_power = 11;
 
     vhtmcs_control = &our_vhtmcs_controls[GET_VHT_MCS(WIFI_11AC_MCS5)];
     vhtmcs_control->rts_rate = WIFI_11G_24M;
     vhtmcs_control->ack_rate = WIFI_11AC_MCS3;
-    vhtmcs_control->tx_power = 8;
+    vhtmcs_control->tx_power = 11;
 
     vhtmcs_control = &our_vhtmcs_controls[GET_VHT_MCS(WIFI_11AC_MCS6)];
     vhtmcs_control->rts_rate = WIFI_11G_24M;
     vhtmcs_control->ack_rate = WIFI_11AC_MCS3;
-    vhtmcs_control->tx_power = 11;
+    vhtmcs_control->tx_power = 12;
 
     vhtmcs_control = &our_vhtmcs_controls[GET_VHT_MCS(WIFI_11AC_MCS7)];
     vhtmcs_control->rts_rate = WIFI_11G_24M;
     vhtmcs_control->ack_rate = WIFI_11AC_MCS3;
-    vhtmcs_control->tx_power = 12;
+    vhtmcs_control->tx_power = 13;
 
     vhtmcs_control = &our_vhtmcs_controls[GET_VHT_MCS(WIFI_11AC_MCS8)];
     vhtmcs_control->rts_rate = WIFI_11G_24M;
     vhtmcs_control->ack_rate = WIFI_11AC_MCS3;
-    vhtmcs_control->tx_power = 13;
+    vhtmcs_control->tx_power = 14;
 
     vhtmcs_control = &our_vhtmcs_controls[GET_VHT_MCS(WIFI_11AC_MCS9)];
     vhtmcs_control->rts_rate = WIFI_11G_24M;
     vhtmcs_control->ack_rate = WIFI_11AC_MCS3;
-    vhtmcs_control->tx_power = 14;
+    vhtmcs_control->tx_power = 15;
 
     DBG_EXIT();
 }

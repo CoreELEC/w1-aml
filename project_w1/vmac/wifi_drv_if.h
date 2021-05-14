@@ -497,6 +497,12 @@ static const unsigned char  all_countries_name[WIFI_country_MAX][3] =
     "JP",
     "IR",
     "MX",
+    "CA",
+    "IN",
+    "AU",
+    "NZ",
+    "BR",
+    "WW"
 };
 
 static inline void drv_hal_setretrynum(unsigned short retrynum)

@@ -265,45 +265,22 @@ void wifi_mac_scan_end(struct wifi_mac *wifimac);
 void wifi_mac_connect_start(struct wifi_mac *wifimac);
 void wifi_mac_connect_end(struct wifi_mac *wifimac);
 unsigned int wifi_mac_add_work_task(struct wifi_mac *wifimac,
-                                                        void *func,void *func_cb,
-                                                        SYS_TYPE param1, 
-                                                        SYS_TYPE param2,
-                                                        SYS_TYPE param3,
-                                                        SYS_TYPE param4,
-                                                        SYS_TYPE param5);
-void wifi_mac_com_ps_set_state(struct wifi_mac *wifimac, 
-                                                                enum wifinet_ps_state newstate, 
-                                                                 int wnet_vif_id);
-void wifi_mac_set_ampduparams(struct wifi_station *sta);
-void wifi_mac_addba_req_setup(struct wifi_station *sta,
-                                unsigned char tid_index,
-                                struct wifi_mac_ba_parameterset *baparamset,
-                                unsigned short *batimeout,
-                                struct wifi_mac_ba_seqctrl *basequencectrl,
-                                unsigned short buffersize
-                               );
-void wifi_mac_addba_rsp_setup(struct wifi_station *sta,
-                                 unsigned char tid_index,
-                                 unsigned char *dialogtoken, unsigned short *statuscode,
-                                 struct wifi_mac_ba_parameterset *baparamset,
-                                 unsigned short *batimeout
-                                );
-int wifi_mac_addba_req(struct wifi_station *sta,
-                                 unsigned char dialogtoken,
-                                 struct wifi_mac_ba_parameterset *baparamset,
-                                 unsigned short batimeout,
-                                 struct wifi_mac_ba_seqctrl basequencectrl
-                                );
+    void *func,void *func_cb, SYS_TYPE param1, SYS_TYPE param2, SYS_TYPE param3, SYS_TYPE param4, SYS_TYPE param5);
 
-void wifi_mac_addba_rsp(struct wifi_station *sta,
-                                   unsigned short statuscode,
-                                   struct wifi_mac_ba_parameterset *baparamset,
-                                   unsigned short batimeout
-                                  );
-void wifi_mac_delba(struct wifi_station *sta,
-                           struct wifi_mac_delba_parameterset *delbaparamset,
-                           unsigned short reasoncode
-                          );
+void wifi_mac_com_ps_set_state(struct wifi_mac *wifimac, enum wifinet_ps_state newstate, int wnet_vif_id);
+void wifi_mac_set_ampduparams(struct wifi_station *sta);
+void wifi_mac_addba_req_setup(struct wifi_station *sta, unsigned char tid_index,
+    struct wifi_mac_ba_parameterset *baparamset, unsigned short *batimeout, struct wifi_mac_ba_seqctrl *basequencectrl, unsigned short buffersize);
+
+void wifi_mac_addba_rsp_setup(struct wifi_station *sta, unsigned char tid_index,
+    unsigned char *dialogtoken, unsigned short *statuscode, struct wifi_mac_ba_parameterset *baparamset, unsigned short *batimeout);
+int wifi_mac_addba_req(struct wifi_station *sta, unsigned char dialogtoken,
+    struct wifi_mac_ba_parameterset *baparamset, unsigned short batimeout, struct wifi_mac_ba_seqctrl basequencectrl);
+
+void wifi_mac_addba_rsp(struct wifi_station *sta, unsigned short statuscode,
+    struct wifi_mac_ba_parameterset *baparamset, unsigned short batimeout);
+
+void wifi_mac_delba(struct wifi_station *sta, struct wifi_mac_delba_parameterset *delbaparamset, unsigned short reasoncode);
 void wifi_mac_config(struct wifi_mac *wifimac, int paramid,int data);
 int wifi_mac_get_config(struct wifi_mac *wifimac, int paramid);
 void wifi_mac_set_txpower_limit(struct wifi_mac *wifimac, unsigned int limit, unsigned short txpowerdb);
@@ -328,35 +305,27 @@ int wifi_mac_get_netif_cfg(void *);
 void *wifi_mac_alloc_ndev(unsigned int len);
 void wifi_mac_free_vmac(void *netif);
 struct wlan_net_vif * wifi_mac_get_wnet_vif_by_vid(struct wifi_mac *wifimac, int wnet_vif_id);
-void    wifi_mac_com_vattach(struct wlan_net_vif *);
-void    wifi_mac_com_vdetach(struct wlan_net_vif *);
-void    wifi_mac_notify_queue_status(struct wifi_mac *wifimac, unsigned int qqcnt);
-void    wifi_mac_ht_prot(struct wifi_mac *wifimac, struct wifi_station *sta, enum wifi_mac_ht_prot_update_flag flag);
-void    wifi_mac_reset_vmac(struct wlan_net_vif *wnet_vif);
-void    wifi_mac_reset_tspecs(struct wlan_net_vif *wnet_vif);
-void    wifi_mac_reset_ht(struct wifi_mac *wifimac);
-void    wifi_mac_reset_vht(struct wifi_mac *wifimac);
-void    wifi_mac_reset_erp(struct wifi_mac *, enum wifi_mac_macmode);
-void    wifi_mac_set_shortslottime(struct wifi_mac *, int onoff);
-
-
-void    wifi_mac_change_cbw(struct wifi_mac *wifimac, int to20);
-
-
-void    wifi_mac_wme_initparams(struct wlan_net_vif *);
-void    wifi_mac_wme_initparams_locked(struct wlan_net_vif *);
-void    wifi_mac_wme_updateparams(struct wlan_net_vif *);
-void    wifi_mac_wme_updateparams_locked(struct wlan_net_vif *);
-
+void wifi_mac_com_vattach(struct wlan_net_vif *);
+void wifi_mac_com_vdetach(struct wlan_net_vif *);
+void wifi_mac_notify_queue_status(struct wifi_mac *wifimac, unsigned int qqcnt);
+void wifi_mac_ht_prot(struct wifi_mac *wifimac, struct wifi_station *sta, enum wifi_mac_ht_prot_update_flag flag);
+void wifi_mac_reset_vmac(struct wlan_net_vif *wnet_vif);
+void wifi_mac_reset_tspecs(struct wlan_net_vif *wnet_vif);
+void wifi_mac_reset_ht(struct wifi_mac *wifimac);
+void wifi_mac_reset_vht(struct wifi_mac *wifimac);
+void wifi_mac_reset_erp(struct wifi_mac *, enum wifi_mac_macmode);
+void wifi_mac_set_shortslottime(struct wifi_mac *, int onoff);
+void wifi_mac_change_cbw(struct wifi_mac *wifimac, int to20);
+void wifi_mac_wme_initparams(struct wlan_net_vif *);
+void wifi_mac_wme_initparams_locked(struct wlan_net_vif *);
+void wifi_mac_wme_updateparams(struct wlan_net_vif *);
+void wifi_mac_wme_updateparams_locked(struct wlan_net_vif *);
 int wifi_mac_open(struct net_device *);
 int wifi_mac_initial(struct net_device *, int force);
 int wifi_mac_stop(struct net_device *);
-void    wifi_mac_stop_running(struct wifi_mac *);
+void wifi_mac_stop_running(struct wifi_mac *);
 int wifi_mac_top_sm(struct wlan_net_vif *,enum wifi_mac_state, int);
-
 enum hal_op_mode wifi_mac_opmode_2_halmode(enum wifi_mac_opmode opmode);
-
-
 int wifi_mac_create_vmac(struct wifi_mac *wifimac, void *ifr,int cmdFromwhr);
 int wifi_mac_device_ip_config(struct wlan_net_vif *wnet_vif, void *event);
 void wifi_mac_tbtt_handle(struct wlan_net_vif *wnet_vif);
@@ -368,11 +337,10 @@ void wnet_vif_vht_cap_init( struct wlan_net_vif *wnet_vif );
 int wifi_mac_setup(struct wifi_mac *, struct wlan_net_vif *, int opmode);
 void wifi_mac_init_ops (struct wifi_mac* wmac);
 
-
 int vm_wlan_net_vif_setup_forchvif(struct wifi_mac *wifimac, struct wlan_net_vif *wnet_vif, const char *name,  int opmode);
 int vm_wlan_net_vif_register(struct wlan_net_vif *, char *);
-void    vm_wlan_net_vif_unregister(struct wlan_net_vif *);
-void    wifi_mac_build_country_ie(struct wifi_mac *);
+void vm_wlan_net_vif_unregister(struct wlan_net_vif *);
+void wifi_mac_build_country_ie(struct wlan_net_vif *);
 int wifi_mac_get_new_vmac_id(struct wifi_mac *wifimac);
 void wifi_mac_delt_vmac_id(struct wifi_mac *wifimac,int vid);
 enum wifi_mac_macmode p2p_phy_mode_filter (enum wifi_mac_macmode in);
@@ -387,6 +355,5 @@ void wifi_mac_pt_rx_stop(void);
 struct wifi_mac* wifi_mac_get_mac_handle(void);
 void wifi_mac_restore_wnet_vif_channel_task(struct wlan_net_vif *wnet_vif);
 void wifi_mac_roaming_trigger(struct wlan_net_vif * wnet_vif);
-
 
 #endif

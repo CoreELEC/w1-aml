@@ -188,11 +188,10 @@ static __inline void FREE(void *a, char *name)
 #ifndef MIN
 #define MIN(a, b)               ((a) < (b) ? a : b)
 #endif
+
 #ifndef MAX
 #define MAX(a, b)               ((a) > (b) ? a : b)
 #endif
-
-
 
 #ifndef NBBY
 #define NBBY    8           /* number of bits/byte */
@@ -209,10 +208,6 @@ static __inline void FREE(void *a, char *name)
 #ifndef offsetof
 #define offsetof(type, field)   ((size_t)(&((type *)0)->field))
 #endif
-
-
-#define NBBY    8           /* number of bits/byte */
-#define howmany(x, y)   (((x)+((y)-1))/(y))
 
 /* Bit map related macros. */
 #define setbit(a,i) ((a)[(i)/NBBY] |= 1<<((i)%NBBY))

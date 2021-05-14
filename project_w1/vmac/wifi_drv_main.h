@@ -313,6 +313,7 @@ struct drv_config
     unsigned char cfg_mfp;
     unsigned char cfg_eat_count_max;
     unsigned short cfg_aggr_thresh;
+    unsigned short cfg_no_aggr_thresh;
     unsigned char cfg_hrtimer_interval;
 };
 
@@ -508,6 +509,7 @@ struct driver_ops
 
     void (*drv_interface_enable)(unsigned char enable, unsigned char vid);
     void (*drv_cfg_cali_param)(void);
+    void (*drv_print_fwlog)(unsigned char *logbuf_ptr, int databyte);
 } ;
 
 struct drv_powersave
@@ -552,7 +554,6 @@ struct drv_private
     unsigned int drv_not_init_flag  ;/* not be initial */
     unsigned char drv_scanning      ;/*wifi_mac layer at  scanning  */
     unsigned char drv_connetting      ;/*wifi_mac layer at  drv_connetting  */
-    unsigned char always_mpdu_timeout;
     unsigned char wait_mpdu_timeout;
     unsigned char add_wakeup_work;
     unsigned char drv_pkt_drop[2];
@@ -569,6 +570,7 @@ struct drv_private
     struct drv_powersave drv_ps;
     struct os_timer_ext drv_txtimer;
     struct tasklet_struct ampdu_tasklet;
+    struct tasklet_struct forward_tasklet;
 
     enum prot_mode drv_protect_mode;    /* protection mode */
     unsigned char drv_protect_rateindex;     /* protection rate index */

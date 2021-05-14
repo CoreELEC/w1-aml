@@ -66,10 +66,6 @@ int wifi_mac_security_req(struct wlan_net_vif *wnet_vif, int cipher, int flags, 
     oflags = key->wk_flags;
     flags &= WIFINET_KEY_COMMON;
 
-    if ((wnet_vif->vm_caps & (1 << cipher)) == 0) {
-        flags |= WIFINET_KEY_SWCRYPT;
-    }
-
     if (cipher == WIFINET_CIPHER_TKIP) {
         flags |= WIFINET_KEY_SWMIC;
     }
@@ -1004,24 +1000,16 @@ int wifi_mac_key_set(struct wlan_net_vif *wnet_vif, const struct wifi_mac_key *k
         struct wifi_station *sta;
         if (opmode == WIFINET_M_STA)
         {
-            sta = vm_StaAtomicInc(wnet_vif->vm_mainsta, __func__);
+            sta = wnet_vif->vm_mainsta;
         }
         else
             sta = wifi_mac_get_sta(&wnet_vif->vm_sta_tbl, mac,wnet_vif->wnet_vif_id);
+
         if (sta)
         {
             sta->sta_flags |= WIFINET_NODE_TKIPCIPHER;
             printk("<running> %s %d \n",__func__,__LINE__);
-            wifi_mac_FreeNsta(sta);
         }
-    }
-
-    if ((k->wk_flags & WIFINET_KEY_MFP) && (opmode == WIFINET_M_STA))
-    {
-        hk.kv_type = HAL_KEY_TYPE_CLEAR;
-        DPRINTF( AML_DEBUG_KEY, "<running> %s %d \n",__func__,__LINE__);
-        status = (wifimac->drv_priv->drv_ops.key_set(wifimac->drv_priv,
-                    wnet_vif->wnet_vif_id, k->wk_clearkeyix, &hk, NULL) != 0);
     }
 
 done:

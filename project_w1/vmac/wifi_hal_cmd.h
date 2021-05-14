@@ -80,7 +80,7 @@ unsigned int phy_set_coexist_scan_priority_range( unsigned int coexist_scan_prio
 unsigned int phy_set_coexist_be_bk_noqos_priority_range( unsigned int coexist_scan_priority_range);
 unsigned int phy_infor_bt_wifi_work_freq(unsigned int enable_infor_bt_wifi_req);
 unsigned int phy_interface_enable(unsigned char enable, unsigned char vid);
-unsigned int hal_set_fwlog_cmd(unsigned char enable);
+unsigned int hal_set_fwlog_cmd(unsigned char mode);
 unsigned int hal_cfg_cali_param(void);
 
 #endif  //__AML_PHY_H__

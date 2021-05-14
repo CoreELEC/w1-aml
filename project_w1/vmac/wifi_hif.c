@@ -680,7 +680,7 @@ unsigned char hi_set_cmd(unsigned char *pdata,unsigned int len)
     if (((hal_priv->powersave_init_flag == 0) && (pscmd.Cmd == Power_Save_Cmd) && (pscmd.psmode == PS_DOZE))
         || ((hal_priv->powersave_init_flag == 0) && (suspend_cmd.Cmd == WoW_Enable_Cmd) && (suspend_cmd.enable == 1)))
     {
-        //unsigned int tmpreg = 0;
+        unsigned int tmpreg = 0;
 
 #ifdef PROJECT_T9026
         tmpreg = hif->hif_ops.hif_aon_read_reg(WIFI_RG_AON_CFG4);
@@ -688,12 +688,10 @@ unsigned char hi_set_cmd(unsigned char *pdata,unsigned int len)
         tmpreg |= BIT(1);
         aml_aon_write_reg(WIFI_RG_AON_CFG4, tmpreg);
 #elif defined (PROJECT_W1)
-#if 0
         tmpreg = hif->hif_ops.hi_bottom_read8(SDIO_FUNC1, RG_SDIO_PMU_HOST_REQ);
         // set host sleep req
         tmpreg |= HOST_SLEEP_REQ;
         hif->hif_ops.hi_bottom_write8(SDIO_FUNC1, RG_SDIO_PMU_HOST_REQ, tmpreg);
-#endif
 #endif
     }
 

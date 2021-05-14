@@ -247,54 +247,54 @@ unsigned int support_legacy_rate_init( struct wifi_station *sta ,  struct ieee80
     for( i = 0; i<sta->sta_rates.dot11_rate_num; i++){
         switch(sta->sta_rates.dot11_rate[i]&0x7f){
             case 0x02: /*1M*/
-                bit_val |= 0x1; 
+                bit_val |= 0x1;
                 break;
-                
+
             case 0x04:  /*2M*/
-                  bit_val |= 0x2; 
+                  bit_val |= 0x2;
                 break;
-                
-            case 0x16:   /*5.5M*/
-                bit_val |= 0x4 ;
+
+            case 0x0b:   /*5.5M*/
+                bit_val |= 0x4;
                 break;
-                
-            case 0x0b: /*11M*/
-                 bit_val |= 0x8; 
+
+            case 0x16: /*11M*/
+                 bit_val |= 0x8;
                 break;
-                
+
             case 0x0c:  /*6M*/
-                 bit_val |= 0x10; 
+                 bit_val |= 0x10;
                 break;
-                
+
             case 0x12:  /*9M*/
-                  bit_val |= 0x20; 
+                  bit_val |= 0x20;
                 break;
-                
+
             case 0x18: /*12M*/
-                bit_val |= 0x40; 
+                bit_val |= 0x40;
                 break;
-                
+
             case 0x24: /*18M*/
-                bit_val |= 0x80; 
+                bit_val |= 0x80;
                 break;
-                
+
             case 0x30:   /*24M*/
-                 bit_val |= 0x100; 
+                 bit_val |= 0x100;
                 break;
-                
+
             case 0x48:   /*36M*/
-                bit_val |= 0x200; 
+                bit_val |= 0x200;
                 break;
-                
+
             case 0x60:   /*48M*/
-                bit_val |= 0x400; 
+                bit_val |= 0x400;
                 break;
-                
+
             case 0x6c:   /*54M*/
-                bit_val |= 0x800; 
+                bit_val |= 0x800;
                 break;
             default :
-                printk("funciton%s, line%d input rate error\n", __func__, __LINE__);
+                printk("%s, %d input rate error\n", __func__, __LINE__);
                break;
         }
     }
@@ -306,10 +306,10 @@ unsigned int support_legacy_rate_init( struct wifi_station *sta ,  struct ieee80
         p_ieee_sta->supp_rates[IEEE80211_BAND_5GHZ] = (bit_val >> 4);
 
     } else {
-        printk("funciton%s, line%d input channel_band error\n", __func__, __LINE__);
+        printk("%s, %d input channel_band error\n", __func__, __LINE__);
     }
 
-    printk("funciton%s, line%d channel_band=%d, bit_val=0x%04x\n", __func__, __LINE__, channel_band, bit_val);
+    printk("%s, %d channel_band=%d, bit_val=0x%04x\n", __func__, __LINE__, channel_band, bit_val);
     return 0;
 }
 

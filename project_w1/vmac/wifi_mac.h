@@ -164,9 +164,9 @@ enum wifi_mac_roamingmode
     WIFINET_ROAMING_FAST    = 2,
 };
 
-#define DEFAULT_ROAMING_THRESHOLD_2G -72
-#define DEFAULT_ROAMING_THRESHOLD_5G -76
-#define ROAMING_TRIGER_COUNT         5
+#define DEFAULT_ROAMING_THRESHOLD_2G -75
+#define DEFAULT_ROAMING_THRESHOLD_5G -78
+#define ROAMING_TRIGER_COUNT         10
 
 
 enum wifi_mac_tx_status_mode
@@ -221,6 +221,20 @@ struct country_set
 {
     int country;
     struct county_global_map opt_idx_map[MAX_CLASS_NUM];
+};
+
+#define MAX_NA_FREQ_NUM (5)
+struct country_na_freq_info
+{
+    char g_operating_class;
+    unsigned short na_freq[MAX_NA_FREQ_NUM];
+};
+
+struct country_na_freq_set
+{
+    int country;
+    int na_freq_class_num;
+    struct country_na_freq_info na_freq_info[5];
 };
 
 #define MAX_P2PIE_NUM         4
@@ -929,36 +943,35 @@ enum
 
 struct wifi_mac_ie_htinfo_cmn
 {
-    unsigned char  hi_ctrlchannel;
+    unsigned char hi_ctrlchannel;
 #if _BYTE_ORDER == _BIG_ENDIAN
-    unsigned char  hi_serviceinterval : 3,
-    hi_ctrlaccess      : 1,
-    hi_rifsmode        : 1,
-    hi_txchwidth       : 1,
-    hi_extchoff        : 2;
+    unsigned char hi_serviceinterval: 3,
+    hi_ctrlaccess: 1,
+    hi_rifsmode: 1,
+    hi_txchwidth: 1,
+    hi_extchoff: 2;
 #else
-    unsigned char    hi_extchoff        : 2,
-    hi_txchwidth       : 1,
-    hi_rifsmode        : 1,
-    hi_ctrlaccess      : 1,
-    hi_serviceinterval : 3;
+    unsigned char hi_extchoff: 2,
+    hi_txchwidth: 1,
+    hi_rifsmode: 1,
+    hi_ctrlaccess: 1,
+    hi_serviceinterval: 3;
 #endif
 #if _BYTE_ORDER == _BIG_ENDIAN
-    unsigned short   hi_chan_center_freq_seg2       : 11,
+    unsigned short reserved1: 11,
     hi_obssnonhtpresent: 1,
-    hi_txburstlimit    : 1,
-    hi_nongfpresent    : 1,
-    hi_opmode          : 2;
+    reserved2: 1,
+    hi_nongfpresent: 1,
+    hi_opmode: 2;
 #else
-    unsigned short   hi_opmode          : 2,
-    hi_nongfpresent    : 1,
-    hi_txburstlimit    : 1,
+    unsigned short hi_opmode: 2,
+    hi_nongfpresent: 1,
+    reserved2: 1,
     hi_obssnonhtpresent: 1,
-    hi_chan_center_freq_seg2       : 11;
+    reserved1: 11;
 #endif
-    unsigned short   hi_miscflags;
-
-    unsigned char  hi_basicmcsset[16];
+    unsigned short hi_miscflags;
+    unsigned char hi_basicmcsset[16];
 } __packed;
 
 struct wifi_mac_ie_htinfo
@@ -1040,6 +1053,7 @@ enum
     WIFINET_ELEMID_2040_COEXT = 72,
     WIFINET_ELEMID_2040_INTOL = 73,
     WIFINET_ELEMID_OBSS_SCAN = 74,
+    WIFINET_ELEMID_TIM_BROADCAST_REQ = 94,
     WIFINET_ELEMID_EXTCAP = 127,
     WIFINET_ELEMID_TPC = 150,
     WIFINET_ELEMID_CCKM = 156,

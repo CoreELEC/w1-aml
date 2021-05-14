@@ -14,29 +14,29 @@ int support_idx[WIFI_country_MAX +1][20] = {
     {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},//WIFI_Israel
     {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},//WIFI_Mexico
     {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},//WIFI_Canada
-    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},//WIFI_India
+    {17,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,128,0,0},//WIFI_India
     {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},//WIFI_Australia
     {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},//WIFI_NewZealand
     {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},//WIFI_Brazil
-    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}, //WIFI_WW
+    {18,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,128,0}, //WIFI_WW
     {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}//WIFI_country_MAX
 };
 
-int dfs_channel_list[WIFI_country_MAX +1][20] = {
-    {4,52,56,60,64,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},//WIFI_China -0
-    {15,52,56,60,64,100,104,108,112,116,120,124,128,132,136,140,0,0,0,0},//WIFI_NorthAmerica
-    {15,52,56,60,64,100,104,108,112,116,120,124,128,132,136,140,0,0,0,0},//WIFI_Europe
-    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},//WIFI_France
-    {15,52,56,60,64,100,104,108,112,116,120,124,128,132,136,140,0,0,0,0},//WIFI_Japan
-    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},//WIFI_Israel
-    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},//WIFI_Mexico
-    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},//WIFI_Canada
-    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},//WIFI_India
-    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},//WIFI_Australia
-    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},//WIFI_NewZealand
-    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},//WIFI_Brazil
-    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},//WIFI_WW
-    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}//WIFI_country_MAX
+int dfs_channel_list[WIFI_country_MAX +1][25] = {
+    {4,52,56,60,64,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},//WIFI_China -0
+    {15,52,56,60,64,100,104,108,112,116,120,124,128,132,136,140,0,0,0,0,0,0,0,0,0},//WIFI_NorthAmerica
+    {15,52,56,60,64,100,104,108,112,116,120,124,128,132,136,140,0,0,0,0,0,0,0,0,0},//WIFI_Europe
+    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},//WIFI_France
+    {15,52,56,60,64,100,104,108,112,116,120,124,128,132,136,140,0,0,0,0,0,0,0,0,0},//WIFI_Japan
+    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},//WIFI_Israel
+    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},//WIFI_Mexico
+    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},//WIFI_Canada
+    {11,52,56,60,64,120,124,128,132,136,140,144,0,0,0,0,0,0,0,0,0,0,0,0,0},//WIFI_India
+    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},//WIFI_Australia
+    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},//WIFI_NewZealand
+    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},//WIFI_Brazil
+    {23,12,13,52,56,60,64,100,104,108,112,116,120,124,128,132,136,140,144,149,153,157,161,165,0},//WIFI_WW
+    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}//WIFI_country_MAX
 };
 
 struct class_chan_set global_chan_set [256] =
@@ -212,7 +212,7 @@ struct class_chan_set global_chan_set [256] =
     }//128
 };
 
-struct country_set all_cnty_set [8] =
+struct country_set all_cnty_set [10] =
 {
     //CN
     {0, {
@@ -309,14 +309,117 @@ struct country_set all_cnty_set [8] =
                {0,0}
            }
     },
-    //MAX
+    //CA
     {7, {
-               {0,0},
-               {0,0},
-               {0,0}
+            {0,0},
+            {0,0},
+            {0,0}
+        }
+    },
+    //IN
+    {8, {
+            {1,115},
+            {2,118},
+            {3,124},
+            {4,121},
+            {5,125},
+            {6,116},
+            {7,119},
+            {8,122},
+            {9,126},
+            {10,117},
+            {11,120},
+            {12,123},
+            {13,127},
+            {14,81},
+            {15,83},
+            {16,84},
+            {128,128}
+        }
+    },
+    //WW
+    {12, {
+            {1,115},
+            {2,118},
+            {3,124},
+            {4,121},
+            {5,125},
+            {7,116},
+            {8,119},
+            {9,122},
+            {10,126},
+            {11,117},
+            {12,120},
+            {13,123},
+            {14,127},
+            {15,81},
+            {16,83},
+            {17,84},
+            {128,128}
+          }
+    }
+};
+
+struct country_na_freq_set all_cnty_na_freq_set [9] =
+{
+    //CN
+    {0, 1, {
+               {128, {CHAN_2_FREQ_5G(106), CHAN_2_FREQ_5G(122), CHAN_2_FREQ_5G(138), 0}}
+           }
+    },
+    //US
+    {1, 3, {
+               {81, {CHAN_2_FREQ_2G(12), CHAN_2_FREQ_2G(13), 0}},
+               {83, {CHAN_2_FREQ_2G(8 + 2), CHAN_2_FREQ_2G(9 + 2), 0}},
+               {84, {CHAN_2_FREQ_2G(12 - 2), CHAN_2_FREQ_2G(13 - 2), 0}}
+          }
+    },
+    //E.R
+    {2, 4, {
+               {121, {CHAN_2_FREQ_5G(144), 0}},
+               {122, {CHAN_2_FREQ_5G(140 + 2), 0}},
+               {123, {CHAN_2_FREQ_5G(144 - 2), 0}},
+               {128, {CHAN_2_FREQ_5G(138), CHAN_2_FREQ_5G(155), 0}}
+           }
+    },
+    //FR
+    {3, 0, {
+               {0,{0}}
+           }
+    },
+    //JP
+    {4, 4, {
+               {121, {CHAN_2_FREQ_5G(144), 0}},
+               {122, {CHAN_2_FREQ_5G(140 + 2), 0}},
+               {123, {CHAN_2_FREQ_5G(144 - 2), 0}},
+               {128, {CHAN_2_FREQ_5G(138), CHAN_2_FREQ_5G(155), 0}}
+           }
+    },
+    //ISR
+    {5, 0, {
+               {0,{0}}
+           }
+    },
+    //MEXI
+    {6, 0, {
+               {0,{0}}
+           }
+    },
+    //CA
+    {7, 0, {
+               {0,{0}}
+           }
+    },
+    //IN
+    {8, 4, {
+                {121, {CHAN_2_FREQ_5G(100), CHAN_2_FREQ_5G(104), CHAN_2_FREQ_5G(108), CHAN_2_FREQ_5G(112), CHAN_2_FREQ_5G(116)}},
+                {122, {CHAN_2_FREQ_5G(100+2), CHAN_2_FREQ_5G(108+2), CHAN_2_FREQ_5G(116+2), 0}},
+                {123, {CHAN_2_FREQ_5G(104-2), CHAN_2_FREQ_5G(112-2), CHAN_2_FREQ_5G(120-2), 0}},
+                {128, {CHAN_2_FREQ_5G(106), CHAN_2_FREQ_5G(122), 0}}
            }
     }
 };
+
 
 static int  wifi_mac_get_pos(struct wifi_channel in[], int a, int b)
 {
@@ -398,7 +501,48 @@ void  wifi_mac_get_opt_set_by_country(int country_code, int support_opt[], int s
     }
 }
 
-void  wifi_mac_select_chan_from_global(int sub_set[], int num,struct wifi_mac *wifimac)
+static int wifi_mac_check_if_na_freq(int country_code, int global_class, int freq)
+{
+    struct country_na_freq_set *na_freq_set = NULL;
+    struct country_na_freq_info *na_freq_info = NULL;
+    int na_freq_class_num = 0;
+    int i = 0;
+
+    /*find country*/
+    for (i = 0; i < ARR_SIZE_OF(all_cnty_na_freq_set); i++) {
+        if (all_cnty_na_freq_set[i].country == country_code) {
+            na_freq_set = &all_cnty_na_freq_set[i];
+            na_freq_class_num = all_cnty_na_freq_set[i].na_freq_class_num;
+            break;
+        }
+    }
+
+    /*find global class*/
+    if (na_freq_set) {
+       for (i = 0; i < na_freq_class_num; i++) {
+           if (na_freq_set->na_freq_info[i].g_operating_class == global_class) {
+               na_freq_info = &na_freq_set->na_freq_info[i];
+           }
+       }
+    }
+
+    /*find freq*/
+    if (na_freq_info) {
+        for (i = 0; i < MAX_NA_FREQ_NUM; i++) {
+           if (na_freq_info->na_freq[i] == freq) {
+               return 1;
+           }
+
+           if (na_freq_info->na_freq[i] == 0) {
+               break;
+           }
+       }
+    }
+
+    return 0;
+}
+
+void  wifi_mac_select_chan_from_global(int country_code, int sub_set[], int num,struct wifi_mac *wifimac)
 {
     int i = 0;
     int j = 0;
@@ -421,6 +565,10 @@ void  wifi_mac_select_chan_from_global(int sub_set[], int num,struct wifi_mac *w
         for (j = 0; j < ARR_SIZE_OF(global_chan_set); j++) {
             if (sub_set[i] == global_chan_set[j].opt_idx) {
                 for (k = 0; k < global_chan_set[j].sub_num ; k++) {
+                    if (wifi_mac_check_if_na_freq(country_code, global_chan_set[j].opt_idx, global_chan_set[j].chan_sub_set[k].chan_cfreq1) == 1) {
+                        continue;
+                    }
+
                     if (global_chan_set[j].chan_sub_set[k].chan_bw == WIFINET_BWC_WIDTH20) {
                         chn_idx_20M = global_chan_set[j].chan_sub_set[k].chan_pri_num;
 
@@ -472,7 +620,7 @@ void  wifi_mac_select_chan_from_global(int sub_set[], int num,struct wifi_mac *w
 #endif
 }
 
-void wifi_mac_mark_dfs_channel(int country_code, struct wifi_mac *wifimac, int chan_num)
+void wifi_mac_mark_dfs_channel_ex(int country_code, struct wifi_mac *wifimac, int chan_num)
 {
     int i = 0;
     int j = 0;
@@ -499,7 +647,7 @@ void wifi_mac_mark_dfs_channel(int country_code, struct wifi_mac *wifimac, int c
     }
 }
 
-void wifi_mac_unmark_dfs_channel(int country_code, struct wifi_mac *wifimac, int chan_num)
+void wifi_mac_unmark_dfs_channel_ex(int country_code, struct wifi_mac *wifimac, int chan_num)
 {
     int i = 0;
 
@@ -512,7 +660,7 @@ void wifi_mac_unmark_dfs_channel(int country_code, struct wifi_mac *wifimac, int
     }
 }
 
-int wifi_mac_if_dfs_channel(struct wifi_mac *wifimac,int chan_num)
+int wifi_mac_if_dfs_channel(struct wifi_mac *wifimac, int chan_num)
 {
     int i = 0;
 
@@ -530,28 +678,28 @@ int wifi_mac_if_dfs_channel(struct wifi_mac *wifimac,int chan_num)
     return 0;
 }
 
-void wifi_mac_enable_dfs_channel(struct wlan_net_vif *wnet_vif, int chan_num)
+void wifi_mac_unmark_dfs_channel(struct wlan_net_vif *wnet_vif, int chan_num)
 {
     struct wifi_mac *wifimac = wnet_vif->vm_wmac;
     struct drv_private* drv_priv =  wifimac->drv_priv;
     int country_code = drv_priv->drv_config.cfg_countrycode;
 
     WIFI_CHANNEL_LOCK(wifimac);
-    wifi_mac_unmark_dfs_channel(country_code,wifimac,chan_num);
+    wifi_mac_unmark_dfs_channel_ex(country_code, wifimac, chan_num);
     WIFI_CHANNEL_UNLOCK (wifimac);
 }
 
-void wifi_mac_disable_dfs_channel(struct wlan_net_vif *wnet_vif, int chan_num)
+void wifi_mac_mark_dfs_channel(struct wlan_net_vif *wnet_vif, int chan_num)
 {
     struct wifi_mac *wifimac = wnet_vif->vm_wmac;
     struct drv_private* drv_priv =  wifimac->drv_priv;
     int country_code = drv_priv->drv_config.cfg_countrycode;
 
     WIFI_CHANNEL_LOCK(wifimac);
-    wifi_mac_mark_dfs_channel(country_code, wifimac,chan_num);
+    wifi_mac_mark_dfs_channel_ex(country_code, wifimac, chan_num);
     WIFI_CHANNEL_UNLOCK(wifimac);
 
-    if (wnet_vif->vm_opmode == WIFINET_M_STA && wifimac->wm_nrunning == 1) {
+    if ((wnet_vif->vm_opmode == WIFINET_M_STA) && (wifimac->wm_nrunning == 1)) {
         if (wifi_mac_if_dfs_channel(wifimac, wnet_vif->vm_curchan->chan_pri_num) == 1) {
             printk("current channel %d is dfs channel \n", wnet_vif->vm_curchan->chan_pri_num);
             wnet_vif->vm_chan_roaming_scan_flag = 0;
@@ -574,8 +722,8 @@ void  wifi_mac_update_chan_list_by_country(int country_code, int support_opt[], 
     wifimac->wm_nchans = 0;
 
     wifi_mac_get_opt_set_by_country(country_code, support_opt, support_num, opt_idx, &opt_num);
-    wifi_mac_select_chan_from_global(opt_idx, opt_num,wifimac);
-    wifi_mac_mark_dfs_channel(country_code, wifimac, 0);
+    wifi_mac_select_chan_from_global(country_code, opt_idx, opt_num,wifimac);
+    wifi_mac_mark_dfs_channel_ex(country_code, wifimac, 0);
 }
 
 unsigned char wifi_mac_chan_num_availd (struct wifi_mac *wifimac, unsigned char channum)
@@ -877,6 +1025,16 @@ void wifi_mac_chan_setup(void * ieee, unsigned int wMode, int countrycode_ex)
             support_num = support_idx[WIFI_Japan][0];
             support_ptr = &support_idx[WIFI_Japan][1];
              break;
+
+        case WIFI_India:
+            support_num = support_idx[WIFI_India][0];
+            support_ptr = &support_idx[WIFI_India][1];
+            break;
+
+        case WIFI_WW:
+            support_num = support_idx[WIFI_WW][0];
+            support_ptr = &support_idx[WIFI_WW][1];
+            break;
 
         default:
            printk("%s(%d) NOT support this country 0x%x\n", __func__, __LINE__, countrycode_ex);

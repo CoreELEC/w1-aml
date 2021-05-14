@@ -111,8 +111,7 @@ static void  wifi_mac_pwrsave_wakeup_ex(SYS_TYPE param1,
 
     wifi_mac_pwrsave_sleep_wait_cancle(wnet_vif);
     wifi_mac_pwrsave_wakeup(wnet_vif, WKUP_FROM_TRANSMIT);
-    if ((wnet_vif->vm_opmode == WIFINET_M_STA)
-        && (wnet_vif->vm_state == WIFINET_S_CONNECTED))
+    if ((wnet_vif->vm_opmode == WIFINET_M_STA) && (wnet_vif->vm_state == WIFINET_S_CONNECTED))
     {
 #ifdef CONFIG_P2P
         if (wnet_vif->vm_p2p->p2p_flag & P2P_OPPPS_START_FLAG_HI)
@@ -342,9 +341,8 @@ void wifi_mac_pwrsave_set_mode(struct wlan_net_vif *wnet_vif, unsigned int mode)
     DPRINTF(AML_DEBUG_PWR_SAVE, "<%s>%s %d mode %d->%d\n",
         VMAC_DEV_NAME(wnet_vif),__func__,__LINE__, wnet_vif->vm_pwrsave.ips_sta_psmode, mode);
 
-    if (wnet_vif->vm_opmode != WIFINET_M_STA
-        || mode > WIFINET_PWRSAVE_MAXIMUM
-        || mode == wnet_vif->vm_pwrsave.ips_sta_psmode)
+    if ((wnet_vif->vm_opmode != WIFINET_M_STA) || (mode > WIFINET_PWRSAVE_MAXIMUM)
+        || (mode == wnet_vif->vm_pwrsave.ips_sta_psmode))
         return;
 
     if (mode == WIFINET_PWRSAVE_NONE)
@@ -500,12 +498,12 @@ void wifi_mac_pwrsave_latevattach(struct wlan_net_vif *wnet_vif)
 
     if (wnet_vif->vm_opmode == WIFINET_M_HOSTAP)
     {
-        wnet_vif->vm_tim_len = howmany(wnet_vif->vm_max_aid,8) * sizeof(unsigned char);
+        wnet_vif->vm_tim_len = howmany(wnet_vif->vm_max_aid, 8) * sizeof(unsigned char);
         wnet_vif->vm_tim_bitmap = (unsigned char *)NET_MALLOC(wnet_vif->vm_tim_len,
             GFP_ATOMIC, "wnet_vif->vm_tim_bitmap");
-        if (wnet_vif->vm_tim_bitmap == NULL)
-        {
-            DPRINTF(AML_DEBUG_DEBUG,"%s: no memory for TIM bitmap!\n", __func__);
+
+        if (wnet_vif->vm_tim_bitmap == NULL) {
+            DPRINTF(AML_DEBUG_WARNING, "%s: no memory for TIM bitmap!\n", __func__);
             wnet_vif->vm_tim_len = 0;
         }
         wnet_vif->vm_ps_pending = 0;
@@ -726,6 +724,15 @@ int wifi_mac_buffer_txq_enqueue (struct sk_buff_head *pstxqueue, struct sk_buff 
     return 0;
 }
 
+int wifi_mac_forward_txq_enqueue (struct sk_buff_head *fwdtxqueue, struct sk_buff *skb)
+{
+    WIFINET_SAVEQ_LOCK(fwdtxqueue);
+    WIFINET_SAVEQ_ENQUEUE(fwdtxqueue, skb);
+    WIFINET_SAVEQ_UNLOCK(fwdtxqueue);
+    return 0;
+}
+
+
 static int wifi_mac_buffer_txq_send(struct sk_buff_head *pstxqueue)
 {
     struct sk_buff *skb = NULL;
@@ -814,7 +821,6 @@ void wifi_mac_pwrsave_send_pspoll(struct wifi_station *sta)
         DPRINTF(AML_DEBUG_ERROR,"<%s> %s, alloc skb fail \n", VMAC_DEV_NAME(wnet_vif), __func__);
         return;
     }
-    vm_StaAtomicInc(sta, __func__);
     cb = (struct wifi_skb_callback *)skb->cb;
     cb->sta = sta;
     cb->flags = 0;
@@ -966,10 +972,6 @@ void wifi_mac_pwrsave_check_ps_end(void * ieee,
             return;
         }
     }
-    else
-    {
-        vm_StaAtomicInc(sta, __func__);
-    }
 
     wnet_vif = sta->sta_wnet_vif;
     ps = &wnet_vif->vm_pwrsave;
@@ -978,7 +980,6 @@ void wifi_mac_pwrsave_check_ps_end(void * ieee,
         || (wifi_mac_pwrsave_is_sta_sleeping(wnet_vif) != 0)
         || ((qwh->i_fc[0] & WIFINET_FC0_TYPE_MASK) != WIFINET_FC0_TYPE_DATA))
     {
-        wifi_mac_FreeNsta(sta);
         return;
     }
 
@@ -1008,7 +1009,6 @@ void wifi_mac_pwrsave_check_ps_end(void * ieee,
                 if (ps->ips_flag_uapsd_trigger == 1)
                 {
                     ps->ips_flag_uapsd_trigger = 0;
-                    wifi_mac_FreeNsta(sta);
                     return;
                 }
                 else
@@ -1102,7 +1102,6 @@ void wifi_mac_pwrsave_check_ps_end(void * ieee,
         WIFINET_PWRSAVE_UNLOCK(wnet_vif);
     }
 
-    wifi_mac_FreeNsta(sta);
     return;
 }
 
@@ -1474,10 +1473,6 @@ void wifi_mac_pwrsave_chk_uapsd_trig(void * ieee,
             return;
         }
     }
-    else
-    {
-        vm_StaAtomicInc(sta, __func__);
-    }
 
     wnet_vif = sta->sta_wnet_vif;
     qwh = (struct wifi_qos_frame *) os_skb_data(skbbuf);
@@ -1560,7 +1555,6 @@ void wifi_mac_pwrsave_chk_uapsd_trig(void * ieee,
         }
     }
 end:
-    wifi_mac_FreeNsta(sta);
     return;
 }
 

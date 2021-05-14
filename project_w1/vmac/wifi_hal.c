@@ -135,12 +135,14 @@ unsigned char hal_chk_replay_cnt(struct hal_private *hal_priv,HW_RxDescripter_bi
         }
         PN = &hal_priv->uRepCnt[wnet_vif_id][staid].rxPN[AccessCategory][0];
     }
+
     switch (RxPrivHdr->RxDecryptType)
     {
         case RX_PHY_TKIP:
         case RX_PHY_CCMP:
             repcnt_my = (unsigned long long *)PN;
             repcnt_rx = (unsigned long long *)RxPrivHdr->PN;
+
             if (*repcnt_my < *repcnt_rx)    //not require "+1", just require increase
             {
                 memcpy(PN,RxPrivHdr->PN,MAX_PN_LEN);
@@ -220,7 +222,8 @@ void hal_soft_rx_cs(struct hal_private *hal_priv, OS_SKBBUF *skb)
         {
             if (hal_chk_replay_cnt(hal_priv,RxPrivHdr_bit)== false)
             {
-                    //PRINT("Hal replay cnt check error ! \n");
+                OS_SKBBUF_FREE(skb);
+                return;
             }
         }
 
@@ -1912,7 +1915,6 @@ int hal_probe()
     }
 #endif
 
-    PRINT("-----start download firmware\n");
     if(hal_download_wifi_fw_img() != true)
     {
         goto __exit_err;
@@ -2016,23 +2018,15 @@ int hal_host_init(struct hal_private *hal_priv)
 
     hif = hif_get_hw_interface();
 
-    PRINT("%s \n", __func__);
-
     ret = hal_get_did(hif);
-    if (ret == false)
-    {
+    if (ret == false) {
         goto exit;
     }
 
     hif->CmdDownFifo.FDH = 0;
     hif->CmdDownFifo.FDT = 0;
-
-    hif->CmdDownFifo.FDN =
-        hif->hif_ops.hi_read_word(CMD_DOWN_FIFO_FDN_ADDR);
-
-    hif->CmdDownFifo.FDB =
-        hif->hif_ops.hi_read_word(CMD_DOWN_FIFO_FDB_ADDR);
-
+    hif->CmdDownFifo.FDN = hif->hif_ops.hi_read_word(CMD_DOWN_FIFO_FDN_ADDR);
+    hif->CmdDownFifo.FDB = hif->hif_ops.hi_read_word(CMD_DOWN_FIFO_FDB_ADDR);
     hif->CmdDownFifo.FCB = CMD_DOWN_FIFO_CTRL_ADDR;
     hif->CmdDownFifo.FDL = APP_CMD_PERFIFO_LEN;
 
@@ -2040,8 +2034,7 @@ int hal_host_init(struct hal_private *hal_priv)
     hi_rx_fifo_init();
 #endif
 
-    for (queueid=0; queueid < HAL_NUM_TX_QUEUES; queueid++)
-    {
+    for (queueid=0; queueid < HAL_NUM_TX_QUEUES; queueid++) {
         CO_SharedFifoInit(&(hal_priv->txds_trista_fifo[queueid]),
             (SYS_TYPE)&hal_priv->txds_trista_fifo_buf[HI_AGG_TXD_NUM_PER_QUEUE *queueid],
             (void *)&hal_priv->txds_trista_fifo_buf[HI_AGG_TXD_NUM_PER_QUEUE *queueid],
@@ -2051,14 +2044,14 @@ int hal_host_init(struct hal_private *hal_priv)
     memset((unsigned char *)&hif->HiStatus,0,sizeof(struct hi_status));
 
     hif->hif_ops.hi_write_sram((unsigned char*)&rfmode,
-            (unsigned char*)HOST_VERSION_ADDR, sizeof(rfmode));
+        (unsigned char*)HOST_VERSION_ADDR, sizeof(rfmode));
 
     ///inital phy interrupt time
     Irq_Time.MaxTimerOut = 200;/*ms*/  //old is 200
     Irq_Time.MinInterval = 1;/*ms*/  //old is 1
 
     hif->hif_ops.hi_write_sram((unsigned char*)&Irq_Time,
-            (unsigned char*)FW_IRQ_TIME_ADDR, sizeof(Irq_Time));
+        (unsigned char*)FW_IRQ_TIME_ADDR, sizeof(Irq_Time));
 
     hal_get_vid(hif);
     hal_get_chip_id();
@@ -2069,8 +2062,7 @@ int hal_host_init(struct hal_private *hal_priv)
 
     //read config
     hif->hif_ops.hi_read_sram((unsigned char *)&hif->hw_config,
-    (unsigned char *)HW_CONFIG_ADDR,sizeof(HW_CONFIG));
-
+        (unsigned char *)HW_CONFIG_ADDR,sizeof(HW_CONFIG));
     hal_priv->txPageFreeNum = hif->hw_config.txpagenum;
 
     PRINT("hal_priv->beaconframeaddress  0x%x \n",hif->hw_config.beaconframeaddress);
@@ -2079,8 +2071,7 @@ int hal_host_init(struct hal_private *hal_priv)
     PRINT("hal_priv->txPageFreeNum 0x%x \n",hif->hw_config.txpagenum );
 
     /*set Rx SRAM Buffer start addr for func6*/
-    hif->hif_ops.hi_write_reg32(RG_SCFG_SRAM_FUNC6,
-            (SYS_TYPE)hif->hw_config.rxframeaddress);
+    hif->hif_ops.hi_write_reg32(RG_SCFG_SRAM_FUNC6, (SYS_TYPE)hif->hw_config.rxframeaddress);
 
     /*frame flag bypass for function4
       BIT(8)=1, w/o setting address.
@@ -2111,7 +2102,6 @@ int hal_host_init(struct hal_private *hal_priv)
     /*
       Bit(6)=1, for func6 update host read ptr by sdio rtl
     */
-
     reg_tmp = hif->hif_ops.hi_read_word(RG_SDIO_IF_MISC_CTRL2);
 
 #if SDIO_UPDATE_HOST_RDPTR
@@ -2235,9 +2225,6 @@ int hal_init_priv(void)
    HI_DRIVER_INIT();
 #endif
     hal_priv->hst_if_init_ok = 1;
-
-    printk(" %s(%d) txPageFreeNum %d bhalOpen 0x%x\n",
-                __func__, __LINE__,hal_priv->txPageFreeNum, hal_priv->bhalOpen);
 
     DBG_EXIT();
     return 0;
@@ -2663,7 +2650,8 @@ int hal_rx_thread(void *param)
             sn =  (sn << 4) | ((*(pVRxDesc->data + 22) & 0xf0) >> 4);
 
             if (frame_control != 0x80) {
-                __D(BIT(17), "%s:%d, frame type:0x%x, seq:%d\n", __func__, __LINE__, frame_control, sn);
+                __D(BIT(17), "%s:%d, frame type:0x%x, seq:%d, %04x:%04x\n", __func__, __LINE__, frame_control, sn, 
+                    *((unsigned short *)(pVRxDesc->data) + 15), *((unsigned short *)(pVRxDesc->data) + 16));
             } else {
                 //__D(BIT(17), "%s:%d, beacon:0x%x, seq:%d\n", __func__, __LINE__, frame_control, sn);
             }
@@ -3362,19 +3350,17 @@ void hal_dpd_calibration(void)
 #endif
 }
 
-void hal_print_fwlog(void)
+unsigned char fwlog_buf[SRAM_FWLOG_BUFFER_LEN] = {0};
+void hal_get_fwlog(void)
 {
     struct hw_interface *hif = hif_get_hw_interface();
     unsigned int addr = SRAM_FWLOG_BUFFER;
-    unsigned char* sdio_kmm = NULL;
     int databyte = SRAM_FWLOG_BUFFER_LEN;
     unsigned int reg_tmp;
-    unsigned char *buf_ptr = NULL;
+    struct drv_private *drv_priv = drv_get_drv_priv();
 
-    //set ram share
-    hif->hif_ops.hi_write_word(0x00a0d0e4, 0x8000007f);
+    memset(fwlog_buf, 0, sizeof(fwlog_buf));
 
-    printk("fw_log:\n");
     /*
      * make sure function 5 section address-mapping feature is disabled,
      * when this feature is disabled,
@@ -3391,19 +3377,10 @@ void hal_print_fwlog(void)
     /*config msb 15 bit address in BaseAddr Register*/
     hif->hif_ops.hi_write_reg32(RG_SCFG_FUNC5_BADDR_A, addr & 0xfffe0000);
 
-    sdio_kmm = (unsigned char*)ZMALLOC(databyte, "fwlog memory", GFP_DMA | GFP_ATOMIC);
-    ASSERT(sdio_kmm != NULL);
-    hif->hif_ops.bt_hi_read_sram(sdio_kmm,
+    hif->hif_ops.bt_hi_read_sram((unsigned char*)fwlog_buf,
         (unsigned char*)(SYS_TYPE)(addr & 0x1ffff), databyte);
 
-    buf_ptr = sdio_kmm;
-    while (databyte--)
-    {
-        printk("%c", *buf_ptr);
-        buf_ptr++;
-    }
-
-    FREE(sdio_kmm, "fwlog memory");
+    drv_priv->drv_ops.drv_print_fwlog(fwlog_buf, databyte);
 }
 
 #ifdef HAL_SIM_VER

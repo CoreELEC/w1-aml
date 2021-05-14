@@ -175,8 +175,8 @@ extern struct _B2B_Platform_Conf gB2BPlatformConf;
 #endif
 
 #if defined (FPGA) ||defined (CHIP)
-#define PRINT(...)      do {printk("wifiHAL->");printk( __VA_ARGS__ );}while(0)
-#define PRINT_ERR(...)      do {printk("wifiHAL->");printk( __VA_ARGS__ );}while(0)
+#define PRINT(...)      do {printk( __VA_ARGS__ );}while(0)
+#define PRINT_ERR(...)      do {printk( __VA_ARGS__ );}while(0)
 #define PUTC( character )   printk("%c" ,character )
 #define PUTX8(size, value)    printk("%02x", value);
 #define PUTU8(value)            printk("%u", value);

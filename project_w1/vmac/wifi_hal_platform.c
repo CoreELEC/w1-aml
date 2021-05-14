@@ -28,10 +28,9 @@ struct platform_wifi_gpio amlhal_gpio =
 
 #if (USE_GPIO_IRQ==1)
     .gpio_irq = GPIOX_7, //235, //GPIOX_7
-    //.gpio_irq_mode = WIFI_GPIO_IRQ_LOW,
-    .gpio_irq_mode = WIFI_GPIO_IRQ_FALLING,
+    .gpio_irq_mode = WIFI_GPIO_IRQ_LOW,
     .irq_num = 97,
-    .filter_num = FILTER_NUM1,
+    .filter_num = FILTER_NUM4,
     .clk_sel = GPIOX_20,//GPIOY_15,//GPIOX_19,
 #endif
 
@@ -40,21 +39,19 @@ struct platform_wifi_gpio amlhal_gpio =
 #endif
 
 };
-
+extern int wifi_irq_trigger_level(void);
+extern int wifi_irq_num(void);
 #if (USE_GPIO_IRQ==1)
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(3,14,29)
 int platform_wifi_request_gpio_irq (void *data)
 {
-    unsigned int gpio = amlhal_gpio.gpio_irq;
-    unsigned int irq_num = amlhal_gpio.irq_num ;
+    unsigned int irq_num = wifi_irq_num();
     int ret = -1;
     int irq_trigger_type, irq_flag;
-    int flag;
 
     irq_flag = IRQF_DISABLED;
-
-    DPRINTF(AML_DEBUG_INFO, "%s(%d) irq_flag=0x%x gpio=%d irq=%d\n", 
-            __func__, __LINE__, irq_flag, gpio, irq_num);
+    amlhal_gpio.gpio_irq_mode = wifi_irq_trigger_level();
+    amlhal_gpio.irq_num = irq_num;
     switch (amlhal_gpio.gpio_irq_mode)
     {
         case WIFI_GPIO_IRQ_FALLING:
@@ -75,26 +72,7 @@ int platform_wifi_request_gpio_irq (void *data)
     }
     do
     {
-        ret = gpio_request(gpio, OWNER_NAME);
-        if (ret < 0){
-            gpio_free(gpio);
-            ret = gpio_request(gpio, OWNER_NAME); //retry
-            printk("%s(%d) gpio irq again request fail ret=%d\n", __func__, __LINE__, ret);
-        }
-
-        ret = gpio_direction_input(gpio);
-        if (ret < 0)
-            DPRINTF(AML_DEBUG_ERROR,"%s(%d) input gpio failed, ret=%d\n",__func__,__LINE__, ret);
-        
-        ret = gpio_set_pullup(gpio, 1);
-        if (ret < 0)
-            DPRINTF(AML_DEBUG_ERROR,"%s(%d) gpio disable failed, ret=%d\n",__func__,__LINE__, ret);
-        
-        irq_flag = AML_GPIO_IRQ((irq_num - GPIO_IRQ0), amlhal_gpio.filter_num, irq_trigger_type);
-        flag = gpio_for_irq(gpio,irq_flag);
-        if (flag < 0)
-            DPRINTF(AML_DEBUG_ERROR,"%s(%d) gpio to irq failed, ret=%d\n",__func__,__LINE__, flag);
-
+        irq_flag = AML_GPIO_IRQ(irq_num, amlhal_gpio.filter_num, irq_trigger_type);
         msleep(10);
         printk("irq_num %d irq_trigger_type %d irq_flag 0x%08x\n",irq_num,irq_trigger_type,irq_flag);
         ret  = request_irq(irq_num, hal_irq_top, irq_flag, "WIFI_INT", data);
@@ -107,8 +85,6 @@ exit:
 }
 
 #else
-extern int wifi_irq_trigger_level(void);
-extern int wifi_irq_num(void);
 
 int platform_wifi_request_gpio_irq (void *data)
 {
@@ -262,7 +238,6 @@ void hi_change_sram_concurrent_mode(void)
     regdata &= ~BIT(31);
     hif->hif_ops.hi_write_word(RG_INTF_RTC_CLK_CTRL, regdata);
 
-    PRINT("share ram  0x%x\n",regdata);
     PRINT("++++++SRAM 64K++++++++++ \n");
 #else //#if  (SRAM_16KMODE ==0)
 
@@ -270,7 +245,6 @@ void hi_change_sram_concurrent_mode(void)
     regdata |= BIT(31);
     hif->hif_ops.hi_write_word(RG_INTF_RTC_CLK_CTRL, regdata);
 
-    PRINT("share ram  0x%x\n",regdata);
     PRINT("++++++SRAM 16K++++++++++ \n");
 #endif  //SRAM_CONCURRENT
 #endif
@@ -461,8 +435,8 @@ unsigned char hal_set_sys_clk(int clockdiv)
 #ifdef HAL_FPGA_VER
 unsigned char hal_set_sys_clk_for_fpga(void)
 {
-	hi_change_sram_concurrent_mode();
-	return 1;
+    hi_change_sram_concurrent_mode();
+    return 1;
 }
 
 unsigned int bbpll_init(void)
@@ -583,8 +557,8 @@ void wifi_cpu_clk_switch(unsigned int clk_cfg)
     struct hw_interface   *hif = hif_get_hw_interface();
     hif->hif_ops.hi_write_word(RG_INTF_CPU_CLK,clk_cfg);
 
-	printk("%s(%d):cpu_clk_reg=0x%08x\n", __func__, __LINE__, 
-		hif->hif_ops.hi_read_word(RG_INTF_CPU_CLK));
+    printk("%s(%d):cpu_clk_reg=0x%08x\n", __func__, __LINE__, 
+        hif->hif_ops.hi_read_word(RG_INTF_CPU_CLK));
 }
 
 #endif
@@ -625,29 +599,23 @@ unsigned char hal_download_wifi_fw_img(void)
 #endif
 
 #ifdef HAL_FPGA_VER
-    printk("%s(%d): no called hal_set_sys_clk\n", __func__, __LINE__);
     hif->hif_ops.hi_write_reg32(RG_SCFG_SRAM_FUNC,MAC_REG_BASE);
-
 
     rg_dpll_a5.data = aml_aon_read_reg(RG_DPLL_A5);
     /*bpll not init*/
-    if ( rg_dpll_a5.b.ro_wifi_bb_pll_done != 1 )
-    {
+    if (rg_dpll_a5.b.ro_wifi_bb_pll_done != 1) {
         bbpll_init();
         bbpll_start();
         printk("bbpll  init ok!\n");
 
-    }
-    else
-    {
+    } else {
         printk("bbpll  already init,not need to init!\n");
     }
 
-	
     hal_set_sys_clk_for_fpga();
     hif->hif_ops.hi_write_reg32(RG_SCFG_SRAM_FUNC,MAC_ICCM_AHB_BASE);
     len = ALIGN(sizeof(fwICCM),4);
-    printk("%s(%d): img len 0x%x\n", __func__, __LINE__, len);
+    printk("%s(%d): img len 0x%x, start download fw\n", __func__, __LINE__, len);
 #else
     hif->hif_ops.hi_write_reg32(RG_SCFG_SRAM_FUNC,MAC_REG_BASE);
     hal_set_sys_clk(10);
@@ -662,10 +630,8 @@ unsigned char hal_download_wifi_fw_img(void)
      */
     offset = ICCM_ROM_LEN;
     len -= ICCM_ROM_LEN;
-    PRINT("start download iccm ram\n");
 #else
     offset = 0;
-    PRINT("start download iccm rom and ram\n");
 #endif
 
     do
@@ -674,26 +640,21 @@ unsigned char hal_download_wifi_fw_img(void)
         if((offset + databyte) >= MAX_OFFSET)
         {
             offset_base += offset;
-            PRINT("ICCM offset=0x%x offset_base=0x%x\n",offset,offset_base);
             hif->hif_ops.hi_write_reg32(RG_SCFG_SRAM_FUNC, MAC_ICCM_AHB_BASE + offset_base);
             offset = 0;
         }
 
-        PRINT("write offset 0x%x,len 0x%lx\n",offset + offset_base,databyte);
         hif->hif_ops.hi_write_sram(bufferICCM + offset + offset_base,
-                        (unsigned char*)(SYS_TYPE)(0 + offset), databyte);
+            (unsigned char*)(SYS_TYPE)(0 + offset), databyte);
 
         offset += databyte;
         len -= databyte;
     } while(len > 0);
 
-    PRINT("end iccm copy \n");
-
     offset = 0;
     offset_base =0;
 
 #ifdef ICCM_CHECK
-    PRINT("start iccm check \n");
     len = ICCM_CHECK_LEN;
     hif->hif_ops.hi_write_reg32(RG_SCFG_SRAM_FUNC,MAC_ICCM_AHB_BASE);
     //host rom read
@@ -704,52 +665,43 @@ unsigned char hal_download_wifi_fw_img(void)
         if((offset + SRAM_MAX_LEN) >= MAX_OFFSET)
         {
             offset_base += offset;
-            PRINT("DCCM offset 0x%x offset_base %x\n", offset, offset_base);
             hif->hif_ops.hi_write_reg32(RG_SCFG_SRAM_FUNC, MAC_ICCM_AHB_BASE + offset_base);
             offset = 0;
         }
 
         hif->hif_ops.hi_read_sram(buf_iccm_rd + offset + offset_base,
-                        (unsigned char*)(SYS_TYPE)(0 + offset) ,databyte);
+            (unsigned char*)(SYS_TYPE)(0 + offset) ,databyte);
 
-        PRINT("read offset 0x%x,len 0x%lx \n",offset + offset_base,databyte);
         offset += databyte;
         len -= databyte;
     } while(len > 0);
 
-    if(memcmp(buf_iccm_rd, bufferICCM, ICCM_CHECK_LEN))
-    {
-        PRINT("\nHost HAL: write ICCM ERROR!!!! \n");
+    if (memcmp(buf_iccm_rd, bufferICCM, ICCM_CHECK_LEN)) {
+        PRINT("Host HAL: write ICCM ERROR!!!! \n");
+        return false;
+
+    } else {
+        PRINT("Host HAL: write ICCM SUCCESS!!!! \n");
     }
-    else
-    {
-        PRINT("\nHost HAL: write ICCM SUCCESS!!!! \n");
-    }
-    PRINT("stop iccm check \n");
 #endif
 
     /* Starting download DCCM */
     len = DCCM_LEN;
     offset = 0;
-    PRINT("start dccm copy, total=0x%x \n", len);
     hif->hif_ops.hi_write_reg32(RG_SCFG_SRAM_FUNC, MAC_DCCM_AHB_BASE);
 
     do
     {
         databyte = (len > SRAM_MAX_LEN) ? SRAM_MAX_LEN : len;
-
-        PRINT("write offset 0x%x,len 0x%lx\n", offset, databyte);
         hif->hif_ops.hi_write_sram(bufferDCCM + offset,
-                (unsigned char*)(SYS_TYPE)(0 + offset), databyte);
+            (unsigned char*)(SYS_TYPE)(0 + offset), databyte);
 
         offset += databyte;
         len -= databyte;
-    }while(len > 0);
-
-    PRINT("end dccm copy \n");
+    } while(len > 0);
 
     /* Starting run firmware */
-    PRINT("set baseaddr to sram \n");
+    //set baseaddr to sram
     hif->hif_ops.hi_write_reg32(RG_SCFG_SRAM_FUNC, MAC_REG_BASE);
     len = SRAM_LEN;
     memset(bufferDCCM, 0, len);
@@ -766,10 +718,9 @@ unsigned char hal_download_wifi_fw_img(void)
     //OS_MDELAY(10000);
 
 #ifdef PROJECT_T9026
-
 #ifdef HAL_FPGA_VER
-	wifi_cpu_clk_switch(0x4f070033);
-	wifi_cpu_clk_switch(0x4f0700f3);
+    wifi_cpu_clk_switch(0x4f070033);
+    wifi_cpu_clk_switch(0x4f0700f3);
 #endif
 
     /* arc cpu domain power save for t9026  */
@@ -817,9 +768,9 @@ unsigned char hal_download_wifi_fw_img(void)
     pmu_a22.b.rg_dev_reset_sw = 0x00;
     hif->hif_ops.bt_hi_write_word(RG_PMU_A22,pmu_a22.data);
     PRINT("RG_PMU_A22 = %x redata= %x \n",RG_PMU_A22,pmu_a22.data);
-
 #endif
 
+    printk("fw download success!\n");
     return true;
 }
 
@@ -832,10 +783,17 @@ int mac_addr3 = 0x58;
 int mac_addr4 = 0x00;
 int mac_addr5 = 0xcc;
 
-int opmode = WIFINET_M_STA;
+static int vif0opmode = -1;
+static int vif1opmode = -1;
+static char * vmac0 = NULL;
+static char * vmac1 = NULL;
+static unsigned int con_mode = ((1 << WIFINET_M_STA) | (1 << WIFINET_M_P2P_DEV));
+
+
 int aml_debug = AML_DEBUG_LEVEL;
 const unsigned char BROADCAST_ADDRESS[WIFINET_ADDR_LEN] =  {0xff,0xff,0xff,0xff,0xff,0xff};
 static char * mac_addr = "00:01:02:58:00:CC";
+static char * country_code = "CN";
 unsigned short dhcp_offload = 0;
 static int sdblksize = BLKSIZE;
 unsigned char aml_insmod_flag = 0;
@@ -901,9 +859,44 @@ void aml_wifi_set_mac_addr(void)
 #endif
 }
 
+char * aml_wifi_get_country_code(void)
+{
+    return country_code;
+}
+
+int aml_wifi_get_vif0_opmode(void)
+{
+    return vif0opmode;
+}
+
+int aml_wifi_get_vif1_opmode(void)
+{
+    return vif1opmode;
+}
+
+char * aml_wifi_get_vif0_name(void)
+{
+    return vmac0;
+}
+
+char * aml_wifi_get_vif1_name(void)
+{
+    return vmac1;
+}
+
+unsigned int aml_wifi_get_con_mode(void)
+{
+    return con_mode;
+}
+
+extern unsigned char wifi_in_insmod;
 static int aml_insmod(void)
 {
     struct hw_interface * hif = hif_get_hw_interface();
+
+#ifdef SDIO_BUILD_IN
+    wifi_in_insmod = 1;
+#endif
 
     print_driver_version();
     printk("driver version: %s\n", DRIVERVERSION);
@@ -924,6 +917,10 @@ static int aml_insmod(void)
 
     //dma interface or sdio interface init
     aml_sdio_init();
+
+#ifdef SDIO_BUILD_IN
+    wifi_in_insmod = 0;
+#endif
 
 #ifdef DRV_PT_SUPPORT
     printk("---Aml drv---:Before calling %s:(%d) \n",__func__,__LINE__);
@@ -965,7 +962,12 @@ MODULE_LICENSE("GPL");
 module_init(aml_insmod);
 module_exit(aml_rmmod);
 
-module_param(opmode, int, S_IRUGO);
+module_param(vif0opmode, int, S_IRUGO);
+module_param(vif1opmode, int, S_IRUGO);
+module_param(vmac0, charp, S_IRUGO);
+module_param(vmac1, charp, S_IRUGO);
+module_param(con_mode, int, S_IRUGO);
+
 
 module_param(sdblksize, int, S_IRUGO);
 
@@ -978,6 +980,12 @@ MODULE_PARM_DESC(mac_addr,"A string variable to discribe wifi mac address");
 
 module_param(dhcp_offload, ushort, S_IRUGO);
 MODULE_PARM_DESC(dhcp_offload,"A short variable to control dhcp offload function");
+
+/*Usage: insmod ***.ko country_code=xx*/
+
+module_param(country_code,charp,0644);
+MODULE_PARM_DESC(country_code,"A string variable to discribe country code");
+
 
 #endif
 

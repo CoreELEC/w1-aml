@@ -8,6 +8,8 @@
 
 #define DEFAULT_TXAMSDU_SUB_MAX              2
 #define DEFAULT_TXAMSDU_SUB_MAX_BW80              4
+#define DEFAULT_TXAMPDU_SUB_MIN               1
+#define DEFAULT_TXAMPDU_SUB_MAX_FOR_HT        2
 #define DEFAULT_TXAMPDU_SUB_MAX_COEX_ESCO     4   /*BT have eSCO logic link, we max aggregation 4 subfram*/
 #define DEFAULT_TXAMPDU_SUB_MAX_COEX               6   /*WIFI max aggregation sub  when WIFI/BT coexist */
 #define DEFAULT_TXAMPDU_SUB_MAX              16
@@ -45,7 +47,8 @@
 
 #define DEFAULT_EAT_COUNT_MAX 1
 #define DEFAULT_MFP_EN 1
-#define DEFAULT_AGGR_THRESH 100
+#define DEFAULT_AGGR_THRESH 40
+#define DEFAULT_NO_AGGR_THRESH 20
 #define DEFAULT_HRTIMER_INTERVAL 1
 
 #ifdef DYNAMIC_BW
