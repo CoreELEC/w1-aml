@@ -527,6 +527,8 @@ int vm_p2p_update_noa_count_start (struct wifi_mac_p2p *p2p)
         if (p2p_noa_start_time_cond(next_tbtt, p2p->noa.start+P2P_NOA_START_TIME_WRAP)
             & P2P_NOA_START_IN_PAST)
         {
+            printk("%s(%d) noa_len %d, count=%d\n",__func__,__LINE__,
+                wnet_vif->app_ie[WIFINET_APPIE_FRAME_BEACON].length, p2p->noa.count);
             wnet_vif->vm_p2p->noa_index ++;
             p2p->noa.start += P2P_NOA_START_TIME_WRAP;
             vm_p2p_update_noa_ie(p2p);
@@ -2047,6 +2049,37 @@ unsigned char is_p2p_negotiation_complete(struct wifi_mac *wifimac) {
 
     return 0;
 }
+
+unsigned char is_need_process_p2p_action(unsigned char* buf) {
+    struct wifi_mac_p2p_pub_act_frame *p2p_pub_act = NULL;
+    struct wifi_mac_p2p_action_frame *p2p_act = NULL;
+    unsigned ret = 0;
+    char category = *(buf + sizeof(struct wifi_frame));
+    p2p_act = (struct wifi_mac_p2p_action_frame *)(buf + sizeof(struct wifi_frame));
+    p2p_pub_act = (struct wifi_mac_p2p_pub_act_frame *)(buf + sizeof(struct wifi_frame));
+    switch(category) {
+        case AML_CATEGORY_P2P:
+            if (p2p_act->subtype == P2P_PRESENCE_REQ
+                || p2p_act->subtype == P2P_PRESENCE_RESP
+                || p2p_act->subtype == P2P_GO_DISC_REQ) {
+                ret = 1;
+            }
+            break;
+        case AML_CATEGORY_PUBLIC:
+            if (p2p_pub_act->action == WIFINET_ACT_PUBLIC_GAS_RSP
+                || (p2p_pub_act->action == WIFINET_ACT_PUBLIC_P2P
+                && (p2p_pub_act->subtype == P2P_DEVDISC_REQ
+                || p2p_pub_act->subtype == P2P_DEVDISC_RESP))) {
+                ret = 1;
+            }
+            break;
+      default:
+          break;
+      }
+
+    return ret;
+}
+
 
 void vm_p2p_switch_nego_state(struct wifi_mac_p2p *p2p, struct wifi_mac_p2p_pub_act_frame *frm, unsigned char tx, int *len)
 {

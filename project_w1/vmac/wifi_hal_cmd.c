@@ -27,6 +27,7 @@ namespace FW_NAME
 #include "wifi_hal.h"
 #include "t9023_calb.h"
 #include "patch_fi_cmd.h"
+#include "wifi_mac_if.h"
 
 #if defined (HAL_FPGA_VER)
 #include "rf_t9026/t9026_top.h"
@@ -34,7 +35,7 @@ namespace FW_NAME
 #endif
 
 
-#define WIFI_CONF_PATH "vendor/etc/wifi/w1"
+#define WIFI_CONF_PATH "/vendor/etc/wifi/w1"
 
 static char * conf_path = WIFI_CONF_PATH;
 module_param(conf_path, charp, S_IRUGO);
@@ -543,6 +544,7 @@ unsigned int phy_set_rf_chan(struct hal_channel *hchan, unsigned char flag, unsi
     channel_switch.bw = hchan->chan_bw;
     channel_switch.flag = flag;
     channel_switch.vid = vid;
+    channel_switch.rssi = 0;
 
     primary_chan.rf_fs = RF_SMP_160;
     primary_chan.ap_bw = hchan->chan_bw;
@@ -777,6 +779,7 @@ unsigned int phy_set_ucast_key(unsigned char wnet_vif_id,unsigned short StaAid,
     HAL_END_LOCK();
     PRINT("phy_set_ucast_key wnet_vif_id %x encryType=%d StaAid %x \n",wnet_vif_id,encryType, StaAid);
     hal_urep_cnt_init(&hal_priv->uRepCnt[wnet_vif_id][StaAid],encryType);
+    hal_pn_win_init(AML_UCAST_TYPE, wnet_vif_id);
     return 1;
 }
 
@@ -810,6 +813,7 @@ unsigned int phy_set_mcast_key(unsigned char wnet_vif_id, unsigned char *pKey,
     hal_priv->bhalMKeySet[2] =1;
     hal_priv->bhalMKeySet[3] =1;
     hal_mrep_cnt_init(hal_priv,wnet_vif_id,encryType);
+    hal_pn_win_init(AML_MCAST_TYPE, wnet_vif_id);
     return 1;
 }
 
@@ -885,6 +889,31 @@ void  phy_scan_cmd(unsigned int data)
     phy_set_param_cmd(MAC_SCAN_CMD,0,data);
 }
 
+void phy_set_channel_rssi(unsigned char rssi)
+{
+    struct Channel_Switch channel_switch;
+    unsigned int reg_val = 0;
+    int i = 0;
+
+    channel_switch.Cmd = CHANNEL_SWITCH_CMD;
+    channel_switch.rssi = rssi;
+    channel_switch.flag = 0;
+    channel_switch.flag |= CHANNEL_RSSI_FLAG;
+
+    DPRINTF(AML_DEBUG_WARNING, "%s channnel rssi:%d\n", __func__, rssi);
+
+    HAL_BEGIN_LOCK();
+    hi_set_cmd((unsigned char*)&channel_switch, sizeof(struct Channel_Switch));
+    HAL_END_LOCK();
+
+    for (i = 0; i < 10; i++) {
+        reg_val  = wifi_mac_read_word(0x00a0816c);
+        printk("AGC_REG_A91 info: Reg data=&0x%08x\n",reg_val);
+        reg_val  = wifi_mac_read_word(0x00a081a4);
+        printk("AGC_REG_A105 info: Reg data=&0x%08x\n",reg_val);
+    }
+
+}
 unsigned int phy_set_slot_time(unsigned int slot)
 {
     struct hal_private * hal_priv =hal_get_priv();
@@ -1162,8 +1191,8 @@ int phy_set_suspend(unsigned char vid, unsigned char enable,
     /* if last suspend fail,this time is resume,just return */
     if ((enable == 0) && (atomic_read(&hal_priv->drv_suspend_cnt) == 0))
     {
-        printk("last suspend fail,don't need resume, just return\n");
-        return 0;
+        printk("last suspend fail,don't need resume, just return -1\n");
+        return -1;
     }
 
     POWER_BEGIN_LOCK();
@@ -1230,11 +1259,38 @@ int phy_set_suspend(unsigned char vid, unsigned char enable,
 
     if (enable == 0)
     {
+        struct hw_interface* hif = hif_get_hw_interface();
+        unsigned int hw_txc_addr = 0;
+        struct tx_complete_status *txcompletestatus = NULL;
+
         ptr = hal_priv->hal_ops.phy_get_rw_ptr(0);
         hal_priv->tx_page_offset = ptr & 0xffff;
 
         PN = phy_get_pn(vid);
         memcpy(hal_priv->uRepCnt[vid][1].txPN[TX_UNICAST_REPCNT_ID], &PN, 8);
+
+        hw_txc_addr = hif->hw_config.txcompleteaddress;
+        txcompletestatus = hal_priv->txcompletestatus;
+
+        hif->hif_ops.hi_read_sram((unsigned char *)txcompletestatus,
+            (unsigned char *)(SYS_TYPE)hw_txc_addr, (SYS_TYPE)sizeof(struct tx_complete_status));
+
+        if (hal_priv->HalTxFrameDoneCounter != hal_priv->txcompletestatus->txdoneframecounter)
+        {
+            printk("%s:%d, txdoneframecounter:%x, HalTxFrameDoneCounter:%x\n", __func__, __LINE__,
+                hal_priv->txcompletestatus->txdoneframecounter, hal_priv->HalTxFrameDoneCounter);
+        }
+
+        if ((hif->HiStatus.Tx_Free_num != hif->HiStatus.Tx_Send_num)
+            || (hif->HiStatus.Tx_Done_num != hif->HiStatus.Tx_Send_num))
+        {
+            printk("%s:%d, free %d, done %d, send %d\n",  __func__, __LINE__,
+                hif->HiStatus.Tx_Free_num, hif->HiStatus.Tx_Done_num, hif->HiStatus.Tx_Send_num);
+        }
+        /* flush packetes when suspend and when resume restore initial value */
+        hal_priv->HalTxFrameDoneCounter = hal_priv->txcompletestatus->txdoneframecounter;
+        hif->HiStatus.Tx_Free_num = hif->HiStatus.Tx_Send_num;
+        hif->HiStatus.Tx_Done_num = hif->HiStatus.Tx_Send_num;
     }
     printk("%s end, wow enable %d, mode %d, filter 0x%x, ret %d\n",
         ((enable == 1) ? "suspend" : "resume"), enable, mode, filters, ret);
@@ -1427,16 +1483,25 @@ unsigned int phy_set_coexist_be_bk_noqos_priority_range( unsigned int coexist_sc
 }
 
 
-unsigned int phy_infor_bt_wifi_work_freq(unsigned int enable_infor_bt_wifi_req)
+unsigned int phy_coexist_config(const void *data, int data_len)
 {
     struct Coexist_Cmd coexist_cmd;
+    unsigned char *opt_data = (unsigned char *)data;
 
     memset(&coexist_cmd, 0 , sizeof( struct Coexist_Cmd));
     coexist_cmd.Cmd = COEXIST_CMD;
-    coexist_cmd.coexist_id_bitmap = COEXIST_INFOR_BT_WIFI_WORK_FREQ;
-    coexist_cmd.enable_infor_bt_wifi_work_freq = enable_infor_bt_wifi_req;
+    coexist_cmd.coexist_id_bitmap = COEXIST_PARAM_CMD_CONFIG;
+    if ((data_len - 1) < sizeof(coexist_cmd.reserve1))
+    {
+        memcpy(&(coexist_cmd.reserve1), opt_data + 1, data_len - 1);
+    }
+    else
+    {
+        printk("%s:%d, coex cmd len error\n", __func__, __LINE__);
+        return -1;
+    }
 
-    printk("%s:%d, enable_infor_bt_wifi_req %d\n", __func__, __LINE__, enable_infor_bt_wifi_req);
+    printk("%s:%d, coex cmd\n", __func__, __LINE__);
     HAL_BEGIN_LOCK();
     hi_set_cmd((unsigned char *)&coexist_cmd, sizeof(struct Coexist_Cmd));
     HAL_END_LOCK();
@@ -1661,10 +1726,12 @@ unsigned char get_s16_item(char *varbuf, int len, char *item, short *item_value)
 
 unsigned char parse_cali_param(char *varbuf, int len, struct Cali_Param *cali_param)
 {
+    unsigned short platform_verid = 0; // default: 0
     get_s8_item(varbuf, len, "version", &cali_param->version);
     get_s16_item(varbuf, len, "cali_config", &cali_param->cali_config);
     get_s8_item(varbuf, len, "freq_offset", &cali_param->freq_offset);
     get_s8_item(varbuf, len, "htemp_freq_offset", &cali_param->htemp_freq_offset);
+    get_s8_item(varbuf, len, "cca_ed_det", &cali_param->cca_ed_det);
     get_s8_item(varbuf, len, "tssi_2g_offset", &cali_param->tssi_2g_offset);
     get_s8_item(varbuf, len, "tssi_5g_offset_5200", &cali_param->tssi_5g_offset[0]);
     get_s8_item(varbuf, len, "tssi_5g_offset_5400", &cali_param->tssi_5g_offset[1]);
@@ -1675,10 +1742,17 @@ unsigned char parse_cali_param(char *varbuf, int len, struct Cali_Param *cali_pa
     get_s8_item(varbuf, len, "rf_count", &cali_param->rf_num);
     get_s8_item(varbuf, len, "wftx_pwrtbl_en", &cali_param->wftx_pwrtbl_en);
 
+    /* maybe get from txt */
+#ifdef HAL_FPGA_VER
+    platform_verid = aml_wifi_get_platform_verid();
+#endif
+    cali_param->platform_versionid = platform_verid;
+
     printk("======>>>>>> version = %d\n", cali_param->version);
     printk("======>>>>>> cali_config = %d\n", cali_param->cali_config);
     printk("======>>>>>> freq_offset = %d\n", cali_param->freq_offset);
     printk("======>>>>>> htemp_freq_offset = %d\n", cali_param->htemp_freq_offset);
+    printk("======>>>>>> cca_ed_det = %d\n", cali_param->cca_ed_det);
     printk("======>>>>>> tssi_2g_offset = 0x%x\n", cali_param->tssi_2g_offset);
     printk("======>>>>>> tssi_5g_offset_5200 = 0x%x\n", cali_param->tssi_5g_offset[0]);
     printk("======>>>>>> tssi_5g_offset_5400 = 0x%x\n", cali_param->tssi_5g_offset[1]);
@@ -1688,6 +1762,7 @@ unsigned char parse_cali_param(char *varbuf, int len, struct Cali_Param *cali_pa
     printk("======>>>>>> spur_freq = %d\n", cali_param->spur_freq);
     printk("======>>>>>> rf_count = %d\n", cali_param->rf_num);
     printk("======>>>>>> wftx_pwrtbl_en = %d\n", cali_param->wftx_pwrtbl_en);
+    printk("======>>>>>> platform_versionid = %d\n", cali_param->platform_versionid);
 
     return 0;
 }
@@ -1717,6 +1792,31 @@ unsigned char parse_tx_power_param(char *varbuf, int len, struct WF2G_Txpwr_Para
 
     return 0;
 }
+
+static void set_cca_energy_detection(unsigned int reg_addr)
+{
+    struct hw_interface* hif =hif_get_hw_interface();
+    unsigned int reg_val = 0;
+
+    if (reg_addr == DF_AGC_REG_A12) {
+        reg_val = hif->hif_ops.hi_read_word(reg_addr);
+        reg_val &= 0xFFFF0000; //bit0~bit15 set to 0
+        hif->hif_ops.hi_write_word(reg_addr, reg_val);
+
+    } else if (reg_addr == DF_AGC_REG_A27) {
+        reg_val = hif->hif_ops.hi_read_word(reg_addr);
+        reg_val &= 0xE00FFFFF; //bit20~bit28 set to 0
+        hif->hif_ops.hi_write_word(reg_addr, reg_val);
+
+    } else if (reg_addr == REG_ED_THR_DB) {
+        hif->hif_ops.hi_write_word(reg_addr, 0x00328328);
+
+    } else if (reg_addr == REG_STF_AC_Q_THR) {
+        hif->hif_ops.hi_write_word(reg_addr, 0x301a4080);
+    }
+    return;
+}
+
 
 unsigned char get_cali_param(struct Cali_Param *cali_param, struct WF2G_Txpwr_Param *wf2g_txpwr_param, 
                                                              struct WF5G_Txpwr_Param *wf5g_txpwr_param)
@@ -1792,6 +1892,17 @@ unsigned char get_cali_param(struct Cali_Param *cali_param, struct WF2G_Txpwr_Pa
     else
     {
         parse_tx_power_param(content, len, wf2g_txpwr_param, wf5g_txpwr_param);
+    }
+
+    if (cali_param->cca_ed_det == 1) {
+        set_cca_energy_detection(DF_AGC_REG_A12);
+        set_cca_energy_detection(DF_AGC_REG_A27);
+
+    } else if (cali_param->cca_ed_det == 2) {
+        set_cca_energy_detection(DF_AGC_REG_A12);
+        set_cca_energy_detection(DF_AGC_REG_A27);
+        set_cca_energy_detection(REG_ED_THR_DB);
+        set_cca_energy_detection(REG_STF_AC_Q_THR);
     }
 
     if (chip_id_l & 0xf0) {

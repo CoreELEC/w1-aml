@@ -214,10 +214,12 @@ void hi_clear_irq_status(unsigned int data)
         {
             unsigned int tmpreg = 0;
 
+            POWER_END_LOCK();
             tmpreg = hif->hif_ops.hi_bottom_read8(SDIO_FUNC1, RG_SDIO_PMU_HOST_REQ);
             // set host sleep req
             tmpreg |= HOST_SLEEP_REQ;
             hif->hif_ops.hi_bottom_write8(SDIO_FUNC1, RG_SDIO_PMU_HOST_REQ, tmpreg);
+            POWER_BEGIN_LOCK();
         }
         POWER_END_LOCK();
     }

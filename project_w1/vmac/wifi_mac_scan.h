@@ -52,6 +52,7 @@ enum
     SCANSTATE_F_WAIT_CHANNEL_SWITCH = BIT(10),
     SCANSTATE_F_CHANNEL_SWITCH_COMPLETE = BIT(11),
     SCANSTATE_F_SEND_PROBEREQ_AGAIN = BIT(12),
+    SCANSTATE_F_GET_CONNECT_AP = BIT(13),
 };
 
 
@@ -83,6 +84,7 @@ struct wifi_mac_scan_state
     unsigned char roaming_full_scan;
     spinlock_t  roaming_chan_lock;
     unsigned long roaming_chan_lock_flag;
+    unsigned short scan_ssid_count;
 
     unsigned short scan_next_chan_index;
     unsigned short scan_last_chan_index;
@@ -209,19 +211,18 @@ struct wifi_scan_info
 #define WIFINET_SCAN_TIME_IDLE_DEFAULT 80
 #define WIFINET_SCAN_PROTECT_TIME 1000
 #define WIFINET_SCAN_TIME_CHANNEL_SWITCH 500
+#define WIFINET_SCAN_TIME_BEFORE_CONNECT 20
 
 #ifndef FW_RF_CALIBRATION
 #define WIFINET_SCAN_TIME_CONNECT_DEFAULT 50
 #define WIFINET_SCAN_DEFAULT_INTERVAL_COEXIST 200
 #define WIFINET_SCAN_CHANNEL_COST 20
 #define WIFINET_SCAN_INTERVAL_LEFT 10
-#define WIFINET_SCAN_TIME_BEFORE_CONNECT 20
 #else
 #define WIFINET_SCAN_TIME_CONNECT_DEFAULT 20
 #define WIFINET_SCAN_DEFAULT_INTERVAL_COEXIST 200
 #define WIFINET_SCAN_CHANNEL_COST 30
 #define WIFINET_SCAN_INTERVAL_LEFT 10
-#define WIFINET_SCAN_TIME_BEFORE_CONNECT 20
 #endif
 
 #define STA_MATCH_ERR_CHAN                  (1<<0)
@@ -253,13 +254,13 @@ void wifi_mac_scan_vattach(struct wlan_net_vif *);
 void wifi_mac_scan_vdetach(struct wlan_net_vif *);
 int wifi_mac_start_scan(struct wlan_net_vif *, int flags, unsigned int nssid, const struct wifi_mac_ScanSSID ssids[]);
 int wifi_mac_chk_scan(struct wlan_net_vif *, int flags, unsigned int nssid, const struct wifi_mac_ScanSSID ssids[]);
-void wifi_mac_cancel_scan(struct wlan_net_vif *);
+void wifi_mac_cancel_scan(struct wifi_mac *wifimac);
 void wifi_mac_scan_rx(struct wlan_net_vif *, const struct wifi_mac_scan_param *, const struct wifi_frame *, int rssi);
 void wifi_mac_scan_flush(struct wifi_mac *);
 int wifi_mac_scan_timeout_ex(void *arg);
 
 typedef int wifi_mac_ScanIterFunc(void *, const struct wifi_scan_info *);
-int wifi_mac_scan_parse(struct wifi_mac *, wifi_mac_ScanIterFunc, void *);
+int wifi_mac_scan_parse(struct wlan_net_vif *, wifi_mac_ScanIterFunc, void *);
 int saveie(unsigned char *iep, const unsigned char *ie);
 void wifi_mac_set_scan_time(struct wlan_net_vif *wnet_vif);
 int vm_scan_user_set_chan(struct wlan_net_vif *wnet_vif,struct cfg80211_scan_request *request);

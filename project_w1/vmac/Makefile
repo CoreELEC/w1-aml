@@ -15,6 +15,7 @@ EXTRA_CFLAGS += -DSYSTEM64
 #SRCTOP ?= /mnt/fileroot2/vlsi.wifi/yeke_64bit
 #SRCTOP ?= /mnt/fileroot02/yuan.wang/ipc_prj
 SRCTOP ?= /mnt/fileroot2/vlsi.wifi/9-xiaomi
+#SRCTOP ?= /mnt/fileroot2/vlsi.wifi/gva
 else
 ARCH ?= arm
 CROSS_COMPILE ?= arm-linux-gnueabihf-
@@ -27,6 +28,7 @@ endif
 #KERNELDIR ?= $(SRCTOP)/output/c1_ae402_a64_release/build/linux-amlogic-4.19-dev
 #KERNELDIR ?= $(SRCTOP)/out/target/product/aquaman/obj/KERNEL_OBJ
 KERNELDIR ?= $(SRCTOP)/out/target/product/ampere/obj/KERNEL_OBJ
+#KERNELDIR ?= $(SRCTOP)/kernel-4.9/common
 
 CC        = $(CROSS_COMPILE)gcc
 STRIP     = $(CROSS_COMPILE)strip

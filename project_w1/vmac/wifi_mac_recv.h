@@ -62,6 +62,7 @@ int rsn_cipher(unsigned char *sel, unsigned char *keylen);
 int rsn_keymgmt(unsigned char *sel);
 void wifi_mac_savenie(unsigned char **, const unsigned char *, size_t, char *name);
 void wifi_mac_saveie(unsigned char **, const unsigned char *, char *name);
+unsigned char is_need_to_print(unsigned char* frm);
 int wifi_mac_parse_wpa(struct wifi_mac_Rsnparms *rsn, unsigned char *frm, unsigned char own);
 int wifi_mac_parse_own_rsn(struct wifi_station *sta, unsigned char *frm);
 int wifi_mac_parse_counterpart_rsn(struct wifi_mac_Rsnparms *rsn, unsigned char *frm, unsigned char is_judge);
@@ -77,8 +78,8 @@ void wifi_mac_parse_vht_quiet_ch(struct wifi_station *sta, unsigned char *ie);
 void wifi_mac_parse_vht_op_md_ntf(struct wifi_station *sta, unsigned char opt_mode);
 void wifi_mac_vht_ie_parse_all(struct wifi_station *sta, struct wifi_mac_scan_param* sp);
 
-void wifi_mac_recv_beacon(struct wlan_net_vif *wnet_vif, struct wifi_station *sta, struct sk_buff *skb,int rssi);
-void wifi_mac_recv_probersp(struct wlan_net_vif *wnet_vif, struct wifi_station *sta, struct sk_buff *skb,int rssi);
+void wifi_mac_recv_beacon(struct wlan_net_vif *wnet_vif, struct wifi_station *sta, struct sk_buff *skb, int rssi, unsigned int channel);
+void wifi_mac_recv_probersp(struct wlan_net_vif *wnet_vif, struct wifi_station *sta, struct sk_buff *skb, int rssi, unsigned int channel);
 void wifi_mac_recv_probe_req(struct wlan_net_vif *wnet_vif, struct wifi_station *sta, struct sk_buff *skb,int rssi);
 void wifi_mac_recv_assoc_req(struct wlan_net_vif *wnet_vif, struct wifi_station *sta, struct sk_buff *skb, unsigned int channel, int rssi);
 void wifi_mac_recv_assoc_rsp(struct wlan_net_vif *wnet_vif, struct wifi_station *sta, struct sk_buff *skb, unsigned int channel);

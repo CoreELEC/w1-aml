@@ -25,14 +25,21 @@ enum tx_frame_flag
 #ifdef CTS_VERIFIER_GAS
     TX_P2P_GAS = 4,
 #endif
+    TX_MGMT_ADDBA_RSP = 5,
+    TX_MGMT_PROBE_REQ = 6,
+    TX_MGMT_AUTH = 7,
+    TX_MGMT_ASSOC_REQ = 8,
+    TX_MGMT_EAPOL = 9,
+    TX_MGMT_DHCP = 10,
 };
 
 struct wifi_mac_pkt_info
 {
     unsigned short b_tcp:1,
+        b_tcp_ack:1,
         b_tcp_ack_del:1,
         b_tcp_push:1,
-        b_EAP:1,
+        b_eap:1,
         b_dhcp:1,
         b_arp:1,
         b_tcp_saved_flag:1,

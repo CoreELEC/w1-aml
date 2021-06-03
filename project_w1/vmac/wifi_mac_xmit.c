@@ -173,7 +173,7 @@ void wifi_mac_xmit_pkt_parse(struct sk_buff *skb, struct wifi_mac *wifimac)
 
     if ((eh->ether_type == __constant_htons(ETHERTYPE_PAE))
         ||(eh->ether_type == __constant_htons(ETHERTYPE_WPI))) {
-        mac_pkt_info->b_EAP = 1;
+        mac_pkt_info->b_eap = 1;
         printk("eapol frame send\n");
     }
 
@@ -192,8 +192,11 @@ void wifi_mac_xmit_pkt_parse(struct sk_buff *skb, struct wifi_mac *wifimac)
 
             tcp_tx_payload = (unsigned long)(skb->data + skb->len) - (unsigned long)((unsigned char *)th + (th->doff << 2));
             if ((th->ack) && (!th->psh) && (!th->fin) && (!th->syn)) {
-                if ((!tcp_tx_payload) && (th->doff == 5))
-                    mac_pkt_info->b_tcp_ack_del = 1;
+                if (!tcp_tx_payload) {
+                    mac_pkt_info->b_tcp_ack = 1;
+                    if (th->doff == 5)
+                        mac_pkt_info->b_tcp_ack_del = 1;
+                }
             }
 
             if (!start_flag) {
@@ -259,9 +262,9 @@ void wifi_mac_xmit_pkt_parse(struct sk_buff *skb, struct wifi_mac *wifimac)
             }
         }
 
-        if ((src_ip_valid == 1) && (sta->connect_status != DHCP_GET_ACK)) {
+        if ((src_ip_valid == 1) && (sta->connect_status != CONNECT_DHCP_GET_ACK)) {
             printk("parse pkt get ip, set dhcp complete\n");
-            sta->connect_status = DHCP_GET_ACK;
+            sta->connect_status = CONNECT_DHCP_GET_ACK;
             if (sta->sta_wnet_vif->vm_p2p->p2p_enable) {
                 set_p2p_negotiation_status(sta, NET80211_P2P_STATE_GO_COMPLETE);
             }
@@ -605,8 +608,8 @@ wifi_mac_mgmt_probe_resp_output(struct wifi_station *sta,
 
     wh = (struct wifi_frame *)os_skb_push(skb, sizeof(struct wifi_frame));
 #ifdef CONFIG_P2P
-    if ((wnet_vif->vm_p2p->p2p_role == NET80211_P2P_ROLE_DEVICE) 
-        || (wnet_vif->vm_p2p->p2p_role == NET80211_P2P_ROLE_CLIENT))
+    if (wnet_vif->vm_p2p_support
+        && ((wnet_vif->vm_p2p->p2p_role == NET80211_P2P_ROLE_DEVICE) || (wnet_vif->vm_p2p->p2p_role == NET80211_P2P_ROLE_CLIENT)))
     {
         bssid = wnet_vif->vm_p2p->dev_addr;
         sa = wnet_vif->vm_p2p->dev_addr;
@@ -635,6 +638,64 @@ wifi_mac_mgmt_probe_resp_output(struct wifi_station *sta,
     WIFINET_NODE_STAT(sta, tx_mgmt);
 
     wifi_mac_tx_mgmt_frm(wifimac, skb);
+}
+
+int wifi_mac_send_nulldata_for_ap(struct wifi_station *sta, unsigned char pwr_save,
+        unsigned char pwr_flag, unsigned char qos, int ac)
+{
+    struct sk_buff *skb;
+    unsigned char pkt_len = 0;
+    unsigned char subtype = 0;
+    int error = 0;
+    struct wlan_net_vif *wnet_vif = sta->sta_wnet_vif;
+    struct wifi_mac *wifimac = sta->sta_wmac;
+    struct wifi_mac_tx_info *txinfo = NULL;
+    struct wifi_frame *wh;
+    struct wifi_skb_callback *cb = NULL;
+
+    KASSERT(sta != NULL, ("null nsta"));
+    if (qos) {
+        pkt_len = sizeof(struct wifi_qos_frame) + FCS_LEN;
+        subtype = WIFINET_FC0_SUBTYPE_QOS_NULL;
+    } else {
+        pkt_len = sizeof(struct wifi_frame) + FCS_LEN;;
+        subtype = WIFINET_FC0_SUBTYPE_NODATA;
+    }
+
+    skb = wifi_mac_get_mgmt_frm(wnet_vif->vm_wmac, pkt_len);
+    if (skb == NULL) {
+        WIFINET_DPRINTF_STA(AML_DEBUG_ERROR, sta, "%s: Unable to allocate frame", __func__);
+        return ENOMEM;
+    }
+
+    cb = (struct wifi_skb_callback *)skb->cb;
+    cb->sta = sta;
+
+    if (qos) {
+        wh = (struct wifi_frame *)os_skb_push(skb, sizeof(struct wifi_qos_frame));
+    } else {
+        wh = (struct wifi_frame *)os_skb_push(skb, sizeof(struct wifi_frame));
+    }
+
+    wifi_mac_send_setup(wnet_vif, sta, wh, WIFINET_FC0_TYPE_DATA | subtype,
+        wnet_vif->vm_myaddr, sta->sta_macaddr, sta->sta_bssid);
+
+    os_skb_set_priority(skb,ac);
+
+    txinfo = (struct wifi_mac_tx_info *)os_skb_cb(skb);
+
+    ASSERT(sizeof(struct wifi_mac_tx_info) <= OS_SKB_CB_MAXLEN);
+    memset(&txinfo->wnet_vif_id, 0, sizeof(struct wifi_mac_tx_info)-sizeof(struct wifi_skb_callback)-sizeof(struct drv_txdesc *));
+    wifi_mac_pwrsave_txpre(skb);
+#if 0
+    txinfo->b_pwr_flag = pwr_flag;
+#endif
+    error = wifi_mac_build_txinfo(wifimac, skb, txinfo);
+    if (!error) {
+        error = wifimac->drv_priv->drv_ops.tx_start(wifimac->drv_priv, skb);
+        return error;
+    }
+    return error;
 }
 
 int wifi_mac_send_nulldata(struct wifi_station *sta, unsigned char pwr_save,
@@ -917,7 +978,7 @@ struct sk_buff *wifi_mac_encap(struct wifi_station *sta, struct sk_buff *skb)
         else
             key = wifi_mac_security_getmcastkey(wnet_vif, sta);
 
-        if (key == NULL && !mac_pkt_info->b_EAP)
+        if (key == NULL && !mac_pkt_info->b_eap)
         {
             WIFINET_DPRINTF_MACADDR( AML_DEBUG_KEY, eh.ether_dhost, "no default transmit key (%s) deftxkey %u",
                 __func__, wnet_vif->vm_def_txkey);
@@ -929,7 +990,7 @@ struct sk_buff *wifi_mac_encap(struct wifi_station *sta, struct sk_buff *skb)
         key = NULL;
     }
 
-    if ((sta->sta_flags & WIFINET_NODE_QOS) && !mac_pkt_info->b_EAP && !mac_pkt_info->b_dhcp && !mac_pkt_info->b_arp)
+    if ((sta->sta_flags & WIFINET_NODE_QOS) && !mac_pkt_info->b_eap && !mac_pkt_info->b_dhcp && !mac_pkt_info->b_arp)
     {
         hdrsize = sizeof(struct wifi_qos_frame);
         addqos = 1;
@@ -2414,24 +2475,21 @@ int wifi_mac_send_probe_rsp(struct wlan_net_vif  *wnet_vif,
                                     WIFINET_VMAC_UAPSD_ENABLED(wnet_vif));
     }
 
-    if (wifi_mac_is_ht_enable(sta))
-    {
+    if (sta->sta_flags & WIFINET_NODE_HT) {
         frm = wifi_mac_add_htcap(frm, sta);
-        //printk("%s(%d)\n", __func__, __LINE__);
         frm = wifi_mac_add_htinfo(frm, sta);
-        if (!(wifimac->wm_flags_ext & WIFINET_FEXT_COEXT_DISABLE))
-        {
+
+        if (!(wifimac->wm_flags_ext & WIFINET_FEXT_COEXT_DISABLE)) {
             frm = wifi_mac_add_obss_scan(frm, sta);
             frm = wifi_mac_add_extcap(frm, sta);
         }
     }
 
-    if (wnet_vif->app_ie[WIFINET_APPIE_FRAME_PROBE_RESP].ie)
-    {
+    if (wnet_vif->app_ie[WIFINET_APPIE_FRAME_PROBE_RESP].ie) {
         WIFINET_DPRINTF( AML_DEBUG_XMIT, "add wps ie ie for proberesp, len=%d\n",
-                         wnet_vif->app_ie[WIFINET_APPIE_FRAME_PROBE_RESP].length);
+            wnet_vif->app_ie[WIFINET_APPIE_FRAME_PROBE_RESP].length);
         memcpy(frm, wnet_vif->app_ie[WIFINET_APPIE_FRAME_PROBE_RESP].ie,
-               wnet_vif->app_ie[WIFINET_APPIE_FRAME_PROBE_RESP].length);
+            wnet_vif->app_ie[WIFINET_APPIE_FRAME_PROBE_RESP].length);
         frm += wnet_vif->app_ie[WIFINET_APPIE_FRAME_PROBE_RESP].length;
     }
 
@@ -2829,7 +2887,7 @@ int wifi_mac_send_assoc_rsp(struct wlan_net_vif *wnet_vif, struct wifi_station *
     }
 
     printk("%s %d sta flags: 0x%x, assoc success :%d.\n",__func__,__LINE__,sta->sta_flags, *(int *)arg);
-    if (wifi_mac_is_ht_enable(sta) && (sta->sta_flags & WIFINET_NODE_HT)) {
+    if (sta->sta_flags & WIFINET_NODE_HT) {
         printk("%s %d will add ht cat and op for assocresp\n",__func__,__LINE__);
         frm = wifi_mac_add_htcap(frm, sta);
         frm = wifi_mac_add_htinfo(frm, sta);
@@ -2875,13 +2933,7 @@ int wifi_mac_send_assoc_rsp(struct wlan_net_vif *wnet_vif, struct wifi_station *
     }
 #endif//#ifdef CONFIG_WFD
 
-    if (wnet_vif->vm_flags & WIFINET_F_WPA) {
-        DPRINTF(AML_DEBUG_CONNECT, "%s %d start 4-way handshake\n", __func__,__LINE__);
-        sta->connect_status = FOUR_WAY_HANDSHAKE_START;
-    } else {
-        sta->connect_status = CONNECT_STATUS_REGISTERED;
-    }
-
+    sta->connect_status = CONNECT_WAIT_FW_CONFIG;
     os_skb_trim(skb, frm - os_skb_data(skb));
     wifi_mac_mgmt_output(sta, skb, type);
     return 0;
@@ -3122,7 +3174,7 @@ int wifi_mac_send_actionframe(struct wlan_net_vif *wnet_vif, struct wifi_station
                             __func__, addbaresponse->rs_baparamset.buffersize);
                     }
 
-                    DPRINTF(AML_DEBUG_ADDBA, "%s: ADDBA response action mgt frame. TID %d, buffer size %d, status %d \n",
+                    DPRINTF(AML_DEBUG_WARNING, "%s: ADDBA response action mgt frame. TID %d, buffer size %d, status %d \n",
                         __func__, tid_index, baparamset.buffersize, statuscode);
                     break;
 
@@ -3138,7 +3190,7 @@ int wifi_mac_send_actionframe(struct wlan_net_vif *wnet_vif, struct wifi_station
                     reasoncode = actionargs->arg3;
                     *(unsigned short *)&delba->dl_delbaparamset = htole16(*(unsigned short *)&delbaparamset);
                     delba->dl_reasoncode = htole16(reasoncode);
-                    DPRINTF(AML_DEBUG_ADDBA, "%s: DELBA action mgt frame. TID %d, initiator %d, reason %d\n",
+                    DPRINTF(AML_DEBUG_WARNING, "%s: DELBA action mgt frame. TID %d, initiator %d, reason %d\n",
                             __func__, tid_index, delbaparamset.initiator, reasoncode);
                     break;
 

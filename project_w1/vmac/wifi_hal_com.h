@@ -636,6 +636,7 @@ struct  hw_interface
 } ;
 
 #define MAX_PN_LEN      16
+#define MAX_PN_WINDOW   62
  struct unicastReplayCnt
 {
 #define MAX_RX_QUEUE    4   //rx PN of each tid need to be increase, so rx need 4 ACs
@@ -817,6 +818,7 @@ struct hal_layer_ops
     unsigned char  (*hal_tx_empty)(void);
     unsigned char *  (*hal_get_config)(void);
     void  (*phy_scan_cmd)(unsigned int data);// 1 start,0 end
+    void (*phy_set_channel_rssi)(unsigned char rssi);
     unsigned int (*phy_pwr_save_mode)(unsigned char wnet_vif_id,unsigned int data);// 1 start,0 end
     unsigned int (*phy_set_rd_support)(unsigned char wnet_vif_id, unsigned int data);
     unsigned int (*phy_set_txlive_time)(unsigned int  txlivetime);//ms
@@ -867,7 +869,7 @@ struct hal_layer_ops
     unsigned int (*phy_set_coexist_max_not_grant_cnt)( unsigned int coexist_max_not_grant_cnt);
     unsigned int (*phy_set_coexist_scan_priority_range)( unsigned int coexist_scan_priority_range);
     unsigned int (*phy_set_coexist_be_bk_noqos_priority_range)( unsigned int coexist_scan_priority_range);
-    unsigned int (*phy_infor_bt_wifi_work_freq)(unsigned int enable_infor_bt_wifi_req);
+    unsigned int (*phy_coexist_config)(const void *data, int data_len);
 
     unsigned int (*phy_interface_enable)(unsigned char enable, unsigned char vid);
     unsigned int (*hal_set_fwlog_cmd)(unsigned char mode);

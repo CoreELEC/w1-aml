@@ -96,12 +96,11 @@ enum wifi_mac_bwc_width
 
 enum sta_connect_status
 {
-    CONNECT_STATUS_IDLE,
-    CONNECT_STATUS_REGISTERED, // sta registered with no encryption ap
-    FOUR_WAY_HANDSHAKE_START,
-    FOUR_WAY_HANDSHAKE_EAPOL_SEND_ALLOWED,
-    FOUR_WAY_HANDSHAKE_COMPLETED,
-    DHCP_GET_ACK,
+    CONNECT_IDLE,
+    CONNECT_WAIT_FW_CONFIG,
+    CONNECT_FW_CONFIG_COMPLETED,
+    CONNECT_FOUR_WAY_HANDSHAKE_COMPLETED,
+    CONNECT_DHCP_GET_ACK,
 };
 
 enum
@@ -232,9 +231,8 @@ struct country_na_freq_info
 
 struct country_na_freq_set
 {
-    int country;
     int na_freq_class_num;
-    struct country_na_freq_info na_freq_info[5];
+    struct country_na_freq_info na_freq_info[7];
 };
 
 #define MAX_P2PIE_NUM         4
@@ -533,46 +531,48 @@ struct WIFINET_S_FRAME_ADDR2
 #define WLAN_GET_SEQ_FRAG(seq) ((seq) & 0x000F)
 #define WLAN_GET_SEQ_SEQ(seq)  ((seq) & 0xFFF0)
 
-#define WIFINET_IS_CRTL(_frame)   (((_frame)->i_fc[0] & WIFINET_FC0_TYPE_MASK) == WIFINET_FC0_TYPE_CTL)
+#define WIFINET_IS_CRTL(_frame) (((_frame)->i_fc[0] & WIFINET_FC0_TYPE_MASK) == WIFINET_FC0_TYPE_CTL)
 
-#define WIFINET_IS_PSPOLL(_frame)   (WIFINET_IS_CRTL(_frame) && \
-                                    (((_frame)->i_fc[0] & WIFINET_FC0_SUBTYPE_MASK) == WIFINET_FC0_SUBTYPE_PS_POLL))
+#define WIFINET_IS_PSPOLL(_frame) (WIFINET_IS_CRTL(_frame) && \
+    (((_frame)->i_fc[0] & WIFINET_FC0_SUBTYPE_MASK) == WIFINET_FC0_SUBTYPE_PS_POLL))
 
-#define WIFINET_IS_BAR(_frame)  (WIFINET_IS_CRTL(_frame) && \
-                                (((_frame)->i_fc[0] & WIFINET_FC0_SUBTYPE_MASK) == WIFINET_FC0_SUBTYPE_BAR))
+#define WIFINET_IS_BAR(_frame) (WIFINET_IS_CRTL(_frame) && \
+    (((_frame)->i_fc[0] & WIFINET_FC0_SUBTYPE_MASK) == WIFINET_FC0_SUBTYPE_BAR))
 
-#define WIFINET_IS_MGM(_frame)    ((((struct wifi_frame *)(_frame))->i_fc[0] & WIFINET_FC0_TYPE_MASK) == WIFINET_FC0_TYPE_MGT )
+#define WIFINET_IS_MGM(_frame) ((((struct wifi_frame *)(_frame))->i_fc[0] & WIFINET_FC0_TYPE_MASK) == WIFINET_FC0_TYPE_MGT )
 
-#define WIFINET_IS_BEACON(_frame)    ((((_frame)->i_fc[0] & WIFINET_FC0_TYPE_MASK) == WIFINET_FC0_TYPE_MGT) && \
-                                        (((_frame)->i_fc[0] & WIFINET_FC0_SUBTYPE_MASK) == WIFINET_FC0_SUBTYPE_BEACON))
+#define WIFINET_IS_BEACON(_frame) ((((_frame)->i_fc[0] & WIFINET_FC0_TYPE_MASK) == WIFINET_FC0_TYPE_MGT) && \
+    (((_frame)->i_fc[0] & WIFINET_FC0_SUBTYPE_MASK) == WIFINET_FC0_SUBTYPE_BEACON))
 
-#define WIFINET_IS_ACTION(_frame)    ((((_frame)->i_fc[0] & WIFINET_FC0_TYPE_MASK) == WIFINET_FC0_TYPE_MGT) && \
-                                        (((_frame)->i_fc[0] & WIFINET_FC0_SUBTYPE_MASK) == WIFINET_FC0_SUBTYPE_ACTION))
+#define WIFINET_IS_ACTION(_frame) ((((_frame)->i_fc[0] & WIFINET_FC0_TYPE_MASK) == WIFINET_FC0_TYPE_MGT) && \
+    (((_frame)->i_fc[0] & WIFINET_FC0_SUBTYPE_MASK) == WIFINET_FC0_SUBTYPE_ACTION))
 
-#define WIFINET_IS_PROBERSP(_frame)    ((((_frame)->i_fc[0] & WIFINET_FC0_TYPE_MASK) == WIFINET_FC0_TYPE_MGT) && \
-                                        (((_frame)->i_fc[0] & WIFINET_FC0_SUBTYPE_MASK) == WIFINET_FC0_SUBTYPE_PROBE_RESP))
+#define WIFINET_IS_PROBERSP(_frame) ((((_frame)->i_fc[0] & WIFINET_FC0_TYPE_MASK) == WIFINET_FC0_TYPE_MGT) && \
+    (((_frame)->i_fc[0] & WIFINET_FC0_SUBTYPE_MASK) == WIFINET_FC0_SUBTYPE_PROBE_RESP))
 
-#define WIFINET_IS_PROBEREQ(_frame)    ((((_frame)->i_fc[0] & WIFINET_FC0_TYPE_MASK) == WIFINET_FC0_TYPE_MGT) && \
-                                        (((_frame)->i_fc[0] & WIFINET_FC0_SUBTYPE_MASK) == WIFINET_FC0_SUBTYPE_PROBE_REQ))
+#define WIFINET_IS_PROBEREQ(_frame) ((((_frame)->i_fc[0] & WIFINET_FC0_TYPE_MASK) == WIFINET_FC0_TYPE_MGT) && \
+    (((_frame)->i_fc[0] & WIFINET_FC0_SUBTYPE_MASK) == WIFINET_FC0_SUBTYPE_PROBE_REQ))
 
-#define WIFINET_IS_DISASSOC(_frame)    ((((_frame)->i_fc[0] & WIFINET_FC0_TYPE_MASK) == WIFINET_FC0_TYPE_MGT) && \
-                                        (((_frame)->i_fc[0] & WIFINET_FC0_SUBTYPE_MASK) == WIFINET_FC0_SUBTYPE_DISASSOC))
+#define WIFINET_IS_DISASSOC(_frame) ((((_frame)->i_fc[0] & WIFINET_FC0_TYPE_MASK) == WIFINET_FC0_TYPE_MGT) && \
+    (((_frame)->i_fc[0] & WIFINET_FC0_SUBTYPE_MASK) == WIFINET_FC0_SUBTYPE_DISASSOC))
 
-#define WIFINET_IS_AUTH(_frame)    ((((_frame)->i_fc[0] & WIFINET_FC0_TYPE_MASK) == WIFINET_FC0_TYPE_MGT) && \
-                                        (((_frame)->i_fc[0] & WIFINET_FC0_SUBTYPE_MASK) == WIFINET_FC0_SUBTYPE_AUTH))
+#define WIFINET_IS_AUTH(_frame) ((((_frame)->i_fc[0] & WIFINET_FC0_TYPE_MASK) == WIFINET_FC0_TYPE_MGT) && \
+    (((_frame)->i_fc[0] & WIFINET_FC0_SUBTYPE_MASK) == WIFINET_FC0_SUBTYPE_AUTH))
 
-#define WIFINET_IS_DEAUTH(_frame)    ((((_frame)->i_fc[0] & WIFINET_FC0_TYPE_MASK) == WIFINET_FC0_TYPE_MGT) && \
-                                        (((_frame)->i_fc[0] & WIFINET_FC0_SUBTYPE_MASK) == WIFINET_FC0_SUBTYPE_DEAUTH))
+#define WIFINET_IS_ASSOC_REQ(_frame) ((((_frame)->i_fc[0] & WIFINET_FC0_TYPE_MASK) == WIFINET_FC0_TYPE_MGT) && \
+    (((_frame)->i_fc[0] & WIFINET_FC0_SUBTYPE_MASK) == WIFINET_FC0_SUBTYPE_ASSOC_REQ))
 
-#define WIFINET_IS_DATA(_wh)    ((((struct wifi_frame *)(_wh))->i_fc[0] & WIFINET_FC0_TYPE_MASK) == WIFINET_FC0_TYPE_DATA )
+#define WIFINET_IS_DEAUTH(_frame) ((((_frame)->i_fc[0] & WIFINET_FC0_TYPE_MASK) == WIFINET_FC0_TYPE_MGT) && \
+    (((_frame)->i_fc[0] & WIFINET_FC0_SUBTYPE_MASK) == WIFINET_FC0_SUBTYPE_DEAUTH))
+
+#define WIFINET_IS_DATA(_wh) ((((struct wifi_frame *)(_wh))->i_fc[0] & WIFINET_FC0_TYPE_MASK) == WIFINET_FC0_TYPE_DATA )
 
 #define WIFINET_IS_MFP_FRAME(_frame) ((((_frame)->i_fc[0] & WIFINET_FC0_TYPE_MASK) == WIFINET_FC0_TYPE_MGT) && \
-                                        ((_frame)->i_fc[1] & WIFINET_FC1_WEP) && \
-                                        ((((_frame)->i_fc[0] & WIFINET_FC0_SUBTYPE_MASK) == WIFINET_FC0_SUBTYPE_DEAUTH) || \
-                                         (((_frame)->i_fc[0] & WIFINET_FC0_SUBTYPE_MASK) == WIFINET_FC0_SUBTYPE_DISASSOC) || \
-                                         (((_frame)->i_fc[0] & WIFINET_FC0_SUBTYPE_MASK) == WIFINET_FC0_SUBTYPE_ACTION)))
+    ((_frame)->i_fc[1] & WIFINET_FC1_WEP) && ((((_frame)->i_fc[0] & WIFINET_FC0_SUBTYPE_MASK) == WIFINET_FC0_SUBTYPE_DEAUTH) || \
+    (((_frame)->i_fc[0] & WIFINET_FC0_SUBTYPE_MASK) == WIFINET_FC0_SUBTYPE_DISASSOC) || \
+    (((_frame)->i_fc[0] & WIFINET_FC0_SUBTYPE_MASK) == WIFINET_FC0_SUBTYPE_ACTION)))
 
-#define WIFINET_IS_CLASS3(_wh)    (WIFINET_IS_DATA(_wh) || WIFINET_IS_ACTION(_wh))
+#define WIFINET_IS_CLASS3(_wh) (WIFINET_IS_DATA(_wh) || WIFINET_IS_ACTION(_wh))
 
 #define WIFINET_RX_MCS_SINGLE_STREAM_BYTE_OFFSET 0
 #define WIFINET_RX_MCS_DUAL_STREAM_BYTE_OFFSET 1

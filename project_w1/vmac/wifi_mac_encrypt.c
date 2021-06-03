@@ -1004,12 +1004,6 @@ int wifi_mac_key_set(struct wlan_net_vif *wnet_vif, const struct wifi_mac_key *k
         }
         else
             sta = wifi_mac_get_sta(&wnet_vif->vm_sta_tbl, mac,wnet_vif->wnet_vif_id);
-
-        if (sta)
-        {
-            sta->sta_flags |= WIFINET_NODE_TKIPCIPHER;
-            printk("<running> %s %d \n",__func__,__LINE__);
-        }
     }
 
 done:

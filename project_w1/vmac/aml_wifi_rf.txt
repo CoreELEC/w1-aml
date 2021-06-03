@@ -8,6 +8,9 @@ cali_config=0x0
 freq_offset=0
 htemp_freq_offset=4
 
+#cca ed detect mode
+cca_ed_det=0
+
 #p212 tssi offset cfg <char>
 tssi_2g_offset=0xef
 tssi_5g_offset_5200=0xec

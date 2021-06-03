@@ -88,7 +88,7 @@ wifi_mac_start_bss_ex(unsigned long arg)
     struct wifi_station *obss;
     int canreassoc;
 
-    DPRINTF(AML_DEBUG_WARNING, "%s %d add main_sta:%p\n",__func__,__LINE__, selbs);
+    DPRINTF(AML_DEBUG_WARNING, "%s ori:%p, add main_sta:%p\n",__func__, wnet_vif->vm_mainsta, selbs);
     obss = wnet_vif->vm_mainsta;
     canreassoc = ((obss != NULL) && (wnet_vif->vm_state == WIFINET_S_CONNECTED) && ssid_equal(obss, selbs));
 
@@ -114,6 +114,9 @@ wifi_mac_start_bss_ex(unsigned long arg)
 #endif
     if (wnet_vif->vm_curchan != WIFINET_CHAN_ERR) {
         wifi_mac_ChangeChannel(wifimac, wnet_vif->vm_curchan, 3, wnet_vif->wnet_vif_id);
+        if (wnet_vif->vm_opmode == WIFINET_M_STA && (wifimac->wm_scan->scan_ssid_count > 10)) {
+            wifi_mac_set_channel_rssi(wifimac, (unsigned char)(wnet_vif->vm_mainsta->sta_avg_bcn_rssi));
+        }
 
     } else {
         return 1;
@@ -243,7 +246,7 @@ int wifi_mac_connect(struct wlan_net_vif *wnet_vif, struct wifi_scan_info *se)
 
     DPRINTF(AML_DEBUG_WARNING, "%s %d \n",__func__,__LINE__);
     /*sta side allocate a sta buffer to save ap capabilities and information */
-    sta = wifi_mac_get_sta_node(&wnet_vif->vm_sta_tbl, wnet_vif, se->SI_macaddr);
+    sta = wifi_mac_get_new_sta_node(&wnet_vif->vm_sta_tbl, wnet_vif, se->SI_macaddr);
     if (sta == NULL)
     {
         DPRINTF(AML_DEBUG_ERROR, "ERROR::%s %d alloc sta FAIL!!! \n",__func__,__LINE__);
@@ -293,6 +296,7 @@ int wifi_mac_connect(struct wlan_net_vif *wnet_vif, struct wifi_scan_info *se)
     sta->sta_capinfo = se->SI_capinfo;
     sta->sta_rsn = wnet_vif->vm_mainsta->sta_rsn;
     sta->sta_listen_intval = DEFAULT_LISTEN_INTERVAL;
+    sta->sta_avg_bcn_rssi = se->SI_rssi;
 
 #ifdef AML_WPA3
     if (wnet_vif->vm_mainsta->sta_flags_ext & WIFINET_NODE_MFP) {
@@ -414,7 +418,7 @@ void wifi_mac_create_wifi(struct wlan_net_vif* wnet_vif, struct wifi_channel *ch
     struct wifi_channel *work_channel = NULL;
 
     DPRINTF(AML_DEBUG_CONNECT, "%s %d\n",__func__,__LINE__);
-    sta = wifi_mac_get_sta_node(&wnet_vif->vm_sta_tbl, wnet_vif, wnet_vif->vm_myaddr);
+    sta = wifi_mac_get_new_sta_node(&wnet_vif->vm_sta_tbl, wnet_vif, wnet_vif->vm_myaddr);
     if (sta == NULL)
     {
         DPRINTF(AML_DEBUG_ERROR, "ERROR::%s %d alloc sta FAIL!!! \n",__func__,__LINE__);
@@ -467,7 +471,9 @@ void wifi_mac_create_wifi(struct wlan_net_vif* wnet_vif, struct wifi_channel *ch
     sta->sta_vhtcap = wnet_vif->vm_mainsta->sta_vhtcap;
     sta->sta_authmode = wnet_vif->vm_mainsta->sta_authmode;
     sta->sta_rsn = wnet_vif->vm_mainsta->sta_rsn;
-
+    if (WIFINET_INCLUDE_11N(wnet_vif->vm_mac_mode)) {
+        sta->sta_flags |= WIFINET_NODE_HT;
+    }
     wifi_mac_build_country_ie(wnet_vif);
     wifi_mac_start_bss(sta);
     printk("<%s>  L:%d, mac mode %d dot11_rate_num %d\n",
@@ -539,6 +545,7 @@ void wifi_mac_sta_leave(struct wifi_station *sta, int reassoc)
     wnet_vif = sta->sta_wnet_vif;
     wifimac = wnet_vif->vm_wmac;
     wnet_vif->vm_fixed_rate.mode = WIFINET_FIXED_RATE_NONE;
+    wnet_vif->vm_change_rate_enable = 1;
 
     printk("wifi_mac_sta_leave:%d, sta:%p, main_sta:%p\n", wnet_vif->wnet_vif_id, sta, wnet_vif->vm_mainsta);
     if (wnet_vif->vm_opmode == WIFINET_M_STA)
@@ -575,6 +582,7 @@ void wifi_mac_sta_leave(struct wifi_station *sta, int reassoc)
         wifimac->drv_priv->drv_ops.drv_set_is_mother_channel(wifimac->drv_priv, wnet_vif->wnet_vif_id, 1);
         wifi_mac_rst_bss(wnet_vif);
         wifi_mac_rst_main_sta(wnet_vif);
+        wifi_mac_set_channel_rssi(wifimac, -82); //default
     }
 
     /*
@@ -679,32 +687,17 @@ alloc_sta_node(struct wifi_station_tbl *nt,struct wlan_net_vif *wnet_vif)
 
 //if sta node is in the table, get it when addr and mac macth
 //if the sta node is not in the table, allocate one and append the queue, and get it
-
-struct wifi_station *wifi_mac_get_sta_node(struct wifi_station_tbl *nt,
+struct wifi_station *wifi_mac_get_new_sta_node(struct wifi_station_tbl *nt,
     struct wlan_net_vif *wnet_vif, const unsigned char *macaddr)
 {
     struct wifi_mac *wifimac = nt->nt_wmac;
     struct wifi_station *sta = NULL;
-    struct wifi_station *sta_next = NULL;
     int hash;
 
-    DPRINTF(AML_DEBUG_NODE, "%s %d \n",__func__,__LINE__);
-
-    list_for_each_entry_safe(sta, sta_next, &nt->nt_nsta, sta_list) {
-        if (sta != NULL) {
-            DPRINTF(AML_DEBUG_NODE, "%s %d \n",__func__,__LINE__);
-
-            if ((WIFINET_ADDR_EQ(macaddr, sta->sta_macaddr))&&(sta->wnet_vif_id == wnet_vif->wnet_vif_id)) {
-                return sta;
-            }
-        }
-    }
-
     sta = alloc_sta_node(nt,wnet_vif);
-    if (sta == NULL)
-    {
+    if (sta == NULL) {
         wnet_vif->vif_sts.sts_rx_sta_all_fail++;
-        DPRINTF(AML_DEBUG_NODE, "WARNNING:%s %d \n",__func__,__LINE__);
+        DPRINTF(AML_DEBUG_NODE, "WARNNING:%s %d \n", __func__, __LINE__);
         return NULL;
     }
     sta->sta_tmp_nsta = 0;
@@ -722,7 +715,7 @@ struct wifi_station *wifi_mac_get_sta_node(struct wifi_station_tbl *nt,
 
     sta->sta_chbw = 0;
     DPRINTF(AML_DEBUG_BWC, "%s(%d),sta_chbw 0x%x\n", __func__, __LINE__,sta->sta_chbw );
-    sta->connect_status = CONNECT_STATUS_IDLE;
+    sta->connect_status = CONNECT_IDLE;
     sta->sta_update_rate_flag = 0;
     sta->wnet_vif_id = wnet_vif->wnet_vif_id;
     sta->sta_bssmode = wnet_vif->vm_mac_mode;
@@ -735,9 +728,37 @@ struct wifi_station *wifi_mac_get_sta_node(struct wifi_station_tbl *nt,
 
     return sta;
 }
-int
-wifi_mac_add_wds_addr(struct wifi_station_tbl *nt,
-                   struct wifi_station *sta, const unsigned char *macaddr)
+
+struct wifi_station *wifi_mac_get_sta_node(struct wifi_station_tbl *nt,
+    struct wlan_net_vif *wnet_vif, const unsigned char *macaddr)
+{
+    struct wifi_station *sta = NULL;
+    struct wifi_station *sta_next = NULL;
+
+    DPRINTF(AML_DEBUG_NODE, "%s %d \n",__func__,__LINE__);
+
+    list_for_each_entry_safe(sta, sta_next, &nt->nt_nsta, sta_list) {
+        if (sta != NULL) {
+            DPRINTF(AML_DEBUG_NODE, "%s %d \n",__func__,__LINE__);
+
+            if ((WIFINET_ADDR_EQ(macaddr, sta->sta_macaddr))&&(sta->wnet_vif_id == wnet_vif->wnet_vif_id)) {
+                return sta;
+            }
+        }
+    }
+
+    sta = wifi_mac_get_new_sta_node(nt, wnet_vif, macaddr);
+    if (sta == NULL) {
+        wnet_vif->vif_sts.sts_rx_sta_all_fail++;
+        DPRINTF(AML_DEBUG_NODE, "WARNNING:%s %d \n",__func__,__LINE__);
+        return NULL;
+    }
+
+    return sta;
+}
+
+int wifi_mac_add_wds_addr(struct wifi_station_tbl *nt,
+    struct wifi_station *sta, const unsigned char *macaddr)
 {
     int hash;
     struct wifi_mac_WdsAddr *wds;
@@ -745,11 +766,11 @@ wifi_mac_add_wds_addr(struct wifi_station_tbl *nt,
     wds = (struct wifi_mac_WdsAddr *)NET_MALLOC(sizeof(struct wifi_mac_WdsAddr),
         GFP_KERNEL, "wifi_mac_add_wds_addr.wds");
 
-    if (wds == NULL)
-    {
+    if (wds == NULL) {
         DPRINTF(AML_DEBUG_NODE, "WARNNING:%s %d \n",__func__,__LINE__);
         return 1;
     }
+
     wds->wds_agingcount = WDS_AGING_COUNT;
     hash = WIFINET_NODE_HASH(macaddr);
     WIFINET_ADDR_COPY(wds->wds_macaddr, macaddr);
@@ -760,9 +781,7 @@ wifi_mac_add_wds_addr(struct wifi_station_tbl *nt,
     return 0;
 }
 
-void
-wifi_mac_rm_wds_addr(struct wifi_station_tbl *nt,
-                      const unsigned char *macaddr)
+void wifi_mac_rm_wds_addr(struct wifi_station_tbl *nt, const unsigned char *macaddr)
 {
     int hash;
     struct wifi_mac_WdsAddr *wds;
@@ -781,10 +800,7 @@ wifi_mac_rm_wds_addr(struct wifi_station_tbl *nt,
     }
 }
 
-
-void
-wifi_mac_delt_wds_sta(struct wifi_station_tbl *nt,
-                   struct wifi_station *sta)
+void wifi_mac_delt_wds_sta(struct wifi_station_tbl *nt, struct wifi_station *sta)
 {
     int hash;
     struct wifi_mac_WdsAddr *wds;
@@ -1335,7 +1351,6 @@ static void wifi_mac_TimeoutStations(struct wifi_station_tbl *nt)
 
     skb_queue_head_init(&skb_freeq);
 
-restart:
     list_for_each_entry_safe(sta, sta_next, &nt->nt_nsta, sta_list) {
         if ((sta->sta_flags & WIFINET_NODE_AREF) == 0)
             continue;
@@ -1343,16 +1358,16 @@ restart:
         if (sta->sta_associd != 0) {
             struct wlan_net_vif *wnet_vif = sta->sta_wnet_vif;
 
-            if (wifi_mac_pwrsave_psqueue_age(sta, &skb_freeq) != 0 &&
-                WIFINET_SAVEQ_QLEN(&(sta->sta_pstxqueue)) == 0 &&
-                wnet_vif->vif_ops.vm_set_tim != NULL)
+            if (wifi_mac_pwrsave_psqueue_age(sta, &skb_freeq) != 0
+                && WIFINET_SAVEQ_QLEN(&(sta->sta_pstxqueue)) == 0
+                && (wnet_vif->vif_ops.vm_set_tim != NULL))
                 wnet_vif->vif_ops.vm_set_tim(sta, 0);
         }
         /*
             if within 5s since last packet, we haven't receive new packets:
             sta send null data, ap send deauth until sta_inact = 0.
         */
-        if (jiffies <(sta->sta_rstamp +5*HZ))
+        if (jiffies < (sta->sta_rstamp + 5 * HZ))
             continue;
 
         if ((sta->sta_rxfrag[0] != NULL) && (jiffies > sta->sta_rxfragstamp + HZ)) {
@@ -1367,35 +1382,33 @@ restart:
         }
 
         sta->sta_inact--;
-        if (sta->sta_associd != 0)
-        {
+        if (sta->sta_associd != 0) {
             struct wlan_net_vif *wnet_vif = sta->sta_wnet_vif;
 
             if ((0 < sta->sta_inact) && (sta->sta_inact <= wnet_vif->vm_inact_probe)) {
-                WIFINET_DPRINTF_STA(AML_DEBUG_NODE , sta, "%s", "probe station due to inactivity");
-                wifi_mac_send_nulldata(sta, 0, 0, 0, 0);
-                goto restart;
+                WIFINET_DPRINTF_STA(AML_DEBUG_ANY , sta, "%s", "probe station due to inactivity");
+                if(sta->sta_wnet_vif->vm_opmode == WIFINET_M_HOSTAP) {
+                    wifi_mac_send_nulldata_for_ap(sta, 0, 0, 0, 0);
+                } else {
+                    wifi_mac_send_nulldata(sta, 0, 0, 0, 0);
+                }
             }
         }
 
-        if (sta->sta_inact <= 0)
-        {
+        if (sta->sta_inact <= 0) {
             WIFINET_DPRINTF_STA(AML_DEBUG_ANY , sta, "station timed out due to inactivity:%p", sta);
 
             sta->sta_wnet_vif->vif_sts.sts_tx_sta_aged++;
-            if (sta->sta_associd != 0)
-            {
+            if (sta->sta_associd != 0) {
                 arg = WIFINET_REASON_AUTH_EXPIRE;
                 wifi_mac_send_mgmt(sta, WIFINET_FC0_SUBTYPE_DEAUTH, (void *)&arg);
             }
 
             wifi_mac_sta_disconnect(sta);
-            goto restart;
         }
     }
 
-    while ((skb = skb_peek(&skb_freeq)) != NULL)
-    {
+    while ((skb = skb_peek(&skb_freeq)) != NULL) {
         skb = __skb_dequeue(&skb_freeq);
         kfree_skb(skb);
     }
@@ -1656,8 +1669,8 @@ void wifi_mac_dump_sta(struct wifi_station_tbl *nt, struct wifi_station *sta)
     int i;
 
     DPRINTF(AML_DEBUG_DEBUG,"0x%p: mac %s\n", sta, ether_sprintf(sta->sta_macaddr));
-    DPRINTF(AML_DEBUG_DEBUG,"\tscangen %u authmode %u flags 0x%x\n",
-            sta->sta_scangen, sta->sta_authmode, sta->sta_flags);
+    DPRINTF(AML_DEBUG_DEBUG,"\tauthmode %u flags 0x%x\n",
+            sta->sta_authmode, sta->sta_flags);
     DPRINTF(AML_DEBUG_DEBUG,"\tassocid 0x%x txpower %u vlan %u\n",
             sta->sta_associd, sta->sta_txpower, sta->sta_vlan);
     DPRINTF(AML_DEBUG_DEBUG,"rxfragstamp %lu\n", sta->sta_rxfragstamp);
@@ -1947,11 +1960,16 @@ void wifi_mac_rst_main_sta(struct wlan_net_vif *wnet_vif)
         sta->sta_associd = 0;
         sta->sta_authmode = WIFINET_AUTH_OPEN;
         memset(sta->sta_bssid, 0, WIFINET_ADDR_LEN);
+        memset(sta->sta_macaddr, 0, WIFINET_ADDR_LEN);
 
         sta->sta_chbw = 0;
-        sta->connect_status = CONNECT_STATUS_IDLE;
+        sta->connect_status = CONNECT_IDLE;
         sta->sta_update_rate_flag = 0;
         sta->sta_bssmode = wnet_vif->vm_mac_mode;
+
+        sta->sta_flags = 0;
+        sta->sta_flags_ext = 0;
+        memset(&sta->sta_rsn, 0, sizeof(struct wifi_mac_Rsnparms));
     }
 }
 

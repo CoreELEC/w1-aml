@@ -139,7 +139,7 @@ enum vm_vendor_command_attr{
 
     VM_NL80211_SET_COEXIST_REQ_TIMEOUT  = 0x59,
     VM_NL80211_SET_COEXIST_NOT_GRANT_WEIGHT  = 0x5a,
-    VM_NL80211_SET_COEXIST_FW_RETRY_WEIGHT   = 0x5b,
+    VM_NL80211_SET_COEXIST_CONFIG = 0x5b,
     VM_NL80211_SET_COEXIST_MAX_NOT_GRANT_CNT= 0x5c,
     VM_NL80211_SET_COEXIST_IRQ_END_TIM  = 0x5d,
     VM_NL80211_SET_COEXIST_SCAN_PRI_RANGE = 0x5e,
@@ -256,7 +256,7 @@ union vendor_if
                  .max_power     = 30,               \
  }
 
-#define CFG80211_CONNECT_TIMER_OUT      (5*1000)
+#define CFG80211_CONNECT_TIMER_OUT (8*1000)
 struct vm_wdev_priv
 {
     struct wireless_dev *vm_wdev;
@@ -360,6 +360,7 @@ void vm_cfg80211_indicate_sta_disassoc(const struct wifi_station *sta, unsigned 
 int vm_cfg80211_send_mgmt(struct wlan_net_vif *wnet_vif,const unsigned char * buf,int len);
 
 int  netdev_setcsum( struct net_device *dev,int data);
+int wifi_mac_preempt_scan( struct wifi_mac *wifimac, int max_grace, int max_wait);
 char preempt_scan(struct net_device *dev, int max_grace, int max_wait);
 int vm_cfg80211_vendor_event(struct wiphy *wiphy, IN int event, IN unsigned char *data, IN int len);
 

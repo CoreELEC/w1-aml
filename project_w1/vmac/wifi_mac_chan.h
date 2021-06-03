@@ -26,5 +26,7 @@ void  wifi_mac_update_chan_list_by_country(int country_code, int support_opt[],i
 void wifi_mac_mark_dfs_channel(struct wlan_net_vif *wnet_vif, int chan_num);
 void wifi_mac_unmark_dfs_channel(struct wlan_net_vif *wnet_vif, int chan_num);
 int wifi_mac_if_dfs_channel(struct wifi_mac *wifimac, int chan_num);
+int find_country_code(unsigned char *countryString);
+int wifi_mac_find_80M_channel_center_chan(int chan);
 
 #endif//__NET80211_CHAN_H__

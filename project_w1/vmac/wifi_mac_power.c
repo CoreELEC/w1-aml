@@ -66,7 +66,7 @@ static void wifi_mac_pwrsave_presleep(struct work_struct *work)
          && (wnet_vif->vm_pwrsave.ips_state == WIFINET_PWRSAVE_AWAKE)
          && (wifi_mac_all_txq_all_qcnt(wifimac) == 0)
          && (!(wnet_vif->vm_flags & WIFINET_F_WPA) || ((wnet_vif->vm_flags & WIFINET_F_WPA)
-         && (wnet_vif->vm_mainsta->connect_status == DHCP_GET_ACK))))
+         && (wnet_vif->vm_mainsta->connect_status == CONNECT_DHCP_GET_ACK))))
     {
         WIFINET_PWRSAVE_UNLOCK(wnet_vif);
         if ((wnet_vif->vm_opmode == WIFINET_M_STA) && (wnet_vif->vm_state == WIFINET_S_CONNECTED))
@@ -78,9 +78,12 @@ static void wifi_mac_pwrsave_presleep(struct work_struct *work)
         }
         else
         {
-            //if sta is disconnected, just sleep
-            DPRINTF(AML_DEBUG_PWR_SAVE, "%s %d disconnect, full sleep \n",__func__,__LINE__);
-            wifi_mac_pwrsave_fullsleep(wnet_vif, SLEEP_AFTER_INACTIVITY_ENOUGH);
+            if (wnet_vif->vm_opmode != WIFINET_M_HOSTAP)
+            {
+                //if sta is disconnected, just sleep
+                DPRINTF(AML_DEBUG_PWR_SAVE, "%s %d disconnect, full sleep \n",__func__,__LINE__);
+                wifi_mac_pwrsave_fullsleep(wnet_vif, SLEEP_AFTER_INACTIVITY_ENOUGH);
+            }
         }
     } else {
         if (wnet_vif->vm_pwrsave.ips_state == WIFINET_PWRSAVE_AWAKE) {
@@ -111,6 +114,7 @@ static void  wifi_mac_pwrsave_wakeup_ex(SYS_TYPE param1,
 
     wifi_mac_pwrsave_sleep_wait_cancle(wnet_vif);
     wifi_mac_pwrsave_wakeup(wnet_vif, WKUP_FROM_TRANSMIT);
+
     if ((wnet_vif->vm_opmode == WIFINET_M_STA) && (wnet_vif->vm_state == WIFINET_S_CONNECTED))
     {
 #ifdef CONFIG_P2P
@@ -507,7 +511,16 @@ void wifi_mac_pwrsave_latevattach(struct wlan_net_vif *wnet_vif)
             wnet_vif->vm_tim_len = 0;
         }
         wnet_vif->vm_ps_pending = 0;
+
+        /* wlan0 change STA mode to HOSTAP, need wake up */
+        if (wnet_vif->vm_opmode == WIFINET_M_HOSTAP)
+        {
+            wnet_vif->vm_pwrsave.ips_sta_psmode = WIFINET_PWRSAVE_LOW;
+            wifi_mac_pwrsave_wakeup(wnet_vif, WKUP_FROM_VMAC_UP);
+        }
+        return;
     }
+
     wifi_mac_pwrsave_fullsleep(wnet_vif, SLEEP_AFTER_VMAC_CREATE);
 }
 
@@ -738,14 +751,12 @@ static int wifi_mac_buffer_txq_send(struct sk_buff_head *pstxqueue)
     struct sk_buff *skb = NULL;
     unsigned int qlen_real = WIFINET_SAVEQ_QLEN(pstxqueue);
 
-    while (qlen_real)
-    {
+    while (qlen_real) {
         WIFINET_SAVEQ_LOCK(pstxqueue);
         WIFINET_SAVEQ_DEQUEUE(pstxqueue, skb, qlen_real);
         WIFINET_SAVEQ_UNLOCK(pstxqueue);
 
-        if (!skb)
-        {
+        if (!skb) {
             break;
         }
 
@@ -762,6 +773,7 @@ static int wifi_mac_buffer_txq_send(struct sk_buff_head *pstxqueue)
             wifimac->drv_priv->drv_ops.tx_start(wifimac->drv_priv, skb);
         }
     }
+
     return qlen_real;
 }
 
@@ -774,7 +786,7 @@ int wifi_mac_buffer_txq_send_pre (struct wlan_net_vif *wnet_vif)
         wifi_mac_buffer_txq_send(&wnet_vif->vm_tx_buffer_queue);
         return 0;
     }
-    //printk("%s end\n", __func__);
+
     return -1;
 }
 
@@ -1651,17 +1663,17 @@ int wifi_mac_pwrsave_wow_suspend(SYS_TYPE param1,
     unsigned int filter = 0, cnt = 0;
 
     printk("%s:%d\n", __func__, __LINE__);
-    OS_MUTEX_LOCK(&wifimac->wm_suspend_mutex);
+    WIFINET_PWRSAVE_MUTEX_LOCK(wnet_vif);
     if (wifimac->wm_suspend_mode == WIFI_SUSPEND_STATE_WOW)
     {
-        OS_MUTEX_UNLOCK(&wifimac->wm_suspend_mutex);
+        WIFINET_PWRSAVE_MUTEX_UNLOCK(wnet_vif);
         return 0;
     }
 
     DPRINTF(AML_DEBUG_PWR_SAVE, "<%s>:%s %d scan abort when host suspend \n",
         wnet_vif->vm_ndev->name,__func__, __LINE__);
     wnet_vif->vm_scan_hang = 1;
-    wifi_mac_cancel_scan(wnet_vif);
+    wifi_mac_cancel_scan(wifimac);
     /* waiting for completing scan process */
     while (wifimac->wm_flags & WIFINET_F_SCAN)
     {
@@ -1670,7 +1682,7 @@ int wifi_mac_pwrsave_wow_suspend(SYS_TYPE param1,
         {
             printk("<%s>:%s %d wait scan end fail when host suspend \n",
                 wnet_vif->vm_ndev->name, __func__, __LINE__);
-            OS_MUTEX_UNLOCK(&wifimac->wm_suspend_mutex);
+            WIFINET_PWRSAVE_MUTEX_UNLOCK(wnet_vif);
             return -1;
         }
     }
@@ -1688,7 +1700,7 @@ int wifi_mac_pwrsave_wow_suspend(SYS_TYPE param1,
         /* need to wait for transmitting data out. waitting suspend
          * command again and try to suspend wifi.
          */
-        OS_MUTEX_UNLOCK(&wifimac->wm_suspend_mutex);
+        WIFINET_PWRSAVE_MUTEX_UNLOCK(wnet_vif);
         return -EINVAL;
         #endif
     }
@@ -1737,7 +1749,7 @@ int wifi_mac_pwrsave_wow_suspend(SYS_TYPE param1,
         /* if both wlan0 and p2p0 don't connect ap, just follow wlan0 operations. */
         if (wnet_vif->wnet_vif_id == 1)
         {
-            OS_MUTEX_UNLOCK(&wifimac->wm_suspend_mutex);
+            WIFINET_PWRSAVE_MUTEX_UNLOCK(wnet_vif);
             return 0;
         }
         wifimac->drv_priv->drv_ops.drv_set_suspend(wifimac->drv_priv, wnet_vif->wnet_vif_id, ENABLE,
@@ -1750,7 +1762,7 @@ int wifi_mac_pwrsave_wow_suspend(SYS_TYPE param1,
     /*set suspend state */
     wifimac->wm_suspend_mode = WIFI_SUSPEND_STATE_WOW;
 
-    OS_MUTEX_UNLOCK(&wifimac->wm_suspend_mutex);
+    WIFINET_PWRSAVE_MUTEX_UNLOCK(wnet_vif);
     return 0;
 }
 
@@ -1762,12 +1774,13 @@ int wifi_mac_pwrsave_wow_resume(SYS_TYPE param1,
     struct wlan_net_vif *wnet_vif_next = NULL, *wnet_vif_tmp = NULL;
     struct wifi_mac *wifimac = wnet_vif->vm_wmac;
     int connect = 0;
+    int ret = 0;
 
     printk("%s:%d\n", __func__, __LINE__);
-    OS_MUTEX_LOCK(&wifimac->wm_suspend_mutex);
+    WIFINET_PWRSAVE_MUTEX_LOCK(wnet_vif);
     if (wifimac->wm_suspend_mode == WIFI_SUSPEND_STATE_NONE)
     {
-        OS_MUTEX_UNLOCK(&wifimac->wm_suspend_mutex);
+        WIFINET_PWRSAVE_MUTEX_UNLOCK(wnet_vif);
         return 0;
     }
 
@@ -1783,7 +1796,7 @@ int wifi_mac_pwrsave_wow_resume(SYS_TYPE param1,
         * disable vmac wow and clear filters. patterns are cleaned in firmware
         * when firmware get wow disable command.
         */
-        wifimac->drv_priv->drv_ops.drv_set_suspend(wifimac->drv_priv, wnet_vif_tmp->wnet_vif_id, DISABLE,
+        ret = wifimac->drv_priv->drv_ops.drv_set_suspend(wifimac->drv_priv, wnet_vif_tmp->wnet_vif_id, DISABLE,
             WIFI_SUSPEND_STATE_NONE, 0);
 
         wifi_mac_set_arp_agent(wnet_vif_tmp, DISABLE);
@@ -1796,7 +1809,10 @@ int wifi_mac_pwrsave_wow_resume(SYS_TYPE param1,
         wifi_mac_set_beacon_miss_ex(wnet_vif_tmp, ENABLE, WIFINET_BCNMISS_TIME/* period, ms*/);
 
         WIFINET_PWRSAVE_LOCK(wnet_vif);
-        wnet_vif_tmp->vm_pwrsave.ips_state = WIFINET_PWRSAVE_AWAKE;
+        if (ret == 0)
+            wnet_vif_tmp->vm_pwrsave.ips_state = WIFINET_PWRSAVE_AWAKE;
+        else
+            printk("%s:%d, ret -1 \n", __func__, __LINE__);
         WIFINET_PWRSAVE_UNLOCK(wnet_vif);
     }
 
@@ -1805,7 +1821,7 @@ int wifi_mac_pwrsave_wow_resume(SYS_TYPE param1,
         /* if both wlan0 and p2p0 don't connect ap, just follow wlan0 operations. */
         if (wnet_vif->wnet_vif_id == 1)
         {
-            OS_MUTEX_UNLOCK(&wifimac->wm_suspend_mutex);
+            WIFINET_PWRSAVE_MUTEX_UNLOCK(wnet_vif);
             wnet_vif->vm_scan_hang = 0;
             netif_wake_queue(wnet_vif->vm_ndev);
             return 0;
@@ -1821,7 +1837,7 @@ int wifi_mac_pwrsave_wow_resume(SYS_TYPE param1,
     /*set suspend state */
     wifimac->wm_suspend_mode = WIFI_SUSPEND_STATE_NONE;
 
-    OS_MUTEX_UNLOCK(&wifimac->wm_suspend_mutex);
+    WIFINET_PWRSAVE_MUTEX_UNLOCK(wnet_vif);
     wnet_vif->vm_scan_hang = 0;
     netif_wake_queue(wnet_vif->vm_ndev);
     return 0;

@@ -28,26 +28,26 @@ struct wifi_station;
 #define CCK_PREAMBLE_BITS   144
 #define CCK_PLCP_BITS        48
 /* value used to specify no encryption key for xmit */
-#define    HAL_TXKEYIX_INVALID    ((unsigned int) -1)
+#define HAL_TXKEYIX_INVALID    ((unsigned int) -1)
 
 /* rcs_flags definition */
-#define HAL_RATECTRL_CW40_FLAG              0x0002    /* CW 40 */
-#define HAL_RATECTRL_SGI_FLAG               0x0004    /* Short Guard Interval */
-#define HAL_RATECTRL_TX_SEND_SUCCES      0X800
-#define HAL_RATECTRL_USE_SAMPLE_RATE      0X1000
+#define HAL_RATECTRL_USE_FIXED_RATE 0x0001
+#define HAL_RATECTRL_CW40_FLAG 0x0002    /* CW 40 */
+#define HAL_RATECTRL_SGI_FLAG 0x0004    /* Short Guard Interval */
+#define HAL_RATECTRL_TX_SEND_SUCCES 0X800
+#define HAL_RATECTRL_USE_SAMPLE_RATE 0X1000
 
-#define HAL_BEACON_PERIOD       0x0000ffff  /* beacon interval period */
-#define WLAN_CTRL_FRAME_SIZE    14   /* ACK+FCS */
-#define CO_WORK_GET     0
-#define CO_WORK_FREE    1
-#define CO_SF_WORK_NBR  2
+#define HAL_BEACON_PERIOD 0x0000ffff  /* beacon interval period */
+#define WLAN_CTRL_FRAME_SIZE 14   /* ACK+FCS */
+#define CO_WORK_GET 0
+#define CO_WORK_FREE 1
+#define CO_SF_WORK_NBR 2
 
 /* WME stream classes */
-#define WME_AC_BE   0       /* best effort */
-#define WME_AC_BK   1       /* background */
-#define WME_AC_VI   2       /* video */
-#define WME_AC_VO   3       /* voice */
-
+#define WME_AC_BE 0       /* best effort */
+#define WME_AC_BK 1       /* background */
+#define WME_AC_VI 2       /* video */
+#define WME_AC_VO 3       /* voice */
 
 /*
  * Spatial Multiplexing Modes.
@@ -58,28 +58,6 @@ enum
     HAL_SM_PWRSAV_STATIC,
     HAL_SM_PWRSAV_DYNAMIC,
 } ;
-
-
-enum WIFI_countryenum
-{
-    WIFI_China,
-    WIFI_NorthAmerica,
-    WIFI_Europe,
-    WIFI_France,
-    WIFI_Japan,
-    WIFI_Israel,//G channel->ch3-9;
-    WIFI_Mexico, //G channel->ch10,11;
-    WIFI_Canada,
-    WIFI_India,
-    WIFI_Australia,
-    WIFI_NewZealand,
-    WIFI_Brazil,
-    WIFI_WW,
-    WIFI_country_MAX, //G channel->ch10,11;
-};
-
-
-
 
 /**
  *  Protection Moide
@@ -146,6 +124,17 @@ enum
     HAL_BAND_5G     = 1,            /* 5G hz */
 } ;
 
+struct country_chan_mapping {
+    char country[2];
+    unsigned char chplan;
+};
+
+struct country_chan_plan {
+    char support_class_num;
+    int support_class[20];
+    char class_na_freq_plan;
+    unsigned char dfs_chan_flag;
+};
 
 
 /*
@@ -487,24 +476,6 @@ static inline unsigned int drv_hal_settxqueueflush(unsigned char vid)
 
 int drv_hal_detach(void);
 
-
-static const unsigned char  all_countries_name[WIFI_country_MAX][3] =
-{
-    "CN",
-    "US",
-    "EU",
-    "FR",
-    "JP",
-    "IR",
-    "MX",
-    "CA",
-    "IN",
-    "AU",
-    "NZ",
-    "BR",
-    "WW"
-};
-
 static inline void drv_hal_setretrynum(unsigned short retrynum)
 {
     struct hal_private* hal_priv = hal_get_priv();
@@ -539,7 +510,6 @@ unsigned char drv_hal_wnet_vif_staid(unsigned char vm_opmode,unsigned short sta_
 unsigned short drv_hal_staid(enum hal_op_mode hal_opmode,unsigned short sta_associd);
 unsigned char drv_hal_nsta_staid(struct wifi_station *sta);
 struct drv_rate_table *drv_hal_get_rate_tbl(int mode);
-int find_country_code(unsigned char *countryString);
 int drv_hal_workitem_inital(void);
 void drv_hal_workitem_free(void);
 int drv_hal_add_workitem(WorkHandler task, WorkHandler taskcallback, SYS_TYPE param1,

@@ -328,22 +328,6 @@ unsigned char drv_hal_nsta_staid(struct wifi_station *sta)
     return drv_hal_wnet_vif_staid(sta->sta_wnet_vif->vm_opmode,sta->sta_associd);
 }
 
-/* * Find the country code. */
-int find_country_code(unsigned char *countryString)
-{
-    int i;
-    if (strlen(countryString) != 2)
-        return 0xff;
-
-    for (i=0; i<WIFI_country_MAX; i++)
-    {
-        if ((all_countries_name[i][0] == countryString[0]) &&
-            (all_countries_name[i][1] == countryString[1]))
-            return i;
-    }
-    return 0xff;        /* Not found */
-}
-
 static void
 drv_hal_workitem_task(SYS_TYPE iparam)
 {

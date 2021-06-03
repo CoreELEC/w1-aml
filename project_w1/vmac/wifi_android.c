@@ -374,13 +374,11 @@ static int aml_android_cmdstr_to_num(char *cmdstr)
             break;
 
         case ANDROID_WIFI_CMD_SET_AP_WPS_P2P_IE:
-        {
             skip = strlen(android_wifi_cmd_str[ANDROID_WIFI_CMD_SET_AP_WPS_P2P_IE]) + 3;
             bytes_written = vm_p2p_set_wpsp2pie(wnet_vif->vm_ndev, command + skip,
                 priv_cmd.total_len - skip, *(command + skip - 2) - '0');
             DPRINTF(AML_DEBUG_ANDROID,"%s %d bytes_written=%d\n", __func__, __LINE__, bytes_written);
             break;
-        }
 #endif //CONFIG_P2P
 #ifdef CONFIG_WFD
         case ANDROID_WIFI_CMD_WFD_ENABLE:

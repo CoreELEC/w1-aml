@@ -253,7 +253,7 @@ int check_ht_rate(struct wlan_net_vif *wnet_vif, const struct wifi_scan_info *sc
     struct wifi_mac_ie_htinfo_cmn *htinfo;
 
     mac_mode = (int)wifi_mac_get_sta_mode((struct wifi_scan_info *)scaninfo);
-    
+
     k = 0;
     srs = &wifimac->wm_sup_ht_rates;
     memset(&rrs, 0, sizeof(rrs));
@@ -262,7 +262,8 @@ int check_ht_rate(struct wlan_net_vif *wnet_vif, const struct wifi_scan_info *sc
         htcap = &((struct wifi_mac_ie_htcap *)scaninfo->SI_htcap_ie)->hc_ie;
         htinfo = &((struct wifi_mac_ie_htinfo *)scaninfo->SI_htinfo_ie)->hi_ie;
 
-        for (i = 0; i < WIFINET_HT_RATE_SIZE; i++) {
+        /* only support Spatial Stream 1 (mcs 0~7)*/
+        for (i = 0; i < 8; i++) {
             if (htcap->hc_mcsset[i / 8] & (1 << (i % 8))) {
                 rrs.dot11_rate[k++] = i | ((htinfo->hi_basicmcsset[i/8] & (1 << (i%8))) ? WIFINET_RATE_BASIC : 0);
             }
@@ -689,6 +690,7 @@ int wifi_mac_rate_vattach (struct wlan_net_vif *wnet_vif)
 {
     wnet_vif->vm_fixed_rate.rateinfo = 0xff;
     wnet_vif->vm_fixed_rate.mode = WIFINET_FIXED_RATE_NONE;
+    wnet_vif->vm_change_rate_enable = 1;
     return 0;
 }
 

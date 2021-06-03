@@ -103,11 +103,9 @@ wifi_macwnet_vif_get_opmode(struct wlan_net_vif *wnet_vif)
     return wnet_vif->vm_opmode;
 }
 
-#define WIFINET_NODE_USEAMPDU(_sta)                         \
-        (wifi_mac_is_ht_enable(_sta) && \
-         (((_sta)->sta_flags & WIFINET_NODE_HT) != 0) && \
-         (((_sta)->sta_wnet_vif->vm_flags_ext & WIFINET_FEXT_AMPDU) != 0)&& \
-         (((_sta)->sta_flags & WIFINET_NODE_NOAMPDU)== 0))
+#define WIFINET_NODE_USEAMPDU(_sta) \
+    (((_sta)->sta_flags & WIFINET_NODE_HT) != 0) && \
+    (((_sta)->sta_wnet_vif->vm_flags_ext & WIFINET_FEXT_AMPDU) != 0)
 
 
 static __inline void
@@ -247,7 +245,7 @@ struct l2_update_frame
     unsigned char xid[3];
 }  __packed;
 
- int wifi_mac_mac_entry(struct wifi_mac *wifimac,void *  drv_priv);
+ int wifi_mac_entry(struct wifi_mac *wifimac,void *  drv_priv);
  void wifi_mac_get_sts(struct wifi_mac *wifimac,unsigned int op_code, unsigned int ctrl_code);
  int wifi_mac_mac_exit(struct wifi_mac *wifimac);
 void wifi_mac_scan_start(struct wifi_mac *wifimac);
@@ -264,6 +262,7 @@ void wifi_mac_vmac_delt(struct wlan_net_vif *wnet_vif);
 void wifi_mac_scan_end(struct wifi_mac *wifimac);
 void wifi_mac_connect_start(struct wifi_mac *wifimac);
 void wifi_mac_connect_end(struct wifi_mac *wifimac);
+void wifi_mac_set_channel_rssi(struct wifi_mac *wifimac, unsigned char rssi);
 unsigned int wifi_mac_add_work_task(struct wifi_mac *wifimac,
     void *func,void *func_cb, SYS_TYPE param1, SYS_TYPE param2, SYS_TYPE param3, SYS_TYPE param4, SYS_TYPE param5);
 
@@ -294,8 +293,8 @@ void wifi_mac_sta_free(struct wifi_station *sta);
 void wifi_mac_sta_clean(struct wifi_station *sta);
 void wifi_mac_get_country(struct wifi_mac *wifimac, struct _wifi_mac_country_iso *ciso);
 
-int wifi_mac_mac_cap_attach(struct wifi_mac *wifimac, struct drv_private*  drv_priv);
-int wifi_mac_mac_cap_detach(struct wifi_mac *wifimac);
+int wifi_mac_cap_attach(struct wifi_mac *wifimac, struct drv_private*  drv_priv);
+int wifi_mac_cap_detach(struct wifi_mac *wifimac);
 int wifi_mac_rx_complete(void * ieee,  struct sk_buff * skbbuf, struct wifi_mac_rx_status* rs);
 int wifi_mac_tx_send( struct sk_buff * skbbuf);
 int wifi_mac_tx_mgmt_frm(struct wifi_mac *wifimac,  struct sk_buff * skbbuf);
@@ -336,6 +335,7 @@ int wifi_mac_ioctrl(struct net_device *dev, struct ifreq *ifr, int cmd);
 void wnet_vif_vht_cap_init( struct wlan_net_vif *wnet_vif );
 int wifi_mac_setup(struct wifi_mac *, struct wlan_net_vif *, int opmode);
 void wifi_mac_init_ops (struct wifi_mac* wmac);
+void wifi_mac_set_reg_val(unsigned int reg_addr, enum wifi_mac_bwc_width bw);
 
 int vm_wlan_net_vif_setup_forchvif(struct wifi_mac *wifimac, struct wlan_net_vif *wnet_vif, const char *name,  int opmode);
 int vm_wlan_net_vif_register(struct wlan_net_vif *, char *);

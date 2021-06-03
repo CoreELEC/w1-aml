@@ -77,9 +77,7 @@ struct wifi_scan_info;
 #define WIFINET_NODE_OWL_WDSWAR 0x0400
 #define WIFINET_NODE_WDS 0x0800
 
-#define WIFINET_NODE_NOAMPDU 0x1000
 #define WIFINET_NODE_VHT 0x2000
-#define WIFINET_NODE_TKIPCIPHER 0x4000
 
 //sta ext flag
 #define WIFINET_NODE_MFP 0x0001
@@ -182,7 +180,6 @@ struct wifi_station
     struct wifi_mac_rateset sta_htrates;
     struct wifi_mac_rateset sta_vhtrates;
 
-    unsigned int sta_scangen;
     unsigned char sta_authmode;
     unsigned short sta_flags;
     unsigned short sta_flags_ext;
@@ -300,6 +297,7 @@ struct wifi_station
     struct minstrel_priv *sta_minstel_pri;
     struct minstrel_sta_info *sta_minstrel_info;
     struct ieee80211_sta ieee_sta;
+    unsigned char sta_vendor_rate_code[IEEE80211_TX_MAX_RATES];
 };
 
 #define WDS_AGING_TIME 600
@@ -386,6 +384,7 @@ void wifi_mac_rst_main_sta(struct wlan_net_vif *wnet_vif);
 int wifi_mac_connect(struct wlan_net_vif *, struct wifi_scan_info *);
 void wifi_mac_sta_leave(struct wifi_station *, int reassoc);
 struct wifi_station *wifi_mac_get_sta_node(struct wifi_station_tbl *, struct wlan_net_vif *, const unsigned char *);
+struct wifi_station *wifi_mac_get_new_sta_node(struct wifi_station_tbl *nt, struct wlan_net_vif *wnet_vif, const unsigned char *macaddr);
 struct wifi_station *wifi_mac_tmp_nsta(struct wlan_net_vif *, const unsigned char *);
 struct wifi_station *wifi_mac_bup_bss(struct wlan_net_vif *, const unsigned char *);
 void wifi_mac_free_sta(struct wifi_station *sta);

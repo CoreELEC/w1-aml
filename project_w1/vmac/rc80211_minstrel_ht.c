@@ -42,47 +42,21 @@ static bool minstrel_vht_only = true;
  */
 const struct mcs_group minstrel_mcs_groups[] = {
 	MCS_GROUP(1, 0, BW_20),
-	MCS_GROUP(2, 0, BW_20),
-	MCS_GROUP(3, 0, BW_20),
-
 	MCS_GROUP(1, 1, BW_20),
-	MCS_GROUP(2, 1, BW_20),
-	MCS_GROUP(3, 1, BW_20),
-
 	MCS_GROUP(1, 0, BW_40),
-	MCS_GROUP(2, 0, BW_40),
-	MCS_GROUP(3, 0, BW_40),
-
 	MCS_GROUP(1, 1, BW_40),
-	MCS_GROUP(2, 1, BW_40),
-	MCS_GROUP(3, 1, BW_40),
 
 	CCK_GROUP,
 
 #ifdef CONFIG_MAC80211_RC_MINSTREL_VHT
 	VHT_GROUP(1, 0, BW_20),
-	VHT_GROUP(2, 0, BW_20),
-	VHT_GROUP(3, 0, BW_20),
-
 	VHT_GROUP(1, 1, BW_20),
-	VHT_GROUP(2, 1, BW_20),
-	VHT_GROUP(3, 1, BW_20),
 
 	VHT_GROUP(1, 0, BW_40),
-	VHT_GROUP(2, 0, BW_40),
-	VHT_GROUP(3, 0, BW_40),
-
 	VHT_GROUP(1, 1, BW_40),
-	VHT_GROUP(2, 1, BW_40),
-	VHT_GROUP(3, 1, BW_40),
 
 	VHT_GROUP(1, 0, BW_80),
-	VHT_GROUP(2, 0, BW_80),
-	VHT_GROUP(3, 0, BW_80),
-
 	VHT_GROUP(1, 1, BW_80),
-	VHT_GROUP(2, 1, BW_80),
-	VHT_GROUP(3, 1, BW_80),
 #endif
 };
 

@@ -79,7 +79,7 @@ unsigned int agc_9026_tbl[][2] =
     {0x0000816c, 0x02296311}, // rssi delta
     {0x00008014, 0x10200414}, //RF stable
     //(shijie, 20201022), extand time of checking cca busy to protect tx ok (especiall fiac queue)
-    {0x00a08028, 0x10080000},
+    {0x00a08028, 0x0a080000},
     //(shijie, 20201023), reduce tx start delay
     {0x00a000b0, 0x6a281c2c},
 
