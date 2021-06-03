@@ -39,7 +39,7 @@
 #define DEFAULT_TXPOWER                     11
 #define DEFAULT_MCAST_EAPOL_NULLDATA_RATE_11N                      6500        /* Kbps */
 #define DEFAULT_MCAST_EAPOL_NULLDATA_RATE_11G                      1000        /* Kbps */
-#define DEFAULT_CONTRY                      WIFI_China
+#define DEFAULT_CONTRY                      0
 #define DEFAULT_CACHESIZE                   32
 #define DEFAULT_DSSUPPORT                   1
 #define DEFAULT_WMMSUPPORT                  1
@@ -47,7 +47,7 @@
 
 #define DEFAULT_EAT_COUNT_MAX 1
 #define DEFAULT_MFP_EN 1
-#define DEFAULT_AGGR_THRESH 40
+#define DEFAULT_AGGR_THRESH 35
 #define DEFAULT_NO_AGGR_THRESH 20
 #define DEFAULT_HRTIMER_INTERVAL 1
 

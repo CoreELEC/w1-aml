@@ -90,5 +90,6 @@ extern void wifi_mac_ap_set_11h(unsigned char channel);
 extern void wifi_mac_ap_set_arp_rx(char** buf);
 extern int aml_set_device_sn(struct wlan_net_vif *wnet_vif, char* buf, int len);
 extern int aml_get_device_sn(struct wlan_net_vif *wnet_vif, char* buf, int len);
-extern int aml_set_signal_power_weak_thresh(struct wlan_net_vif *wnet_vif, char* buf, int len);
+extern int aml_set_signal_power_weak_thresh_for_narrow_bandwidth(struct wlan_net_vif *wnet_vif, char* buf, int len);
+extern int aml_set_signal_power_weak_thresh_for_wide_bandwidth(struct wlan_net_vif *wnet_vif, char* buf, int len);
 #endif

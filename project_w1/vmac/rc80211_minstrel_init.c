@@ -94,7 +94,7 @@ static struct ieee80211_supported_band aml_band_5ghz = {
 	.channels = aml_5ghz_channels,
 	.band = IEEE80211_BAND_5GHZ,
 	.n_bitrates = aml_legacy_rates_size - 4 ,/*Eliminate 11b rate*/
-	.bitrates = aml_legacy_rates - 4,/*Eliminate 11b rate*/
+	.bitrates = aml_legacy_rates + 4,/*Eliminate 11b rate*/
 	.ht_cap.cap = 0,  /*Need to be initialized later*/
 	.ht_cap.ht_supported = true,
 };
@@ -676,9 +676,10 @@ unsigned char minstrel_find_rate(
     if (g_minstel_pri->fixed_rate_idx != ((u32) -1)) {
         for (i = 0; i < IEEE80211_TX_MAX_RATES-1; i++) {
             ratectrl[i].vendor_rate_code = g_minstel_pri->fixed_rate_idx;
+            sta->sta_vendor_rate_code[i] = ratectrl[i].vendor_rate_code;
             ratectrl[i].rate_index = g_minstel_pri->fixed_rate_idx&0xf;
             info->control.rates[i].idx = ratectrl[i].rate_index;
-            //ratectrl[i].flags = minstrel_mcs_groups[25].flags;
+            ratectrl[i].flags |= HAL_RATECTRL_USE_FIXED_RATE;
             ratectrl[i].trynum = 2;
             ratectrl[i].maxampdulen = max_4ms_framelen[0][HT_RC_2_MCS(ratectrl[i].vendor_rate_code )];
             // DPRINTF(AML_DEBUG_RATE, "%s(%d): vendor_rate_code=0x%x, rate_index=%d, maxampdulen=%d\n", 
@@ -708,6 +709,7 @@ unsigned char minstrel_find_rate(
         ratectrl[i].rate_index = info->control.rates[i].idx;
         ratectrl[i].shortgi_en = info->control.rates[i].flags & IEEE80211_TX_RC_SHORT_GI ? 1: 0;
         ratectrl[i].vendor_rate_code = minsstrel_rate_index_to_vendor_rate_code(ratectrl[i].rate_index, p_ieee_sta);
+        sta->sta_vendor_rate_code[i] = ratectrl[i].vendor_rate_code;
         ratectrl[i].trynum = info->control.rates[i].count;
         ratectrl[i].flags = info->control.rates[i].flags;
 

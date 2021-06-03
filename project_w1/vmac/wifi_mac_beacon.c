@@ -270,44 +270,30 @@ int _wifi_mac_beacon_update(struct wifi_station *sta,
 
 
         if (concurrent_set_channel) { /*need think if system want to change channel*/
+            struct wlan_net_vif *main_wnet_vif = wifi_mac_running_main_wnet_vif(wifimac);
 
-            printk("set to ap %s(%d) pri chan %d, band %d, center_chan %d\n",__func__,__LINE__,
-                                  main_vmac_chan->chan_pri_num, main_vmac_chan->chan_bw, wifi_mac_Mhz2ieee(main_vmac_chan->chan_cfreq1, 0));
+            /*sta connect to 5G ap, softap need update channel/band/mac_mode as  sta*/
+            if (main_wnet_vif != NULL) {
+                wnet_vif->vm_curchan = main_vmac_chan;
+                wnet_vif->vm_bandwidth = main_vmac_chan->chan_bw;
+                wnet_vif->vm_mac_mode = main_wnet_vif->vm_mac_mode;
+                sta->sta_chbw = main_vmac_chan->chan_bw;
 
-            if ((main_vmac_chan != WIFINET_CHAN_ERR) && WIFINET_IS_CHAN_2GHZ(main_vmac_chan)) {
-                /*sta connect to 40M ap, softap need limit to 20M. */
-                wnet_vif->vm_bandwidth = WIFINET_BWC_WIDTH20;
-                if (wifi_mac_set_wnet_vif_channel(wnet_vif, wifimac->wm_doth_channel, wnet_vif->vm_bandwidth, wifimac->wm_doth_channel) == true) {
-                    DPRINTF(AML_DEBUG_CFG80211|AML_DEBUG_ERROR, "%s  %d change to new channel %d\n", __func__, __LINE__, wifimac->wm_doth_channel);
-                } else {
-                    DPRINTF(AML_DEBUG_CFG80211|AML_DEBUG_ERROR, "%s  %d chan not supported\n", __func__, __LINE__);
-                    return 0;
+                if (wnet_vif->vm_curchan->chan_bw >= WIFINET_BWC_WIDTH40) {
+                    wnet_vif->vm_htcap |= WIFINET_HTCAP_SUPPORTCBW40;
                 }
-            } else {
-                /*sta connect to 5G ap, softap need update channel/band/mac_mode as  sta*/
-                struct wlan_net_vif *main_wnet_vif = wifi_mac_running_main_wnet_vif(wifimac);
-                if (main_wnet_vif != NULL) {
-                    wnet_vif->vm_curchan = main_vmac_chan;
-                    wnet_vif->vm_bandwidth = main_vmac_chan->chan_bw;
-                    wnet_vif->vm_mac_mode = main_wnet_vif->vm_mac_mode;
-                    sta->sta_chbw = main_vmac_chan->chan_bw;
 
-                    if (wnet_vif->vm_curchan->chan_bw >= WIFINET_BWC_WIDTH40) {
-                        wnet_vif->vm_htcap |= WIFINET_HTCAP_SUPPORTCBW40;
-                    }
-
-                    if (main_vmac_chan->chan_pri_num < wifi_mac_Mhz2ieee(main_vmac_chan->chan_cfreq1, 0)) {
-                        wnet_vif->scnd_chn_offset = WIFINET_HTINFO_EXTOFFSET_ABOVE;
-                    } else if (main_vmac_chan->chan_pri_num > wifi_mac_Mhz2ieee(main_vmac_chan->chan_cfreq1, 0)) {
-                        wnet_vif->scnd_chn_offset = WIFINET_HTINFO_EXTOFFSET_BELOW;
-                    } else{
-                        wnet_vif->scnd_chn_offset = WIFINET_HTINFO_EXTOFFSET_NA;
-                    }
-
-                    wifi_mac_set_wnet_vif_channel(wnet_vif, main_vmac_chan->chan_pri_num, main_vmac_chan->chan_bw, wifi_mac_Mhz2ieee(main_vmac_chan->chan_cfreq1, 0));
-                    printk("set ap %s(%d) chan %d, mac mode %d, band %d\n",__func__,__LINE__,
-                          wnet_vif->vm_curchan->chan_pri_num, wnet_vif->vm_mac_mode, wnet_vif->vm_bandwidth);
+                if (main_vmac_chan->chan_pri_num < wifi_mac_Mhz2ieee(main_vmac_chan->chan_cfreq1, 0)) {
+                    wnet_vif->scnd_chn_offset = WIFINET_HTINFO_EXTOFFSET_ABOVE;
+                } else if (main_vmac_chan->chan_pri_num > wifi_mac_Mhz2ieee(main_vmac_chan->chan_cfreq1, 0)) {
+                    wnet_vif->scnd_chn_offset = WIFINET_HTINFO_EXTOFFSET_BELOW;
+                } else{
+                    wnet_vif->scnd_chn_offset = WIFINET_HTINFO_EXTOFFSET_NA;
                 }
+
+                wifi_mac_set_wnet_vif_channel(wnet_vif, main_vmac_chan->chan_pri_num, main_vmac_chan->chan_bw, wifi_mac_Mhz2ieee(main_vmac_chan->chan_cfreq1, 0));
+                printk("set ap %s(%d) chan %d, mac mode %d, band %d\n",__func__,__LINE__,
+                      wnet_vif->vm_curchan->chan_pri_num, wnet_vif->vm_mac_mode, wnet_vif->vm_bandwidth);
             }
         }
     } else {

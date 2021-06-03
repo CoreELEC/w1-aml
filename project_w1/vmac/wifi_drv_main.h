@@ -29,9 +29,9 @@ enum drv_rx_type
     DRV_RX_CONSUMED
 };
 
-#define DRV_RXDESC_NUM   256
-#define DRV_TXDESC_RATE_NUM    4
-#define DRIVER_NODE(_n)                    ((struct aml_driver_nsta *)(_n))
+#define DRV_RXDESC_NUM 256
+#define DRV_TXDESC_RATE_NUM 4
+#define DRIVER_NODE(_n) ((struct aml_driver_nsta *)(_n))
 
 
 #define DRV_AGGR_DELIM_SZ       4       /* delimiter size   */
@@ -355,6 +355,7 @@ struct driver_ops
     /* connect notifications */
     void        (*connect_start)(struct drv_private *);
     void        (*connect_end)(struct drv_private *);
+    void        (*set_channel_rssi)(struct drv_private *, unsigned char rssi);
 
     /* tx callbacks */
     int         (*tx_init)(struct drv_private *, int nbufs);
@@ -449,8 +450,6 @@ struct driver_ops
     unsigned int   (*Low_callRegisteredTask)( struct drv_private *drv_priv,SYS_TYPE taskid,SYS_TYPE param1);
     unsigned int   (*Low_addDHWorkTask)( struct drv_private *drv_priv,void *func,void *func_cb,SYS_TYPE param1,SYS_TYPE param2,SYS_TYPE param3, SYS_TYPE param4,SYS_TYPE param5);
 
-    unsigned int   (*Addba_Cmd_To_HAL)( struct drv_private *drv_priv,unsigned char wnet_vif_id,unsigned short StaAid,unsigned char TID,unsigned short SeqNumStart,unsigned char BA_Size,unsigned char AuthRole,unsigned char BA_TYPE);
-    unsigned int   (*Delba_Cmd_To_HAL)( struct drv_private *drv_priv,unsigned char wnet_vif_id,unsigned short StaAid,unsigned char TID,unsigned char AuthRole);
     unsigned int   (*RegisterStationID)( struct drv_private *drv_priv,unsigned char wnet_vif_id,unsigned short StaAid,unsigned char *pMac, unsigned char encrypt);
     int   (*clear_staid_and_bssid)( struct drv_private *drv_priv,unsigned char wnet_vif_id,unsigned short StaAid);
     unsigned int   (*UnRegisterAllStationID)( struct drv_private *drv_priv,unsigned char wnet_vif_id);

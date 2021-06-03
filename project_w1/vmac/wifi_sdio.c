@@ -1415,7 +1415,7 @@ static void config_pmu_reg(bool is_power_on)
         printk("%s power off: before write A12=0x%x, A15=0x%x, A17=0x%x, A18=0x%x, A20=0x%x, A22=0x%x\n",
             __func__, value_pmu_A12,value_pmu_A15,value_pmu_A17,value_pmu_A18,value_pmu_A20,value_pmu_A22);
 
-        hif->hif_ops.hi_write_word(RG_PMU_A12, 0x2a2c);
+        hif->hif_ops.hi_write_word(RG_PMU_A12, 0x8ea2e);
         hif->hif_ops.hi_write_word(RG_PMU_A14, 0x1);
         hif->hif_ops.hi_write_word(RG_PMU_A16, 0x0);
         hif->hif_ops.hi_write_word(RG_PMU_A17, 0x700);

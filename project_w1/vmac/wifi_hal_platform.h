@@ -12,6 +12,11 @@
 #define GPIOY_15    226 //IRQ TEST USE OK
 #define GPIOX_20    248  //used to clk_sel,replace before GPIOY_15
 
+typedef struct version_info {
+    char version_name[10];
+    unsigned short version_id;
+} version_info;
+
 void platform_wifi_reset_cpu(void);
 int platform_wifi_request_gpio_irq (void *data);
 void platform_wifi_free_gpio_irq (void *data);
@@ -39,5 +44,6 @@ extern char * aml_wifi_get_vif1_name(void);
 extern int aml_wifi_get_vif0_opmode(void);
 extern int aml_wifi_get_vif1_opmode(void);
 extern unsigned int aml_wifi_get_con_mode(void);
+extern unsigned int aml_wifi_get_platform_verid(void);
 
 #endif

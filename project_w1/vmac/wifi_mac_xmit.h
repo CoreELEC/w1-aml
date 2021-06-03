@@ -34,6 +34,7 @@ unsigned short wifi_mac_udp_sum_calc(unsigned short len_udp, unsigned char * src
 int wifi_mac_udp_csum(struct sk_buff *skb);
 int wifi_mac_hardstart(struct sk_buff *, struct net_device *);
 int wifi_mac_send_nulldata(struct wifi_station *sta, unsigned char pwr_save, unsigned char pwr_flag, unsigned char qos, int ac);
+int wifi_mac_send_nulldata_for_ap(struct wifi_station *sta, unsigned char pwr_save,unsigned char pwr_flag, unsigned char qos, int ac);
 
 int wifi_mac_send_qosnulldata(struct wifi_station *, int);
 struct sk_buff *wifi_mac_skbhdr_adjust(struct wlan_net_vif *wnet_vif, int hdrsize, struct wifi_mac_key *key, struct sk_buff *skb, int ismulticast);

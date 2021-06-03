@@ -174,10 +174,11 @@ void drv_pwrsave_wake_req (void *dpriv, int power_save)
             if ((wnet_vif != NULL)
                 && (drv_priv->net_ops->wifi_mac_pwrsave_is_wnet_vif_sleeping(wnet_vif) == 0))
             {
-                drv_priv->net_ops->wifi_mac_pwrsave_wakeup_for_tx(wnet_vif);
                 DRV_PS_LOCK(drv_priv);
                 drv_priv->add_wakeup_work = 1;
                 DRV_PS_UNLOCK(drv_priv);
+
+                drv_priv->net_ops->wifi_mac_pwrsave_wakeup_for_tx(wnet_vif);
                 /* wake a wnet_vif operation can wake hal and firmware */
                 break;
             }

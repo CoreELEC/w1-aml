@@ -469,6 +469,7 @@ int vm_p2p_go_cancle_noa (struct wifi_mac_p2p *p2p);
 int vm_p2p_client_cancle_opps (struct wifi_mac_p2p *p2p);
 int vm_p2p_opps_start(struct wifi_mac_p2p *p2p, const union type_ctw_opps_u *ctw_opps_u);
 int vm_p2p_noa_start(struct wifi_mac_p2p *p2p, const struct p2p_noa *noa);
+unsigned char is_need_process_p2p_action(unsigned char* buf);
 int vm_p2p_parse_negotiation_frames(struct wifi_mac_p2p *p2p, const unsigned char *frm, unsigned int *len, unsigned char tx);
 int vm_p2p_client_cancle_noa (struct wifi_mac_p2p *p2p);
 void vm_change_p2pie_channel(struct wifi_mac_p2p *p2p , const unsigned char *frm, unsigned int *len);

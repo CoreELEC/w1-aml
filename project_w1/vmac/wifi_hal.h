@@ -13,6 +13,14 @@ enum aml_prealloc_index {
         AML_TX_DESC_BUF = 1
 };
 #endif
+
+enum aml_key_type {
+    AML_UCAST_TYPE = 0,
+    AML_MCAST_TYPE = 1,
+    AML_TYPE_MAX
+};
+
+
 int hal_host_init(struct hal_private *hal_priv);
 int hal_probe(void);
 int hal_free(void);
@@ -31,9 +39,12 @@ int hal_init_task(void);
 int hal_calc_mpdu_page (int mpdulen);
 int hal_get_agg_pend_cnt(void);
 void hal_txinfo_show(void);
+void hal_pn_win_init(enum aml_key_type type, unsigned char wnet_vif_id);
 void hal_mrep_cnt_init(struct hal_private *hal_priv,unsigned char wnet_vif_id,unsigned char encryType);
 void hal_urep_cnt_init(struct unicastReplayCnt  *RepCnt,unsigned char encryType);
 unsigned char hal_chk_replay_cnt(struct hal_private *hal_priv,HW_RxDescripter_bit*RxPrivHdr);
+unsigned char hal_set_pn_win(unsigned long long *pn_win);
+unsigned long long hal_check_dup_pn(unsigned long long *pn_win, unsigned int repcnt_diff);
 void hal_wpi_pn_self_plus(  unsigned long long *WpiPN );
 void hal_wpi_pn_self_plus_plus(  unsigned long long *WpiPN );
 unsigned char * hal_get_config(void);

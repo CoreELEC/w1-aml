@@ -567,7 +567,6 @@ int drv_tx_withdraw_legacyps_send (struct drv_private *drv_priv, struct aml_driv
 
 void drv_tx_bk_list_init (struct drv_txlist *txlist)
 {
-
     drv_txdesc_list_init(&txlist->txlist_backup, &txlist->txlist_backup_qcnt);
 }
 
@@ -585,13 +584,12 @@ void drv_txq_backup_cleanup (struct drv_private *drv_priv, struct drv_txlist *tx
 
     DRV_TX_QUEUE_LOCK(drv_priv);
     DRV_TXQ_LOCK(txlist);
-    list_for_each_entry_safe(ptxdesc,txdesc_queue_next,&txlist->txlist_backup,txdesc_queue)
-    {
+    list_for_each_entry_safe(ptxdesc,txdesc_queue_next,&txlist->txlist_backup,txdesc_queue) {
         sta = (struct aml_driver_nsta *)ptxdesc->txdesc_sta;
-        if (sta != drv_sta)
-        {
+        if (sta != drv_sta) {
             continue;
         }
+
         drv_txdesc_list_cleanup(drv_priv, &txlist->txlist_backup_qcnt, ptxdesc, txlist);
     }
     DRV_TXQ_UNLOCK(txlist);

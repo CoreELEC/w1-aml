@@ -115,7 +115,9 @@ struct vm_wlan_net_vif_params
     unsigned short vm_param_opmode;
 };
 
-#define WIFINET_SIGNAL_POWER_WEAK_THRESH -70
+#define WIFINET_SIGNAL_POWER_WEAK_THRESH_NARROW -75
+#define WIFINET_SIGNAL_POWER_WEAK_THRESH_WIDE -70
+
 #define WIFINET_TXPOWER_MAX  100
 
 #define WIFINET_TXSTREAM  1
@@ -124,6 +126,7 @@ struct vm_wlan_net_vif_params
 
 #define WIFINET_BINTVAL_DEFAULT  100
 #define DEFAULT_MGMT_RETRY_TIMES 3
+#define DEFAULT_P2P_ACTION_RETRY_TIMES 5
 #define DEFAULT_MGMT_RETRY_INTERVAL 100
 #define DEFAULT_P2P_ACTION_RETRY_INTERVAL 50
 #define FIRST_AUTH_RETRY_INTERVAL_DUE_TO_CHANNEL_SWITCH 500
@@ -333,7 +336,8 @@ struct wifi_mac
     unsigned char wm_nrunning;
     unsigned int wm_runningmask;
 
-    short wm_signal_power_weak_thresh;
+    short wm_signal_power_weak_thresh_narrow;
+    short wm_signal_power_weak_thresh_wide;
 
     struct wifi_mac_ops wmac_ops;
     struct drv_private *drv_priv;
@@ -440,7 +444,6 @@ struct wifi_mac
     /* suspend for all vif, so wifimac maintains suspend mode */
     unsigned int wm_suspend_mode;
     wait_queue_head_t wm_suspend_wq;
-    OS_MUTEX wm_suspend_mutex;
     unsigned char wm_esco_en;
     unsigned char wm_bt_en;
 
@@ -658,7 +661,8 @@ struct wlan_net_vif
 
     unsigned short vm_tx_speed;
     unsigned short vm_rx_speed;
-
+    unsigned char vm_change_rate_enable;
+    unsigned long long pn_window[2][2];
 #ifdef CONFIG_P2P
     struct wifi_mac_p2p* vm_p2p;
     int vm_p2p_support;

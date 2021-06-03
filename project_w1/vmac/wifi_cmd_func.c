@@ -50,7 +50,8 @@ cmd_to_func_table_t cmd_to_func[] =
     {"unmark_dfs_chan",aml_unmark_dfs_channel},
     {"set_dev_sn", aml_set_device_sn},
     {"get_dev_sn", aml_get_device_sn},
-    {"set_weak_thresh", aml_set_signal_power_weak_thresh},
+    {"set_weak_thr_nb", aml_set_signal_power_weak_thresh_for_narrow_bandwidth},
+    {"set_weak_thr_wb", aml_set_signal_power_weak_thresh_for_wide_bandwidth},
     {"", NULL},
 };
 
@@ -1106,7 +1107,7 @@ int aml_get_device_sn(struct wlan_net_vif *wnet_vif, char* buf, int len)
     return 0;
 }
 
-int aml_set_signal_power_weak_thresh(struct wlan_net_vif *wnet_vif, char* buf, int len)
+int aml_set_signal_power_weak_thresh_for_narrow_bandwidth(struct wlan_net_vif *wnet_vif, char* buf, int len)
 {
     char **arg;
     char sep = ' ';
@@ -1114,10 +1115,10 @@ int aml_set_signal_power_weak_thresh(struct wlan_net_vif *wnet_vif, char* buf, i
     int data = 0;
 
     arg = aml_cmd_char_prase(sep, buf, &cmd_arg);
-    if ((wnet_vif != NULL)&& (wnet_vif->vm_wmac != NULL) && (arg[1] != NULL)) {
+    if ((wnet_vif != NULL) && (wnet_vif->vm_wmac != NULL) && (arg[1] != NULL)) {
         data = simple_strtol(arg[1], NULL, 0);
-        wnet_vif->vm_wmac->wm_signal_power_weak_thresh = data;
-        printk("set signal power weak thresh to: %d\n", wnet_vif->vm_wmac->wm_signal_power_weak_thresh);
+        wnet_vif->vm_wmac->wm_signal_power_weak_thresh_narrow = data;
+        printk("set signal power weak thresh to: %d\n", wnet_vif->vm_wmac->wm_signal_power_weak_thresh_narrow);
 
     } else {
         printk("Parameter is error.\n");
@@ -1126,4 +1127,26 @@ int aml_set_signal_power_weak_thresh(struct wlan_net_vif *wnet_vif, char* buf, i
     kfree(arg);
     return 0;
 }
+
+int aml_set_signal_power_weak_thresh_for_wide_bandwidth(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    char **arg;
+    char sep = ' ';
+    int cmd_arg;
+    int data = 0;
+
+    arg = aml_cmd_char_prase(sep, buf, &cmd_arg);
+    if ((wnet_vif != NULL) && (wnet_vif->vm_wmac != NULL) && (arg[1] != NULL)) {
+        data = simple_strtol(arg[1], NULL, 0);
+        wnet_vif->vm_wmac->wm_signal_power_weak_thresh_wide = data;
+        printk("set signal power weak thresh to: %d\n", wnet_vif->vm_wmac->wm_signal_power_weak_thresh_wide);
+
+    } else {
+        printk("Parameter is error.\n");
+    }
+
+    kfree(arg);
+    return 0;
+}
+
 

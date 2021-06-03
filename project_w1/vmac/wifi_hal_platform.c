@@ -789,6 +789,10 @@ static char * vmac0 = NULL;
 static char * vmac1 = NULL;
 static unsigned int con_mode = ((1 << WIFINET_M_STA) | (1 << WIFINET_M_P2P_DEV));
 
+static char * plt_ver = NULL;
+struct version_info version_map[] = {
+    {"gva", 1}
+};
 
 int aml_debug = AML_DEBUG_LEVEL;
 const unsigned char BROADCAST_ADDRESS[WIFINET_ADDR_LEN] =  {0xff,0xff,0xff,0xff,0xff,0xff};
@@ -857,6 +861,20 @@ void aml_wifi_set_mac_addr(void)
         }
     }
 #endif
+
+    if (mac_addr0 & 0x3) {
+        printk("change the mac addr from [0x%x] ", mac_addr0);
+
+        mac_addr0 &= ~0x3;
+        printk("to [0x%x] \n", mac_addr0);
+#ifdef CONFIG_MAC_SUPPORT
+        aml_retrieve_from_file(WIFIMAC_PATH, cbuf, 48);
+
+        sprintf(cbuf + 21, MAC_FMT, mac_addr0, mac_addr1, mac_addr2, mac_addr3, mac_addr4, mac_addr5);
+        if (aml_store_to_file(WIFIMAC_PATH, cbuf, strlen(cbuf)) > 0)
+            printk("write the random mac to wifimac.txt\n");
+#endif
+    }
 }
 
 char * aml_wifi_get_country_code(void)
@@ -887,6 +905,25 @@ char * aml_wifi_get_vif1_name(void)
 unsigned int aml_wifi_get_con_mode(void)
 {
     return con_mode;
+}
+
+/* return value default is 0 */
+unsigned int aml_wifi_get_platform_verid(void)
+{
+    int i;
+    if (plt_ver == NULL)
+    {
+        return 0;
+    }
+    for (i = 0; i < sizeof(version_map)/sizeof(struct version_info); ++i)
+    {
+        if (strcmp(version_map[i].version_name, plt_ver) == 0)
+        {
+            printk("%s(%d) version name: %s\n", __func__, __LINE__, version_map[i].version_name);
+            return version_map[i].version_id;
+        }
+    }
+    return 0;
 }
 
 extern unsigned char wifi_in_insmod;
@@ -966,7 +1003,8 @@ module_param(vif0opmode, int, S_IRUGO);
 module_param(vif1opmode, int, S_IRUGO);
 module_param(vmac0, charp, S_IRUGO);
 module_param(vmac1, charp, S_IRUGO);
-module_param(con_mode, int, S_IRUGO);
+module_param(con_mode, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+module_param(plt_ver, charp, S_IRUGO);
 
 
 module_param(sdblksize, int, S_IRUGO);

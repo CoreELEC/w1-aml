@@ -46,26 +46,81 @@ struct hal_private *  hal_get_priv(void)
     return &g_hal_priv;
 }
 
+unsigned char hal_set_pn_win(unsigned long long *pn_win)
+{
+    unsigned char i = 0, offset = 0;
+    unsigned long long win;
+    unsigned long long tmp;
+
+    for (i = 0; i < 2; i++) {
+        win = *(pn_win + i);
+        while(win > 0) {
+            if ((win & 1) == 0) {
+                break;
+            }
+            win >>= 1;
+            offset++;
+        }
+        if (offset < MAX_PN_WINDOW/2) {
+            break;
+        }
+    }
+    if (offset == 0) {
+        offset = 1;
+    }
+
+    if (offset > 0 && offset < MAX_PN_WINDOW/2) {
+        pn_win[0] >>= offset;
+        tmp = pn_win[1] & ((1 << offset) - 1);
+        pn_win[0] |= (tmp << (MAX_PN_WINDOW/2 - offset));
+        pn_win[1] >>= offset;
+
+    } else if (offset >= MAX_PN_WINDOW/2 && offset < MAX_PN_WINDOW) {
+        pn_win[0] = pn_win[1] >> (offset - MAX_PN_WINDOW/2);
+        pn_win[1] = 0;
+
+    } else {
+        pn_win[0] = 0;
+        pn_win[1] = 0;
+    }
+  return offset;
+}
+
+
+unsigned long long hal_check_dup_pn(unsigned long long *pn_win, unsigned int repcnt_diff)
+{
+    if (repcnt_diff > 0 && repcnt_diff <= MAX_PN_WINDOW/2) {
+        return pn_win[0] & (1 << (repcnt_diff - 1));
+    } else if (repcnt_diff > MAX_PN_WINDOW/2 && repcnt_diff <= MAX_PN_WINDOW) {
+        return pn_win[1] & (1 << (repcnt_diff - MAX_PN_WINDOW/2 - 1));
+    } else {
+        return 0;
+    }
+}
+
+
 unsigned char hal_chk_replay_cnt(struct hal_private *hal_priv,HW_RxDescripter_bit  *RxPrivHdr)
 {
-    int MacHdrLen = MAC_SHORT_MAC_HDR_LEN;
-    unsigned char Priority = 0;
-    unsigned char AccessCategory = DP_AC_BE;
-    unsigned int FrameCtl = *(unsigned int *)&RxPrivHdr->data[0];
-    unsigned short QoSCtl = 0;
     int staid = 0;
     unsigned char wnet_vif_id = 0;
     unsigned char *PN = NULL;
-    unsigned long long *repcnt_my ;
+    unsigned long long *repcnt_my[2];
     unsigned long long *repcnt_rx ;
     int ret =0;
     struct aml_hal_call_backs *AmlmS_opt = hal_get_drv_func();
     HW_RxDescripter_bit *RxPrivHdr_bit = (HW_RxDescripter_bit *)RxPrivHdr;
+    struct drv_private *drv_priv = (struct drv_private *)hal_priv->drv_priv;
+    struct wlan_net_vif *wnet_vif = NULL;
+    unsigned char offset = 0;
+    unsigned char is_group = AML_UCAST_TYPE;
+    unsigned int repcnt_diff = 0;
 
     if (WIFI_ADDR_ISGROUP(RxPrivHdr->data))
     {
+        is_group = AML_MCAST_TYPE;
         wnet_vif_id =RxPrivHdr_bit->bssidmatch_id;
         PN = &hal_priv->mRepCnt[wnet_vif_id].rxPN[0];
+        wnet_vif = drv_priv->drv_wnet_vif_table[wnet_vif_id];
     }
     else
     {
@@ -83,79 +138,58 @@ unsigned char hal_chk_replay_cnt(struct hal_private *hal_priv,HW_RxDescripter_bi
             //if we are sta, we should disconnect from the counterpart.
             return false;
         }
-
-        if ((FrameCtl & ( MAC_FCTRL_TODS | MAC_FCTRL_FROMDS))
-             == (MAC_FCTRL_TODS | MAC_FCTRL_FROMDS))
-        {
-            MacHdrLen += 6; // There is an ADRR4 field present
-        }
-        if (( FrameCtl & MAC_QOS_ST_BIT ) == MAC_QOS_ST_BIT
-             && (FrameCtl & MAC_FCTRL_TYPE_MASK ) == MAC_FCTRL_DATA_T)
-        {
-            QoSCtl = *(unsigned short *)( &RxPrivHdr->data[MacHdrLen] );
-
-            Priority = QoSCtl & MAC_HEAD_QOS_UP_MASK;
-            switch (Priority )
-            {
-                // UP = 1 or 2 ==> BACKGROUND
-                case 1:
-                case 2:
-                    AccessCategory = DP_AC_BK;
-                    break;
-
-                // UP = 0 or 3 ==> BEST EFFORT
-                case 0:
-                case 3:
-                    AccessCategory = DP_AC_BE;
-                    break;
-
-                // UP = 4 or 5 ==> VIDEO
-                case 4:
-                case 5:
-                    AccessCategory = DP_AC_VI;
-                    break;
-
-                // UP = 6 or 7 ==> VOICE
-                case 6:
-                case 7:
-                    AccessCategory = DP_AC_VO;
-                    break;
-
-                // UP unspecified ==> BEST EFFORT
-                default:
-                    AccessCategory = DP_AC_BE;
-
-                    PRINT("--> DP TC: Bad user priority => Mapped on Best Effort" ) ;
-                    break;
-            }
-        }
-        else
-        {
-            AccessCategory = DP_AC_BE;
-        }
-        PN = &hal_priv->uRepCnt[wnet_vif_id][staid].rxPN[AccessCategory][0];
+        wnet_vif = drv_priv->drv_wnet_vif_table[wnet_vif_id];
+        PN = &hal_priv->uRepCnt[wnet_vif_id][staid].rxPN[0][0];
     }
 
     switch (RxPrivHdr->RxDecryptType)
     {
         case RX_PHY_TKIP:
         case RX_PHY_CCMP:
-            repcnt_my = (unsigned long long *)PN;
+            repcnt_my[is_group] = (unsigned long long *)PN;
             repcnt_rx = (unsigned long long *)RxPrivHdr->PN;
+            //not require "+1", just require increase
+            if (*repcnt_my[is_group] < *repcnt_rx) {
+                if (*repcnt_my[is_group] == 0 && *repcnt_rx > 0) {
+                    *repcnt_my[is_group] = *repcnt_rx - 1;
+                }
 
-            if (*repcnt_my < *repcnt_rx)    //not require "+1", just require increase
-            {
-                memcpy(PN,RxPrivHdr->PN,MAX_PN_LEN);
+                if (*repcnt_my[is_group] == *repcnt_rx - 1
+                    && wnet_vif->pn_window[is_group][0] == 0
+                    && wnet_vif->pn_window[is_group][1] == 0) {
+                    memcpy(PN, RxPrivHdr->PN, MAX_PN_LEN);
+
+                } else {
+                    repcnt_diff = (int)(*repcnt_rx - *repcnt_my[is_group]);
+                    if (hal_check_dup_pn(wnet_vif->pn_window[is_group], repcnt_diff)) {
+                        return false;
+                    }
+
+                    if (repcnt_diff > MAX_PN_WINDOW) {
+                        offset = hal_set_pn_win(wnet_vif->pn_window[is_group]);
+                        *repcnt_my[is_group] += offset;
+                        repcnt_diff = (int)(*repcnt_rx - *repcnt_my[is_group]);
+                    }
+
+                    if (repcnt_diff > 0 && repcnt_diff <= MAX_PN_WINDOW/2) {
+                        wnet_vif->pn_window[is_group][0] |= (1 << (repcnt_diff - 1));
+                        if (repcnt_diff == 1) {
+                            offset = hal_set_pn_win(wnet_vif->pn_window[is_group]);
+                            *repcnt_my[is_group] += offset;
+                        }
+                    } else if (repcnt_diff > MAX_PN_WINDOW/2 && repcnt_diff <= MAX_PN_WINDOW){
+                        wnet_vif->pn_window[is_group][1] |= (1 << (repcnt_diff - MAX_PN_WINDOW/2 - 1));
+                    }
+                }
+
                 return true;
             }
-            else
-            {
+            else {
                 return false;
             }
             break;
         case RX_PHY_WAPI:
-            if (hal_wpi_chk_pn_increase(RxPrivHdr->PN,PN) ==  true)
-            {
+            if (hal_wpi_chk_pn_increase(RxPrivHdr->PN,PN) ==  true) {
                 memcpy(PN,RxPrivHdr->PN,MAX_PN_LEN);
                 return true;
             }
@@ -434,14 +468,11 @@ unsigned char hal_wake_fw_req(void)
     // check fw power save status
     while (halpriv->hal_fw_ps_status != HAL_FW_IN_ACTIVE)
     {
+        POWER_END_LOCK();
         fw_ps_st = halpriv->hal_ops.hal_get_fw_ps_status();
         fw_sleep = ((fw_ps_st & FW_SLEEP) != 0) ? 1 : 0;
-#ifdef PROJECT_T9026
-        host_sleep_req = ((fw_ps_st & HOST_SLEEP_REQ) != 0) ? 1 : 0;
-#elif defined (PROJECT_W1)
         host_req_status = hif->hif_ops.hi_bottom_read8(SDIO_FUNC1, RG_SDIO_PMU_HOST_REQ);
         host_sleep_req = ((host_req_status & HOST_SLEEP_REQ) != 0) ? 1 : 0;
-#endif
 
         //printk("fw ps st 0x%x, fw_sleep 0x%x, host_sleep_req 0x%x\n", fw_ps_st, fw_sleep, host_sleep_req);
         // fw/pmu st
@@ -453,6 +484,8 @@ unsigned char hal_wake_fw_req(void)
                 wake_flag = 1;
                 //delay 10ms for pmu deep sleep
                 OS_MDELAY(10);
+
+                POWER_BEGIN_LOCK();
                 continue;
             }
             else if ((fw_ps_st == PMU_SLEEP_MODE) && (wake_flag == 1))
@@ -464,13 +497,11 @@ unsigned char hal_wake_fw_req(void)
             }
         }
 
-#ifdef PROJECT_W1
         if (host_sleep_req == 1)
         {
             host_req_status &= ~HOST_SLEEP_REQ;
             hif->hif_ops.hi_bottom_write8(SDIO_FUNC1, RG_SDIO_PMU_HOST_REQ, host_req_status);
         }
-#endif
 
         if ((fw_ps_st == PMU_ACT_MODE) && (fw_sleep == 0) && (host_sleep_req == 0))
         {
@@ -478,6 +509,7 @@ unsigned char hal_wake_fw_req(void)
             {
                 hal_clear_fw_wake();
             }
+            POWER_BEGIN_LOCK();
             if (halpriv->hal_fw_ps_status == HAL_FW_IN_SLEEP)
                 halpriv->hal_fw_ps_status = HAL_FW_IN_AWAKE;
             POWER_END_LOCK();
@@ -492,9 +524,9 @@ unsigned char hal_wake_fw_req(void)
         else
         {
             printk("fw ps st 0x%x, fw_sleep 0x%x, host_sleep_req 0x%x\n", fw_ps_st, fw_sleep, host_sleep_req);
-            POWER_END_LOCK();
             return 0;
         }
+        POWER_BEGIN_LOCK();
     }
     POWER_END_LOCK();
     return 1;
@@ -505,14 +537,15 @@ unsigned char hal_check_fw_wake(void)
 {
     struct hal_private * halpriv = hal_get_priv();
     int loop_count = 0;
+    unsigned int fw_ps_st = 0;
+    unsigned int host_sleep_req = 0;
+    unsigned int fw_sleep = 0;
 
     POWER_BEGIN_LOCK();
     while (halpriv->hal_fw_ps_status == HAL_FW_IN_SLEEP)
     {
-        unsigned int fw_ps_st =  halpriv->hal_ops.hal_get_fw_ps_status();
-        unsigned int host_sleep_req = 0;
-        unsigned int fw_sleep = 0;
-
+        POWER_END_LOCK();
+        fw_ps_st =  halpriv->hal_ops.hal_get_fw_ps_status();
         fw_sleep = ((fw_ps_st & FW_SLEEP) != 0) ? 1 : 0;
         host_sleep_req = ((fw_ps_st & HOST_SLEEP_REQ) != 0) ? 1 : 0;
 
@@ -529,13 +562,13 @@ unsigned char hal_check_fw_wake(void)
         }
         else
         {
-            break;
+            return 1;
         }
         if (loop_count > 2)
         {
-            POWER_END_LOCK();
             return 0;
         }
+        POWER_BEGIN_LOCK();
     }
     POWER_END_LOCK();
     return 1;
@@ -636,6 +669,7 @@ void hal_ops_attach(void)
     hal_priv->hal_ops.phy_set_sretry_limit = phy_set_sretry_limit;
 
     hal_priv->hal_ops.phy_scan_cmd = phy_scan_cmd;
+    hal_priv->hal_ops.phy_set_channel_rssi = phy_set_channel_rssi;
     hal_priv->hal_ops.phy_pwr_save_mode = phy_pwr_save_mode;
     hal_priv->hal_ops.phy_set_rd_support = phy_set_rd_support;
     hal_priv->hal_ops.phy_set_txlive_time = phy_set_txlive_time;
@@ -666,7 +700,7 @@ void hal_ops_attach(void)
     hal_priv->hal_ops.phy_set_coexist_max_not_grant_cnt = phy_set_coexist_max_not_grant_cnt;
     hal_priv->hal_ops.phy_set_coexist_scan_priority_range = phy_set_coexist_scan_priority_range;
     hal_priv->hal_ops.phy_set_coexist_be_bk_noqos_priority_range = phy_set_coexist_be_bk_noqos_priority_range;
-    hal_priv->hal_ops.phy_infor_bt_wifi_work_freq = phy_infor_bt_wifi_work_freq;
+    hal_priv->hal_ops.phy_coexist_config = phy_coexist_config;
 
     hal_priv->hal_ops.phy_send_ndp_announcement = phy_send_ndp_announcement;
     hal_priv->hal_ops.phy_interface_enable = phy_interface_enable;
@@ -789,6 +823,17 @@ enum irqreturn  hal_irq_top(int irq, void *dev_id)
 
 exit:
     return IRQ_HANDLED;
+}
+
+void hal_pn_win_init(enum aml_key_type type, unsigned char wnet_vif_id)
+{
+    unsigned int LoopCnt;
+    struct hal_private * hal_priv =hal_get_priv();
+    struct drv_private *drv_priv = (struct drv_private *)hal_priv->drv_priv;
+    struct wlan_net_vif *wnet_vif = drv_priv->drv_wnet_vif_table[wnet_vif_id];
+    for (LoopCnt = 0; LoopCnt < 2; LoopCnt++) {
+        wnet_vif->pn_window[type][LoopCnt] = 0;
+    }
 }
 
 void hal_urep_cnt_init(struct unicastReplayCnt  *RepCnt,unsigned char encryType)
@@ -2496,7 +2541,6 @@ int hal_txok_thread(void *param)
 
         WAKE_LOCK(hal_priv, WAKE_LOCK_TXOK);
         if (hal_priv->hal_call_back != NULL) {
-
             if ((hal_priv->hal_call_back->intr_tx_pkt_clear != NULL)
                 && (hal_priv->txPageFreeNum == DEFAULT_TXPAGENUM))
                 hal_priv->hal_call_back->intr_tx_pkt_clear(hal_priv->drv_priv);

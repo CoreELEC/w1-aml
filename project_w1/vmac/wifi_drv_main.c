@@ -28,9 +28,6 @@
 #include "wifi_mac_action.h"
 #include "wifi_mac_main_reg.h"
 
-static char *version = "(Amlogic) 2018-06-01 v1.00" ;
-static char *dev_info = "aml_sdio";
-
 const unsigned char drv_bcast_mac[WIFINET_ADDR_LEN] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 
 static unsigned int drv_phy_reg_sta_id( struct drv_private *drv_priv,
@@ -263,6 +260,19 @@ drv_connect_end( struct drv_private *drv_priv)
 {
     drv_hal_add_workitem((WorkHandler)drv_connect_end_ex,
         NULL, (SYS_TYPE)drv_priv, 0, 0, 0, 0);
+}
+
+static void drv_set_channel_rssi_ex( SYS_TYPE param1,SYS_TYPE param2,SYS_TYPE param3, SYS_TYPE param4,SYS_TYPE param5)
+{
+    struct hal_private* hal_priv = hal_get_priv();
+
+    hal_priv->hal_ops.phy_set_channel_rssi(param1);
+}
+
+
+static void drv_set_channel_rssi( struct drv_private *drv_priv, unsigned char rssi)
+{
+    drv_hal_add_workitem((WorkHandler)drv_set_channel_rssi_ex, NULL, (SYS_TYPE)rssi, 0, 0, 0, 0);
 }
 
 
@@ -506,16 +516,13 @@ static int
 drv_wnet_vif_disconnect(struct drv_private *drv_priv,
     int wnet_vif_id)
 {
-    drv_hal_add_workitem((WorkHandler)drv_wnet_vif_disconnect_ex,NULL,
-                         (SYS_TYPE)drv_priv,(SYS_TYPE)wnet_vif_id,
-                         (SYS_TYPE)0,(SYS_TYPE)0, (SYS_TYPE)0);
+    drv_hal_add_workitem((WorkHandler)drv_wnet_vif_disconnect_ex, NULL,
+        (SYS_TYPE)drv_priv, (SYS_TYPE)wnet_vif_id, (SYS_TYPE)0, (SYS_TYPE)0,  (SYS_TYPE)0);
     return 0;
 }
 
-static int
-drv_wnet_vif_connect_ex(SYS_TYPE param1,
-    SYS_TYPE param2, SYS_TYPE param3,
-    SYS_TYPE param4,SYS_TYPE param5)
+static int drv_wnet_vif_connect_ex(SYS_TYPE param1, SYS_TYPE param2,
+    SYS_TYPE param3, SYS_TYPE param4,SYS_TYPE param5)
 {
     struct drv_private *drv_priv = (void *)param1;
     int wnet_vif_id = (int)param2;
@@ -527,8 +534,7 @@ drv_wnet_vif_connect_ex(SYS_TYPE param1,
     int error = 0;
 
     wnet_vif = drv_priv->drv_wnet_vif_table[wnet_vif_id];
-    if ((wnet_vif == NULL) || (wnet_vif->vm_state != WIFINET_S_CONNECTED))
-    {
+    if ((wnet_vif == NULL) || (wnet_vif->vm_state != WIFINET_S_CONNECTED)) {
         return -EINVAL;
     }
 
@@ -536,19 +542,13 @@ drv_wnet_vif_connect_ex(SYS_TYPE param1,
     driv_ps_wakeup(drv_priv);
     drv_hal_wnet_vifconnect(wnet_vif_id);
 
-    if (wnet_vif->vm_hal_opmode == WIFI_M_STA
-        || wnet_vif->vm_hal_opmode == WIFI_M_IBSS)
-    {
+    if ((wnet_vif->vm_hal_opmode == WIFI_M_STA) || (wnet_vif->vm_hal_opmode == WIFI_M_IBSS)) {
         drv_set_bssid(drv_priv, wnet_vif_id, bssid);
         drv_phy_reg_sta_id(drv_priv, wnet_vif_id, aid, drv_priv->drv_bssid, sta->sta_encrypt_flag);
 
-        if (wnet_vif->vm_flags & WIFINET_F_WPA) {
-            DPRINTF(AML_DEBUG_CONNECT, "%s %d sta id registered, allow to send eapol\n", __func__,__LINE__);
-            sta->connect_status = FOUR_WAY_HANDSHAKE_EAPOL_SEND_ALLOWED;
-            wifi_mac_buffer_txq_send_pre(wnet_vif);
-        } else {
-            sta->connect_status = CONNECT_STATUS_REGISTERED;
-        }
+        printk("%s %d sta id registered, allow to send pkt\n", __func__,__LINE__);
+        sta->connect_status = CONNECT_FW_CONFIG_COMPLETED;
+        wifi_mac_buffer_txq_send_pre(wnet_vif);
     }
 
 // bad:
@@ -749,41 +749,11 @@ drv_low_call_task( struct drv_private *drv_priv,
     return drv_low_call_register_task(taskid,param1);
 }
 
-unsigned int
-drv_low_add_worktask( struct drv_private *drv_priv,
+unsigned int drv_low_add_worktask( struct drv_private *drv_priv,
     void *func,void *func_cb,SYS_TYPE param1,SYS_TYPE param2,
     SYS_TYPE param3,SYS_TYPE param4,SYS_TYPE param5)
 {
-
-    return drv_hal_add_workitem(func,func_cb,param1,
-                                param2,param3, param4,param5);
-}
-
-static unsigned int
-drv_addba_cmd_to_hal(struct drv_private *drv_priv,
-    unsigned char wnet_vif_id,unsigned short StaAid,
-    unsigned char TID,unsigned short SeqNumStart,
-    unsigned char BA_Size,unsigned char AuthRole,
-    unsigned char BA_TYPE)
-{
-    unsigned int ret;
-    driv_ps_wakeup(drv_priv);
-    ret = hal_phy_addba_ok( wnet_vif_id,StaAid, TID,
-                SeqNumStart, BA_Size, AuthRole, BA_TYPE);
-    driv_ps_sleep(drv_priv);
-    return ret;
-}
-
-static unsigned int
-drv_delba_cmd_to_hal( struct drv_private *drv_priv,
-    unsigned char wnet_vif_id,unsigned short StaAid,
-    unsigned char TID,unsigned char AuthRole)
-{
-    unsigned int ret;
-    driv_ps_wakeup(drv_priv);
-    ret = hal_phy_delt_ba_ok(wnet_vif_id,StaAid,TID,AuthRole);
-    driv_ps_sleep(drv_priv);
-    return ret;
+    return drv_hal_add_workitem(func,func_cb,param1, param2,param3, param4,param5);
 }
 
 static unsigned int
@@ -795,25 +765,22 @@ drv_phy_reg_sta_id( struct drv_private *drv_priv,
     driv_ps_wakeup(drv_priv);
     ret = hal_phy_register_sta_id(wnet_vif_id,StaAid,pMac, encrypt);
     driv_ps_sleep(drv_priv);
-    return ret;
 
+    return ret;
 }
 
-static unsigned int
-drv_phy_unreg_all_sta_id(struct drv_private *drv_priv,
-    unsigned char wnet_vif_id)
+static unsigned int drv_phy_unreg_all_sta_id(struct drv_private *drv_priv, unsigned char wnet_vif_id)
 {
     unsigned int ret;
     driv_ps_wakeup(drv_priv);
     ret =  hal_phy_unregister_all_sta_id(wnet_vif_id);
     driv_ps_sleep(drv_priv);
+
     return ret;
 }
 
-static int
-drv_add_wnet_vif(struct drv_private *drv_priv,
-    int wnet_vif_id, void * if_data,
-    enum hal_op_mode vm_opmode, unsigned char *myaddr, unsigned int ip)
+static int drv_add_wnet_vif(struct drv_private *drv_priv,
+    int wnet_vif_id, void * if_data, enum hal_op_mode vm_opmode, unsigned char *myaddr, unsigned int ip)
 {
     struct wlan_net_vif *wnet_vif;
     int ret = 0;
@@ -857,8 +824,7 @@ drv_add_wnet_vif(struct drv_private *drv_priv,
 /*
 TxBufLock
 */
-static int
-drv_delete_wnet_vif(struct drv_private * drv_priv, int wnet_vif_id)
+static int drv_delete_wnet_vif(struct drv_private * drv_priv, int wnet_vif_id)
 {
     int flags;
     int ret = 0;
@@ -1086,8 +1052,10 @@ drv_set_country(struct drv_private * drv_priv, char *isoName)
     int tmpi;
 
     tmpi = find_country_code((unsigned char *)isoName);
-    if (tmpi == 0xff)
-        return -EINVAL;
+    if (tmpi == 0xff) {
+//        printk("%s can't find country code \n", __func__);
+        tmpi = 0;
+    }
 
     drv_priv->drv_config.cfg_countrycode = tmpi;
 
@@ -1105,20 +1073,20 @@ drv_set_country(struct drv_private * drv_priv, char *isoName)
 /*
  * Return the current country and domain information
  */
+extern struct country_chan_mapping  country_chan_mapping_list[];
 static void
 drv_get_curr_cntry( struct drv_private * drv_priv, unsigned char *iso_name)
 {
-    if (drv_priv->drv_config.cfg_countrycode<WIFI_country_MAX)
+    if (drv_priv->drv_config.cfg_countrycode != 0xff)
     {
-        iso_name[0] = all_countries_name[drv_priv->drv_config.cfg_countrycode][0];
-        iso_name[1] = all_countries_name[drv_priv->drv_config.cfg_countrycode][1];
+        iso_name[0] = country_chan_mapping_list[drv_priv->drv_config.cfg_countrycode].country[0];
+        iso_name[1] = country_chan_mapping_list[drv_priv->drv_config.cfg_countrycode].country[1];
         iso_name[2] = 0;
     }
     else
     {
-        // WIFI_China;
-        iso_name[0] = 'C';
-        iso_name[1] = 'N';
+        iso_name[0] = 'W';
+        iso_name[1] = 'W';
         iso_name[2] = 0;
     }
 }
@@ -1232,6 +1200,7 @@ static void drv_init_ops(struct drv_private *drv_priv)
     drv_priv->drv_ops.scan_end = drv_scan_end;               /* scan_end */
     drv_priv->drv_ops.connect_start = drv_connect_start;             /*connect_start */
     drv_priv->drv_ops.connect_end = drv_connect_end;               /* connect_end */
+    drv_priv->drv_ops.set_channel_rssi = drv_set_channel_rssi;    /* set_channel_rssi */
     drv_priv->drv_ops.tx_init = drv_tx_init;                /* tx_init */
     drv_priv->drv_ops.tx_cleanup = drv_txlist_cleanup;             /* tx_cleanup */
     drv_priv->drv_ops.tx_wmm_queue_update = drv_update_wmmq_param;             /* tx_wmm_queue_update */
@@ -1278,8 +1247,6 @@ static void drv_init_ops(struct drv_private *drv_priv)
     drv_priv->drv_ops.Low_register_behindTask = drv_low_reg_behind_task; /* Low_register_behindTask */
     drv_priv->drv_ops.Low_callRegisteredTask = drv_low_call_task;  /* Low_callRegisteredTask */
     drv_priv->drv_ops.Low_addDHWorkTask = drv_low_add_worktask;   /* Low_addDHWorkTask */
-    drv_priv->drv_ops.Addba_Cmd_To_HAL = drv_addba_cmd_to_hal;        /* Addba_Cmd_To_HAL */
-    drv_priv->drv_ops.Delba_Cmd_To_HAL = drv_delba_cmd_to_hal;        /* Delba_Cmd_To_HAL */
     drv_priv->drv_ops.RegisterStationID = drv_phy_reg_sta_id;     /*RegisterStationID */
     drv_priv->drv_ops.clear_staid_and_bssid = drv_clear_staid_and_bssid;   /* clear_staid_and_bssid */
     drv_priv->drv_ops.UnRegisterAllStationID = drv_phy_unreg_all_sta_id; /* UnRegisterAllStationID */
@@ -2166,6 +2133,7 @@ static void drv_intr_tx_null_data(void *dpriv, struct tx_nulldata_status * tx_nu
 
             }
             drv_priv->net_ops->wifi_mac_notify_ap_success(wnet_vif);
+            printk("fw send null data fail\n");
         }
     }
 }
@@ -2302,12 +2270,9 @@ drv_dev_probe(void)
     char * vmac0 = NULL;
     char * vmac1 = NULL;
 
-
-    /*1, init sdio, here we are in initialization process of sdio. */
-
     /*2 init hal, download fw, host init */
     if ((hal_priv->hal_ops.hal_probe != NULL) && (!hal_priv->hal_ops.hal_probe())) {
-        DPRINTF(AML_DEBUG_ERROR,"init hal error %s %d \n", __func__,__LINE__);
+        DPRINTF(AML_DEBUG_ERROR, "init hal error %s %d \n", __func__,__LINE__);
         goto err_ret;
     }
 
@@ -2322,14 +2287,13 @@ drv_dev_probe(void)
 
     /*3 init driver */
     if(aml_driv_attach(drv_priv, wm_mac)) {
-        DPRINTF(AML_DEBUG_ERROR,"init driver error %s %d \n", __func__,__LINE__);
+        DPRINTF(AML_DEBUG_ERROR, "init driver error %s %d \n", __func__,__LINE__);
         goto err_ret;
     }
 
     /*4 init wifimac */
-    if (wifi_mac_mac_entry(wm_mac, drv_priv) != 0) {
-        DPRINTF(AML_DEBUG_INIT|AML_DEBUG_ERROR,"init wifimac error %s %d \n",
-                __func__,__LINE__);
+    if (wifi_mac_entry(wm_mac, drv_priv) != 0) {
+        DPRINTF(AML_DEBUG_ERROR, "init wifimac error %s %d \n", __func__,__LINE__);
         goto err_ret;
     }
 
@@ -2340,6 +2304,7 @@ drv_dev_probe(void)
     } else {
         memcpy(&vm_param.vm_param_name, vmac0, IFNAMSIZ);
     }
+
     vif0opmode = aml_wifi_get_vif0_opmode();
     if ((vif0opmode >= WIFINET_M_IBSS) && (vif0opmode <= WIFINET_M_P2P_DEV)) {
         vm_param.vm_param_opmode = vif0opmode;
@@ -2354,6 +2319,7 @@ drv_dev_probe(void)
     } else {
         memcpy(&vm_param.vm_param_name, vmac1, IFNAMSIZ);
     }
+
     vif1opmode = aml_wifi_get_vif1_opmode();
     if ((vif1opmode >= WIFINET_M_IBSS) && (vif1opmode <= WIFINET_M_P2P_DEV)) {
         vm_param.vm_param_opmode = vif1opmode;
@@ -2369,10 +2335,6 @@ drv_dev_probe(void)
     drv_priv->drv_ops.drv_set_bmfm_info(drv_priv, 0, 0, 0, 0);
     drv_hal_enable_coexist(drv_priv->drv_config.cfg_wifi_bt_coexist_support );
 
-
-    printk("%s(%d) interface = %s opmode %d, %s dev info %s version %s\n",
-        __func__, __LINE__,vm_param.vm_param_name, vm_param.vm_param_opmode,
-        ret==0?"success":"fail", dev_info, version);
     return ret;
 
 err_ret:
