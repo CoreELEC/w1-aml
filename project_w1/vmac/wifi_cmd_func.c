@@ -22,8 +22,8 @@ cmd_to_func_table_t cmd_to_func[] =
     {"set_bt_dev_id", aml_set_bt_device_id},
     {"get_bt_dev_id", aml_get_bt_device_id},
     {"sta_send_bareq", aml_sta_send_addba_req},
-    {"send_bss_coex", aml_sta_send_coexist_mgmt},
-    {"get_txaggr_sta", aml_get_drv_txaggr_status},
+    {"set_bss_coex", aml_sta_send_coexist_mgmt},
+    {"get_txaggr_sta", aml_wpa_get_txaggr_status},
     {"sta_get_session", aml_sta_get_wfd_session},
     {"wmm_ac_addts",  aml_wmm_ac_addts},
     {"wmm_ac_delts",  aml_wmm_ac_delts},
@@ -33,25 +33,61 @@ cmd_to_func_table_t cmd_to_func[] =
     {"set_amsdu", aml_set_mac_amsdu},
     {"set_ampdu", aml_set_drv_ampdu},
     {"update_wmm_arg", aml_update_wmm_arg},
-    {"set_dynamic_bw", aml_set_dynamic_bw},
-    {"set_short_gi", aml_set_short_gi},
+    {"set_dynamic_bw", aml_wpa_set_dynamic_bw},
+    {"set_short_gi", aml_wpa_set_short_gi},
     {"set_eat_count", aml_set_eat_count_max},
-    {"set_aggr_thresh", aml_set_aggr_thresh},
-    {"set_hrt_int", aml_set_hrtimer_interval},
+    {"set_aggr_thr", aml_set_aggr_thresh},
+    {"set_hrt_intv", aml_set_hrtimer_interval},
     {"get_ap_ip", aml_get_ap_ip},
-    {"set_roam_thr_2g", aml_set_roaming_threshold_2g},//wpa_cli driver set_roam_thr_2g -80
-    {"set_roam_thr_5g", aml_set_roaming_threshold_5g},
+    {"set_roam_2gthr", aml_set_roaming_threshold_2g},//wpa_cli driver set_roam_thr_2g -80
+    {"set_roam_5gthr", aml_set_roaming_threshold_5g},
     {"get_roam_chan", aml_get_roaming_candidate_chans},
     {"set_roam_chan", aml_set_roaming_candidate_chans},
     {"set_roam_mode", aml_set_roaming_mode},
     {"set_udp_info", aml_set_udp_info},
     {"get_udp_info", aml_get_udp_info},
-    {"mark_dfs_chan",aml_mark_dfs_channel},
-    {"unmark_dfs_chan",aml_unmark_dfs_channel},
+    {"set_dfs_mark",aml_mark_dfs_channel},
+    {"set_dfs_unmark",aml_unmark_dfs_channel},
     {"set_dev_sn", aml_set_device_sn},
     {"get_dev_sn", aml_get_device_sn},
-    {"set_weak_thr_nb", aml_set_signal_power_weak_thresh_for_narrow_bandwidth},
-    {"set_weak_thr_wb", aml_set_signal_power_weak_thresh_for_wide_bandwidth},
+    {"set_nb_thr", aml_set_signal_power_weak_thresh_for_narrow_bandwidth},
+    {"set_wb_thr", aml_set_signal_power_weak_thresh_for_wide_bandwidth},
+    {"set_rate_legacy", aml_set_lagecy_bitrate_mask},
+    {"set_rate_ht", aml_set_ht_bitrate_mask},
+    {"set_rate_vht", aml_set_vht_bitrate_mask},
+    {"set_rate_auto", aml_set_rate_auto},
+    {"set_wifi_slcreq", aml_set_coex_req_timeslice_timeout},
+    {"set_coex_bcnmis", aml_set_coex_max_miss_bcn},
+    {"set_sc_hang", aml_set_scan_hang},
+    {"set_sc_contime", aml_set_scan_connect_time},
+    {"set_sc_idltime", aml_set_scan_idle_time},
+    {"set_reg", aml_wpa_set_reg},
+    {"get_reg", aml_wpa_get_reg},
+    {"get_cca_stat", aml_wpa_get_cca_status},
+    {"get_agc_stat", aml_wpa_get_agc_status},
+    {"get_tx_stat", aml_wpa_get_latest_tx_status},
+    {"get_drv_ver", aml_wpa_get_drv_ver},
+    {"set_country", aml_wpa_set_country_code},
+    {"get_country", aml_wpa_get_country_code},
+    {"set_pwr_save", aml_wpa_set_power},
+    {"set_chl_rssi", aml_wpa_set_channel_rssi},
+    {"set_burst", aml_wpa_set_burst},
+    {"set_coex_btwifi", aml_wpa_set_coex_btwifi},
+    {"set_coex_bcnmis", aml_wpa_set_coex_bcnmis},
+    {"set_bcn_intv", aml_wpa_set_bcn_intv},
+    {"set_ldpc", aml_wpa_set_ldpc},
+#if defined(SU_BF) || defined(MU_BF)
+    {"set_beamforming", aml_wpa_set_beamforming},
+#endif
+    {"get_chan_list", aml_wpa_get_chan_list},
+    {"set_uapsd", aml_wpa_set_uapsd},
+    {"set_pt_rxstart", aml_wpa_set_pt_rxstart},
+    {"set_pt_rxstop", aml_wpa_set_pt_rxstop},
+    {"set_scan_pri", aml_wpa_set_scan_pri},
+    {"set_bebk_pri", aml_wpa_set_bebk_pri},
+    {"set_pkt_fetch", aml_wpa_set_pkt_fetch},
+    {"set_frag_thr", aml_wpa_set_frag_thr},
+    {"set_preamble", aml_wpa_set_preamble},
     {"", NULL},
 };
 
@@ -300,6 +336,28 @@ int aml_sta_send_coexist_mgmt(struct wlan_net_vif *wnet_vif, char* buf, int len)
     wifi_mac_send_coexist_mgmt(buf + skip);
     return 0;
 }
+
+int aml_wpa_get_txaggr_status(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    char* str[2] = {"all", "reset"};
+    char **arg;
+    char sep = ' ';
+    int cmd_arg;
+    int data = 0;
+
+    arg = aml_cmd_char_prase(sep, buf, &cmd_arg);
+    if (arg[1] == NULL) {
+        return -EINVAL;
+    }
+    data = simple_strtol(arg[1], NULL, 0);
+    len = strlen("get_txaggr_sta ") + strlen(str[data]) + 1;
+    snprintf(buf, len, "get_txaggr_sta %s", str[data]);
+    printk("%s: buf %s\n", __func__, buf);
+    aml_get_drv_txaggr_status(wnet_vif, buf, len);
+
+    return 0;
+}
+
 
 int aml_get_drv_txaggr_status(struct wlan_net_vif *wnet_vif, char* buf, int len)
 {
@@ -661,6 +719,28 @@ int aml_update_wmm_arg(struct wlan_net_vif *wnet_vif, char* buf, int len)
     return 0;
 }
 
+int aml_wpa_set_dynamic_bw(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    char* str[2] = {"off", "on"};
+    char **arg;
+    char sep = ' ';
+    int cmd_arg;
+    int data = 0;
+
+    arg = aml_cmd_char_prase(sep, buf, &cmd_arg);
+    if (arg[1] == NULL) {
+        return -EINVAL;
+    }
+    data = simple_strtol(arg[1], NULL, 0);
+    len = strlen("get_txaggr_sta ") + strlen(str[data]) + 1;
+    snprintf(buf, len, "get_txaggr_sta %s", str[data]);
+    printk("%s: buf %s\n", __func__, buf);
+    aml_set_dynamic_bw(wnet_vif, buf, len);
+
+    return 0;
+}
+
+
 int aml_set_dynamic_bw(struct wlan_net_vif *wnet_vif, char* buf, int len)
 {
     char **arg;
@@ -692,6 +772,28 @@ int aml_set_dynamic_bw(struct wlan_net_vif *wnet_vif, char* buf, int len)
     kfree(arg);
     return 0;
 }
+
+int aml_wpa_set_short_gi(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    char* str[2] = {"off", "on"};
+    char **arg;
+    char sep = ' ';
+    int cmd_arg;
+    int data = 0;
+
+    arg = aml_cmd_char_prase(sep, buf, &cmd_arg);
+    if (arg[1] == NULL) {
+        return -EINVAL;
+    }
+    data = simple_strtol(arg[1], NULL, 0);
+    len = strlen("get_txaggr_sta ") + strlen(str[data]) + 1;
+    snprintf(buf, len, "get_txaggr_sta %s", str[data]);
+    printk("%s: buf %s\n", __func__, buf);
+    aml_set_short_gi(wnet_vif, buf, len);
+
+    return 0;
+}
+
 
 int aml_set_short_gi(struct wlan_net_vif *wnet_vif, char* buf, int len)
 {
@@ -1149,4 +1251,571 @@ int aml_set_signal_power_weak_thresh_for_wide_bandwidth(struct wlan_net_vif *wne
     return 0;
 }
 
+extern int aml_iwpriv_set_lagecy_bitrate_mask(struct net_device *dev, unsigned int set);
+int aml_set_lagecy_bitrate_mask(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    char **arg;
+    char sep = ' ';
+    int cmd_arg;
+    int data = 0;
 
+    arg = aml_cmd_char_prase(sep, buf, &cmd_arg);
+    if (arg[1] == NULL) {
+        return -EINVAL;
+    }
+    data = simple_strtol(arg[1], NULL, 0);
+    aml_iwpriv_set_lagecy_bitrate_mask(wnet_vif->vm_ndev, data);
+
+    return 0;
+}
+
+extern int aml_iwpriv_set_ht_bitrate_mask(struct net_device *dev, unsigned int set);
+int aml_set_ht_bitrate_mask(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    char **arg;
+    char sep = ' ';
+    int cmd_arg;
+    int data = 0;
+
+    arg = aml_cmd_char_prase(sep, buf, &cmd_arg);
+    if (arg[1] == NULL) {
+        return -EINVAL;
+    }
+    data = simple_strtol(arg[1], NULL, 0);
+    aml_iwpriv_set_ht_bitrate_mask(wnet_vif->vm_ndev, data);
+
+    return 0;
+}
+
+
+extern int aml_iwpriv_set_vht_bitrate_mask(struct net_device *dev, unsigned int set);
+int aml_set_vht_bitrate_mask(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    char **arg;
+    char sep = ' ';
+    int cmd_arg;
+    int data = 0;
+
+    arg = aml_cmd_char_prase(sep, buf, &cmd_arg);
+    if (arg[1] == NULL) {
+        return -EINVAL;
+    }
+    data = simple_strtol(arg[1], NULL, 0);
+    aml_iwpriv_set_vht_bitrate_mask(wnet_vif->vm_ndev, data);
+
+    return 0;
+}
+
+extern void aml_iwpriv_set_rate_auto(struct wlan_net_vif *wnet_vif);
+int aml_set_rate_auto(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    aml_iwpriv_set_rate_auto(wnet_vif);
+    return 0;
+}
+
+int aml_set_coex_req_timeslice_timeout(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    struct wifi_mac *wifimac = NULL;
+    char **arg;
+    char sep = ' ';
+    int cmd_arg;
+    int data = 0;
+
+    arg = aml_cmd_char_prase(sep, buf, &cmd_arg);
+    if (arg[1] == NULL) {
+        return -EINVAL;
+    }
+    data = simple_strtol(arg[1], NULL, 0);
+    wifimac = wifi_mac_get_mac_handle();
+    wifimac->drv_priv->hal_priv->hal_ops.phy_set_coexist_req_timeslice_timeout_value(data);
+
+    return 0;
+}
+
+int aml_set_coex_max_miss_bcn(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    struct wifi_mac *wifimac = NULL;
+    char **arg;
+    char sep = ' ';
+    int cmd_arg;
+    int data = 0;
+
+    arg = aml_cmd_char_prase(sep, buf, &cmd_arg);
+    if (arg[1] == NULL) {
+        return -EINVAL;
+    }
+    data = simple_strtol(arg[1], NULL, 0);
+    wifimac = wifi_mac_get_mac_handle();
+    wifimac->drv_priv->hal_priv->hal_ops.phy_set_coexist_max_miss_bcn(data);
+
+    return 0;
+}
+
+int aml_set_scan_hang(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    char **arg;
+    char sep = ' ';
+    int cmd_arg;
+    int data = 0;
+
+    arg = aml_cmd_char_prase(sep, buf, &cmd_arg);
+    if (arg[1] == NULL) {
+        return -EINVAL;
+    }
+    data = simple_strtol(arg[1], NULL, 0);
+    wnet_vif->vm_scan_hang = (unsigned char)data;
+    printk("%s, vid:%d vm_scan_hang:%d\n ", __func__, wnet_vif->wnet_vif_id, wnet_vif->vm_scan_hang);
+
+    return 0;
+}
+
+int aml_set_scan_connect_time(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    char **arg;
+    char sep = ' ';
+    int cmd_arg;
+    int data = 0;
+
+    arg = aml_cmd_char_prase(sep, buf, &cmd_arg);
+    if (arg[1] == NULL) {
+        return -EINVAL;
+    }
+    data = simple_strtol(arg[1], NULL, 0);
+    wnet_vif->vm_scan_time_connect = (unsigned char)data;
+    wifi_mac_set_scan_time(wnet_vif);
+    printk("%s, vid:%d vm_scan_time_connect:%d\n ", __func__, wnet_vif->wnet_vif_id, wnet_vif->vm_scan_time_connect);
+
+    return 0;
+}
+
+int aml_set_scan_idle_time(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    char **arg;
+    char sep = ' ';
+    int cmd_arg;
+    int data = 0;
+
+    arg = aml_cmd_char_prase(sep, buf, &cmd_arg);
+    if (arg[1] == NULL) {
+        return -EINVAL;
+    }
+    data = simple_strtol(arg[1], NULL, 0);
+    wnet_vif->vm_scan_time_idle = (unsigned char)data;
+    wifi_mac_set_scan_time(wnet_vif);
+    printk("%s, vid:%d vm_scan_idle:%d\n ", __func__, wnet_vif->wnet_vif_id, wnet_vif->vm_scan_time_idle);
+
+    return 0;
+}
+
+unsigned int get_reg(struct wlan_net_vif *wnet_vif, unsigned int set);
+int aml_wpa_get_reg(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    char **arg;
+    char sep = ' ';
+    int cmd_arg;
+    int data = 0;
+
+    arg = aml_cmd_char_prase(sep, buf, &cmd_arg);
+    if (arg[1] == NULL) {
+        return -EINVAL;
+    }
+    data = simple_strtol(arg[1], NULL, 0);
+    get_reg(wnet_vif, data);
+
+    return 0;
+}
+
+unsigned int set_reg(struct wlan_net_vif *wnet_vif, unsigned int set1, unsigned int set2);
+int aml_wpa_set_reg(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    char **arg;
+    char sep = ' ';
+    int cmd_arg;
+    int data1 = 0;
+    int data2 = 0;
+
+    arg = aml_cmd_char_prase(sep, buf, &cmd_arg);
+    if (arg[1] == NULL) {
+        return -EINVAL;
+    }
+    data1 = simple_strtol(arg[1], NULL, 0);
+    data2 = simple_strtol(arg[2], NULL, 0);
+    set_reg(wnet_vif, data1, data2);
+
+    return 0;
+}
+
+int aml_wpa_get_cca_status(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    struct wifi_mac *wifimac = NULL;
+
+    wifimac = wifi_mac_get_mac_handle();
+    wifimac->drv_priv->drv_ops.cca_busy_check();
+
+    return 0;
+}
+
+int aml_wpa_get_agc_status(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    struct wifi_mac *wifimac = NULL;
+
+    wifimac = wifi_mac_get_mac_handle();
+    wifimac->drv_priv->drv_ops.phy_stc();
+
+    return 0;
+}
+
+unsigned int get_latest_tx_status(struct wifi_mac *wifimac);
+int aml_wpa_get_latest_tx_status(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    struct wifi_mac *wifimac = NULL;
+
+    wifimac = wifi_mac_get_mac_handle();
+    get_latest_tx_status(wifimac);
+
+    return 0;
+}
+
+extern void print_driver_version(void);
+int aml_wpa_get_drv_ver(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    print_driver_version();
+    return 0;
+}
+
+int aml_wpa_set_country_code(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    char **arg;
+    char sep = ' ';
+    int cmd_arg;
+    arg = aml_cmd_char_prase(sep, buf, &cmd_arg);
+    if (arg[1] == NULL) {
+        return -EINVAL;
+    }
+    wifi_mac_set_country_code(arg[1]);
+    return 0;
+}
+
+int aml_wpa_get_country_code(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    struct wifi_mac *wifimac = NULL;
+    wifimac = wifi_mac_get_mac_handle();
+    printk("country code: %s\n", wifimac->wm_country.iso);
+
+    return 0;
+}
+
+extern void wifi_mac_pwrsave_set_inactime(struct wlan_net_vif *wnet_vif, unsigned int time);
+int aml_wpa_set_power(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    char **arg;
+    char sep = ' ';
+    int cmd_arg;
+    int data = 0;
+    arg = aml_cmd_char_prase(sep, buf, &cmd_arg);
+    if (arg[1] == NULL) {
+        printk("%s, %d\n", __func__, __LINE__);
+        return -EINVAL;
+    }
+    data = simple_strtol(arg[1], NULL, 0);
+    wifi_mac_pwrsave_set_inactime(wnet_vif, data);
+
+    return 0;
+}
+
+int aml_wpa_set_channel_rssi(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    struct wifi_mac *wifimac = NULL;
+    char **arg;
+    char sep = ' ';
+    int cmd_arg;
+    int data = 0;
+
+    wifimac = wifi_mac_get_mac_handle();
+    arg = aml_cmd_char_prase(sep, buf, &cmd_arg);
+    if (arg[1] == NULL) {
+        return -EINVAL;
+    }
+    data = simple_strtol(arg[1], NULL, 0);
+    wifi_mac_set_channel_rssi(wifimac, data);
+
+    return 0;
+}
+
+int aml_wpa_set_burst(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    struct wifi_mac *wifimac = NULL;
+    char **arg;
+    char sep = ' ';
+    int cmd_arg;
+    int data = 0;
+
+    wifimac = wifi_mac_get_mac_handle();
+    arg = aml_cmd_char_prase(sep, buf, &cmd_arg);
+    if (arg[1] == NULL) {
+        return -EINVAL;
+    }
+    data = simple_strtol(arg[1], NULL, 0);
+    wifimac->drv_priv->drv_config.cfg_burst_ack = data;
+    printk("wpa cli set burst %d\n", data);
+
+    return 0;
+}
+
+extern void aml_iwpriv_set_uapsd(struct wlan_net_vif *wnet_vif, unsigned int set);
+int aml_wpa_set_uapsd(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    struct wifi_mac *wifimac = NULL;
+    char **arg;
+    char sep = ' ';
+    int cmd_arg;
+    int data = 0;
+
+    wifimac = wifi_mac_get_mac_handle();
+    arg = aml_cmd_char_prase(sep, buf, &cmd_arg);
+    if (arg[1] == NULL) {
+        return -EINVAL;
+    }
+    data = simple_strtol(arg[1], NULL, 0);
+    aml_iwpriv_set_uapsd(wnet_vif, data);
+    printk("wpa cli set uapsd %d\n", data);
+
+    return 0;
+}
+
+int aml_wpa_set_pt_rxstart(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    char **arg;
+    char sep = ' ';
+    int cmd_arg;
+    int data = 0;
+
+    arg = aml_cmd_char_prase(sep, buf, &cmd_arg);
+    if (arg[1] == NULL) {
+        return -EINVAL;
+    }
+    data = simple_strtol(arg[1], NULL, 0);
+    wnet_vif->vif_ops.pt_rx_start(data);
+    printk("wpa cli set rxstart %d\n", data);
+
+    return 0;
+}
+
+int aml_wpa_set_pt_rxstop(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    wnet_vif->vif_ops.pt_rx_stop();
+    return 0;
+}
+
+int aml_wpa_set_scan_pri(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    struct wifi_mac *wifimac = NULL;
+    char **arg;
+    char sep = ' ';
+    int cmd_arg;
+    int data = 0;
+
+    wifimac = wifi_mac_get_mac_handle();
+    arg = aml_cmd_char_prase(sep, buf, &cmd_arg);
+    if (arg[1] == NULL) {
+        return -EINVAL;
+    }
+    data = simple_strtol(arg[1], NULL, 0);
+    wifimac->drv_priv->hal_priv->hal_ops.phy_set_coexist_scan_priority_range(data);
+    printk("wpa cli set scan pri %d\n", data);
+
+    return 0;
+}
+
+int aml_wpa_set_bebk_pri(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    struct wifi_mac *wifimac = NULL;
+    char **arg;
+    char sep = ' ';
+    int cmd_arg;
+    int data = 0;
+
+    wifimac = wifi_mac_get_mac_handle();
+    arg = aml_cmd_char_prase(sep, buf, &cmd_arg);
+    if (arg[1] == NULL) {
+        return -EINVAL;
+    }
+    data = simple_strtol(arg[1], NULL, 0);
+    wifimac->drv_priv->hal_priv->hal_ops.phy_set_coexist_be_bk_noqos_priority_range(data);
+    printk("wpa cli set bebk noqos pri %d\n", data);
+
+    return 0;
+}
+
+int aml_wpa_set_coex_btwifi(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    struct wifi_mac *wifimac = NULL;
+    char **arg;
+    char sep = ' ';
+    int cmd_arg;
+    int data = 0;
+
+    wifimac = wifi_mac_get_mac_handle();
+    arg = aml_cmd_char_prase(sep, buf, &cmd_arg);
+    if (arg[1] == NULL) {
+        return -EINVAL;
+    }
+    data = simple_strtol(arg[1], NULL, 0);
+    printk("%s, coexist en= %d\n ", __func__, data);
+    wifimac->drv_priv->hal_priv->hal_ops.phy_set_coexist_en(data);
+
+    return 0;
+}
+
+int aml_wpa_set_coex_bcnmis(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    struct wifi_mac *wifimac = NULL;
+    char **arg;
+    char sep = ' ';
+    int cmd_arg;
+    int data = 0;
+
+    wifimac = wifi_mac_get_mac_handle();
+    arg = aml_cmd_char_prase(sep, buf, &cmd_arg);
+    if (arg[1] == NULL) {
+        return -EINVAL;
+    }
+    data = simple_strtol(arg[1], NULL, 0);
+    printk("%s, coexist value=%d\n ", __func__, data);
+    wifimac->drv_priv->hal_priv->hal_ops.phy_set_coexist_max_miss_bcn(data);
+
+    return 0;
+}
+
+extern int aml_beacon_intvl_set(struct wlan_net_vif *wnet_vif, unsigned int set);
+int aml_wpa_set_bcn_intv(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    char **arg;
+    char sep = ' ';
+    int cmd_arg;
+    int data = 0;
+
+    arg = aml_cmd_char_prase(sep, buf, &cmd_arg);
+    if (arg[1] == NULL) {
+        return -EINVAL;
+    }
+    data = simple_strtol(arg[1], NULL, 0);
+    printk("%s, coexist value=%\n ", __func__, data);
+    aml_beacon_intvl_set(wnet_vif, data);
+
+    return 0;
+}
+
+extern int aml_set_ldpc(struct wlan_net_vif *wnet_vif, unsigned int set);
+int aml_wpa_set_ldpc(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    char **arg;
+    char sep = ' ';
+    int cmd_arg;
+    int data = 0;
+
+    arg = aml_cmd_char_prase(sep, buf, &cmd_arg);
+    if (arg[1] == NULL) {
+        return -EINVAL;
+    }
+    data = simple_strtol(arg[1], NULL, 0);
+    printk("%s, coexist value=%\n ", __func__, data);
+    aml_set_ldpc(wnet_vif, data);
+
+    return 0;
+}
+
+int aml_wpa_get_chan_list(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    struct wifi_mac *wifimac = NULL;
+    struct wifi_channel *c = NULL;
+    int i = 0;
+    wifimac = wifi_mac_get_mac_handle();
+
+    WIFI_CHANNEL_LOCK(wifimac);
+    for (i = 0; i < wifimac->wm_nchans; i++) {
+        c = &wifimac->wm_channels[i];
+        printk("channel:%d\tfrequency:%d \tbandwidth:%dMHz \n", c->chan_pri_num, c->chan_cfreq1, ((1 << c->chan_bw) * 20));
+    }
+    WIFI_CHANNEL_UNLOCK(wifimac);
+
+    return 0;
+}
+
+#if defined(SU_BF) || defined(MU_BF)
+extern int aml_set_beamforming(struct wlan_net_vif *wnet_vif, unsigned int set1,unsigned int set2);
+int aml_wpa_set_beamforming(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    char **arg;
+    char sep = ' ';
+    int cmd_arg;
+    int data1 = 0;
+    int data2 = 0;
+
+    arg = aml_cmd_char_prase(sep, buf, &cmd_arg);
+    if (arg[1] == NULL) {
+        return -EINVAL;
+    }
+    data1 = simple_strtol(arg[1], NULL, 0);
+    data2 = simple_strtol(arg[2], NULL, 0);
+    aml_set_beamforming(wnet_vif, data1,data1);
+
+    return 0;
+}
+#endif
+
+int aml_wpa_set_pkt_fetch(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    char **arg;
+    char sep = ' ';
+    int cmd_arg;
+    int data = 0;
+
+    arg = aml_cmd_char_prase(sep, buf, &cmd_arg);
+    if (arg[1] == NULL) {
+        return -EINVAL;
+    }
+    data = simple_strtol(arg[1], NULL, 0);
+    wnet_vif->vm_mainsta->sta_fetch_pkt_method = (unsigned char)data;
+    printk("wpa cli set pkt fetch %d\n", data);
+
+    return 0;
+}
+
+int aml_wpa_set_frag_thr(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    char **arg;
+    char sep = ' ';
+    int cmd_arg;
+    int data = 0;
+
+    arg = aml_cmd_char_prase(sep, buf, &cmd_arg);
+    if (arg[1] == NULL) {
+        return -EINVAL;
+    }
+    data = simple_strtol(arg[1], NULL, 0);
+    if ((unsigned short)data > 0) {
+        wnet_vif->vm_fragthreshold = (unsigned short)data;
+    }
+    printk("wpa cli set frag thr %d\n", data);
+
+    return 0;
+}
+
+int aml_wpa_set_preamble(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    char **arg;
+    char sep = ' ';
+    int cmd_arg;
+    int data = 0;
+
+    arg = aml_cmd_char_prase(sep, buf, &cmd_arg);
+    if (arg[1] == NULL) {
+        return -EINVAL;
+    }
+    data = simple_strtol(arg[1], NULL, 0);
+    phy_set_preamble_type(data);
+    printk("wpa cli set premble type %d\n", data);
+
+    return 0;
+}

@@ -115,6 +115,8 @@ wifi_mac_start_bss_ex(unsigned long arg)
     if (wnet_vif->vm_curchan != WIFINET_CHAN_ERR) {
         wifi_mac_ChangeChannel(wifimac, wnet_vif->vm_curchan, 3, wnet_vif->wnet_vif_id);
         if (wnet_vif->vm_opmode == WIFINET_M_STA && (wifimac->wm_scan->scan_ssid_count > 10)) {
+            if (wnet_vif->vm_mainsta->sta_avg_bcn_rssi > -65)
+                wnet_vif->vm_mainsta->sta_avg_bcn_rssi = -65;
             wifi_mac_set_channel_rssi(wifimac, (unsigned char)(wnet_vif->vm_mainsta->sta_avg_bcn_rssi));
         }
 
@@ -296,7 +298,7 @@ int wifi_mac_connect(struct wlan_net_vif *wnet_vif, struct wifi_scan_info *se)
     sta->sta_capinfo = se->SI_capinfo;
     sta->sta_rsn = wnet_vif->vm_mainsta->sta_rsn;
     sta->sta_listen_intval = DEFAULT_LISTEN_INTERVAL;
-    sta->sta_avg_bcn_rssi = se->SI_rssi;
+    sta->sta_avg_bcn_rssi = translate_to_dbm(se->SI_rssi);
 
 #ifdef AML_WPA3
     if (wnet_vif->vm_mainsta->sta_flags_ext & WIFINET_NODE_MFP) {
@@ -666,7 +668,7 @@ alloc_sta_node(struct wifi_station_tbl *nt,struct wlan_net_vif *wnet_vif)
 
     sta->sta_wnet_vif = wnet_vif;
     sta->sta_wmac = wnet_vif->vm_wmac;
-    sta->sta_avg_bcn_rssi  = 156;
+    sta->sta_avg_bcn_rssi  = -100;
     sta->sta_avg_rssi   = 156;
     sta->sta_last_txrate = 1000; /*1M*/
     sta->sta_last_rxrate = 1000; /*1M*/

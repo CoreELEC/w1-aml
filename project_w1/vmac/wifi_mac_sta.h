@@ -233,7 +233,7 @@ struct wifi_station
     unsigned short sa_query_seq;
     unsigned short sa_query_try_count;
 
-    int32_t sta_avg_bcn_rssi;    // dbm =  Rssi-256
+    int32_t sta_avg_bcn_rssi;    // dbm
     int32_t sta_avg_rssi;
     unsigned int sta_last_txrate;  //kbps
     unsigned int sta_last_rxrate;  //kbps

@@ -218,6 +218,36 @@ void wifi_mac_set_channel_rssi(struct wifi_mac *wifimac, unsigned char rssi)
     DPRINTF(AML_DEBUG_WARNING, "%s channnel rssi:%d\n", __func__, rssi);
     wifimac->drv_priv->drv_ops.set_channel_rssi(wifimac->drv_priv, rssi);
 }
+
+void wifi_mac_change_channel_rssi(struct wifi_mac *wifimac, int *rssi)
+{
+    int channel_set_rssi = 0;
+
+    switch (*rssi) {
+        case -82:
+            if (wifimac->wm_scan->scan_ssid_count > 10) {
+                channel_set_rssi = -65; //low power scan
+            } else {
+                channel_set_rssi = -82; //default
+            }
+            break;
+        case -65:
+            if ((wifimac->wm_nrunning == 0 && wifimac->wm_scan->scan_ssid_count >= 100)
+                || (wifimac->wm_nrunning != 0 && wifimac->wm_scan->scan_ssid_count >= 25)) {
+                channel_set_rssi = -65; //low power scan
+            } else {
+                channel_set_rssi = -82; //default
+            }
+            break;
+        default:
+            channel_set_rssi = -65; //low power scan
+            break;
+    }
+
+    wifi_mac_set_channel_rssi(wifimac, (unsigned char)channel_set_rssi);
+    *rssi = channel_set_rssi;
+}
+
 int
 wifi_mac_wmm_update2hal(struct wifi_mac *wifimac, struct wlan_net_vif *wnet_vif)
 {
@@ -904,9 +934,9 @@ void wifi_mac_roaming_check(  struct wifi_mac *wifimac, struct wifi_station *sta
         roaming_threshold = wifimac->roaming_threshold_2g;
     }
 
-    if ((sta->sta_avg_bcn_rssi - 255) < roaming_threshold) {
+    if (sta->sta_avg_bcn_rssi  < roaming_threshold) {
         if (++roaming_cnt > ROAMING_TRIGER_COUNT && time_before((wifimac->wm_lastroaming + (5 * HZ)), jiffies)) {
-            printk("Rssi[%d] < Threshold[%d]  trigger roaming \n", sta->sta_avg_bcn_rssi - 255, roaming_threshold);
+            printk("Rssi[%d] < Threshold[%d]  trigger roaming \n", sta->sta_avg_bcn_rssi, roaming_threshold);
             roaming_cnt = 0;
             wifimac->wm_lastroaming = jiffies;
             wifi_mac_roaming_trigger(sta->sta_wnet_vif);
@@ -969,6 +999,8 @@ int wifi_mac_rx_complete(void *ieee,struct sk_buff *skbbuf, struct wifi_mac_rx_s
 
     int frame_type, frame_subtype;
     enum drv_rx_type status;
+    static unsigned char recv_beacon_count = 0;
+    static int auto_gain_base = 0;
 
     if (os_skb_get_pktlen(skbbuf) < WIFINET_MIN_LEN)
     {
@@ -1022,13 +1054,27 @@ int wifi_mac_rx_complete(void *ieee,struct sk_buff *skbbuf, struct wifi_mac_rx_s
         }
     }
 
+    wnet_vif= sta->sta_wnet_vif;
+
     sta->sta_avg_rssi =  (sta->sta_avg_rssi + rs->rs_rssi*3)/4;
     if (WIFINET_IS_BEACON(wh))
     {
         rs->rs_rssi = wifi_mac_average_rssi(rs->rs_rssi);
-        sta->sta_avg_bcn_rssi =  (sta->sta_avg_bcn_rssi + rs->rs_rssi*3)/4;
+        sta->sta_avg_bcn_rssi =  (sta->sta_avg_bcn_rssi + (rs->rs_rssi -256) * 3) / 4; //dbm
+
+        if ((wnet_vif->vm_opmode == WIFINET_M_STA) && (wnet_vif->vm_state == WIFINET_S_CONNECTED)
+            && !(wifimac->wm_flags & WIFINET_F_SCAN)) {
+            recv_beacon_count++;
+            if (recv_beacon_count == 20) {
+                recv_beacon_count = 0;
+                if ((sta->sta_avg_bcn_rssi - auto_gain_base) > 5 || (auto_gain_base - sta->sta_avg_bcn_rssi) > 5) {
+                    auto_gain_base = sta->sta_avg_bcn_rssi;
+                    wifi_mac_set_channel_rssi(wifimac, (unsigned char)(auto_gain_base));
+                }
+            }
+        }
     }
-    wnet_vif= sta->sta_wnet_vif;
+
     net_ops = wifimac->drv_priv->net_ops;
     /* AP check triggers */
     net_ops->wifi_mac_ap_chk_uapsd_trig(wifimac->drv_priv->wmac, skbbuf, sta,rs);
@@ -2394,15 +2440,24 @@ static void wifi_mac_check_special_ap(struct wlan_net_vif *wnet_vif)
     int i;
     char special_dev_manu_addr[][3]={
         {0x88, 0xc3, 0x97},
+        {0x64, 0x64, 0x4a},
+        {0x50, 0x64, 0x2b},
     };
 
     wnet_vif->vm_wmac->wm_signal_power_weak_thresh_narrow = WIFINET_SIGNAL_POWER_WEAK_THRESH_NARROW;
     wnet_vif->vm_wmac->wm_signal_power_weak_thresh_wide = WIFINET_SIGNAL_POWER_WEAK_THRESH_WIDE;
 
+    wnet_vif->vm_wmac->wm_signal_power_bw_change_thresh_narrow = WIFINET_SIGNAL_POWER_BW_CHANGE_THRESH_NARROW;
+    wnet_vif->vm_wmac->wm_signal_power_bw_change_thresh_wide = WIFINET_SIGNAL_POWER_BW_CHANGE_THRESH_WIDE;
+
     for (i = 0; i < ARRAY_SIZE(special_dev_manu_addr); i++) {
         if (!(memcmp(wnet_vif->vm_des_bssid, special_dev_manu_addr[i], 3))) {
-            wnet_vif->vm_wmac->wm_signal_power_weak_thresh_narrow = WIFINET_SIGNAL_POWER_WEAK_THRESH_NARROW + 8;
-            wnet_vif->vm_wmac->wm_signal_power_weak_thresh_wide = WIFINET_SIGNAL_POWER_WEAK_THRESH_WIDE + 20;
+            wnet_vif->vm_wmac->wm_signal_power_weak_thresh_narrow = WIFINET_SIGNAL_POWER_WEAK_THRESH_NARROW + 5;
+            wnet_vif->vm_wmac->wm_signal_power_weak_thresh_wide = WIFINET_SIGNAL_POWER_WEAK_THRESH_WIDE + 18;
+
+            wnet_vif->vm_wmac->wm_signal_power_bw_change_thresh_narrow = WIFINET_SIGNAL_POWER_BW_CHANGE_THRESH_NARROW + 1;
+            wnet_vif->vm_wmac->wm_signal_power_bw_change_thresh_wide = WIFINET_SIGNAL_POWER_BW_CHANGE_THRESH_WIDE + 7;
+
             break;
         }
     }
@@ -2569,6 +2624,7 @@ wifi_mac_sub_sm(struct wlan_net_vif *wnet_vif, enum wifi_mac_state nstate, int a
                         wifi_mac_send_mgmt(sta, WIFINET_FC0_SUBTYPE_DISASSOC, (void *)&mgmt_arg);
                         wifi_mac_sta_leave(sta, 0);
                         wnet_vif->vm_flags &= ~WIFINET_F_SIBSS;
+                        wnet_vif->vm_scanchan_rssi = -82;
                     }
                     else if (wnet_vif->vm_opmode == WIFINET_M_IBSS)
                     {

@@ -2,6 +2,7 @@ TARGET=vlsicomm.ko
 
 #PROJECT=PROJECT_W1
 #export PROJECT
+export PROJ_NAME
 
 all: firmware driver
 

@@ -263,6 +263,8 @@ void wifi_mac_scan_end(struct wifi_mac *wifimac);
 void wifi_mac_connect_start(struct wifi_mac *wifimac);
 void wifi_mac_connect_end(struct wifi_mac *wifimac);
 void wifi_mac_set_channel_rssi(struct wifi_mac *wifimac, unsigned char rssi);
+void wifi_mac_change_channel_rssi(struct wifi_mac *wifimac, int *rssi);
+
 unsigned int wifi_mac_add_work_task(struct wifi_mac *wifimac,
     void *func,void *func_cb, SYS_TYPE param1, SYS_TYPE param2, SYS_TYPE param3, SYS_TYPE param4, SYS_TYPE param5);
 

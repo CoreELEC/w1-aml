@@ -23,7 +23,7 @@ spur_freq=24478
 rf_count=2
 
 #wifi 2g/5g tx power table
-wftx_pwrtbl_en=0
+wftx_pwrtbl_en=2
 
 ##0:11b(1,2) 1: 11b(5.5,11) 2:11a/g(6~12) 3:11a/g(18~36) 4:11a/g(48) 5:11a/g(54)
 ##6:11n(MCS0~2) 7:11n(MCS3~5) 8:11n(MCS6) 9:11n(MCS7) 10:11ac(MCS0~2)

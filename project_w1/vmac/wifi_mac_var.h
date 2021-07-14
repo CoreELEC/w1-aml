@@ -118,6 +118,10 @@ struct vm_wlan_net_vif_params
 #define WIFINET_SIGNAL_POWER_WEAK_THRESH_NARROW -75
 #define WIFINET_SIGNAL_POWER_WEAK_THRESH_WIDE -70
 
+#define WIFINET_SIGNAL_POWER_BW_CHANGE_THRESH_NARROW -75
+#define WIFINET_SIGNAL_POWER_BW_CHANGE_THRESH_WIDE -70
+
+
 #define WIFINET_TXPOWER_MAX  100
 
 #define WIFINET_TXSTREAM  1
@@ -339,6 +343,9 @@ struct wifi_mac
     short wm_signal_power_weak_thresh_narrow;
     short wm_signal_power_weak_thresh_wide;
 
+    short wm_signal_power_bw_change_thresh_narrow;
+    short wm_signal_power_bw_change_thresh_wide;
+
     struct wifi_mac_ops wmac_ops;
     struct drv_private *drv_priv;
     struct wifi_mac_wme_state wm_wme[DEFAULT_MAX_VMAC];
@@ -545,6 +552,7 @@ struct wlan_net_vif
     struct conn_chan_list vm_connchan;
     enum wifi_mac_bwc_width vm_bandwidth;
     unsigned char vm_scan_before_connect_flag;
+    int vm_scanchan_rssi;
     struct wifi_scan_info *vm_connect_scaninfo;
     unsigned char vm_chan_simulate_scan_flag;
     unsigned char vm_chan_switch_scan_flag;

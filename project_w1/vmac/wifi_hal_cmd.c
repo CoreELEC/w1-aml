@@ -892,8 +892,6 @@ void  phy_scan_cmd(unsigned int data)
 void phy_set_channel_rssi(unsigned char rssi)
 {
     struct Channel_Switch channel_switch;
-    unsigned int reg_val = 0;
-    int i = 0;
 
     channel_switch.Cmd = CHANNEL_SWITCH_CMD;
     channel_switch.rssi = rssi;
@@ -905,14 +903,6 @@ void phy_set_channel_rssi(unsigned char rssi)
     HAL_BEGIN_LOCK();
     hi_set_cmd((unsigned char*)&channel_switch, sizeof(struct Channel_Switch));
     HAL_END_LOCK();
-
-    for (i = 0; i < 10; i++) {
-        reg_val  = wifi_mac_read_word(0x00a0816c);
-        printk("AGC_REG_A91 info: Reg data=&0x%08x\n",reg_val);
-        reg_val  = wifi_mac_read_word(0x00a081a4);
-        printk("AGC_REG_A105 info: Reg data=&0x%08x\n",reg_val);
-    }
-
 }
 unsigned int phy_set_slot_time(unsigned int slot)
 {
@@ -1793,6 +1783,19 @@ unsigned char parse_tx_power_param(char *varbuf, int len, struct WF2G_Txpwr_Para
     return 0;
 }
 
+unsigned char set_tx_power_param_enhance(struct WF2G_Txpwr_Param *wf2g_txpwr_param, struct WF5G_Txpwr_Param *wf5g_txpwr_param)
+{
+    unsigned char wf2g_pwr_tbl_dft[2][16] = {{0xBA,0xBA,0xf8,0xea,0xB5,0xB5,0xf8,0xea,0xA1,0xA1,0x84,0x7C,0x6C,0x6C,0x63,0x58},
+                                                                  {0xBA,0xBA,0xf8,0xea,0xB5,0xB5,0xe8,0xd4,0x94,0x94,0x7C,0x75,0x6C,0x66,0x5D,0x58}};
+    unsigned char wf5g_pwr_tbl_dft[3][16] = {{0xBA,0xBA,0xa6,0x94,0x75,0x75,0xb0,0x96,0x6C,0x6C,0xa2,0x86,0x6C,0x6C,0x63,0x58},
+                                                                  {0xBA,0xBA,0xa6,0x94,0x75,0x75,0xa8,0x8e,0x6C,0x6C,0x8a,0x75,0x6C,0x66,0x5D,0x58},
+                                                                  {0xBA,0xBA,0xa6,0x94,0x75,0x75,0xa8,0x8e,0x6C,0x6C,0x98,0x82,0x60,0x60,0x60,0x58}};
+
+    memcpy(&wf2g_txpwr_param->wf2g_pwr_tbl, wf2g_pwr_tbl_dft, sizeof(wf2g_txpwr_param->wf2g_pwr_tbl));
+    memcpy(&wf5g_txpwr_param->wf5g_pwr_tbl, wf5g_pwr_tbl_dft, sizeof(wf5g_txpwr_param->wf5g_pwr_tbl));
+    return 0;
+}
+
 static void set_cca_energy_detection(unsigned int reg_addr)
 {
     struct hw_interface* hif =hif_get_hw_interface();
@@ -1889,9 +1892,13 @@ unsigned char get_cali_param(struct Cali_Param *cali_param, struct WF2G_Txpwr_Pa
     {
         set_tx_power_param_default(wf2g_txpwr_param, wf5g_txpwr_param);
     }
-    else
+    else if (cali_param->wftx_pwrtbl_en == 1)
     {
         parse_tx_power_param(content, len, wf2g_txpwr_param, wf5g_txpwr_param);
+    }
+    else if (cali_param->wftx_pwrtbl_en == 2)
+    {
+        set_tx_power_param_enhance(wf2g_txpwr_param, wf5g_txpwr_param);
     }
 
     if (cali_param->cca_ed_det == 1) {

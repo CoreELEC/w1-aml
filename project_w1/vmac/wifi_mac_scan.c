@@ -229,6 +229,7 @@ wifi_mac_scan_get_match_node(struct wifi_mac_scan_state *ss, struct wlan_net_vif
         DPRINTF(AML_DEBUG_CONNECT, "<running> %s %d se%p st_entry%p \n",__func__,__LINE__,se, &st->st_entry);
         if (match_bss(wnet_vif, ss, se) == 0)
         {
+             wnet_vif->vm_scanchan_rssi = se->se_avgrssi - 255;
              wnet_vif->vm_connchan.conn_chan[wnet_vif->vm_connchan.num++] = se->scaninfo.SI_chan;
              WIFINET_ADDR_COPY(wnet_vif->vm_connchan.da, se->scaninfo.SI_macaddr);
              WIFINET_ADDR_COPY(wnet_vif->vm_connchan.bssid, se->scaninfo.SI_bssid);
@@ -469,7 +470,6 @@ void update_roaming_candidate_chan(struct wifi_mac_scan_state *ss, struct wifi_c
     WIFI_ROAMING_CHANNLE_UNLOCK(ss);
 
 }
-
 
 void wifi_mac_update_roaming_candidate_chan(struct wlan_net_vif *wnet_vif,const struct wifi_mac_scan_param *sp, int rssi)
 {
@@ -1396,8 +1396,12 @@ void wifi_mac_end_scan( struct wifi_mac_scan_state *ss)
     }
 
     printk("%s---> scan finish, vid:%d, clean vm_flags 0x%x\n", __func__, wnet_vif->wnet_vif_id, wifimac->wm_flags);
-    if ((wnet_vif->vm_opmode == WIFINET_M_STA) && (wnet_vif->vm_state == WIFINET_S_CONNECTED) && (wifimac->wm_scan->scan_ssid_count > 10)) {
-        wifi_mac_set_channel_rssi(wifimac, (unsigned char)(wnet_vif->vm_mainsta->sta_avg_bcn_rssi));
+    if ((wnet_vif->vm_opmode == WIFINET_M_STA) && (wnet_vif->vm_state == WIFINET_S_CONNECTED)) {
+        if (wifimac->wm_scan->scan_ssid_count > 10) {
+            wifi_mac_set_channel_rssi(wifimac, (unsigned char)(wnet_vif->vm_mainsta->sta_avg_bcn_rssi));
+        } else {
+            wifi_mac_set_channel_rssi(wifimac, -82);
+        }
     }
     os_timer_ex_start_period(&wnet_vif->vm_pwrsave.ips_timer_presleep, wnet_vif->vm_pwrsave.ips_inactivitytime);
 }
@@ -1597,8 +1601,6 @@ int wifi_mac_start_scan(struct wlan_net_vif *wnet_vif, int flags,
     }
 #endif//CONFIG_P2P
 
-    if (wnet_vif->vm_opmode == WIFINET_M_STA)
-        wifi_mac_set_channel_rssi(wifimac, -82); //default
     wifi_mac_save_ssid(wnet_vif, ss, nssid, ssids);
     if (ss->scan_CfgFlags & WIFINET_SCANCFG_CONNECT) {
         if ((wnet_vif->vm_opmode == WIFINET_M_STA) && time_before(jiffies, wifimac->wm_lastscan + SCAN_VALID_DEFAULT)) {
@@ -1610,6 +1612,19 @@ int wifi_mac_start_scan(struct wlan_net_vif *wnet_vif, int flags,
     }
 
     wifimac->wm_flags |= WIFINET_F_SCAN;
+
+    if (wnet_vif->vm_opmode == WIFINET_M_STA) {
+        printk("%s %d wnet_vif->vm_scanchan_rssi:%d \n", __func__, __LINE__, wnet_vif->vm_scanchan_rssi);
+        if (wnet_vif->vm_scan_before_connect_flag) {
+            if (wnet_vif->vm_scanchan_rssi > -65) {
+                wnet_vif->vm_scanchan_rssi = -65;
+            }
+            wifi_mac_set_channel_rssi(wifimac, wnet_vif->vm_scanchan_rssi); //rssi set by before_scan
+        } else {
+              wifi_mac_change_channel_rssi(wifimac, &wnet_vif->vm_scanchan_rssi);
+        }
+    }
+
     ss->scan_CfgFlags |= (flags & WIFINET_SCANCFG_MASK);
     wifi_mac_pwrsave_wakeup_for_tx(wnet_vif);
 

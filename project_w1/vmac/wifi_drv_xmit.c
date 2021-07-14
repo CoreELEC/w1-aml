@@ -612,131 +612,83 @@ static void drv_tx_lower_rate_when_signal_weak(struct wlan_net_vif *wnet_vif, st
     unsigned int sta_chbw= sta->sta_chbw;
     static unsigned int votes = 101;
     unsigned short rx_speed = wnet_vif->vm_rx_speed;
-    unsigned short tx_speed = wnet_vif->vm_tx_speed;
     unsigned int rate = 0, tcp_rx = ptxdesc->drv_pkt_info.pkt_info[0].b_tcp_ack;
     int i, power, power_margin, power_weak_thresh = wnet_vif->vm_wmac->wm_signal_power_weak_thresh_narrow;
 
     if (!IS_MCS_RATE(ptxdesc->txdesc_rateinfo[0].vendor_rate_code))
         return;
 
-    if (sta_chbw == WIFINET_BWC_WIDTH80)
+    if (WIFINET_IS_CHAN_5GHZ(wnet_vif->vm_curchan))
         power_weak_thresh = wnet_vif->vm_wmac->wm_signal_power_weak_thresh_wide;
 
-    power = translate_to_dbm(wnet_vif->vm_mainsta->sta_avg_rssi);
+    power = wnet_vif->vm_mainsta->sta_avg_bcn_rssi;
 
     if (power < power_weak_thresh) {
         if (WIFINET_IS_CHAN_2GHZ(wnet_vif->vm_curchan)) {
             if (sta_chbw == WIFINET_BWC_WIDTH20) {
                 if (tcp_rx) {
-                    rate = (power + 78 > 0) ? WIFI_11N_MCS3 : (power + 85 > 0) ? WIFI_11N_MCS2 : (power + 90 >0) ? WIFI_11N_MCS1 : WIFI_11N_MCS0;
+                    rate = (power + 71 > 0) ? WIFI_11N_MCS4 : (power + 75 > 0) ? WIFI_11N_MCS3 : (power + 80 > 0) ? WIFI_11N_MCS2 : (power + 85 >0) ? WIFI_11N_MCS1 : WIFI_11N_MCS0;
 
                     if (rx_speed < 20)
                         rate = WIFI_11N_MCS0;
                 } else {
-                    rate = (power + 78 > 0) ? WIFI_11N_MCS3 : (power + 85 > 0) ? WIFI_11N_MCS2 : (power + 90 >0) ? WIFI_11N_MCS1 : WIFI_11N_MCS0;
-
-                    if (tx_speed < 5) {
-                        rate = WIFI_11N_MCS0;
-                    }
+                    rate = (power + 72 > 0) ? WIFI_11N_MCS5 :  (power + 76 > 0) ? WIFI_11N_MCS4 : (power + 80 > 0) ? WIFI_11N_MCS3 : (power + 84 > 0) ? WIFI_11N_MCS2 : (power + 86 > 0) ? WIFI_11N_MCS1 : WIFI_11N_MCS0;
                 }
             }
 
             else if (sta_chbw == WIFINET_BWC_WIDTH40) {
                 if (tcp_rx) {
-                    rate = (power + 76 > 0) ? WIFI_11N_MCS3 : (power + 81 > 0) ? WIFI_11N_MCS2 : (power + 87 >0) ? WIFI_11N_MCS1 : WIFI_11N_MCS0;
+                    rate = (power + 70 > 0) ? WIFI_11N_MCS3 : (power + 75 > 0) ? WIFI_11N_MCS2 : (power + 80 >0) ? WIFI_11N_MCS1 : WIFI_11N_MCS0;
 
                     if (rx_speed < 20)
                         rate = WIFI_11N_MCS0;
                 } else {
-                    rate = (power + 76 > 0) ? WIFI_11N_MCS3 : (power + 81 > 0) ? WIFI_11N_MCS2 : (power + 87 >0) ? WIFI_11N_MCS1 : WIFI_11N_MCS0;
-
-                    if (tx_speed < 5)
-                        rate = WIFI_11N_MCS0;
+                    rate = (power + 75 > 0) ? WIFI_11N_MCS4 : (power + 77 > 0) ? WIFI_11N_MCS3 : (power + 79 > 0) ? WIFI_11N_MCS2 : (power + 81 > 0) ? WIFI_11N_MCS1 : WIFI_11N_MCS0;
                 }
             }
             else
                 printk("%s, %d, bw-%d not found!\n", __func__, __LINE__, sta_chbw);
 
         } else {
-            if (sta_chbw == WIFINET_BWC_WIDTH20) {
+            if (sta_chbw == WIFINET_BWC_WIDTH20  || power < sta->sta_wmac->wm_signal_power_bw_change_thresh_narrow) {
                 if (tcp_rx) {
-                    rate = (power + 75 > 0) ? WIFI_11N_MCS3 : (power + 78 > 0) ? WIFI_11N_MCS2 : (power + 81 >0) ? WIFI_11N_MCS1 : WIFI_11N_MCS0;
+                    rate = (power + 73 > 0) ? WIFI_11N_MCS3 : (power + 78 > 0) ? WIFI_11N_MCS2 : (power + 81 >0) ? WIFI_11N_MCS1 : WIFI_11N_MCS0;
 
                     if (rx_speed < 20)
                         rate = WIFI_11N_MCS0;
                 } else {
-                    rate = (power + 72 > 0) ? WIFI_11N_MCS6 : (power + 76 > 0) ? WIFI_11N_MCS5 : (power + 79 >0) ? WIFI_11N_MCS4 : \
-                    (power + 81 > 0) ? WIFI_11N_MCS3 : (power + 83 > 0) ? WIFI_11N_MCS2 : WIFI_11N_MCS0;
-
-                    if (tx_speed > 45)
-                        rate = WIFI_11N_MCS7;
-
-                    if (tx_speed < 10) {
-                        rate = WIFI_11N_MCS1;
-                        if (tx_speed < 5)
-                            rate = WIFI_11N_MCS0;
-                    }
+                    rate = (power + 65 > 0) ? WIFI_11N_MCS6 : (power + 68 > 0) ? WIFI_11N_MCS5 : (power + 70 > 0) ? WIFI_11N_MCS4 : \
+                    (power + 73 > 0) ? WIFI_11N_MCS3 : (power + 78 > 0) ? WIFI_11N_MCS2 :  (power + 83 > 0) ? WIFI_11N_MCS1 : WIFI_11N_MCS0;
                 }
 
                 if (IS_MCS_RATE(rate) && (sta->sta_flags & WIFINET_NODE_VHT))
                     rate |= 0x40;
             }
 
-            else if (sta_chbw == WIFINET_BWC_WIDTH40) {
+            else if (sta_chbw == WIFINET_BWC_WIDTH40  || power < sta->sta_wmac->wm_signal_power_bw_change_thresh_wide) {
                 if (tcp_rx) {
                     rate = (power + 73 > 0) ? WIFI_11N_MCS3 : (power + 75 > 0) ? WIFI_11N_MCS2 : (power + 77 >0) ? WIFI_11N_MCS1 : WIFI_11N_MCS0;
 
                     if (rx_speed < 20)
                         rate = WIFI_11N_MCS0;
                 } else {
-                    rate = (power + 73 > 0) ? WIFI_11N_MCS5 : (power + 77 > 0) ? WIFI_11N_MCS4 : (power + 79 >0) ? WIFI_11N_MCS3 : \
-                    (power + 82 > 0) ? WIFI_11N_MCS2 : (power + 89 >0) ? WIFI_11N_MCS1 : (power + 99 > 0) ? WIFI_11N_MCS0 : WIFI_11N_MCS0;
-
-                    if (tx_speed > 80)
-                        rate = WIFI_11N_MCS7;
-
-                    if (tx_speed < 20) {
-                        rate = WIFI_11N_MCS1;
-                        if (tx_speed < 5)
-                            rate =WIFI_11N_MCS0;
-                    }
+                    rate = (power + 54 > 0) ? WIFI_11AC_MCS8 : (power + 60 > 0) ? WIFI_11N_MCS7 : (power + 62 > 0) ? WIFI_11N_MCS6 : (power + 64 > 0) ? WIFI_11N_MCS5 : (power + 67 > 0) ? WIFI_11N_MCS4 : (power + 71 > 0) ? WIFI_11N_MCS3 : \
+                    (power + 74 > 0) ? WIFI_11N_MCS2 : (power + 76 > 0) ? WIFI_11N_MCS1 : (power + 99 > 0) ? WIFI_11N_MCS0 : WIFI_11N_MCS0;
                 }
                 if (IS_MCS_RATE(rate) && (sta->sta_flags & WIFINET_NODE_VHT))
                     rate |= 0x40;
             }
 
-
             else if (sta_chbw == WIFINET_BWC_WIDTH80) {
                 if (tcp_rx) {
-                    rate = (power + 76 > 0) ? WIFI_11AC_MCS4 : (power + 79 > 0) ? WIFI_11AC_MCS3 : (power + 82 >0) ? WIFI_11AC_MCS2 : \
-                    (power + 85 > 0) ? WIFI_11AC_MCS1 : WIFI_11AC_MCS0;
+                    rate = (power + 60 > 0) ? WIFI_11AC_MCS4 : (power + 63 > 0) ? WIFI_11AC_MCS3 : (power + 66 >0) ? WIFI_11AC_MCS2 : \
+                    (power + 70 > 0) ? WIFI_11AC_MCS1 : WIFI_11AC_MCS0;
 
                     if (rx_speed < 10)
                         rate = WIFI_11AC_MCS0;
                 } else {
-                    rate = (power + 62 > 0) ? WIFI_11AC_MCS6 : (power + 70 > 0) ? WIFI_11AC_MCS5 : (power + 76 >0) ? WIFI_11AC_MCS4 : \
-                    (power + 78 > 0) ? WIFI_11AC_MCS3 : (power + 84 >0) ? WIFI_11AC_MCS2 : WIFI_11AC_MCS0;
-
-                    if ((tx_speed > 140) && (power > -72)) {
-                        rate = WIFI_11AC_MCS7;
-                        if ((tx_speed > 160) && (power > -67))
-                            rate = WIFI_11AC_MCS9;
-                    }
-
-                    if (tx_speed < 90) {
-                        rate = WIFI_11AC_MCS4;
-                        if (tx_speed < 60) {
-                            rate = WIFI_11AC_MCS3;
-                            if (tx_speed < 30) {
-                                rate = WIFI_11AC_MCS2;
-                                if (tx_speed < 20) {
-                                    rate = WIFI_11AC_MCS1;
-                                    if (tx_speed < 8)
-                                        rate = WIFI_11AC_MCS0;
-                                }
-                            }
-                        }
-                    }
+                    rate = (power + 56 > 0) ? WIFI_11AC_MCS5 : (power + 60 >0) ? WIFI_11AC_MCS4 : \
+                    (power + 64 > 0) ? WIFI_11AC_MCS3 : (power + 67 >0) ? WIFI_11AC_MCS2 : (power + 71 >0) ? WIFI_11AC_MCS1 : WIFI_11AC_MCS0;
                 }
             }
 
@@ -1959,7 +1911,14 @@ void drv_txdesc_set_bw(struct drv_private *drv_priv, struct drv_txdesc *ptxdesc)
         }
         else if(sta->sta_chbw == WIFINET_BWC_WIDTH40)
         {
-            ptxdesc->txdesc_chanbw = CHAN_BW_40M;
+            if(sta->sta_avg_bcn_rssi < sta->sta_wmac->wm_signal_power_bw_change_thresh_narrow)
+            {
+                ptxdesc->txdesc_chanbw = CHAN_BW_20M;
+            }
+            else
+            {
+                ptxdesc->txdesc_chanbw = CHAN_BW_40M;
+            }
         }
         else
         {
@@ -1974,15 +1933,44 @@ void drv_txdesc_set_bw(struct drv_private *drv_priv, struct drv_txdesc *ptxdesc)
         }
         else if (sta->sta_chbw == WIFINET_BWC_WIDTH40 /*|| (rt->info[rate_index].phy == WIFINET_T_HT)*/ )
         {
-            ptxdesc->txdesc_chanbw = CHAN_BW_40M;
+            if(sta->sta_avg_bcn_rssi  < sta->sta_wmac->wm_signal_power_bw_change_thresh_narrow)
+            {
+                ptxdesc->txdesc_chanbw = CHAN_BW_20M;
+            }
+            else
+            {
+                ptxdesc->txdesc_chanbw = CHAN_BW_40M;
+            }
         }
         else if (sta->sta_chbw == WIFINET_BWC_WIDTH80)
         {
             if (IS_HT_RATE(ptxdesc->txdesc_rateinfo[i].vendor_rate_code)) {
-                ptxdesc->txdesc_chanbw = CHAN_BW_40M;
+                if(sta->sta_avg_bcn_rssi < sta->sta_wmac->wm_signal_power_bw_change_thresh_narrow)
+                {
+                    ptxdesc->txdesc_chanbw = CHAN_BW_20M;
+                }
+                else
+                {
+                    ptxdesc->txdesc_chanbw = CHAN_BW_40M;
+                }
 
             } else {
                 ptxdesc->txdesc_chanbw = CHAN_BW_80M;
+                if(sta->sta_avg_bcn_rssi < sta->sta_wmac->wm_signal_power_bw_change_thresh_wide)
+                {
+                    if(sta->sta_avg_bcn_rssi < sta->sta_wmac->wm_signal_power_bw_change_thresh_narrow)
+                    {
+                        ptxdesc->txdesc_chanbw = CHAN_BW_20M;
+                    }
+                    else
+                    {
+                        ptxdesc->txdesc_chanbw = CHAN_BW_40M;
+                    }
+                }
+                else
+                {
+                    ptxdesc->txdesc_chanbw = CHAN_BW_80M;
+                }
             }
         }
         else

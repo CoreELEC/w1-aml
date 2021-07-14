@@ -1,33 +1,48 @@
 ifeq ($(ARCH),)
-#SYSTEM_TYPE ?= SYSTEM64
-SYSTEM_TYPE ?= SYSTEM32
-else ifeq ($(ARCH),arm)
-SYSTEM_TYPE = SYSTEM32
-else ifeq ($(ARCH),arm64)
-SYSTEM_TYPE = SYSTEM64
-endif
-
-ifeq ($(SYSTEM_TYPE),SYSTEM64)
 ARCH ?= arm64
 CROSS_COMPILE ?= aarch64-linux-gnu-
-EXTRA_CFLAGS += -DSYSTEM64
-#SRCTOP ?= /mnt/fileroot2/vlsi.wifi/p-amlogic
-#SRCTOP ?= /mnt/fileroot2/vlsi.wifi/yeke_64bit
-#SRCTOP ?= /mnt/fileroot02/yuan.wang/ipc_prj
-SRCTOP ?= /mnt/fileroot2/vlsi.wifi/9-xiaomi
-#SRCTOP ?= /mnt/fileroot2/vlsi.wifi/gva
-else
-ARCH ?= arm
+else ifeq ($(ARCH),arm)
+SYSTEM_TYPE = SYSTEM32
 CROSS_COMPILE ?= arm-linux-gnueabihf-
 EXTRA_CFLAGS += -DSYSTEM32
-SRCTOP ?= /mnt/fileroot2/vlsi.wifi/p212_32bit
+else ifeq ($(ARCH),arm64)
+SYSTEM_TYPE = SYSTEM64
+CROSS_COMPILE ?= aarch64-linux-gnu-
+EXTRA_CFLAGS += -DSYSTEM64
+endif
+
+
+ifeq ($(PROJ_NAME),p-amlogic)
+SRCTOP ?= /proj/vlsi.wifi/p-amlogic
+KERNELDIR ?= $(SRCTOP)/out/target/product/newton/obj/KERNEL_OBJ
+EXTRA_CFLAGS += -DSYSTEM64
+else ifeq ($(PROJ_NAME),yeke)
+SRCTOP ?= /proj/vlsi.wifi/yeke_64bit
+KERNELDIR ?= $(SRCTOP)/out/target/product/p281/obj/KERNEL_OBJ
+EXTRA_CFLAGS += -DSYSTEM64
+else ifeq ($(PROJ_NAME),9-xiaomi)
+SRCTOP ?= /proj/vlsi.wifi/9-xiaomi
+KERNELDIR ?= $(SRCTOP)/out/target/product/aquaman/obj/KERNEL_OBJ
+EXTRA_CFLAGS += -DSYSTEM64
+else ifeq ($(PROJ_NAME),gva)
+SRCTOP ?= /proj/vlsi.wifi/gva
+KERNELDIR ?= $(SRCTOP)/kernel-4.9/common
+EXTRA_CFLAGS += -DSYSTEM64
+else
+ifeq ($(SYSTEM_TYPE),)
+ARCH = arm
+CROSS_COMPILE = arm-linux-gnueabihf-
+EXTRA_CFLAGS += -DSYSTEM32
+endif
+SRCTOP ?= /proj/vlsi.wifi/p212_32bit
+KERNELDIR ?= $(SRCTOP)/out/target/product/ampere/obj/KERNEL_OBJ
 endif
 
 #KERNELDIR ?= $(SRCTOP)/out/target/product/newton/obj/KERNEL_OBJ
 #KERNELDIR ?= $(SRCTOP)/out/target/product/p281/obj/KERNEL_OBJ
 #KERNELDIR ?= $(SRCTOP)/output/c1_ae402_a64_release/build/linux-amlogic-4.19-dev
 #KERNELDIR ?= $(SRCTOP)/out/target/product/aquaman/obj/KERNEL_OBJ
-KERNELDIR ?= $(SRCTOP)/out/target/product/ampere/obj/KERNEL_OBJ
+#KERNELDIR ?= $(SRCTOP)/out/target/product/ampere/obj/KERNEL_OBJ
 #KERNELDIR ?= $(SRCTOP)/kernel-4.9/common
 
 CC        = $(CROSS_COMPILE)gcc
@@ -71,6 +86,7 @@ EXTRA_CFLAGS += -DPROJECT_W1
 #EXTRA_CFLAGS += -DINTER_BEACON
 EXTRA_CFLAGS += -DSRAM_CONCURRENT
 EXTRA_CFLAGS += -DCTS_VERIFIER_GAS
+#EXTRA_CFLAGS += -DRX_PN_CHECK
 #EXTRA_CFLAGS += -DCONFIG_COMPAT
 EXTRA_CFLAGS += -DCONFIG_AML_USE_STATIC_BUF
 EXTRA_CFLAGS += -DSDIO_BUILD_IN
@@ -79,6 +95,7 @@ EXTRA_CFLAGS += -DSDIO_BUILD_IN
 EXTRA_CFLAGS += -DFW_RF_CALIBRATION
 #EXTRA_CFLAGS += -DPOWER_SAVE_NO_SDIO
 EXTRA_CFLAGS += -DAML_WPA3
+EXTRA_CFLAGS += -DDYNAMIC_BW
 
 ifeq ($(UNOENV),$(UNO_GXL))
 EXTRA_CFLAGS += -DCONFIG_GXL
@@ -158,6 +175,7 @@ else
 modules:
 	perl ./create_version_file.pl
 	@echo "UNO_GXL_SUB_P200=$(UNO_GXL_SUB_P200)"
+	@echo "PROJECT = $(PROJ_NAME)"
 	@echo "UNOENV=$(UNOENV) MAC_VER=$(MAC_VER)"
 	@echo "EXTRA_CFLAGS=$(EXTRA_CFLAGS)"
 	$(MAKE) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) -C $(KERNEL_SRC) M=$(M) modules

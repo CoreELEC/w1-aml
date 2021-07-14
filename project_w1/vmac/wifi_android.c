@@ -72,7 +72,7 @@ static int aml_android_get_rssi(struct wlan_net_vif *wnet_vif, char *command, in
                 wnet_vif->vm_mainsta->sta_essid, rssi);
 
             printk("sta_avg_rssi:%d, sta_avg_bcn_rssi:%d\n",
-                (wnet_vif->vm_mainsta->sta_avg_rssi - 255), (wnet_vif->vm_mainsta->sta_avg_bcn_rssi - 255));
+                (wnet_vif->vm_mainsta->sta_avg_rssi - 255), wnet_vif->vm_mainsta->sta_avg_bcn_rssi);
         }
     }
 

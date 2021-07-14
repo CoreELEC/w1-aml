@@ -121,7 +121,7 @@ void wifi_mac_security_delt_default_key(struct wlan_net_vif *wnet_vif)
 
     wifi_mac_KeyUpdateBegin(wnet_vif);
     for (i = 0; i < WIFINET_WEP_NKID; i++)
-        (void) wifi_mac_security_delkey(wnet_vif, &wnet_vif->vm_nw_keys[i], NULL);
+        (void) wifi_mac_security_delkey(wnet_vif, &wnet_vif->vm_nw_keys[i], wnet_vif->vm_mainsta);
     wifi_mac_KeyUpdateEnd(wnet_vif);
 }
 
