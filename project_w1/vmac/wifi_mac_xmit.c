@@ -206,19 +206,28 @@ void wifi_mac_xmit_pkt_parse(struct sk_buff *skb, struct wifi_mac *wifimac)
 
             tcp_tx_payload_total += tcp_tx_payload;
 
-            if (time_after(jiffies, in_time + HZ)) {
-                sta->sta_wnet_vif->vm_tx_speed = tcp_tx_payload_total >> 17;
+            if (time_after(jiffies, in_time + HZ/3)) {
+                sta->sta_wnet_vif->vm_tx_speed = (tcp_tx_payload_total >> 17) * 3;
                 start_flag = 0;
                 tcp_tx_payload_total = 0;
             }
 
             wifimac->drv_priv->drv_config.cfg_ampdu_subframes = DEFAULT_TXAMPDU_SUB_MAX;
 
-            if (tcp_tx_payload && (sta->sta_wnet_vif->vm_tx_speed < wifimac->drv_priv->drv_config.cfg_aggr_thresh)) {
-                wifimac->drv_priv->drv_config.cfg_ampdu_subframes = DEFAULT_TXAMPDU_SUB_MAX_FOR_HT;
-
-                if (sta->sta_wnet_vif->vm_tx_speed < wifimac->drv_priv->drv_config.cfg_no_aggr_thresh) {
-                    wifimac->drv_priv->drv_config.cfg_ampdu_subframes = DEFAULT_TXAMPDU_SUB_MIN;
+            if (tcp_tx_payload && sta->sta_wnet_vif->vm_tx_speed) {
+                if (sta->sta_wnet_vif->vm_tx_speed < 48) {
+                    wifimac->drv_priv->drv_config.cfg_ampdu_subframes = 9;
+                    if (sta->sta_wnet_vif->vm_tx_speed < 46) {
+                        wifimac->drv_priv->drv_config.cfg_ampdu_subframes = 7;
+                        if (sta->sta_wnet_vif->vm_tx_speed < 40) {
+                            wifimac->drv_priv->drv_config.cfg_ampdu_subframes = 5;
+                            if (sta->sta_wnet_vif->vm_tx_speed < 35) {
+                                wifimac->drv_priv->drv_config.cfg_ampdu_subframes = 2;
+                                if (sta->sta_wnet_vif->vm_tx_speed < 23)
+                                     wifimac->drv_priv->drv_config.cfg_ampdu_subframes = 1;
+                            }
+                        }
+                    }
                 }
             }
 

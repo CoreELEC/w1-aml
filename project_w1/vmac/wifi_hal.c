@@ -254,11 +254,13 @@ void hal_soft_rx_cs(struct hal_private *hal_priv, OS_SKBBUF *skb)
     {
         if (RxPrivHdr_bit->RxDecryptType != RX_PHY_NOWEP)
         {
+#ifdef RX_PN_CHECK
             if (hal_chk_replay_cnt(hal_priv,RxPrivHdr_bit)== false)
             {
                 OS_SKBBUF_FREE(skb);
                 return;
             }
+#endif
         }
 
         if (RxPrivHdr_bit->RxTcpCSUM_err && RxPrivHdr_bit->RxTcpCSUMCalculated
@@ -1210,7 +1212,7 @@ void hal_txframe_pre(void)
 
             //if buffered mpdu num > 2 in hal, then skip
             if ((hif->HiStatus.TX_DOWNLOAD_OK_EVENT_num[txqueueid]
-                 - hif->HiStatus.TX_SEND_OK_EVENT_num[txqueueid])>2)
+                 - hif->HiStatus.TX_SEND_OK_EVENT_num[txqueueid]) > 16)
             {
                 continue;
             }
@@ -2285,7 +2287,8 @@ int hal_reinit_priv(void) {
     hal_priv->bhalPowerSave  = 0;
     hal_priv->tx_frames_map[0] = 0;
     hal_priv->tx_frames_map[1] = 0;
-    hal_priv->hal_fw_ps_status = HAL_FW_IN_ACTIVE;
+    /* note: it maybe cause abnormal status here, so delete */
+    //hal_priv->hal_fw_ps_status = HAL_FW_IN_ACTIVE;
     return 0;
 }
 
@@ -2694,7 +2697,7 @@ int hal_rx_thread(void *param)
             sn =  (sn << 4) | ((*(pVRxDesc->data + 22) & 0xf0) >> 4);
 
             if (frame_control != 0x80) {
-                __D(BIT(17), "%s:%d, frame type:0x%x, seq:%d, %04x:%04x\n", __func__, __LINE__, frame_control, sn, 
+                __D(BIT(17), "%s:%d, frame type:0x%x, seq:%d, %04x:%04x\n", __func__, __LINE__, frame_control, sn,
                     *((unsigned short *)(pVRxDesc->data) + 15), *((unsigned short *)(pVRxDesc->data) + 16));
             } else {
                 //__D(BIT(17), "%s:%d, beacon:0x%x, seq:%d\n", __func__, __LINE__, frame_control, sn);

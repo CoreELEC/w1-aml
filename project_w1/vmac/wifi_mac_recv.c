@@ -4339,14 +4339,6 @@ void wifi_mac_recv_deauth(struct wlan_net_vif *wnet_vif,
 
         WIFINET_DPRINTF_STA(AML_DEBUG_WARNING, sta, "recv deauthenticate (reason %d)", reason);
 
-        printk("%s %d sorure bssid: %02x:%02x:%02x:%02x:%02x:%02x\n", __func__, __LINE__,
-            wh->i_addr2[0], wh->i_addr2[1],wh->i_addr2[2],
-            wh->i_addr2[3], wh->i_addr2[4], wh->i_addr2[5]);
-
-        printk("%s %d connect AP bssid:%02x:%02x:%02x:%02x:%02x:%02x\n", __func__, __LINE__,
-            wnet_vif->vm_des_bssid[0], wnet_vif->vm_des_bssid[1], wnet_vif->vm_des_bssid[2],
-            wnet_vif->vm_des_bssid[3], wnet_vif->vm_des_bssid[4], wnet_vif->vm_des_bssid[5]);
-
         switch (wnet_vif->vm_opmode) {
             case WIFINET_M_STA:
                 if (wnet_vif->vm_state != WIFINET_S_INIT) {

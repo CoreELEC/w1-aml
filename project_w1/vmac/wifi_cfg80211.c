@@ -2842,6 +2842,9 @@ static int vm_cfg80211_connect(struct wiphy *wiphy, struct net_device *dev,
         } else if (lsme->crypto.akm_suites[0] == WLAN_AKM_SUITE_PSK_SHA256) {
             key_mgt = RSN_ASE_8021X_PSK_SHA256;
 
+        } else if (lsme->crypto.akm_suites[0] == WLAN_AKM_SUITE_8021X) {
+            key_mgt = RSN_ASE_8021X_UNSPEC;
+
         } else {
             ret = -ENOTSUPP;
             DPRINTF(AML_DEBUG_ERROR, "%s unsupported akm_suites[0]=0x%x\n", __func__, lsme->crypto.akm_suites[0]);
@@ -4248,9 +4251,9 @@ vm_cfg80211_get_station(struct wiphy *wiphy, struct net_device *dev,
 
     sinfo->filled |= BIT(NL80211_STA_INFO_SIGNAL);
     sinfo->signal =  sta->sta_avg_bcn_rssi;
-    if (sinfo->signal > -30) {
+    if (sinfo->signal > -10) {
         //DPRINTF(AML_DEBUG_ERROR, "%s signal exceeds scope:%d\n", __func__, sinfo->signal);
-        sinfo->signal = -30;
+        sinfo->signal = -10;
     }
 
     sinfo->filled |= BIT(NL80211_STA_INFO_TX_BYTES) | BIT(NL80211_STA_INFO_TX_FAILED) | BIT(NL80211_STA_INFO_TX_PACKETS);
@@ -5847,7 +5850,7 @@ int vm_cfg80211_vnd_cmd_set_para(struct wiphy *wiphy, struct wireless_dev *wdev,
 
                     sprintf(buf, "att:%d, sta_avg_rssi:%d, sta_avg_bcn_rssi:%d, CP1:%d, avg_snr:%d, ",
                         opt_data[1], wnet_vif->vm_mainsta->sta_avg_rssi - 256,
-                        wnet_vif->vm_mainsta->sta_avg_bcn_rssi - 256,
+                        wnet_vif->vm_mainsta->sta_avg_bcn_rssi,
                         arr[0], arr[1]);
                     sprintf(&buf[strlen(buf)], "snr_qdb:%d crc_err:%d, crc_ok:%d, noise_f:%d\r\n",
                         arr[5], arr[2], arr[3], arr[4]);
