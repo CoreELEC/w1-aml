@@ -1,7 +1,6 @@
 #ifndef _HI_SDIO_H_
 #define _HI_SDIO_H_
 
-#include "wifi_hal_com.h"
 #include "wifi_sdio.h"
 
 #define HIF_RD_MAC_REG_MAX (15)

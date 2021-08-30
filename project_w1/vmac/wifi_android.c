@@ -135,7 +135,7 @@ static int aml_android_set_country(struct wlan_net_vif *wnet_vif, char *command,
     struct wifi_mac *wifimac = wnet_vif->vm_wmac;
 
     if ((country_code[0] == wifimac->wm_country.iso[0]) && (country_code[1] == wifimac->wm_country.iso[1])) {
-        printk("%s no need to set country code due to the same country code\n", __func__);
+        ERROR_DEBUG_OUT("no need to set country code due to the same country code\n");
         return 0;
     }
 
@@ -155,7 +155,7 @@ static int wl_android_wifi_on(struct net_device *dev)
     printk("%s in\n", __FUNCTION__);
     if (!dev)
     {
-        printk("%s: dev is null\n", __FUNCTION__);
+        ERROR_DEBUG_OUT("dev is null\n");
         return -EINVAL;
     }
 
@@ -170,7 +170,7 @@ static int wl_android_wifi_off(struct net_device *dev)
     printk("%s in\n", __FUNCTION__);
     if (!dev)
     {
-        printk("%s: dev is null\n", __FUNCTION__);
+        ERROR_DEBUG_OUT("dev is null\n");
         return -EINVAL;
     }
 

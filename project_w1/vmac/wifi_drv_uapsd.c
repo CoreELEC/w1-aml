@@ -207,7 +207,6 @@ static void drv_txdesc_list_send (struct drv_private *drv_priv, struct list_head
             break;
         }
 
-        //show_bf(ptxdesc);
         lastbf = ptxdesc->txdesc_queue_last;
         KASSERT(ptxdesc->txdesc_queue_last, ("ptxdesc->txdesc_queue_last is NULL"));
 
@@ -393,6 +392,7 @@ int drv_process_uapsd_nsta_trigger( struct drv_private *drv_priv, void * nsta, u
             whqos->i_fc[1] &= ~WIFINET_FC1_MORE_DATA;
         }
 
+        lastbf->txdesc_framectrl = *(unsigned short*)&whqos->i_fc[0];
         drv_to_hal(drv_priv, txlist, &tx_queue);
         DRV_TXQ_UNLOCK(txlist);
         DRV_TX_QUEUE_UNLOCK(drv_priv);
@@ -432,18 +432,6 @@ void drv_tx_mcastq_addbuf(struct drv_private *drv_priv, struct list_head *head)
     struct drv_txlist *txlist = &drv_priv->drv_txlist_table[HAL_WME_MCAST];
     DPRINTF(AML_DEBUG_PWR_SAVE, "%s %d txlist->txlist_backup_qcnt=%d\n", __func__,__LINE__, txlist->txlist_backup_qcnt);
     drv_txdesc_list_queue(drv_priv, head, &txlist->txlist_backup, &txlist->txlist_backup_qcnt);
-}
-
-void show_bf (const struct drv_txdesc *ptxdesc)
-{
-    // struct sk_buff * skbbuf = ptxdesc->txdesc_mpdu;
-    struct wifi_mac_tx_info *txinfo = ptxdesc->txinfo;
-
-    DPRINTF(AML_DEBUG_PWR_SAVE, "%s %d txinfo->mpdulen=%d\n",__func__,__LINE__, txinfo->mpdulen);
-    DPRINTF(AML_DEBUG_PWR_SAVE, "%s %d ptxdesc->txdesc_agglen=%d\n",__func__,__LINE__, ptxdesc->txdesc_agglen);
-    DPRINTF(AML_DEBUG_PWR_SAVE, "%s %d ptxdesc->txinfo->queue_id=%d\n",__func__,__LINE__, ptxdesc->txinfo->queue_id);
-    //DPRINTF(AML_DEBUG_PWR_SAVE, "%s %d ptxdesc->txinfo->b_BarPkt=%d\n",__func__,__LINE__, ptxdesc->txinfo->b_BarPkt);
-    DPRINTF(AML_DEBUG_PWR_SAVE, "%s %d ptxdesc->txinfo->tid_index=%d\n",__func__,__LINE__, ptxdesc->txinfo->tid_index);
 }
 
 int drv_tx_mcastq_send (struct drv_private *drv_priv)

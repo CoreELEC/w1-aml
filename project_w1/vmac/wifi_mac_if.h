@@ -180,6 +180,16 @@ wifi_mac_wmm_chanparams(struct wlan_net_vif *wnet_vif,
 #define LLC_SNAP_LSAP   0xaa
 
 
+#define MAC_MAX_GAIN -82
+#define MAC_MID_GAIN -70
+#define MAC_MIN_GAIN -65
+
+// when scan ap count less than MAX_GIAN_THRESHOLD, use MAC_MAX_GAIN
+#define MAX_GIAN_THRESHOLD 10
+// when scan ap count more than MIN_GIAN_THRESHOLD , use MAC_MIN_GAIN
+#define CONNECTED_MIN_GIAN_THRESHOLD 25
+#define UNCONNECT_MIN_GIAN_THRESHOLD 80
+
 
 struct  ether_header
 {
@@ -263,7 +273,11 @@ void wifi_mac_scan_end(struct wifi_mac *wifimac);
 void wifi_mac_connect_start(struct wifi_mac *wifimac);
 void wifi_mac_connect_end(struct wifi_mac *wifimac);
 void wifi_mac_set_channel_rssi(struct wifi_mac *wifimac, unsigned char rssi);
-void wifi_mac_change_channel_rssi(struct wifi_mac *wifimac, int *rssi);
+
+void wifi_mac_get_channel_rssi_before_scan(struct wifi_mac *wifimac, int *rssi);
+
+void wifi_mac_set_tx_power_accord_rssi(struct wifi_mac *wifimac, unsigned char rssi);
+
 
 unsigned int wifi_mac_add_work_task(struct wifi_mac *wifimac,
     void *func,void *func_cb, SYS_TYPE param1, SYS_TYPE param2, SYS_TYPE param3, SYS_TYPE param4, SYS_TYPE param5);

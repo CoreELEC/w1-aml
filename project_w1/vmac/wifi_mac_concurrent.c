@@ -16,19 +16,21 @@ static void concurrent_change_channel_timeout_ex(SYS_TYPE param1,
     struct wlan_net_vif *main_vmac = drv_priv->drv_wnet_vif_table[NET80211_MAIN_VMAC];
     struct wlan_net_vif *p2p_vmac = drv_priv->drv_wnet_vif_table[NET80211_P2P_VMAC];
 
-    DPRINTF(AML_DEBUG_P2P, "%s\n", __func__);
+    AML_PRINT(AML_DBG_MODULES_P2P, "++\n");
 
     if (vm_p2p_is_state(p2p_vmac->vm_p2p, NET80211_P2P_STATE_LISTEN)) {
         vm_p2p_cancel_remain_channel(p2p_vmac->vm_p2p);
+        AML_PRINT(AML_DBG_MODULES_P2P, "p2p in listen state\n");
         return;
 
     } else if (vm_p2p_is_state(p2p_vmac->vm_p2p, NET80211_P2P_STATE_SCAN)) {
+        AML_PRINT(AML_DBG_MODULES_P2P, "p2p in scan state\n");
         return;
     }
 
     if (main_vmac->vm_curchan != WIFINET_CHAN_ERR)
     {
-        DPRINTF(AML_DEBUG_P2P, "%s pri_chan%d\n", __func__, main_vmac->vm_curchan->chan_pri_num);
+        AML_PRINT(AML_DBG_MODULES_P2P, "pri_chan%d\n", main_vmac->vm_curchan->chan_pri_num);
         wifi_mac_restore_wnet_vif_channel(main_vmac);
     }
 }
@@ -49,7 +51,7 @@ void concurrent_channel_restore(int target_channel, struct wlan_net_vif *wnet_vi
     struct wifi_mac *wifimac = wnet_vif->vm_wmac;
     struct wifi_channel *main_vmac_chan = NULL;
 
-    DPRINTF(AML_DEBUG_CFG80211|AML_DEBUG_P2P, "%s\n", __func__);
+    DPRINTF(AML_DEBUG_CFG80211, "%s\n", __func__);
 
     main_vmac_chan = wifi_mac_get_main_vmac_channel(wifimac);
     if ((main_vmac_chan != WIFINET_CHAN_ERR) && (times != 0))

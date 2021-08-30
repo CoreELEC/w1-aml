@@ -14,6 +14,7 @@ unsigned int phy_get_param_cmd_ul(unsigned char cmd,unsigned char vid);
 unsigned int phy_enable_bcn(unsigned char vid,unsigned short BecaonInterval, unsigned short DtimPeriod, unsigned char BssType);
 unsigned int phy_set_bcn_buf(unsigned char wnet_vif_id,unsigned char *pBeacon, unsigned short len,unsigned short Rate,unsigned short Flag);
 unsigned int phy_switch_chan(unsigned short channel, unsigned char bw, unsigned char restore);
+void phy_rf_channel_restore(unsigned short channel, int bw);
 unsigned int phy_set_mac_bssid(unsigned char wnet_vif_id,unsigned char * Bssid);
 unsigned int phy_init_hmac(unsigned char wnet_vif_id);
 unsigned int phy_update_bcn_intvl(unsigned char wnet_vif_id,unsigned short BcnInterval);
@@ -40,6 +41,7 @@ unsigned int phy_set_dhcp(unsigned char wnet_vif_id,unsigned int ip);
 unsigned int phy_set_chan_support_type(struct hal_channel *chan);
 unsigned int phy_set_chan_phy_type(int);
 void phy_scan_cmd(unsigned int data);
+void phy_set_tx_power_accord_rssi(int bw, unsigned short channel, unsigned char rssi, unsigned char power_mode);
 void phy_set_channel_rssi(unsigned char rssi);
 unsigned int phy_set_rd_support(unsigned char wnet_vif_id, unsigned int data);
 unsigned int phy_pwr_save_mode(unsigned char wnet_vif_id,unsigned int data);
@@ -83,5 +85,7 @@ unsigned int phy_coexist_config(const void *data, int data_len);
 unsigned int phy_interface_enable(unsigned char enable, unsigned char vid);
 unsigned int hal_set_fwlog_cmd(unsigned char mode);
 unsigned int hal_cfg_cali_param(void);
+unsigned int hal_cfg_txpwr_cffc_param(void * chan, void * txpwr_plan);
+
 
 #endif  //__AML_PHY_H__

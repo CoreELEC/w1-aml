@@ -134,8 +134,24 @@ struct country_chan_plan {
     int support_class[20];
     char class_na_freq_plan;
     unsigned char dfs_chan_flag;
+    unsigned char tx_power_plan;
 };
 
+enum
+{
+    TX_POWER_DEFAULT = 0,
+    TX_POWER_CE,          //EU
+    TX_POWER_FCC,         //US
+    TX_POWER_ARIB,        //JP
+    TX_POWER_SRRC,        //CN
+    TX_POWER_ANATEL,      //BR
+};
+
+struct tx_power_plan {
+    unsigned char cffc_num;
+    unsigned char band_pwr_table[4];
+    unsigned char coefficient[57];
+};
 
 /*
  * Calculate the transmit duration of a frame.

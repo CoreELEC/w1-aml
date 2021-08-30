@@ -27,6 +27,12 @@ void wifi_mac_mark_dfs_channel(struct wlan_net_vif *wnet_vif, int chan_num);
 void wifi_mac_unmark_dfs_channel(struct wlan_net_vif *wnet_vif, int chan_num);
 int wifi_mac_if_dfs_channel(struct wifi_mac *wifimac, int chan_num);
 int find_country_code(unsigned char *countryString);
+int wifimac_set_tx_pwr_plan(int txpoweplan);
+unsigned char wifimac_get_tx_pwr_plan(int coutry_code);
+int wifi_mac_set_tx_power_coefficient(struct drv_private *drv_priv, struct wifi_channel *chan, int tx_power_plan);
+int hal_cfg_txpwr_cffc_param_init(int tx_power_plan);
+int update_tx_power_coefficient_plan(int tx_power_plan, unsigned short pwr_coefficient[]);
+int update_tx_power_band(int tx_power_plan, unsigned short pwr_value[]);
 int wifi_mac_find_80M_channel_center_chan(int chan);
 
 #endif//__NET80211_CHAN_H__

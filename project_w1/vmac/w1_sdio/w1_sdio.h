@@ -42,6 +42,11 @@ extern void set_usb_bt_power(int is_on);
         } while (0);
 #endif
 
+#define ERROR_DEBUG_OUT(format,...) do {    \
+                 printk("FUNCTION: %s LINE: %d:"format"",__FUNCTION__, __LINE__, ##__VA_ARGS__); \
+        } while (0)
+
+
 #define CHIP_BT_PMU_REG_BASE               (0xf03000)
 #define RG_BT_PMU_A17                             (CHIP_BT_PMU_REG_BASE + 0x44)
 #define RG_BT_PMU_A18                             (CHIP_BT_PMU_REG_BASE + 0x48)

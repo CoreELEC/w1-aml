@@ -382,7 +382,7 @@ int drv_hal_add_workitem(WorkHandler task, WorkHandler taskcallback, SYS_TYPE pa
     left_count = CO_SharedFifoNbEltCont(pWorkFifo, CO_WORK_GET);
     STATUS = CO_SharedFifoGet(pWorkFifo, CO_WORK_GET, 1, &EltPtr);
     if (STATUS != CO_STATUS_OK) {
-        printk("%s:%d work fifo overflow\n", __func__, __LINE__);
+        ERROR_DEBUG_OUT("work fifo overflow\n");
         CO_SharedFifo_Dump(pWorkFifo, CO_WORK_GET);
         CO_SharedFifo_Dump(pWorkFifo, CO_WORK_FREE);
     }
@@ -411,7 +411,7 @@ int drv_hal_add_workitem(WorkHandler task, WorkHandler taskcallback, SYS_TYPE pa
 
     STATUS = CO_SharedFifoPut(pWorkFifo, CO_WORK_GET, 1);
     if (STATUS != CO_STATUS_OK) {
-        printk("%s:%d, work fifo overflow\n", __func__, __LINE__);
+        ERROR_DEBUG_OUT("work fifo overflow\n");
         CO_SharedFifo_Dump(pWorkFifo, CO_WORK_GET);
         CO_SharedFifo_Dump(pWorkFifo, CO_WORK_FREE);
     }

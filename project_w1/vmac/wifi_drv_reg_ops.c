@@ -136,7 +136,7 @@ void write_word_32ba(unsigned char Bus, unsigned char SlaveAddr,
 
         cnt++;
         if (cnt == 100000) {
-            printk("-------[ERR]-----> i2c[W] err\n");
+            ERROR_DEBUG_OUT("-------[ERR]-----> i2c[W] err\n");
             break;
         }
     } while (tmp & (1 << 2));
@@ -186,7 +186,7 @@ unsigned int read_word_32ba(unsigned int SlaveAddr, unsigned int RegAddr)
 
         cnt++;
         if (cnt == 100000) {
-            printk("-------[ERR]-----> i2c[R] err\n");
+            ERROR_DEBUG_OUT("-------[ERR]-----> i2c[R] err\n");
             break;
         }
     } while( tmp & (1 << 2));
@@ -426,7 +426,6 @@ void efuse_manual_write(unsigned int bit, unsigned int addr)
     //////////////////////////////////////////////////////
     // set STROBE = 0 (bit[28] = 0)
     //tmp = *(RG_EFUSE_CNTL3);
-    tmp = fi_ahb_read(0xf0400c);
     tmp = (tmp & ~(1 << 28));  //set STROBE = 0
     //*(RG_EFUSE_CNTL3) = tmp;
     new_set_reg(0xf0400c, tmp);

@@ -66,9 +66,6 @@ extern struct hal_private g_hal_priv;
                 if (tsk) send_sig(sig, tsk, 1); \
         }
 
-#define  OS_UnMapDMAAddress(_buffer, _len, _direction) do {} while(0)
-
-
 #if defined(CONFIG_HAS_WAKELOCK)
 #if LINUX_VERSION_CODE > KERNEL_VERSION(3,14,29)
 #define WAKE_LOCK_INIT( hal_priv,  index, y)

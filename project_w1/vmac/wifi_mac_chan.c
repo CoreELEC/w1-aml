@@ -1,5 +1,5 @@
 #include "wifi_mac_com.h"
-#include "rf_t9026/t9026_top.h"
+#include "wifi_hal_cmd.h"
 
 #define ARR_SIZE_OF(arr) (sizeof(arr)/sizeof(arr[0]))
 #define CHAN_2_FREQ_5G(chan) ((chan) * 5 + 5000)
@@ -261,20 +261,35 @@ struct country_na_freq_set country_na_freq_plan_list [] =
     }
 };
 
+struct tx_power_plan tx_power_plan_list[] = {
+    {57, {0, 0, 0, 0}, {100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100,
+        100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100}}, //TX_POWER_DEFAULT
+    {57, {0, 0, 0, 0}, {100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100,
+        100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100}}, //TX_POWER_CE
+    {57, {0, 0, 0, 0}, {100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100,
+        100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100}}, //TX_POWER_FCC
+    {57, {0, 0, 0, 0}, {100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100,
+        100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100}}, //TX_POWER_ARIB
+    {57, {0, 0, 0, 0}, {100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100,
+        100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100}}, //TX_POWER_SRRC
+    {57, {0, 0, 0, 0}, {100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100,
+        100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100}}, //TX_POWER_ANATEL
+};
+
 struct country_chan_plan country_chan_plan_list[] = {
-    /* 0x00 */ {17, {115,118,124,121,125,116,119,122,126,117,120,123,127,81,83,84,128,0,0,0}, 0xff, DFS_5G_B2|DFS_5G_B3|DFS_5G_B4|PASSIVE_2G_12_14}, //Worldwide
-    /* 0x01 */ {10, {115,118,125,116,119,126,81,83,84,128,0,0,0,0,0,0,0,0,0,0}, 0x00, DFS_5G_B2}, //China
-    /* 0x02 */ {19, {115,118,124,121,125,81,116,119,122,126,126,117,120,123,127,127,83,84,128,0}, 0x01, DFS_5G_B2|DFS_5G_B3}, //United States of America
-    /* 0x03 */ {14, {115,118,121,81,116,119,122,117,120,123,83,84,125,128,0,0,0,0,0,0}, 0x02, DFS_5G_B2|DFS_5G_B3}, //Europe
-    /* 0x04 */ {13, {115,118,121,116,119,122,117,120,123,81,83,84,128,0,0,0,0,0,0,0}, 0x02, DFS_5G_B2|DFS_5G_B3}, //France
-    /* 0x05 */ {16, {115,109,118,121,116,119,122,117,120,123,104,83,84,121,128,82,0,0,0,0}, 0x02, DFS_5G_B2|DFS_5G_B3}, //Japan
-    /* 0x06 */ {11, {115,118,116,119,117,120,128,81,83,84,128,0,0,0,0,0,0,0,0,0}, 0x03, DFS_5G_B2}, //Israel
-    /* 0x07 */ {13, {115,118,125,116,119,126,117,120,127,81,83,84,128,0,0,0,0,0,0,0}, 0x04, DFS_5G_B2}, //Mexico
-    /* 0x08 */ {16, {115,118,121,125,116,119,122,126,117,120,123,127,81,83,84,128,0,0,0,0}, 0x05, DFS_5G_B2|DFS_5G_B3}, //Canada
-    /* 0x09 */ {17, {115,118,124,121,125,116,119,122,126,117,120,123,127,81,83,84,128,0,0,0}, 0x06, DFS_5G_B2|DFS_5G_B3}, //India
-    /* 0x0A */ {16, {115,118,121,125,116,119,122,126,117,120,123,127,81,83,84,128,0,0,0,0}, 0x07, DFS_5G_B2|DFS_5G_B3}, //Australia
-    /* 0x0B */ {16, {115,118,121,125,116,119,122,126,117,120,123,127,81,83,84,128,0,0,0,0}, 0xff, DFS_5G_B2|DFS_5G_B3}, //NewZealand
-    /* 0x0C */ {16, {115,118,121,125,116,119,122,126,117,120,123,127,81,83,84,128,0,0,0,0}, 0x08, DFS_5G_B2|DFS_5G_B3} //Brazi
+    /* 0x00 */ {17, {115,118,124,121,125,116,119,122,126,117,120,123,127,81,83,84,128,0,0,0}, 0xff, DFS_5G_B2|DFS_5G_B3|DFS_5G_B4|PASSIVE_2G_12_14, TX_POWER_DEFAULT}, //Worldwide
+    /* 0x01 */ {10, {115,118,125,116,119,126,81,83,84,128,0,0,0,0,0,0,0,0,0,0}, 0x00, DFS_5G_B2, TX_POWER_SRRC}, //China
+    /* 0x02 */ {19, {115,118,124,121,125,81,116,119,122,126,126,117,120,123,127,127,83,84,128,0}, 0x01, DFS_5G_B2|DFS_5G_B3, TX_POWER_FCC}, //United States of America
+    /* 0x03 */ {14, {115,118,121,81,116,119,122,117,120,123,83,84,125,128,0,0,0,0,0,0}, 0x02, DFS_5G_B2|DFS_5G_B3, TX_POWER_CE}, //Europe
+    /* 0x04 */ {13, {115,118,121,116,119,122,117,120,123,81,83,84,128,0,0,0,0,0,0,0}, 0x02, DFS_5G_B2|DFS_5G_B3, TX_POWER_DEFAULT}, //France
+    /* 0x05 */ {17, {115,109,118,121,116,119,122,117,120,123,104,83,84,121,128,82,81,0,0,0}, 0x02, DFS_5G_B2|DFS_5G_B3, TX_POWER_ARIB}, //Japan
+    /* 0x06 */ {11, {115,118,116,119,117,120,128,81,83,84,128,0,0,0,0,0,0,0,0,0}, 0x03, DFS_5G_B2, TX_POWER_DEFAULT}, //Israel
+    /* 0x07 */ {13, {115,118,125,116,119,126,117,120,127,81,83,84,128,0,0,0,0,0,0,0}, 0x04, DFS_5G_B2, TX_POWER_DEFAULT}, //Mexico
+    /* 0x08 */ {16, {115,118,121,125,116,119,122,126,117,120,123,127,81,83,84,128,0,0,0,0}, 0x05, DFS_5G_B2|DFS_5G_B3, TX_POWER_DEFAULT}, //Canada
+    /* 0x09 */ {17, {115,118,124,121,125,116,119,122,126,117,120,123,127,81,83,84,128,0,0,0}, 0x06, DFS_5G_B2|DFS_5G_B3, TX_POWER_DEFAULT}, //India
+    /* 0x0A */ {16, {115,118,121,125,116,119,122,126,117,120,123,127,81,83,84,128,0,0,0,0}, 0x07, DFS_5G_B2|DFS_5G_B3, TX_POWER_DEFAULT}, //Australia
+    /* 0x0B */ {16, {115,118,121,125,116,119,122,126,117,120,123,127,81,83,84,128,0,0,0,0}, 0xff, DFS_5G_B2|DFS_5G_B3, TX_POWER_DEFAULT}, //NewZealand
+    /* 0x0C */ {16, {115,118,121,125,116,119,122,126,117,120,123,127,81,83,84,128,0,0,0,0}, 0x08, DFS_5G_B2|DFS_5G_B3, TX_POWER_ANATEL} //Brazi
 };
 
 struct country_chan_mapping  country_chan_mapping_list[] = {
@@ -576,7 +591,7 @@ static int wifi_mac_check_if_na_freq(int country_code, int global_class, int fre
     int i = 0;
 
     int plan_index = country_chan_mapping_list[country_code].chplan;
-    int na_freq_plan_index = na_freq_plan_index = country_chan_plan_list[plan_index].class_na_freq_plan;
+    int na_freq_plan_index = country_chan_plan_list[plan_index].class_na_freq_plan;
 
     /*get na_freq index*/
     if (na_freq_plan_index == 0xff) {
@@ -624,7 +639,7 @@ void  wifi_mac_select_chan_from_global(int country_code, int sub_set[], int num,
     int chn_idx_80M = 0;
 
     if ((!sub_set) || (!wifimac)) {
-        printk("%s(%d) input or memory err!\n", __func__, __LINE__);
+        ERROR_DEBUG_OUT("input or memory err!\n");
         return;
     }
 
@@ -722,7 +737,7 @@ void wifi_mac_unmark_dfs_channel_ex(int country_code, struct wifi_mac *wifimac, 
     int i = 0;
 
     for (i = 0; i < wifimac->wm_nchans; i++) {
-        if (( chan_num == 0 && (wifimac->wm_channels[i].chan_flags | WIFINET_CHAN_DFS) )
+        if (( chan_num == 0 && (wifimac->wm_channels[i].chan_flags & WIFINET_CHAN_DFS) )
             || (chan_num != 0 && (wifimac->wm_channels[i].chan_pri_num == chan_num)) ){
 //            printk("%s UNmark channel %d \n", __func__,wifimac->wm_channels[i].chan_pri_num);
             wifimac->wm_channels[i].chan_flags &= ~WIFINET_CHAN_DFS;
@@ -782,7 +797,7 @@ void  wifi_mac_update_chan_list_by_country(int country_code, int support_opt[], 
 {
     if ((!support_opt)||(support_num==0))
     {
-        printk(" %s(%d) input is NULL!!!\n", __func__, __LINE__);
+        ERROR_DEBUG_OUT("input is NULL!!!\n");
     }
 
     memset(wifimac->wm_channels, 0, sizeof(struct wifi_channel) * (WIFINET_CHAN_MAX * 2 + 1));
@@ -841,7 +856,7 @@ const struct wifi_channel *c)
 {
     if (c == NULL)
     {
-        printk("amlwifi,invalid channel (NULL)\n");
+        ERROR_DEBUG_OUT("amlwifi,invalid channel (NULL)\n");
         return WIFINET_CHAN_INVALUE;
     }
     return c->chan_pri_num;
@@ -893,8 +908,6 @@ struct wifi_channel * wifi_mac_find_chan(struct wifi_mac *wifimac, int chan, int
         }
     }
     WIFI_CHANNEL_UNLOCK(wifimac);
-
-    DPRINTF(AML_DEBUG_BWC, "%s(%d) !!!: NOT find a chan=%d, bw=%d and center chan=%d.\n", __func__, __LINE__,  chan, bw ,center_chan);
     return NULL;
 }
 
@@ -939,7 +952,7 @@ int wifi_mac_recv_bss_intol_channelCheck(struct wifi_mac *wifimac, struct wifi_m
     unsigned char intol_chan  = 0;
     unsigned char *chan_list = &intol_ie->chan_list[0];
 
-    if (intol_ie->elem_len <= 1)
+    if (intol_ie->elem_len <= 1 || intol_ie->elem_len >254)
         return false;
 
     WIFI_CHANNEL_LOCK(wifimac);
@@ -1094,7 +1107,7 @@ void wifi_mac_ChangeChannel(void * ieee, struct wifi_channel *chan, unsigned cha
     struct hal_channel hchan;
 
     if (chan == WIFINET_CHAN_ERR) {
-        printk("%s chan not valid !!\n", __func__);
+        ERROR_DEBUG_OUT("chan not valid !!\n");
         return;
     }
 
@@ -1147,8 +1160,8 @@ int wifi_mac_set_wnet_vif_channel(struct wlan_net_vif *wnet_vif,  int chan, int 
     c = wifi_mac_find_chan(wifimac, chan, bw, center_chan);
 
     if (c == NULL) {
-        DPRINTF(AML_DEBUG_ERROR, "WARNING<%s>:: %s %d can't support set this channel, chan %d, bw %d, c_chan %d\n",
-            (wnet_vif)->vm_ndev->name, __func__, __LINE__, chan, bw, center_chan);
+        ERROR_DEBUG_OUT("WARNING<%s>can't support set this channel, chan %d, bw %d, c_chan %d\n",
+            (wnet_vif)->vm_ndev->name, chan, bw, center_chan);
         return false;
     }
 
@@ -1292,3 +1305,71 @@ int find_country_code(unsigned char *countryString)
     return 0xff;        /* Not found */
 }
 
+/* * Set the country tx_power_plan. */
+int wifimac_set_tx_pwr_plan(int txpoweplan)
+{
+    struct wifi_mac *wifimac = wifi_mac_get_mac_handle();
+    struct drv_private *drv_priv = drv_get_drv_priv();
+
+    if (txpoweplan == drv_priv->drv_config.cfg_txpoweplan) {
+        printk("not need to update tx power plan(%d)\n", txpoweplan);
+    } else {
+        drv_priv->drv_config.cfg_txpoweplan = txpoweplan;
+        wifi_mac_set_tx_power_coefficient(drv_priv, wifimac->wm_curchan, txpoweplan);
+    }
+
+    return 0;
+}
+
+/* * Get the country tx_power_plan. */
+unsigned char wifimac_get_tx_pwr_plan(int coutry_code)
+{
+    int chan_plan = country_chan_mapping_list[coutry_code].chplan;
+    unsigned char tx_power_plan = 0;
+
+    tx_power_plan = country_chan_plan_list[chan_plan].tx_power_plan;
+
+    return tx_power_plan;
+}
+
+/* * Set the country tx_power_plan. */
+int wifi_mac_set_tx_power_coefficient(struct drv_private *drv_priv, struct wifi_channel *chan, int tx_power_plan)
+{
+    drv_priv->drv_ops.drv_cfg_txpwr_cffc_param(chan, &tx_power_plan_list[tx_power_plan]);
+    return 0;
+}
+
+
+int hal_cfg_txpwr_cffc_param_init(int tx_power_plan)
+{
+    hal_cfg_txpwr_cffc_param(NULL, (void *)&tx_power_plan_list[tx_power_plan]);
+
+    return 0;
+}
+
+
+int update_tx_power_coefficient_plan(int tx_power_plan, unsigned short pwr_coefficient[])
+{
+    int i = 0;
+    int power_plan_size = tx_power_plan_list[tx_power_plan].cffc_num;
+
+    for (i = 0; i < power_plan_size; i++) {
+        tx_power_plan_list[tx_power_plan].coefficient[i] = pwr_coefficient[i];
+        if (tx_power_plan_list[tx_power_plan].coefficient[i] == 0) {
+            tx_power_plan_list[tx_power_plan].coefficient[i] = 100;
+        }
+    }
+
+    return 0;
+}
+
+int update_tx_power_band(int tx_power_plan, unsigned short pwr_value[])
+{
+    int i = 0;
+
+    for (i = 0; i < 4; i++) {
+        tx_power_plan_list[tx_power_plan].band_pwr_table[i] = pwr_value[i];
+    }
+
+    return 0;
+}

@@ -92,6 +92,7 @@ int drv_tx_init( struct drv_private *drv_priv, int nbufs)
     DRV_TX_NORMAL_BUF_LOCK_INIT(drv_priv);
     DRV_TX_QUEUE_LOCK_INIT(drv_priv);
     DRV_TX_TIMEOUT_LOCK_INIT(drv_priv);
+    DRV_HRTIMER_LOCK_INIT(drv_priv);
 
     INIT_LIST_HEAD(&drv_priv->drv_normal_buffer_queue[0]);
     INIT_LIST_HEAD(&drv_priv->drv_normal_buffer_queue[1]);
@@ -392,7 +393,6 @@ static void drv_init_txpriv (struct hi_tx_priv_hdr * txpriv_content, struct drv_
     txpriv_content->Delimiter = ptxdesc->txdesc_delimit;
     txpriv_content->Seqnum = ptxdesc->txinfo->seqnum;
 
-    __D(AML_DBG_TX_SN,"%s(%d): sn=0x%x\n", __func__, __LINE__, txpriv_content->Seqnum);
 
     txpriv_content->hostreserve = (SYS_TYPE)ptxdesc;
     txpriv_content->FrameControl = ptxdesc->txdesc_framectrl;
@@ -424,15 +424,15 @@ int drv_to_hal(struct drv_private *drv_priv, struct drv_txlist *txlist, struct l
     ASSERT(txlist->txlist_qnum == ptxdesc->txinfo->queue_id);
 
     if (aml_tx_hal_buffer_full(drv_priv, txlist->txlist_qnum, 1, (ptxdesc->txdesc_pktnum )) !=0 ) {
-        __D(AML_DBG_HAL_FULL, "%s(%d) hal tfifo full, txlist_idx %d\n", __func__, __LINE__, txlist->txlist_qnum);
         return -1;
     }
     qh = (struct wifi_qos_frame *)ptxdesc->txdesc_ddraddr;
 
     //rate & retry
     rateinfo = &ptxdesc->txdesc_rateinfo[0];
-    memset (&agg_content,0,sizeof(agg_content));
-    memset (&txpriv_content,0,sizeof(txpriv_content));
+    ptxdesc->txdesc_chanbw = rateinfo->bw;
+    memset(&agg_content,0,sizeof(agg_content));
+    memset(&txpriv_content,0,sizeof(txpriv_content));
 
     aml_prepare_agg_tx_priv_param(drv_priv, &agg_content, ptxdesc, sta);
 
@@ -444,16 +444,13 @@ int drv_to_hal(struct drv_private *drv_priv, struct drv_txlist *txlist, struct l
     }
 
     drv_init_txpriv(&txpriv_content, ptxdesc);
+    txpriv_content.EncryptType = agg_content.EncryptType;
     if ((ptxdesc->txinfo->b_Ampdu == 0)||(ptxdesc->txdesc_pktnum == 1))
     {
         txpriv_content.Flag &= ~WIFI_MORE_AGG;
     }
 
-    AML_TXLOCK_LOCK();  //upper lock here, lower lock see hal_fill_agg_end
-    ptxdesc->txdesc_mpdu_hal = drv_priv->hal_priv->hal_ops.hal_fill_agg_start(&agg_content, &txpriv_content);
-    if (ptxdesc->txdesc_mpdu_hal == ptxdesc->txdesc_mpdu) {
-        ptxdesc->txdesc_mpdu_hal = NULL;
-    }
+    drv_priv->hal_priv->hal_ops.hal_fill_agg_start(&agg_content, &txpriv_content);
 
    //loop the residue mpdus for ampdu
     do
@@ -476,18 +473,16 @@ int drv_to_hal(struct drv_private *drv_priv, struct drv_txlist *txlist, struct l
         qh = (struct wifi_qos_frame *) ptxdesc->txdesc_ddraddr;
         //rate & retry
         memcpy(&ptxdesc->txdesc_rateinfo[0], rateinfo, 4*sizeof(struct aml_ratecontrol));
+        ptxdesc->txdesc_chanbw = rateinfo->bw;
         drv_init_txpriv(&txpriv_content, ptxdesc);
 
-	 if (list_is_last(&ptxdesc->txdesc_queue,head))
-        {
+        if (list_is_last(&ptxdesc->txdesc_queue,head)) {
             txpriv_content.Flag &= ~WIFI_MORE_AGG;
             ASSERT(mpdunum == agg_content.MpduNum);
         }
 
-        ptxdesc->txdesc_mpdu_hal = drv_priv->hal_priv->hal_ops.hal_fill_priv(&txpriv_content, agg_content.queue_id);
-        if (ptxdesc->txdesc_mpdu_hal == ptxdesc->txdesc_mpdu) {
-            ptxdesc->txdesc_mpdu_hal = NULL;
-        }
+        drv_priv->hal_priv->hal_ops.hal_fill_priv(&txpriv_content, agg_content.queue_id);
+
     }
     while (1);
 
@@ -499,10 +494,6 @@ int drv_to_hal(struct drv_private *drv_priv, struct drv_txlist *txlist, struct l
     }
 #endif
 
-    __D(AML_DBG_TX_AGG_CNT, "%s(%d) ampdu agg_cnt %d, agg_len %d, first seq:%d\n",
-        __func__, __LINE__, mpdunum, agg_content.AGGR_len, first->txinfo->seqnum);
-
-    AML_TXLOCK_UNLOCK();    //lower lock here, upper lock see hal_fill_agg_start
     up(&hal_priv->hi_irq_thread_sem);
 
     /*Saving txdesc which are sent to hal layer.  And will be freed when txcomplete,
@@ -519,22 +510,6 @@ int drv_to_hal(struct drv_private *drv_priv, struct drv_txlist *txlist, struct l
     return 0;
 }
 
-int drv_rate_findindex_form_kbps(const struct drv_rate_table *rt, int rate)
-{
-    int i;
-    int ndx = 0;
-
-    for (i = 0; i < rt->rateCount; i++)
-    {
-        if (rt->info[i].rateKbps == rate)
-        {
-            ndx = i;
-            break;
-        }
-    }
-
-    return ndx;
-}
 int drv_rate_findindex_from_ratecode(const struct drv_rate_table *rt, int vendor_rate_code)
 {
     int i;
@@ -576,44 +551,28 @@ int drv_tx_get_mgmt_frm_rate(struct drv_private *drv_priv,
                     unsigned char fc_type,unsigned char *rate,unsigned short *flag );
 
 static void drv_tx_get_spec_frm_rate(struct drv_private *drv_priv, struct sk_buff *skbbuf,
-    struct drv_txdesc *ptxdesc, struct aml_ratecontrol *ratectrl, unsigned short rate_kbps, unsigned char retry_times)
+    struct drv_txdesc *ptxdesc, struct aml_ratecontrol *ratectrl, unsigned char retry_times)
 {
     struct wifi_frame *wh = (struct wifi_frame *)os_skb_data(skbbuf);
     struct wifi_mac_tx_info *txinfo = ptxdesc->txinfo;
     const struct drv_rate_table *rt = drv_priv->drv_currratetable;
     struct wifi_station *sta = (struct wifi_station *)txinfo->cb.sta;
-    struct wlan_net_vif *wnet_vif = sta->sta_wnet_vif;
 
-    if ( !wnet_vif->vm_specific_packet_rate_fixed)
-    {
-        drv_tx_get_mgmt_frm_rate(drv_priv,sta->sta_wnet_vif,wh->i_fc[0],
-                          &ratectrl[0].vendor_rate_code,&ptxdesc->txdesc_flag);
-        ratectrl[0].rate_index = drv_rate_findindex_from_ratecode(rt, ratectrl[0].vendor_rate_code);
-        ratectrl[1].vendor_rate_code = ratectrl[2].vendor_rate_code = ratectrl[3].vendor_rate_code = ratectrl[0].vendor_rate_code;
-        DPRINTF(AML_DEBUG_INFO,"<running> %s %d ratectrl[0].vendor_rate_code=0x%x->(rate_index=%d, rt->info[%d].vendor_rate_code=0x%x)\n",
-                __func__,__LINE__, ratectrl[0].vendor_rate_code, ratectrl[0].rate_index, ratectrl[0].rate_index, rt->info[ratectrl[0].rate_index].vendor_rate_code);
-    }
-    else
-    {
-        //ptxdesc->txdesc_flag = HAL_CHAN_BW_NOHT_20M;
-        ratectrl[0].rate_index = (unsigned char)drv_rate_findindex_form_kbps(rt, rate_kbps);
-        ratectrl[0].vendor_rate_code= rt->info[ratectrl[0].rate_index].vendor_rate_code;
-        ratectrl[1].vendor_rate_code = ratectrl[2].vendor_rate_code = ratectrl[3].vendor_rate_code = ratectrl[0].vendor_rate_code;
-        DPRINTF(AML_DEBUG_INFO,"<running> %s %d %dkbps->(rate_index=%d, rt->info[%d].rateKbps=%d, ratectrl[0].vendor_rate_code=0x%x)\n",
-                __func__,__LINE__, rate_kbps, ratectrl[0].rate_index, ratectrl[0].rate_index, rt->info[ratectrl[0].rate_index].rateKbps, ratectrl[0].vendor_rate_code);
-
-    }
+    drv_tx_get_mgmt_frm_rate(drv_priv, sta->sta_wnet_vif, wh->i_fc[0], &ratectrl[0].vendor_rate_code, &ptxdesc->txdesc_flag);
+    ratectrl[0].rate_index = drv_rate_findindex_from_ratecode(rt, ratectrl[0].vendor_rate_code);
+    ratectrl[1].vendor_rate_code = ratectrl[2].vendor_rate_code = ratectrl[3].vendor_rate_code = ratectrl[0].vendor_rate_code;
+    ratectrl[1].bw = ratectrl[2].bw = ratectrl[3].bw = ratectrl[0].bw = sta->sta_chbw;
     ratectrl[0].trynum = retry_times;
 }
 
 static void drv_tx_lower_rate_when_signal_weak(struct wlan_net_vif *wnet_vif, struct drv_txdesc *ptxdesc)
 {
     struct wifi_station *sta = wnet_vif->vm_mainsta;
-    unsigned int sta_chbw= sta->sta_chbw;
-    static unsigned int votes = 101;
+    unsigned int sta_chbw = sta->sta_chbw;
     unsigned short rx_speed = wnet_vif->vm_rx_speed;
     unsigned int rate = 0, tcp_rx = ptxdesc->drv_pkt_info.pkt_info[0].b_tcp_ack;
-    int i, power, power_margin, power_weak_thresh = wnet_vif->vm_wmac->wm_signal_power_weak_thresh_narrow;
+    int i, power, power_weak_thresh = wnet_vif->vm_wmac->wm_signal_power_weak_thresh_narrow;
+    unsigned char mcs_bw = 0;
 
     if (!IS_MCS_RATE(ptxdesc->txdesc_rateinfo[0].vendor_rate_code))
         return;
@@ -622,61 +581,55 @@ static void drv_tx_lower_rate_when_signal_weak(struct wlan_net_vif *wnet_vif, st
         power_weak_thresh = wnet_vif->vm_wmac->wm_signal_power_weak_thresh_wide;
 
     power = wnet_vif->vm_mainsta->sta_avg_bcn_rssi;
-
     if (power < power_weak_thresh) {
         if (WIFINET_IS_CHAN_2GHZ(wnet_vif->vm_curchan)) {
             if (sta_chbw == WIFINET_BWC_WIDTH20) {
                 if (tcp_rx) {
-                    rate = (power + 71 > 0) ? WIFI_11N_MCS4 : (power + 75 > 0) ? WIFI_11N_MCS3 : (power + 80 > 0) ? WIFI_11N_MCS2 : (power + 85 >0) ? WIFI_11N_MCS1 : WIFI_11N_MCS0;
-
-                    if (rx_speed < 20)
-                        rate = WIFI_11N_MCS0;
+                    rate = (power + 71 > 0) ? WIFI_11N_MCS4 : (power + 78 > 0) ? WIFI_11N_MCS3 : (power + 80 > 0) ? WIFI_11N_MCS2 : (power + 83 >0) ? WIFI_11N_MCS1 : WIFI_11N_MCS0;
                 } else {
-                    rate = (power + 72 > 0) ? WIFI_11N_MCS5 :  (power + 76 > 0) ? WIFI_11N_MCS4 : (power + 80 > 0) ? WIFI_11N_MCS3 : (power + 84 > 0) ? WIFI_11N_MCS2 : (power + 86 > 0) ? WIFI_11N_MCS1 : WIFI_11N_MCS0;
+                    rate = (power + 72 > 0) ? WIFI_11N_MCS6 : (power + 74 > 0) ? WIFI_11N_MCS5 :  (power + 79 > 0) ? WIFI_11N_MCS4 : (power + 81 > 0) ? WIFI_11N_MCS3 : (power + 84 > 0) ? WIFI_11N_MCS2 : (power + 86 > 0) ? WIFI_11N_MCS1 : WIFI_11N_MCS0;
                 }
             }
 
             else if (sta_chbw == WIFINET_BWC_WIDTH40) {
                 if (tcp_rx) {
                     rate = (power + 70 > 0) ? WIFI_11N_MCS3 : (power + 75 > 0) ? WIFI_11N_MCS2 : (power + 80 >0) ? WIFI_11N_MCS1 : WIFI_11N_MCS0;
-
-                    if (rx_speed < 20)
-                        rate = WIFI_11N_MCS0;
                 } else {
-                    rate = (power + 75 > 0) ? WIFI_11N_MCS4 : (power + 77 > 0) ? WIFI_11N_MCS3 : (power + 79 > 0) ? WIFI_11N_MCS2 : (power + 81 > 0) ? WIFI_11N_MCS1 : WIFI_11N_MCS0;
+                    rate = (power + 72 > 0) ? WIFI_11N_MCS6 : (power + 74 > 0) ? WIFI_11N_MCS5 : (power + 77 > 0) ? WIFI_11N_MCS4 : (power + 79 > 0) ? WIFI_11N_MCS3 : (power + 82 > 0) ? WIFI_11N_MCS2 : (power + 84 > 0) ? WIFI_11N_MCS1 : WIFI_11N_MCS0;
                 }
             }
             else
-                printk("%s, %d, bw-%d not found!\n", __func__, __LINE__, sta_chbw);
+                ERROR_DEBUG_OUT("bw-%d not found!\n", sta_chbw);
 
         } else {
             if (sta_chbw == WIFINET_BWC_WIDTH20  || power < sta->sta_wmac->wm_signal_power_bw_change_thresh_narrow) {
                 if (tcp_rx) {
-                    rate = (power + 73 > 0) ? WIFI_11N_MCS3 : (power + 78 > 0) ? WIFI_11N_MCS2 : (power + 81 >0) ? WIFI_11N_MCS1 : WIFI_11N_MCS0;
+                    rate = (power + 73 > 0) ? WIFI_11AC_MCS3 : (power + 78 > 0) ? WIFI_11AC_MCS2 : (power + 81 >0) ? WIFI_11AC_MCS1 : WIFI_11AC_MCS0;
 
                     if (rx_speed < 20)
-                        rate = WIFI_11N_MCS0;
+                        rate = WIFI_11AC_MCS0;
                 } else {
-                    rate = (power + 65 > 0) ? WIFI_11N_MCS6 : (power + 68 > 0) ? WIFI_11N_MCS5 : (power + 70 > 0) ? WIFI_11N_MCS4 : \
-                    (power + 73 > 0) ? WIFI_11N_MCS3 : (power + 78 > 0) ? WIFI_11N_MCS2 :  (power + 83 > 0) ? WIFI_11N_MCS1 : WIFI_11N_MCS0;
+                    rate = (power + 65 > 0) ? WIFI_11AC_MCS6 : (power + 68 > 0) ? WIFI_11AC_MCS5 : (power + 70 > 0) ? WIFI_11AC_MCS4 : \
+                    (power + 73 > 0) ? WIFI_11AC_MCS3 : (power + 78 > 0) ? WIFI_11AC_MCS2 :  (power + 81 > 0) ? WIFI_11AC_MCS1 : WIFI_11AC_MCS0;
                 }
 
-                if (IS_MCS_RATE(rate) && (sta->sta_flags & WIFINET_NODE_VHT))
-                    rate |= 0x40;
+                if (!(sta->sta_flags & WIFINET_NODE_VHT))
+                    rate &= 0x8f;
             }
 
             else if (sta_chbw == WIFINET_BWC_WIDTH40  || power < sta->sta_wmac->wm_signal_power_bw_change_thresh_wide) {
                 if (tcp_rx) {
-                    rate = (power + 73 > 0) ? WIFI_11N_MCS3 : (power + 75 > 0) ? WIFI_11N_MCS2 : (power + 77 >0) ? WIFI_11N_MCS1 : WIFI_11N_MCS0;
+                    rate = (power + 56 > 0) ? WIFI_11AC_MCS6 : (power + 62 > 0) ? WIFI_11AC_MCS5 : (power + 68 > 0) ? WIFI_11AC_MCS4 : (power + 73 > 0) ? WIFI_11AC_MCS3 : (power + 75 > 0) ? WIFI_11AC_MCS2 : (power + 77 >0) ? WIFI_11AC_MCS1 : WIFI_11AC_MCS0;
 
                     if (rx_speed < 20)
-                        rate = WIFI_11N_MCS0;
+                        rate = WIFI_11AC_MCS0;
                 } else {
-                    rate = (power + 54 > 0) ? WIFI_11AC_MCS8 : (power + 60 > 0) ? WIFI_11N_MCS7 : (power + 62 > 0) ? WIFI_11N_MCS6 : (power + 64 > 0) ? WIFI_11N_MCS5 : (power + 67 > 0) ? WIFI_11N_MCS4 : (power + 71 > 0) ? WIFI_11N_MCS3 : \
-                    (power + 74 > 0) ? WIFI_11N_MCS2 : (power + 76 > 0) ? WIFI_11N_MCS1 : (power + 99 > 0) ? WIFI_11N_MCS0 : WIFI_11N_MCS0;
+                    rate = (power + 54 > 0) ? WIFI_11AC_MCS8 : (power + 60 > 0) ? WIFI_11AC_MCS7 : (power + 62 > 0) ? WIFI_11AC_MCS6 : (power + 64 > 0) ? WIFI_11AC_MCS5 : (power + 67 > 0) ? WIFI_11AC_MCS4 : (power + 69 > 0) ? WIFI_11AC_MCS3 : \
+                    (power + 74 > 0) ? WIFI_11AC_MCS2 : (power + 76 > 0) ? WIFI_11AC_MCS1 : WIFI_11AC_MCS0;
                 }
-                if (IS_MCS_RATE(rate) && (sta->sta_flags & WIFINET_NODE_VHT))
-                    rate |= 0x40;
+
+                if (!(sta->sta_flags & WIFINET_NODE_VHT))
+                    rate &= 0x8f;
             }
 
             else if (sta_chbw == WIFINET_BWC_WIDTH80) {
@@ -687,39 +640,55 @@ static void drv_tx_lower_rate_when_signal_weak(struct wlan_net_vif *wnet_vif, st
                     if (rx_speed < 10)
                         rate = WIFI_11AC_MCS0;
                 } else {
-                    rate = (power + 56 > 0) ? WIFI_11AC_MCS5 : (power + 60 >0) ? WIFI_11AC_MCS4 : \
+                    rate = (power + 54 > 0) ? WIFI_11AC_MCS6 : (power + 57 > 0) ? WIFI_11AC_MCS5 : (power + 62 >0) ? WIFI_11AC_MCS4 : \
                     (power + 64 > 0) ? WIFI_11AC_MCS3 : (power + 67 >0) ? WIFI_11AC_MCS2 : (power + 71 >0) ? WIFI_11AC_MCS1 : WIFI_11AC_MCS0;
                 }
             }
-
             else
-                printk("%s, %d, BW-%d not found!\n", __func__, __LINE__, sta_chbw);
+                ERROR_DEBUG_OUT("BW-%d not found!\n", sta_chbw);
 
         }
 
-        if (!IS_MCS_RATE(rate))
-            printk("%s, %d, power: %d; bw: %d; rate: 0x%x\n", __func__, __LINE__, power, sta_chbw, rate);
+        if (rate > ptxdesc->txdesc_rateinfo[0].vendor_rate_code)
+            rate = ptxdesc->txdesc_rateinfo[0].vendor_rate_code;
+
+        mcs_bw = sta_chbw;
+        if ((sta->sta_avg_bcn_rssi < sta->sta_wmac->wm_signal_power_bw_change_thresh_narrow) && !(rate & 0xf)) {
+            mcs_bw = CHAN_BW_20M;
+
+        } else if (sta->sta_avg_bcn_rssi < sta->sta_wmac->wm_signal_power_bw_change_thresh_wide) {
+            if (sta_chbw >= CHAN_BW_40M)
+                mcs_bw = CHAN_BW_40M;
+        }
 
         for (i = 0 ; i < DRV_TXDESC_RATE_NUM - 1; i++) {
-                ptxdesc->txdesc_rateinfo[i].vendor_rate_code = rate;
-                ptxdesc->txdesc_rateinfo[i].shortgi_en = 0;
+            if (IS_VHT_RATE(rate)) {
+                if ((rate - i) > 0xc0) {
+                    ptxdesc->txdesc_rateinfo[i].vendor_rate_code = (rate - i);
+                } else {
+                    ptxdesc->txdesc_rateinfo[i].vendor_rate_code = 0xc0;
+                }
+                ptxdesc->txdesc_rateinfo[i].flags |= IEEE80211_TX_RC_VHT_MCS;
+            } else if (IS_HT_RATE(rate)) {
+                if ((rate - i) > 0x80) {
+                    ptxdesc->txdesc_rateinfo[i].vendor_rate_code = (rate - i);
+                } else {
+                    ptxdesc->txdesc_rateinfo[i].vendor_rate_code = 0x80;
+                }
+                ptxdesc->txdesc_rateinfo[i].flags |= IEEE80211_TX_RC_MCS;
+            } else {
+                ERROR_DEBUG_OUT("power: %d; bw: %d; rate: 0x%x\n", power, sta_chbw, rate);
             }
+            ptxdesc->txdesc_rateinfo[i].shortgi_en = 0;
+            ptxdesc->txdesc_rateinfo[i].bw = mcs_bw;
+            ptxdesc->txdesc_rateinfo[i].flags &= ~(IEEE80211_TX_RC_40_MHZ_WIDTH | IEEE80211_TX_RC_80_MHZ_WIDTH | IEEE80211_TX_RC_SHORT_GI);
+            ptxdesc->txdesc_rateinfo[i].flags |= (mcs_bw == CHAN_BW_80M) ? IEEE80211_TX_RC_80_MHZ_WIDTH : (mcs_bw == CHAN_BW_40M) ? IEEE80211_TX_RC_40_MHZ_WIDTH : CHAN_BW_20M;
+            ptxdesc->txdesc_rateinfo[i].rate_index = ptxdesc->txdesc_rateinfo[i].vendor_rate_code & 0x0f;
 
-            wnet_vif->vm_fixed_rate.rateinfo = rate;
-            wnet_vif->vm_fixed_rate.mode = WIFINET_FIXED_RATE_MCS;
-
-            votes = 0;
+            if (IS_MCS_RATE(ptxdesc->txdesc_rateinfo[i].vendor_rate_code)) {
+                ptxdesc->txdesc_rateinfo[i].maxampdulen = max_4ms_framelen[0][HT_RC_2_MCS(ptxdesc->txdesc_rateinfo[i].vendor_rate_code)];
+            }
         }
-    else {
-        power_margin = power - power_weak_thresh;
-        if (power_margin > 5) {
-            votes++;
-            if (power_margin > 15)
-                votes = 101;
-        }
-
-        if (votes > 100)
-            wnet_vif->vm_fixed_rate.mode = WIFINET_FIXED_RATE_NONE;
     }
 }
 
@@ -732,46 +701,25 @@ static int drv_tx_prepare(struct drv_private *drv_priv, struct sk_buff *skbbuf,s
     struct sk_buff *skb = (struct sk_buff *)skbbuf;
     struct wifi_mac_tx_info *txinfo = ptxdesc->txinfo;
     char seq_assign_flag = 0;
-    unsigned short mcast_eapol_nulldata_rate;
     struct wifi_mac_pkt_info *mac_pkt_info = &txinfo->ptxdesc->drv_pkt_info.pkt_info[0];
 
     wh = (struct wifi_frame *)os_skb_data(skbbuf);
-
     ptxdesc->txdesc_framectrl = *(unsigned short*)&wh->i_fc[0];
     ptxdesc->txdesc_ddraddr = (SYS_TYPE)wh;
-
     sta = (struct wifi_station *)txinfo->cb.sta;
     wnet_vif = sta->sta_wnet_vif;
 
-    if ((sta->sta_flags & WIFINET_NODE_HT) &&(sta->sta_rates.dot11_rate_num == 0)) {
-        mcast_eapol_nulldata_rate = DEFAULT_MCAST_EAPOL_NULLDATA_RATE_11N;
-
-    } else {
-        mcast_eapol_nulldata_rate = DEFAULT_MCAST_EAPOL_NULLDATA_RATE_11G;
-    }
     ratectrl = &ptxdesc->txdesc_rateinfo[0];
-
-    DPRINTF(AML_DEBUG_INFO,"<running> %s %d txinfo->b_datapkt = %d\n",
-            __func__,__LINE__,txinfo->b_datapkt);
 
     if (txinfo->b_datapkt) {
         if (txinfo->b_mcast) {
-            drv_tx_get_spec_frm_rate(drv_priv, skbbuf,
-                ptxdesc, ratectrl, mcast_eapol_nulldata_rate, 1);
-            DPRINTF(AML_DEBUG_INFO,"<running> %s %d vendor_rate_code=%x\n",
-                __func__,__LINE__,ratectrl[0].vendor_rate_code);
+            drv_tx_get_spec_frm_rate(drv_priv, skbbuf, ptxdesc, ratectrl, 1);
 
         } else if (mac_pkt_info->b_eap || mac_pkt_info->b_dhcp || mac_pkt_info->b_arp) {
-            drv_tx_get_spec_frm_rate(drv_priv, skbbuf,
-                ptxdesc, ratectrl, mcast_eapol_nulldata_rate, DRV_MGT_TXMAXTRY);
-            DPRINTF(AML_DEBUG_INFO,"<running> %s %d vendor_rate_code=%x\n",
-                __func__,__LINE__,ratectrl[0].vendor_rate_code);
+            drv_tx_get_spec_frm_rate(drv_priv, skbbuf, ptxdesc, ratectrl, DRV_MGT_TXMAXTRY);
 
         } else if (txinfo->b_nulldata) {
-            drv_tx_get_spec_frm_rate(drv_priv, skbbuf,
-                ptxdesc, ratectrl, mcast_eapol_nulldata_rate, DRV_MGT_TXMAXTRY);
-            DPRINTF(AML_DEBUG_INFO,"<running> %s %d vendor_rate_code=%x\n",
-                __func__,__LINE__,ratectrl[0].vendor_rate_code);
+            drv_tx_get_spec_frm_rate(drv_priv, skbbuf, ptxdesc, ratectrl, DRV_MGT_TXMAXTRY);
 
         } else {// unicast packet
             struct drv_tx_scoreboard *tid;
@@ -788,8 +736,6 @@ static int drv_tx_prepare(struct drv_private *drv_priv, struct sk_buff *skbbuf,s
             */
             if (IS_MCS_RATE(ratectrl[0].vendor_rate_code) && txinfo->ht
                 && drv_priv->drv_config.cfg_txaggr && drv_aggr_query(drv_priv, sta->drv_sta, skbbuf)) {
-                DPRINTF(AML_DEBUG_INFO,"<running> %s %d \n",__func__,__LINE__);
-
                 /*assign a new seq num with specify tid */
                 if (likely(!(txinfo->b_txfrag))) {
                     *(unsigned short*)wh->i_seq = htole16(tid->seq_next << WIFINET_SEQ_SEQ_SHIFT);
@@ -803,18 +749,12 @@ static int drv_tx_prepare(struct drv_private *drv_priv, struct sk_buff *skbbuf,s
 
             } else {
                 if ((wh->i_fc[0] & WIFINET_FC0_SUBTYPE_MASK) == WIFINET_FC0_SUBTYPE_NODATA) {
-                    DPRINTF(AML_DEBUG_INFO,"%s vendor_rate_code = %x os_skb_get_pktlen(skb)=%d,txinfo->packetlen=%d, txinfo->mpdulen=%d\n",
-                        __func__, ratectrl[0].vendor_rate_code, os_skb_get_pktlen(skb), txinfo->packetlen, txinfo->mpdulen);
-
                     if (IS_HT_RATE(ratectrl[0].vendor_rate_code)) {
                         os_skb_put(skb, 2);
                         wh->i_fc[0] |= WIFINET_FC0_SUBTYPE_QOS_NULL;
                         txinfo->packetlen += 2;
                         txinfo->mpdulen += 2;
                         txinfo->cb.hdrsize += 2;
-
-                        DPRINTF(AML_DEBUG_INFO,"%s(%d) vendor_rate_code=%x os_skb_get_pktlen(skb)=%d, txinfo->packetlen=%d,txinfo->mpdulen=%d\n",
-                            __func__, __LINE__, ratectrl[0].vendor_rate_code, os_skb_get_pktlen(skb), txinfo->packetlen,txinfo->mpdulen);
                     }
                 }
 
@@ -824,16 +764,13 @@ static int drv_tx_prepare(struct drv_private *drv_priv, struct sk_buff *skbbuf,s
                     seq_assign_flag = 1;
                 }
             }
+
             if ((wnet_vif->vm_opmode == WIFINET_M_STA) && wnet_vif->vm_change_rate_enable)
                 drv_tx_lower_rate_when_signal_weak(wnet_vif, ptxdesc);
         }
-    }
-    else
-    {
-        drv_tx_get_spec_frm_rate(drv_priv, skbbuf,ptxdesc, ratectrl,
-                    wnet_vif->vm_specific_packet_rate_kbps, DRV_MGT_TXMAXTRY);
-        DPRINTF(AML_DEBUG_INFO,"<running> %s %d vendor_rate_code=%x\n",
-                __func__,__LINE__,ratectrl[0].vendor_rate_code);
+
+    } else {
+        drv_tx_get_spec_frm_rate(drv_priv, skbbuf, ptxdesc, ratectrl, DRV_MGT_TXMAXTRY);
     }
 
     //seq not assign
@@ -864,23 +801,24 @@ int drv_tx_start( struct drv_private *drv_priv, struct sk_buff *skbbuf)
     struct wifi_station *sta = drv_priv->net_ops->os_skb_get_nsta(skbbuf);
     struct wlan_net_vif *wnet_vif = NULL;
     struct wifi_mac_tx_info *txinfo = (struct wifi_mac_tx_info *)os_skb_cb(skbbuf);
+    struct sk_buff *skb_new = NULL;
+    unsigned short header_room = os_skb_hdrspace(skbbuf);
+    unsigned short tail_room = os_skb_get_tailroom(skbbuf);
 
     do
     {
         struct wifi_frame *wh = (struct wifi_frame *)os_skb_data(skbbuf);
-        wnet_vif = sta->sta_wnet_vif;
-
-        if (drv_priv->drv_pkt_drop[wnet_vif->wnet_vif_id]) {
-            printk("%s vid:%d, disconnect not allow to send pkt\n", __func__, wnet_vif->wnet_vif_id);
-            error = -1;
-            break;
-        }
-
         ASSERT(skbbuf != NULL);
         if (!sta)
         {
-            printk("%s sta is NULL\n", __func__);
+            ERROR_DEBUG_OUT("sta is NULL\n");
             error = -2;
+            break;
+        }
+        wnet_vif = sta->sta_wnet_vif;
+        if (drv_priv->drv_pkt_drop[wnet_vif->wnet_vif_id]) {
+            ERROR_DEBUG_OUT("vid:%d, disconnect not allow to send pkt\n", wnet_vif->wnet_vif_id);
+            error = -1;
             break;
         }
 
@@ -963,6 +901,12 @@ int drv_tx_start( struct drv_private *drv_priv, struct sk_buff *skbbuf)
             txinfo->queue_id = sta->sta_wmac->wm_mng_qid;
         }
 
+        if ((header_room < HI_TXDESC_DATAOFFSET + 32) || (tail_room < 32) || (((unsigned long)skbbuf->data) % 8)) {
+            skb_new = os_skb_copy_expand(skbbuf, HI_TXDESC_DATAOFFSET + 32, 32, GFP_ATOMIC);
+            ASSERT(skb_new != NULL);
+            os_skb_free(skbbuf);
+            skbbuf = skb_new;
+        }
         error = drv_send(skbbuf,  drv_priv);
     }
     while (0);
@@ -975,7 +919,7 @@ int drv_tx_start( struct drv_private *drv_priv, struct sk_buff *skbbuf)
         ts.ts_longretry = 0;
         drv_priv->net_ops->wifi_mac_tx_complete(wnet_vif, skbbuf, &ts);
 
-        DPRINTF(AML_DEBUG_WARNING, "%s vid:%d drop skb in drv_send due to err:%d\n", __func__, wnet_vif->wnet_vif_id, error);
+        ERROR_DEBUG_OUT("drop skb in drv_send due to err:%d\n", error);
     }
 
     return error;
@@ -1056,6 +1000,7 @@ int drv_send(struct sk_buff *skbbuf, struct drv_private *drv_priv)
     struct drv_tx_scoreboard *tid = DRV_GET_TIDTXINFO(drv_sta, txinfo->tid_index);
     struct drv_txlist *txlist = &drv_priv->drv_txlist_table[txinfo->queue_id];
     int ret = -1;
+    struct wifi_frame *wh = (struct wifi_frame *)(skbbuf->data);
 
     sts_sw_probe(sts_drv_send_skb_idx , 1);
 
@@ -1073,7 +1018,7 @@ int drv_send(struct sk_buff *skbbuf, struct drv_private *drv_priv)
     DRV_TXQ_LOCK(txlist);
     //get a fitable rate according tx_info
     if (!drv_tx_prepare(drv_priv, skbbuf, ptxdesc)) {
-        printk("%s drv_tx_prepare not ok\n", __func__);
+        ERROR_DEBUG_OUT("drv_tx_prepare not ok\n");
         goto bad;
     }
 
@@ -1084,10 +1029,9 @@ int drv_send(struct sk_buff *skbbuf, struct drv_private *drv_priv)
     ptxdesc->txdesc_queue_lastframe = ptxdesc;  // pointer to itself
     ptxdesc->txdesc_queue_last = ptxdesc;          //pointer to itself
     ptxdesc->txdesc_pktnum = 1;
+    drv_txdesc_set_rts_cts(drv_priv, ptxdesc);
 
-    if (txinfo->b_uapsd)
-    {
-        drv_txdesc_set_bw(drv_priv, ptxdesc);
+    if (txinfo->b_uapsd && (wh->i_fc[0] & (FRAME_TYPE_MASK | FRAME_SUBTYPE_MASK)) == MAC_FCTRL_QOS_DATA) {
         drv_tx_queue_uapsd_nsta(drv_priv, &txdesc_list_head, drv_sta);
         DRV_TXQ_UNLOCK(txlist);
         printk("%s uapsd\n", __func__);
@@ -1095,19 +1039,15 @@ int drv_send(struct sk_buff *skbbuf, struct drv_private *drv_priv)
     }
 
     /*send qos data frames : not frag and set agg flag*/
-    if (txinfo->b_Ampdu)
-    {
-        if (drv_tx_send_ampdu(drv_priv, txlist, tid, &txdesc_list_head))
-        {
-            DPRINTF(AML_DEBUG_WARNING, "<running> %s %d \n",__func__,__LINE__);
+    if (txinfo->b_Ampdu) {
+        if (drv_tx_send_ampdu(drv_priv, txlist, tid, &txdesc_list_head)) {
+            ERROR_DEBUG_OUT("<running> drv_tx_send_ampdu fail\n");
             goto bad;
         }
-    }
-    else
-    {
+
+    } else {
         DRV_TXQ_UNLOCK(txlist);
         /*no aggregted: data frames,  mgmt frames and multicast/broad frames*/
-        drv_txdesc_set_bw(drv_priv, ptxdesc);
         if (txinfo->b_mcast) {
 #ifdef  AML_MCAST_QUEUE
             //mcast backup also use txlist_backup_qcnt
@@ -1123,7 +1063,7 @@ int drv_send(struct sk_buff *skbbuf, struct drv_private *drv_priv)
         DRV_TXQ_LOCK(txlist);
 
         if (ret != 0) {
-            DPRINTF(AML_DEBUG_WARNING,"<running> %s %d \n",__func__,__LINE__);
+            ERROR_DEBUG_OUT("<running> fail\n");
             goto bad;
         }
     }
@@ -1153,7 +1093,7 @@ void drv_tx_complete(struct drv_private *drv_priv, struct drv_txdesc *ptxdesc, i
     ts.ts_flags = 0;
 
     if (skbbuf == NULL) {
-        DPRINTF(AML_DEBUG_ERROR, "%s ,%d (skbbuf== NULL) ERROR!!!!!!!\n",__func__,__LINE__);
+        ERROR_DEBUG_OUT("(skbbuf== NULL) ERROR!!!!!!!\n");
         return;
     }
 
@@ -1178,9 +1118,6 @@ void drv_tx_complete(struct drv_private *drv_priv, struct drv_txdesc *ptxdesc, i
     } else {
         ts.ts_flags = WIFINET_TX_ERROR;
     }
-
-    if (ptxdesc->txdesc_mpdu_hal)
-        os_skb_free(ptxdesc->txdesc_mpdu_hal);
 
     {
         struct wifi_frame *wh = (struct wifi_frame *)os_skb_data(skbbuf);
@@ -1446,19 +1383,19 @@ static int drv_tx_complete_task(struct drv_private *drv_priv, struct drv_txlist 
 
                 if (ptxdesc->txinfo->b_Ampdu) {
                     if (ptxdesc->txdesc_queue_last != ptxdesc) {
-                        __D(BIT(23), "first status:%d, ts.ts_longretry:%d, ts.ts_shortretry:%d, rate:%02x:%02x:%02x, seqnum:%04x, vid:%d\n", status,
+                        AML_PRINT(AML_DBG_MODULES_RATE_CTR, "first status:%d, ts.ts_longretry:%d, ts.ts_shortretry:%d, rate:%02x:%02x:%02x, bw:%d, seqnum:%04x, vid:%d, rssi:%d, snr:%d\n", status,
                             ts.ts_longretry, ts.ts_shortretry, ptxdesc->txdesc_rateinfo[0].vendor_rate_code, ptxdesc->txdesc_rateinfo[1].vendor_rate_code,
-                            ptxdesc->txdesc_rateinfo[2].vendor_rate_code, ptxdesc->txinfo->seqnum, ptxdesc->txinfo->wnet_vif_id);
+                            ptxdesc->txdesc_rateinfo[2].vendor_rate_code, ptxdesc->txdesc_rateinfo[0].bw, ptxdesc->txinfo->seqnum, ptxdesc->txinfo->wnet_vif_id, sta->sta_avg_bcn_rssi, sta->sta_avg_snr);
 
                     } else {
-                        __D(BIT(23), "status:%d, ts.ts_longretry:%d, ts.ts_shortretry:%d, rate:%02x:%02x:%02x, seqnum:%04x, vid:%d\n", status,
+                        AML_PRINT(AML_DBG_MODULES_RATE_CTR, "status:%d, ts.ts_longretry:%d, ts.ts_shortretry:%d, rate:%02x:%02x:%02x, bw:%d, seqnum:%04x, vid:%d, rssi:%d, snr:%d\n", status,
                             ts.ts_longretry, ts.ts_shortretry, ptxdesc->txdesc_rateinfo[0].vendor_rate_code, ptxdesc->txdesc_rateinfo[1].vendor_rate_code,
-                            ptxdesc->txdesc_rateinfo[2].vendor_rate_code, ptxdesc->txinfo->seqnum, ptxdesc->txinfo->wnet_vif_id);
+                            ptxdesc->txdesc_rateinfo[2].vendor_rate_code, ptxdesc->txdesc_rateinfo[0].bw, ptxdesc->txinfo->seqnum, ptxdesc->txinfo->wnet_vif_id, sta->sta_avg_bcn_rssi, sta->sta_avg_snr);
                     }
                 } else {
-                    __D(BIT(23), "status:%d, ts.ts_longretry:%d, ts.ts_shortretry:%d, rate:%02x:%02x:%02x, seqnum:%04x, vid:%d\n", status,
+                    AML_PRINT(AML_DBG_MODULES_RATE_CTR, "status:%d, ts.ts_longretry:%d, ts.ts_shortretry:%d, rate:%02x:%02x:%02x, bw:%d, seqnum:%04x, vid:%d, rssi:%d, snr:%d\n", status,
                         ts.ts_longretry, ts.ts_shortretry, ptxdesc->txdesc_rateinfo[0].vendor_rate_code, ptxdesc->txdesc_rateinfo[1].vendor_rate_code,
-                        ptxdesc->txdesc_rateinfo[2].vendor_rate_code, ptxdesc->txinfo->seqnum, ptxdesc->txinfo->wnet_vif_id);
+                        ptxdesc->txdesc_rateinfo[2].vendor_rate_code, ptxdesc->txdesc_rateinfo[0].bw, ptxdesc->txinfo->seqnum, ptxdesc->txinfo->wnet_vif_id, sta->sta_avg_bcn_rssi, sta->sta_avg_snr);
                 }
                 drv_priv->ratctrl_ops->rate_tx_complete(ptxdesc->txdesc_rateinfo, sta);
             }
@@ -1525,9 +1462,7 @@ static int drv_tx_complete_task(struct drv_private *drv_priv, struct drv_txlist 
     }
     while(0);
 
-    if (cnt % 5 == 0) {
-        tasklet_schedule(&drv_priv->ampdu_tasklet);
-    }
+    tasklet_schedule(&drv_priv->ampdu_tasklet);
 
     if (drv_txq_backup_qcnt(txlist) > 0)
     {
@@ -1546,10 +1481,11 @@ static int drv_tx_complete_task(struct drv_private *drv_priv, struct drv_txlist 
     return nacked;
 }
 
-void drv_tx_irq_tasklet( struct drv_private *drv_priv, struct txdonestatus *tx_done_status,
+void drv_tx_irq_tasklet(void *drv_priv_s, struct txdonestatus *tx_done_status,
     SYS_TYPE callback, unsigned char queue_id)
 {
     int qqcnt = 0;
+    struct drv_private *drv_priv = (struct drv_private *)drv_priv_s;
     struct drv_txdesc *ptxdesc = (struct drv_txdesc *)callback;
     struct drv_txlist *txlist;
 
@@ -1605,6 +1541,7 @@ static void drv_txlist_free_all_by_vid(struct drv_private *drv_priv, struct drv_
     struct drv_txdesc *ptxdesc;
     struct list_head txdesc_list_head_not_free;
     struct drv_tx_scoreboard *tid = NULL;
+    struct hi_tx_desc *pTxDPape = NULL;
 
     INIT_LIST_HEAD(&txdesc_list_head_not_free);
 
@@ -1621,14 +1558,17 @@ static void drv_txlist_free_all_by_vid(struct drv_private *drv_priv, struct drv_
         if ((ptxdesc->txinfo->wnet_vif_id == vid) || (vid == 3)) {
             txlist->txlist_qcnt--;
 
-            tid = DRV_GET_TIDTXINFO((struct aml_driver_nsta *)ptxdesc->txdesc_sta, ptxdesc->txinfo->tid_index);
-            if (tid != NULL && ptxdesc->txinfo->b_Ampdu) {
-                drv_tx_update_ba_win(drv_priv, tid, ptxdesc->txinfo->seqnum, txlist);
-            }
-            ptxdesc->txdesc_sta = NULL;
-
             DRV_TXQ_UNLOCK(txlist);
-            drv_tx_complete(drv_priv, ptxdesc, 0);
+            pTxDPape = (struct hi_tx_desc *)os_skb_data(ptxdesc->txdesc_mpdu);
+            if (pTxDPape && !pTxDPape->TxOption.pkt_position) {
+                tid = DRV_GET_TIDTXINFO((struct aml_driver_nsta *)ptxdesc->txdesc_sta, ptxdesc->txinfo->tid_index);
+                if (tid != NULL && ptxdesc->txinfo->b_Ampdu) {
+                    drv_tx_update_ba_win(drv_priv, tid, ptxdesc->txinfo->seqnum, txlist);
+                }
+
+                ptxdesc->txdesc_sta = NULL;
+                drv_tx_complete(drv_priv, ptxdesc, 0);
+            }
             DRV_TXQ_LOCK(txlist);
 
         } else {
@@ -1782,8 +1722,6 @@ void drv_flush_normal_buffer_queue(struct drv_private *drv_priv, unsigned char v
 
         if ((wnet_vif != NULL) && (wnet_vif->vm_state == WIFINET_S_CONNECTED)) {
             ptxdesc->txinfo->b_Ampdu = 0;
-            drv_txdesc_set_bw(drv_priv, ptxdesc);
-
             if (drv_tx_normal(drv_priv, txlist, &txdesc_list_head, vid))
             {
                 ASSERT(0);
@@ -1833,14 +1771,13 @@ int drv_txlist_isfull(struct drv_private *drv_priv, int queue_id, struct sk_buff
     int tid_idx = 0;
     struct aml_driver_nsta *drv_sta = DRIVER_NODE(nsta);
     int fifo_freecnt = 0;
-    struct wifi_mac *wifimac = drv_priv->wmac;
 
     struct wifi_station *sta = (struct wifi_station *)drv_sta->net_nsta;
 
     if ((sta->sta_flags & WIFINET_NODE_UAPSD) &&
         drv_tx_uapsd_nsta_qcnt(sta->drv_sta) >= WME_UAPSD_NODE_MAXQDEPTH)
     {
-        printk("<running> %s %d \n",__func__,__LINE__);
+        ERROR_DEBUG_OUT("<running> \n");
         return -1;
     }
 
@@ -1850,12 +1787,6 @@ int drv_txlist_isfull(struct drv_private *drv_priv, int queue_id, struct sk_buff
     fifo_freecnt = drv_priv->hal_priv->hal_ops.hal_get_priv_cnt(queue_id);
 
     tid_idx = drv_priv->net_ops->os_skb_get_tid(skbbuf);
-
-    __D(AML_DBG_TXLIST_CNT,"%s(%d)txlist_%d allcnt=%d mpdu_pend= %d txqcnt=%d, fifio_cnt:%d, msdu_pend %d\n",
-        __func__, __LINE__, queue_id, txlist_qcnt,
-        drv_priv->drv_txlist_table[queue_id].txds_pending_cnt,
-        drv_priv->drv_txlist_table[queue_id].txlist_qcnt, fifo_freecnt,
-        wifimac->msdu_cnt[tid_idx]);
 
     /*check if txlist is full by mpdu pending cnt is greater than
         (get_fifo free num + WIFI_MAX_TXFRAME/WIFI_MAX_TID))*/
@@ -1867,11 +1798,9 @@ int drv_txlist_isfull(struct drv_private *drv_priv, int queue_id, struct sk_buff
     return 0;
 }
 
-void drv_txdesc_set_bw(struct drv_private *drv_priv, struct drv_txdesc *ptxdesc)
+void drv_txdesc_set_rts_cts(struct drv_private *drv_priv, struct drv_txdesc *ptxdesc)
 {
     unsigned char i;
-    struct aml_driver_nsta *drv_sta = (struct aml_driver_nsta *) ptxdesc->txdesc_sta;
-    struct wifi_station * sta = (struct wifi_station *)drv_sta->net_nsta;
 
     for (i = 0; i <= 2; ++i) {
         if (ptxdesc->txdesc_rateinfo[i].trynum) {
@@ -1879,13 +1808,10 @@ void drv_txdesc_set_bw(struct drv_private *drv_priv, struct drv_txdesc *ptxdesc)
         }
     }
 
-    if ( (ptxdesc->txinfo->b_mgmt == 0) &&
-         (ptxdesc->txinfo->b_rsten == 0) &&
-         (drv_priv->drv_protect_mode != PROT_M_NONE) &&
-         (!IS_CCK_RATE(ptxdesc->txdesc_rateinfo[i].vendor_rate_code)) &&
-         (ptxdesc->txinfo->b_noack == 0) &&
-         !(M_PWR_SAV_GET((struct sk_buff *)(ptxdesc->txdesc_mpdu)) ||
-         M_FLAG_GET((struct sk_buff *)(ptxdesc->txdesc_mpdu), M_UAPSD)))
+    if ((ptxdesc->txinfo->b_mgmt == 0) && (ptxdesc->txinfo->b_rsten == 0)
+        && (drv_priv->drv_protect_mode != PROT_M_NONE) && (!IS_CCK_RATE(ptxdesc->txdesc_rateinfo[i].vendor_rate_code))
+        && (ptxdesc->txinfo->b_noack == 0) && !(M_PWR_SAV_GET((struct sk_buff *)(ptxdesc->txdesc_mpdu))
+        || M_FLAG_GET((struct sk_buff *)(ptxdesc->txdesc_mpdu), M_UAPSD)))
     {
         if (drv_priv->drv_protect_mode == PROT_M_RTSCTS)
             ptxdesc->txinfo->b_rsten = 1;
@@ -1896,102 +1822,6 @@ void drv_txdesc_set_bw(struct drv_private *drv_priv, struct drv_txdesc *ptxdesc)
     if (drv_priv->drv_config.cfg_aggr_prot && ptxdesc->txinfo->b_aggr)
     {
         ptxdesc->txinfo->b_rsten = 1;
-    }
-
-    //BWC parameter Filling
-    if (drv_priv->drv_curchannel.chan_bw == WIFINET_BWC_WIDTH20)   //judgement for support  HT or not
-    {
-        ptxdesc->txdesc_chanbw = CHAN_BW_20M;
-    }
-    else if(drv_priv->drv_curchannel.chan_bw == WIFINET_BWC_WIDTH40)
-    {
-        if (sta->sta_chbw == WIFINET_BWC_WIDTH20 /*|| (rt->info[rate_index].phy == WIFINET_T_DS)*/)
-        {
-            ptxdesc->txdesc_chanbw = CHAN_BW_20M;
-        }
-        else if(sta->sta_chbw == WIFINET_BWC_WIDTH40)
-        {
-            if(sta->sta_avg_bcn_rssi < sta->sta_wmac->wm_signal_power_bw_change_thresh_narrow)
-            {
-                ptxdesc->txdesc_chanbw = CHAN_BW_20M;
-            }
-            else
-            {
-                ptxdesc->txdesc_chanbw = CHAN_BW_40M;
-            }
-        }
-        else
-        {
-            printk("%s(%d) BW 40M ERR vid:%d, bw:%d\n", __func__, __LINE__, ptxdesc->txinfo->wnet_vif_id, sta->sta_chbw);
-        }
-    }
-    else if (drv_priv->drv_curchannel.chan_bw == WIFINET_BWC_WIDTH80)
-    {
-         if (sta->sta_chbw == WIFINET_BWC_WIDTH20 /*|| (rt->info[rate_index].phy == WIFINET_T_DS) */)
-        {
-            ptxdesc->txdesc_chanbw = CHAN_BW_20M;
-        }
-        else if (sta->sta_chbw == WIFINET_BWC_WIDTH40 /*|| (rt->info[rate_index].phy == WIFINET_T_HT)*/ )
-        {
-            if(sta->sta_avg_bcn_rssi  < sta->sta_wmac->wm_signal_power_bw_change_thresh_narrow)
-            {
-                ptxdesc->txdesc_chanbw = CHAN_BW_20M;
-            }
-            else
-            {
-                ptxdesc->txdesc_chanbw = CHAN_BW_40M;
-            }
-        }
-        else if (sta->sta_chbw == WIFINET_BWC_WIDTH80)
-        {
-            if (IS_HT_RATE(ptxdesc->txdesc_rateinfo[i].vendor_rate_code)) {
-                if(sta->sta_avg_bcn_rssi < sta->sta_wmac->wm_signal_power_bw_change_thresh_narrow)
-                {
-                    ptxdesc->txdesc_chanbw = CHAN_BW_20M;
-                }
-                else
-                {
-                    ptxdesc->txdesc_chanbw = CHAN_BW_40M;
-                }
-
-            } else {
-                ptxdesc->txdesc_chanbw = CHAN_BW_80M;
-                if(sta->sta_avg_bcn_rssi < sta->sta_wmac->wm_signal_power_bw_change_thresh_wide)
-                {
-                    if(sta->sta_avg_bcn_rssi < sta->sta_wmac->wm_signal_power_bw_change_thresh_narrow)
-                    {
-                        ptxdesc->txdesc_chanbw = CHAN_BW_20M;
-                    }
-                    else
-                    {
-                        ptxdesc->txdesc_chanbw = CHAN_BW_40M;
-                    }
-                }
-                else
-                {
-                    ptxdesc->txdesc_chanbw = CHAN_BW_80M;
-                }
-            }
-        }
-        else
-        {
-            printk("%s(%d) BW 80M ERR \n", __func__, __LINE__);
-        }
-    }
-    else  if(drv_priv->drv_curchannel.chan_bw == WIFINET_BWC_WIDTH160)
-    {
-        /*shijie.chen add for 160M and 80P80 */
-        printk("%s(%d)Not support BW 160M yet\n", __func__, __LINE__);
-    }
-    else  if(drv_priv->drv_curchannel.chan_bw == WIFINET_BWC_WIDTH80P80)
-    {
-        /*shijie.chen add for 160M and 80P80 */
-        printk("%s(%d)Not support BW 80+80M yet\n", __func__, __LINE__);
-    }
-    else
-    {
-         ptxdesc->txdesc_chanbw = CHAN_BW_20M;
-         printk("%s(%d) bw setting ERR!!!\n", __func__, __LINE__);
     }
 }
 
@@ -2251,15 +2081,11 @@ static void drv_tx_update_ba_win(struct drv_private *drv_priv, struct drv_tx_sco
     desc_id = (tid->baw_head + index) & (DRV_TID_MAX_BUFS - 1);
 
     tid->tx_desc[desc_id] = NULL;
-    __D(AML_DBG_TX_FLOW, "%s:%d, head:%d, tail:%d, ssn:%d, sn:%d, index:%d\n",
-        __func__, __LINE__, tid->baw_head, tid->baw_tail, tid->seq_start, seqnum, index);
 
     if (((tid->baw_tail - tid->baw_head) & (DRV_TID_MAX_BUFS - 1)) >= tid->baw_size - 1 - MIN(tid->baw_size/2, drv_priv->drv_config.cfg_ampdu_subframes))
     {
         if (tid->tx_desc[tid->baw_head] != NULL)
         {
-            __D(AML_DEBUG_TX, "%s:%d, head:%d, index:%d, desc_id %d, sn %d desc[head]!=null\n",
-                __func__, __LINE__, tid->baw_head, index,desc_id, seqnum);
             tid->tx_desc[tid->baw_head] = NULL;
             if (txlist->txlist_qcnt > 0)
                 txlist->txlist_qcnt--;
@@ -2356,7 +2182,6 @@ static void drv_txlist_flush_for_sta_tid(struct drv_private *drv_priv, struct dr
             ptxdesc->txinfo->b_Ampdu = 0;
             DPRINTF(AML_DEBUG_XMIT,"<running> %s %d \n",__func__,__LINE__);
 
-            drv_txdesc_set_bw(drv_priv, ptxdesc);
             if (drv_tx_normal(drv_priv, txlist, &txdesc_list_head, wnet_vif->wnet_vif_id))
             {
                 ASSERT(0);
@@ -2472,7 +2297,7 @@ drv_tx_normal(struct drv_private *drv_priv, struct drv_txlist *txlist, struct li
 
     if (list_empty(txdesc_list_head))
     {
-        DPRINTF(AML_DEBUG_XMIT,"----------list empty %s -------------\n", __func__);
+        ERROR_DEBUG_OUT("----------list empty -------------\n");
         return -1;
     }
     ptxdesc = list_first_entry(txdesc_list_head, struct drv_txdesc, txdesc_queue);
@@ -2523,11 +2348,10 @@ static int drv_tx_send_ampdu(struct drv_private *drv_priv, struct drv_txlist *tx
     struct drv_tx_scoreboard *tid, struct list_head *txdesc_list_head)
 {
     struct drv_txdesc *ptxdesc;
-    unsigned int counts = 0;
 
     if (list_empty(txdesc_list_head))
     {
-        printk("%s(%d) no data to send\n", __func__, __LINE__);
+        ERROR_DEBUG_OUT("no data to send\n");
         return 0;
     }
 
@@ -2539,25 +2363,27 @@ static int drv_tx_send_ampdu(struct drv_private *drv_priv, struct drv_txlist *tx
     counts = drv_tx_ack_optimize(drv_priv, tid, ptxdesc);
     txlist->txds_pending_cnt -= counts;*/
 
-    __D(BIT(24), "mpdu pending cnt:%d, counts:%d, drv_priv->wait_mpdu_timeout:%d\n", txlist->txds_pending_cnt, counts, drv_priv->wait_mpdu_timeout);
-
     //connect txdesc to tid->txds_queue
     list_splice_tail_init(txdesc_list_head, &tid->txds_queue);
 
     ASSERT(txlist->txlist_qnum == ptxdesc->txinfo->queue_id);
 
     drv_tx_queue_tid(txlist, tid);
-    __D(BIT(17), "mpdu pending cnt:%d, seq:%d, len:%d, qid:%d, tid:%d, sn:%04x, timeout:%d\n", txlist->txds_pending_cnt, ptxdesc->txinfo->seqnum,
+    AML_PRINT(AML_DBG_MODULES_TX, "mpdu pending cnt:%d, seq:%d, len:%d, qid:%d, tid:%d, sn:%04x, timeout:%d\n", txlist->txds_pending_cnt, ptxdesc->txinfo->seqnum,
         ptxdesc->txdesc_agglen, ptxdesc->txinfo->queue_id, ptxdesc->txinfo->tid_index, ptxdesc->txinfo->seqnum, drv_priv->wait_mpdu_timeout);
 
+    DRV_HRTIMER_LOCK(drv_priv);
 
     if ((++txlist->txds_pending_cnt < drv_priv->drv_config.cfg_ampdu_subframes) && (!drv_priv->wait_mpdu_timeout)) {
         //pending pkts not enough, wait more pkts or scheduled by TX_OK.
         wifi_mac_tx_lock_timer_cancel();
         wifi_mac_tx_lock_timer_attach();
+
+        DRV_HRTIMER_UNLOCK(drv_priv);
         return 0;
     }
     wifi_mac_tx_lock_timer_cancel();
+    DRV_HRTIMER_UNLOCK(drv_priv);
 
 #if 0// 1 schedule; 0 direct call
     tasklet_schedule(&drv_priv->ampdu_tasklet);
@@ -2589,12 +2415,12 @@ unsigned int drv_lookup_rate(struct drv_private *drv_priv, struct aml_driver_nst
         }
 
     } else {
-        DPRINTF(AML_DEBUG_WARNING, "%s wnet_vif is NULL\n", __func__);
+        ERROR_DEBUG_OUT("wnet_vif is NULL\n");
         return 0;
     }
 
     if (!drv_priv->ratctrl_ops->rate_findrate(txdesc_rateinfo, sta)) {
-        printk("get rate error, drop\n");
+        ERROR_DEBUG_OUT("get rate error, drop\n");
         return 0;
     }
     maxampdulen = WIFINET_AMPDU_LIMIT_MAX;
@@ -2710,8 +2536,6 @@ drv_txampdu_build(struct drv_private *drv_priv, struct drv_tx_scoreboard *tid,
 
     bf_first = list_first_entry(&tid->txds_queue, struct drv_txdesc, txdesc_queue);
     if (!BAW_WITHIN(tid->seq_start, tid->baw_size, bf_first->txinfo->seqnum + MIN(h_baw, drv_priv->drv_config.cfg_ampdu_subframes))) {
-        __D(AML_DEBUG_TX, "%s:%d, BA win not enough, seq_start %d, cur_sn %d, last_sn = %d\n",
-            __func__,__LINE__, tid->seq_start, bf_first->txinfo->seqnum, tid->baw_sn_last);
         return status;
     }
 
@@ -2731,26 +2555,18 @@ drv_txampdu_build(struct drv_private *drv_priv, struct drv_tx_scoreboard *tid,
         aggr_limit = MIN(bf_first->txdesc_rateinfo[2].maxampdulen, aggr_limit);
     }
 
-    __D(BIT(17), "%s %d seq_start %d, cur_sn %d last_sn = %d, pending:%d, wait_mpdu_timeout:%d, aggr_limit:%d\n",
-        __func__,__LINE__,tid->seq_start, bf_first->txinfo->seqnum, tid->baw_sn_last, txlist->txds_pending_cnt, drv_priv->wait_mpdu_timeout, aggr_limit);
+    AML_PRINT(AML_DBG_MODULES_TX, "seq_start %d, cur_sn %d last_sn = %d, pending:%d, wait_mpdu_timeout:%d, aggr_limit:%d\n",
+        tid->seq_start, bf_first->txinfo->seqnum, tid->baw_sn_last, txlist->txds_pending_cnt, drv_priv->wait_mpdu_timeout, aggr_limit);
 
     do {
         ptxdesc = list_first_entry(&tid->txds_queue, struct drv_txdesc, txdesc_queue);
-        __D(AML_DEBUG_AGG,"%s %d seq_start %d, cur_sn %d last_sn = %d, pending:%d, wait_mpdu_timeout:%d\n",
-            __func__,__LINE__,tid->seq_start, ptxdesc->txinfo->seqnum, tid->baw_sn_last, txlist->txds_pending_cnt, drv_priv->wait_mpdu_timeout);
 
         /*backup sample rate*/
         if ((nframes != 0) && (ptxdesc->txdesc_rateinfo[0].flags & HAL_RATECTRL_USE_SAMPLE_RATE)) {
-            if ((drv_priv->minstrel_sample_rate[0].trynum != 0) && !(drv_priv->minstrel_sample_rate[0].flags & HAL_RATECTRL_USE_FIXED_RATE)) {
-                printk("drop one sample rate:%02x:%02x\n", drv_priv->minstrel_sample_rate[0].vendor_rate_code,
-                    drv_priv->minstrel_sample_rate[1].vendor_rate_code);
-            }
             memcpy(&drv_priv->minstrel_sample_rate, &ptxdesc->txdesc_rateinfo, DRV_TXDESC_RATE_NUM * sizeof(struct aml_ratecontrol));
         }
 
         if (!BAW_WITHIN(tid->seq_start, tid->baw_size, ptxdesc->txinfo->seqnum)) {
-            __D(AML_DEBUG_TX,"%s %d seqnum:%d out ba window, seq_start %d, last_sn = %d\n"    ,
-                __func__,__LINE__, ptxdesc->txinfo->seqnum, tid->seq_start, tid->baw_sn_last);
             status = 1;
             break;
         }
@@ -2758,15 +2574,11 @@ drv_txampdu_build(struct drv_private *drv_priv, struct drv_tx_scoreboard *tid,
         al_delta = DRV_AGGR_DELIM_SZ + ptxdesc->txinfo->packetlen;
         if (nframes && (aggr_limit < (al + bpad + al_delta + prev_al))) {
             status = 2;
-            __D(AML_DEBUG_AGG, "%s:%d, length, aggr_max %d, mpdu_num %d, ampdu_len %d \n",
-                __func__, __LINE__, aggr_limit, nframes, al);
             break;
         }
 
         if (nframes >= MIN(h_baw, drv_priv->drv_config.cfg_ampdu_subframes)) {
             status = 2;
-            __D(AML_DEBUG_AGG, "%s:%d, sub num, aggr_max %d, num_max %d mpdu_num %d, ampdu_len %d \n",
-                __func__, __LINE__, aggr_limit, drv_priv->drv_config.cfg_ampdu_subframes, nframes, al);
             break;
         }
 
@@ -2793,7 +2605,6 @@ drv_txampdu_build(struct drv_private *drv_priv, struct drv_tx_scoreboard *tid,
             bf_prev->txdesc_queue_next = ptxdesc;
         }
         bf_prev = ptxdesc;
-        memcpy(&ptxdesc->txdesc_rateinfo, &bf_first->txdesc_rateinfo, DRV_TXDESC_RATE_NUM * sizeof(struct aml_ratecontrol));
     }
     while (!list_empty(&tid->txds_queue));
 
@@ -2874,7 +2685,7 @@ static void drv_tx_sched_aggr(struct drv_private *drv_priv, struct drv_txlist *t
                 //compel to form ampdu when pending mpdu less than cfg_ampdu_subframes except hal pending too much data
                 hal_co_get_cnt = drv_priv->hal_priv->hal_ops.hal_get_priv_cnt(txlist->txlist_qnum);
                 if (HI_AGG_TXD_NUM_PER_QUEUE - hal_co_get_cnt >= drv_priv->drv_config.cfg_ampdu_subframes) {
-                    __D(BIT(17), "%s wait more mpdu to form ampdu due to hal_co_get_cnt:%d\n",__func__, hal_co_get_cnt);
+                    AML_PRINT(AML_DBG_MODULES_TX, "wait more mpdu to form ampdu due to hal_co_get_cnt:%d\n", hal_co_get_cnt);
                     /* BYPASS */
                         drv_priv->wait_mpdu_timeout = 0;//wait another tx_ok or pending enough mpdu
                     break;
@@ -2884,13 +2695,11 @@ static void drv_tx_sched_aggr(struct drv_private *drv_priv, struct drv_txlist *t
 
         if (list_empty(&tid->txds_queue))
         {
-            __D(AML_DEBUG_TX, "%s:%d, tid_queue empty\n", __func__, __LINE__);
             break;
         }
 
         if (aml_tx_hal_buffer_full(drv_priv, txlist->txlist_qnum,1,drv_priv->drv_config.cfg_ampdu_subframes))
         {
-            __D(AML_DEBUG_TX, "%s(%d) hal full\n", __func__, __LINE__);
             break;
         }
 
@@ -2899,7 +2708,6 @@ static void drv_tx_sched_aggr(struct drv_private *drv_priv, struct drv_txlist *t
 
         if (list_empty(&tx_queue))
         {
-            __D(AML_DBG_TX_FLOW, "%s:%d, build ampdu is empty\n", __func__, __LINE__);
             break;
         }
 
@@ -2931,8 +2739,6 @@ static void drv_tx_sched_aggr(struct drv_private *drv_priv, struct drv_txlist *t
                 ptxdesc->txinfo->b_Ampdu = 0;
             }
 
-            drv_txdesc_set_bw(drv_priv, ptxdesc);
-
             DPRINTF(AML_DEBUG_INFO,"<running> %s %d tid->seq_start %x, ptxdesc->txinfo->seqnum %x \n",__func__,__LINE__,tid->seq_start, ptxdesc->txinfo->seqnum);
             DPRINTF(AML_DEBUG_INFO,"<running> %s %d ptxdesc->txdesc_pktnum=1,tidq_qcnt %d, txlist_qcnt %d \n",__func__,__LINE__,txlist->txds_pending_cnt,txlist->txlist_qcnt);
             ret = drv_to_hal(drv_priv, txlist, &tx_queue);
@@ -2941,7 +2747,6 @@ static void drv_tx_sched_aggr(struct drv_private *drv_priv, struct drv_txlist *t
         }
 
         ptxdesc->txinfo->b_aggr  = 1;
-        drv_txdesc_set_bw(drv_priv, ptxdesc);
         drv_priv->drv_stats.tx_ampdu_cnt++;
 
         ASSERT(bf_lastaggr);
@@ -3275,11 +3080,6 @@ void drv_set_ampduparams( struct drv_private *drv_priv,
 int drv_tx_get_mgmt_frm_rate(struct drv_private *drv_priv,
     struct wlan_net_vif *wnet_vif, unsigned char fc_type,unsigned char *rate,unsigned short *flag)
 {
-    if ((drv_priv->drv_curchannel.chan_bw == WIFINET_BWC_WIDTH160)
-        || (drv_priv->drv_curchannel.chan_bw == WIFINET_BWC_WIDTH80P80))
-        printk("<running> %s %d, not support bandwidth %d\n",
-            __func__, __LINE__, drv_priv->drv_curchannel.chan_bw);
-
     switch (wnet_vif->vm_mac_mode)
     {
         case WIFINET_MODE_11B:
@@ -3297,8 +3097,6 @@ int drv_tx_get_mgmt_frm_rate(struct drv_private *drv_priv,
             break;
 
         case WIFINET_MODE_AUTO:
-            printk("<running> %s %d  WIFINET_MODE_AUTO\n", __func__, __LINE__);
-
         case WIFINET_MODE_11G:
         case WIFINET_MODE_11GN:
         case WIFINET_MODE_11GNAC:

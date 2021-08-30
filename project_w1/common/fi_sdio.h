@@ -28,7 +28,6 @@
 #define MAC_DCCM_AHB_BASE    0x00d00000
 #define PHY_REG_AGC_BASE     0x00a08000
 #define PHY_AGC_BUSY_FSM          (PHY_REG_AGC_BASE+0x34)
-#define MAC_RXPKT_CONTROL45      (MAC_REG_BASE+0x324)
 
 #define DF_AGC_REG_A12 (PHY_REG_AGC_BASE + 0x30)
 #define DF_AGC_REG_A27 (PHY_REG_AGC_BASE + 0x6c)
@@ -797,7 +796,8 @@ typedef struct Fw_TxPriv
 /*use in HW_TxVector option address, for key */
 typedef struct HW_TxOption
 {
-        unsigned char Reserve[3];
+        unsigned char Reserve[2];
+        unsigned char pkt_position;
         unsigned char KeyIdex;
         //tkip/ccmp use 8B, wpi use 16B
         unsigned char PN[16];
@@ -961,7 +961,7 @@ typedef struct HW_CONFIG
         unsigned int rxframeaddress;
         unsigned int txcompleteaddress;
         unsigned short bcn_page_num;
-        unsigned short reserve;
+        unsigned short flags;
         unsigned int fweventaddress;
 } HW_CONFIG;
 

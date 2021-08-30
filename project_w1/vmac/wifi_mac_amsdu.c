@@ -112,13 +112,8 @@ wifi_mac_amsdu_tx2drvlay(struct wifi_mac *wifimac, struct wifi_mac_amsdu_tx *ams
         return;
     }
 
-    wifimac->drv_priv->drv_ops.tx_start(wifimac->drv_priv, skbbuf);
-
-    if(g_dbg_info_enable & AML_DBG_TX_VIP_INFO)
-    {
-        printk("amsdu_sub=%d, amsdu_len=%d\n", txinfo->amsdunum, os_skb_get_pktlen(skbbuf));
-    }
     wnet_vif->vif_sts.sts_tx_amsdu_out_msdu[txinfo->tid_index]++;
+    wifimac->drv_priv->drv_ops.tx_start(wifimac->drv_priv, skbbuf);
 }
 
 void wifi_mac_txamsdu_free_all(struct wifi_mac *wifimac, unsigned char vid)
@@ -349,7 +344,7 @@ struct sk_buff *wifi_mac_amsdu_aggr(struct wifi_mac *wifimac, struct wifi_mac_am
             amsdutx->amsdu_tx_buf = wifi_mac_alloc_skb(wifimac, skblen);
             if (amsdutx->amsdu_tx_buf == NULL)
             {
-                printk("%s:%d, alloc skb fail\n", __func__, __LINE__);
+                ERROR_DEBUG_OUT("alloc skb fail\n");
                 return NULL;
             }
 
@@ -498,7 +493,7 @@ struct sk_buff *wifi_mac_amsdu_ex( struct sk_buff *skbbuf)
         /*process exception */
         if (amsdutx->amsdunum >= DEFAULT_TXAMSDU_SUB_MAX_BW80 * 2)
         {
-            printk("%s:%d, alloc skb fail, drop skb\n", __func__, __LINE__);
+            ERROR_DEBUG_OUT("alloc skb fail, drop skb\n");
             while (--(amsdutx->amsdunum) >= 0)
             {
                 wifi_mac_complete_wbuf(amsdutx->msdu_tmp_buf[amsdutx->amsdunum], 0);
@@ -524,7 +519,7 @@ struct sk_buff *wifi_mac_amsdu_send( struct sk_buff * skbbuf)
 
     if (sta->sta_amsdu == NULL)
     {
-        DPRINTF(AML_DEBUG_INFO,"ERROR: %s not called\n", __func__);
+        ERROR_DEBUG_OUT("ERROR: not called\n");
         return skbbuf;
     }
 
@@ -534,7 +529,7 @@ struct sk_buff *wifi_mac_amsdu_send( struct sk_buff * skbbuf)
           wnet_vif->vm_opmode == WIFINET_M_HOSTAP||
           wnet_vif->vm_opmode == WIFINET_M_P2P_GO))
     {
-        DPRINTF(AML_DEBUG_INFO, "%s %d not statisfy amsdu\n", __func__,__LINE__);
+        ERROR_DEBUG_OUT("not statisfy amsdu\n");
         return skbbuf;
     }
 
@@ -544,7 +539,7 @@ struct sk_buff *wifi_mac_amsdu_send( struct sk_buff * skbbuf)
     if (msdu_node == NULL)
     {
         WIFINET_AMSDU_UNLOCK(wifimac);
-        printk("%s, %d, alloc failed\n", __func__, __LINE__);
+        ERROR_DEBUG_OUT("alloc failed\n");
         return skbbuf;
     }
 

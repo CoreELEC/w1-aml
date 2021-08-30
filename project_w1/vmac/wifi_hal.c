@@ -21,8 +21,6 @@ namespace FW_NAME
 #include <linux/mmc/card.h>
 #include <linux/mmc/host.h>
 #include <linux/kthread.h>
-#include "t9023_calb.h"
-#include "./rf_t9026/t9026_top.h"
 #include "rf_d_top_reg.h"
 #include "dpd_memory_packet.h"
 #elif defined (HAL_SIM_VER)
@@ -39,7 +37,7 @@ extern struct aml_hal_call_backs * get_hal_call_back_table(void);
 extern unsigned char *g_rx_fifo;
 static int hal_dev_unreg(void);
 static int hal_dev_reg(void * drv_priv);
-
+extern unsigned char wifi_in_insmod;
 struct hal_private g_hal_priv;
 struct hal_private *  hal_get_priv(void)
 {
@@ -203,7 +201,7 @@ unsigned char hal_chk_replay_cnt(struct hal_private *hal_priv,HW_RxDescripter_bi
     return true;
 }
 
-void hal_soft_rx_cs(struct hal_private *hal_priv, OS_SKBBUF *skb)
+void hal_soft_rx_cs(struct hal_private *hal_priv, struct sk_buff *skb)
 #if defined (HAL_FPGA_VER)
 {
     HW_RxDescripter_bit *RxPrivHdr_bit;
@@ -211,12 +209,8 @@ void hal_soft_rx_cs(struct hal_private *hal_priv, OS_SKBBUF *skb)
     static unsigned char print_count = 0;
     unsigned char pkt_drop = 0;
 
-    RxPrivHdr_bit = (HW_RxDescripter_bit *)OS_SKBBUF_DATA(skb);
-    if (g_dbg_info_enable & AML_DBG_HAL_RX_FRM)
-    {
-        hal_show_rxframe(RxPrivHdr_bit);
-    }
-    OS_SKBBUF_PULL(skb, sizeof(HW_RxDescripter_bit));
+    RxPrivHdr_bit = (HW_RxDescripter_bit *)os_skb_data(skb);
+    os_skb_pull(skb, sizeof(HW_RxDescripter_bit));
 
     if (WIFI_ADDR_ISGROUP(RxPrivHdr_bit->data))
         wnet_vif_id = RxPrivHdr_bit->bssidmatch_id;
@@ -227,7 +221,7 @@ void hal_soft_rx_cs(struct hal_private *hal_priv, OS_SKBBUF *skb)
     {
         PRINT("hal_soft_rx_cs wnet_vif_id %d \n", wnet_vif_id);
         //dump_memory_internel(RxPrivHdr_bit->data, 32);
-        OS_SKBBUF_FREE(skb);
+        os_skb_free(skb);
         return;
     }
 
@@ -247,7 +241,7 @@ void hal_soft_rx_cs(struct hal_private *hal_priv, OS_SKBBUF *skb)
         }
 
         if (pkt_drop)
-            OS_SKBBUF_FREE(skb);
+            os_skb_free(skb);
         return;
     }
     else
@@ -257,7 +251,7 @@ void hal_soft_rx_cs(struct hal_private *hal_priv, OS_SKBBUF *skb)
 #ifdef RX_PN_CHECK
             if (hal_chk_replay_cnt(hal_priv,RxPrivHdr_bit)== false)
             {
-                OS_SKBBUF_FREE(skb);
+                os_skb_free(skb);
                 return;
             }
 #endif
@@ -671,6 +665,7 @@ void hal_ops_attach(void)
     hal_priv->hal_ops.phy_set_sretry_limit = phy_set_sretry_limit;
 
     hal_priv->hal_ops.phy_scan_cmd = phy_scan_cmd;
+    hal_priv->hal_ops.phy_set_tx_power_accord_rssi = phy_set_tx_power_accord_rssi;
     hal_priv->hal_ops.phy_set_channel_rssi = phy_set_channel_rssi;
     hal_priv->hal_ops.phy_pwr_save_mode = phy_pwr_save_mode;
     hal_priv->hal_ops.phy_set_rd_support = phy_set_rd_support;
@@ -718,6 +713,7 @@ void hal_ops_attach(void)
     hal_priv->hal_ops.hal_check_fw_wake = hal_check_fw_wake;
     hal_priv->hal_ops.hal_set_fwlog_cmd = hal_set_fwlog_cmd;
     hal_priv->hal_ops.hal_cfg_cali_param = hal_cfg_cali_param;
+    hal_priv->hal_ops.hal_cfg_txpwr_cffc_param = hal_cfg_txpwr_cffc_param;
 
 #ifdef SDIO_BUILD_IN
     host_wake_w1_req = hal_wake_fw_req;
@@ -961,7 +957,7 @@ unsigned char hal_alloc_txcmp_buf( struct hal_private *hal_priv)
     hal_priv->txcompletestatus = (struct tx_complete_status  *)ZMALLOC(sizeof(struct tx_complete_status), "hal_priv->txcompletestatus", GFP_KERNEL);
     if (hal_priv->txcompletestatus == NULL)
     {
-        PRINT("%s(%d) alloc_err\n", __func__, __LINE__);
+        ERROR_DEBUG_OUT("alloc_err\n");
         return false;
     }
     return true;
@@ -969,7 +965,7 @@ unsigned char hal_alloc_txcmp_buf( struct hal_private *hal_priv)
     hal_priv->txcompletestatus = (struct tx_complete_status *)MALLOC(sizeof(struct tx_complete_status));
     if (hal_priv->txcompletestatus == NULL)
     {
-        PRINT("%s(%d) alloc_err\n", __func__, __LINE__);
+        ERROR_DEBUG_OUT("alloc_err\n");
         return false;
     }
     return true;
@@ -993,7 +989,7 @@ unsigned char hal_alloc_fw_event_buf( struct hal_private *hal_priv)
     hal_priv->fw_event = (struct fw_event_to_driver *)ZMALLOC(sizeof(struct fw_event_to_driver), "hal_priv->fw_event", GFP_KERNEL);
     if (hal_priv->fw_event == NULL)
     {
-        PRINT("%s(%d) alloc_err\n", __func__, __LINE__);
+        ERROR_DEBUG_OUT("alloc_err\n");
         return false;
     }
     return true;
@@ -1001,7 +997,7 @@ unsigned char hal_alloc_fw_event_buf( struct hal_private *hal_priv)
     hal_priv->fw_event = (struct fw_event_to_driver *)MALLOC(sizeof(struct fw_event_to_driver));
     if (hal_priv->fw_event == NULL)
     {
-        PRINT("%s(%d) alloc_err\n", __func__, __LINE__);
+        ERROR_DEBUG_OUT("alloc_err\n");
         return false;
     }
     return true;
@@ -1012,9 +1008,6 @@ unsigned char hal_alloc_fw_event_buf( struct hal_private *hal_priv)
 unsigned char hal_tx_empty()
 {
     struct hw_interface* hif = hif_get_hw_interface();
-
-    __D(AML_DEBUG_TX, "send:%d, free:%d, done:%d\n", hif->HiStatus.Tx_Send_num,
-        hif->HiStatus.Tx_Free_num, hif->HiStatus.Tx_Done_num);
 
     if ((hif->HiStatus.Tx_Send_num == hif->HiStatus.Tx_Free_num)
         &&(hif->HiStatus.Tx_Send_num ==hif->HiStatus.Tx_Done_num))
@@ -1041,76 +1034,12 @@ int hal_is_empty_tx_id(struct hal_private * hal_priv)
     return 0;
 }
 
-#ifdef DRV_PT_SUPPORT
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 20, 0))
-extern void do_gettimeofday(struct timeval *tv);
-#endif
-static void b2b_tx_throughput_calc(struct Tx_FrameDesc*  pTxFrameDesc,
-                             struct txdonestatus * txstatus )
-{
-    static int rx_count=0;
-    static unsigned long length_start=0;
-    static unsigned long length_end=0;
-    unsigned int throughput = 0;
-    static long start = 0;
-    long end = 0;
-    long time_cost = 0;
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 20, 0))
-    struct timeval t_start;
-    struct timeval  t_end;
-#endif
-    struct hi_tx_desc *pTxDPape = NULL;
-
-    if ( TX_DESCRIPTOR_STATUS_SUCCESS == txstatus->txstatus )
-    {
-        pTxDPape = (struct hi_tx_desc *)OS_SKBBUF_DATA(pTxFrameDesc->skb);
-
-        //The following code added for b2b thr debug
-        //Update with the dst mac address later to void broadcast or multicast, get from RxPrivHdr->data
-        if ( HW_MPDU_LEN_GET(pTxDPape->MPDUBufFlag) > 1000 )
-         {
-            rx_count++;
-            if (rx_count == 1)
-            {
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 20, 0))
-                start = ktime_to_ms(ktime_get_boottime());
-#else
-                do_gettimeofday(&t_start);
-                start = ((long)t_start.tv_sec)*1000+(long)t_start.tv_usec/1000;
-#endif
-                printk("Tx side: Got the first packet and the start time is :%ld ms.\n",start);
-                length_start += HW_MPDU_LEN_GET(pTxDPape->MPDUBufFlag);
-                length_end += HW_MPDU_LEN_GET(pTxDPape->MPDUBufFlag);
-            }
-            else
-            {
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 20, 0))
-                end = ktime_to_ms(ktime_get_boottime());
-#else
-                do_gettimeofday(&t_end);
-                end = ((long)t_end.tv_sec)*1000+(long)t_end.tv_usec/1000;
-#endif
-                time_cost = end - start;
-                length_end += HW_MPDU_LEN_GET(pTxDPape->MPDUBufFlag);
-                if ( time_cost >= 2000 )
-                {
-                    throughput = (length_end-length_start)*8/time_cost;
-                    start = end;
-                    length_start = length_end;
-                    printk("Tx side: Current throughput: %d Mbps.\n\n",(throughput*1000)/(1024*1024));
-                }
-            }
-        }
-    }
-}
-#endif
-
 int hal_free_tx_id(struct hal_private * hal_priv, struct txdonestatus *txstatus,
     unsigned long *callback, unsigned char *queue_id)
 {
     struct hw_interface *hif = hif_get_hw_interface();
     unsigned char id = txstatus->callbackid;
-    struct Tx_FrameDesc *pTxFrameDesc;
+    struct fw_txdesc_fifo *pTxFrameDesc;
     int ret = 0;
     *callback = 0;
 
@@ -1118,20 +1047,14 @@ int hal_free_tx_id(struct hal_private * hal_priv, struct txdonestatus *txstatus,
     COMMON_LOCK();
     if (test_and_clear_bit(id, hal_priv->tx_frames_map))
     {
-        pTxFrameDesc = &hal_priv->tx_frames[id];
-        hal_priv->tx_frames[id].valid= 0;
-        hif->HiStatus.TX_SEND_OK_EVENT_num[pTxFrameDesc->txqueueid]++;
+        pTxFrameDesc = hal_priv->tx_frames[id];
+        hal_priv->tx_frames[id] = NULL;
 
-        if (pTxFrameDesc->skb != NULL)
-        {
-#ifdef DRV_PT_SUPPORT
-            b2b_tx_throughput_calc(pTxFrameDesc,txstatus);
-#endif
+        if (pTxFrameDesc) {
+            hif->HiStatus.TX_SEND_OK_EVENT_num[pTxFrameDesc->txqueueid]++;
+            *callback = pTxFrameDesc->callback;
+            *queue_id = pTxFrameDesc->txqueueid;
         }
-
-        /*callback pointer to up-layer ampdu*/
-        *callback = pTxFrameDesc->callback;
-        *queue_id = pTxFrameDesc->txqueueid;
 
         if (hal_priv->bhaltxdrop) {
             if (hal_is_empty_tx_id(hal_priv) == 0) {
@@ -1153,7 +1076,7 @@ int hal_free_tx_id(struct hal_private * hal_priv, struct txdonestatus *txstatus,
     return ret;
 }
 
-static int hal_alloc_tx_id(struct hal_private * hal_priv,struct fw_txdesc_fifo * pTxDescFiFo)
+static int hal_alloc_tx_id(struct hal_private * hal_priv,struct fw_txdesc_fifo *pTxDescFiFo)
 {
     int id;
     struct  hw_interface* hif = hif_get_hw_interface();
@@ -1168,11 +1091,7 @@ static int hal_alloc_tx_id(struct hal_private * hal_priv,struct fw_txdesc_fifo *
     }
 
     set_bit(id, hal_priv->tx_frames_map);
-    hal_priv->tx_frames[id].SN = pTxDescFiFo->SN;
-    hal_priv->tx_frames[id].txqueueid= pTxDescFiFo->txqueueid;
-    hal_priv->tx_frames[id].callback= pTxDescFiFo->callback;
-    hal_priv->tx_frames[id].skb = NULL;
-    hal_priv->tx_frames[id].valid = 1;
+    hal_priv->tx_frames[id] = pTxDescFiFo;
     hif->HiStatus.TX_REQ_EVENT_num[pTxDescFiFo->txqueueid]++;
 
 __alloc_fail:
@@ -1265,8 +1184,8 @@ void hal_txframe_pre(void)
 void hal_tx_complete(struct sk_buff * skb_buf)
 {
 #ifdef DRV_PT_SUPPORT
-    if (skb_buf != NULL)
-        OS_SKBBUF_FREE(skb_buf);
+    if (aml_wifi_is_enable_rf_test() && (skb_buf != NULL))
+        os_skb_free(skb_buf);
 #endif
 }
 
@@ -1292,8 +1211,8 @@ void  hal_tx_frame(void)
         }
         return;
     }
-
     AML_TXLOCK_UNLOCK();
+
     POWER_BEGIN_LOCK();
     if ((hal_priv->hal_drv_ps_status & HAL_DRV_IN_SLEEPING) != 0)
     {
@@ -1320,8 +1239,8 @@ void  hal_tx_frame(void)
         return;
     }
     POWER_END_LOCK();
-    AML_TXLOCK_LOCK();
 
+    AML_TXLOCK_LOCK();
     hal_txframe_pre();
     for (txqueueid = HAL_NUM_TX_QUEUES-1; txqueueid>=0; txqueueid--)
     {
@@ -1380,7 +1299,7 @@ void  hal_tx_frame(void)
 #endif
                 aggr_page_num += pTxDPape->TxPriv.aggr_page_num;
 #if defined (HAL_FPGA_VER)
-                __D(BIT(17), "TxPriv.aggr_page_num:%d <= txPageFreeNum:%d, TxPriv.AggrNum:%d <= q_fifo_set_cnt:%d, "\
+                AML_PRINT(AML_DBG_MODULES_TX, "TxPriv.aggr_page_num:%d <= txPageFreeNum:%d, TxPriv.AggrNum:%d <= q_fifo_set_cnt:%d, "\
                     "AggrNum:%d + mpdu_num:%d, aggr_page_num:%d, len:%d\n",
                     pTxDPape->TxPriv.aggr_page_num, hal_priv->txPageFreeNum,
                     pTxDPape->TxPriv.AggrNum, q_fifo_set_cnt, AggrNum, mpdu_num, aggr_page_num, pTxDPape->TxPriv.AggrLen);
@@ -1405,7 +1324,7 @@ void  hal_tx_frame(void)
                     scat_req->scat_list[mpdu_num].len = HW_MPDU_LEN_GET(pTxDPape->MPDUBufFlag) + HI_TXDESC_DATAOFFSET;
                     scat_req->scat_count++;
                     scat_req->len += scat_req->scat_list[mpdu_num].len;
-
+                    pTxDPape->TxOption.pkt_position = AML_PKT_NOT_IN_HAL;
                     pTxDescFiFo->ampduskb = NULL;
                     mpdu_num++;
 #elif defined (HAL_SIM_VER)
@@ -1433,7 +1352,7 @@ void  hal_tx_frame(void)
             else
             {
 #if defined (HAL_FPGA_VER)
-                __D(BIT(17), "not TxPriv.aggr_page_num:%d <= txPageFreeNum:%d, TxPriv.AggrNum:%d <= q_fifo_set_cnt:%d, "\
+                AML_PRINT(AML_DBG_MODULES_TX, "not TxPriv.aggr_page_num:%d <= txPageFreeNum:%d, TxPriv.AggrNum:%d <= q_fifo_set_cnt:%d, "\
                     "AggrNum:%d + mpdu_num:%d, aggr_page_num:%d\n",
                     pTxDPape->TxPriv.aggr_page_num, hal_priv->txPageFreeNum,
                     pTxDPape->TxPriv.AggrNum, q_fifo_set_cnt, AggrNum, mpdu_num, aggr_page_num);
@@ -1454,27 +1373,14 @@ void  hal_tx_frame(void)
     }
 
 #if defined (HAL_FPGA_VER)
-
     AML_TXLOCK_UNLOCK();
+
     POWER_BEGIN_LOCK();
     hal_priv->hal_drv_ps_status &= ~HAL_DRV_IN_ACTIVE;
     POWER_END_LOCK();
     AML_TXLOCK_LOCK();
 
     hal_priv->need_scheduling_tx = 0;
-    if (g_dbg_info_enable & AML_DBG_TX_HAL)
-    {
-        if (qid != -1)
-        {
-            pTxShareFifo = &hal_priv->txds_trista_fifo[qid];
-            printk("%s:%d, tid1:0x%lx,tid2:0x%lx, get :%d, make:%d, set:%d, free page:%d\n",
-                    __func__,__LINE__, hal_priv->tx_frames_map[0],
-                    hal_priv->tx_frames_map[1], hal_get_priv_cnt(qid),
-                    CO_SharedFifoNbElt(pTxShareFifo, CO_TX_BUFFER_MAKE),
-                    CO_SharedFifoNbElt(pTxShareFifo, CO_TX_BUFFER_SET),
-                    hal_priv->txPageFreeNum);
-        }
-    }
 #endif
 }
 
@@ -1519,7 +1425,7 @@ struct sk_buff *hal_fill_agg_start(struct hi_agg_tx_desc *HI_AGG,struct hi_tx_pr
 {
     unsigned short STATUS;
     unsigned char *EltPtr = NULL;
-    struct sk_buff *skb = NULL;
+    struct sk_buff *skb = (struct sk_buff *)(HI_TxPriv->DMAADDR);
     struct hal_private *hal_priv = hal_get_priv();
     struct hw_interface *hif = hif_get_hw_interface();
 
@@ -1527,9 +1433,6 @@ struct sk_buff *hal_fill_agg_start(struct hi_agg_tx_desc *HI_AGG,struct hi_tx_pr
     struct fw_txdesc_fifo *pTxDescFiFo = NULL;
     unsigned char txqueueid = 0;
     unsigned short frame_control;
-    struct sk_buff *ori_skb = NULL;
-    unsigned short tail_room;
-    unsigned short header_room;
 
     DBG_ENTER();
     ASSERT(HI_AGG->TID<WIFI_MAX_TXQUEUE_ID);
@@ -1541,29 +1444,13 @@ struct sk_buff *hal_fill_agg_start(struct hi_agg_tx_desc *HI_AGG,struct hi_tx_pr
                  (((HI_AGG->FLAG >> WIFI_CHANNEL_BW_OFFSET) & 0x3) == CHAN_BW_40M)||
                  (((HI_AGG->FLAG >> WIFI_CHANNEL_BW_OFFSET) & 0x3) == CHAN_BW_80M));
 
-    ori_skb = (struct sk_buff *)(HI_TxPriv->DMAADDR);
-    header_room = os_skb_hdrspace(ori_skb);
-    tail_room = os_skb_get_tailroom(ori_skb);
-
-#if defined (HAL_FPGA_VER)
-#ifdef DRV_PT_SUPPORT
-skb = ori_skb;
-#else
-    if ((header_room < HI_TXDESC_DATAOFFSET + 32) || (tail_room < 32) || ((unsigned long)(ori_skb->data) % 8 != 0)) {
-        skb = skb_copy_expand(ori_skb, HI_TXDESC_DATAOFFSET + 32, 32 , GFP_ATOMIC);
-
-    } else {
-        skb = ori_skb;
-        //printk("%s not copy:%p, head:%p, data:%p, tail:%d, end:%d\n", __func__, ori_skb, ori_skb->head, ori_skb->data, ori_skb->tail, ori_skb->end);
-    }
-
-#endif
-#elif defined (HAL_SIM_VER)
+#ifdef HAL_SIM_VER
     skb = OS_SKBBUF_ALLOC(HI_TxPriv->MPDULEN + HI_TXDESC_DATAOFFSET + 4);
 #endif
+
     if (skb == NULL)
     {
-        printk("%s(%d) alloc skb fail\n",__func__,__LINE__);
+        ERROR_DEBUG_OUT("alloc skb fail\n");
         return NULL;
     }
 
@@ -1618,13 +1505,14 @@ skb = ori_skb;
     hal_tx_desc_build(HI_AGG,HI_TxPriv,pTxDPape);
 #if defined (HAL_FPGA_VER)
     frame_control = *(unsigned short *)(&pTxDPape->txdata[0]);//(frame_control & 0xff) == 0x88
-    if (g_dbg_info_enable & AML_DBG_TX_SHOW_TXVEC)
+    if (g_dbg_modules & AML_DBG_MODULES_HAL_TX)
     {
         //printk("pTxDescFiFo->SN:%04x, frame_control:%04x\n", pTxDescFiFo->SN, frame_control);
         hal_show_txframe(pTxDPape);
     }
 #endif
 
+    pTxDPape->TxOption.pkt_position = AML_PKT_IN_HAL;
     hal_priv->Hi_TxAgg[txqueueid] = pTxDPape;
     hif->HiStatus.Tx_Send_num++;
 
@@ -1645,34 +1533,17 @@ struct sk_buff *hal_fill_priv(struct hi_tx_priv_hdr* HI_TxPriv,unsigned char que
     struct fw_txdesc_fifo *pTxDescFiFo = NULL;
     struct hi_tx_desc *pTxDPape = NULL;
     struct hi_tx_desc *pFirstTxDPape = NULL;
-    struct sk_buff *skb = NULL;
-    struct sk_buff *ori_skb = NULL;
-    unsigned short tail_room;
-    unsigned short header_room;
+    struct sk_buff *skb = (struct sk_buff *)(HI_TxPriv->DMAADDR);
 
     DBG_ENTER();
 
-    ori_skb = (struct sk_buff *)(HI_TxPriv->DMAADDR);
-    header_room = os_skb_hdrspace(ori_skb);
-    tail_room = os_skb_get_tailroom(ori_skb);
-
-#if defined (HAL_FPGA_VER)
-#ifdef DRV_PT_SUPPORT
-    skb = ori_skb;
-#else
-    if ((header_room < HI_TXDESC_DATAOFFSET + 32) || (tail_room < 32) || ((unsigned long)(ori_skb->data) % 8 != 0)) {
-        skb = skb_copy_expand(ori_skb, HI_TXDESC_DATAOFFSET + 32, 32 , GFP_ATOMIC);
-
-    } else {
-        skb = ori_skb;
-    }
-#endif
-#elif defined (HAL_SIM_VER)
+#ifdef HAL_SIM_VER
     skb = OS_SKBBUF_ALLOC(HI_TxPriv->MPDULEN + HI_TXDESC_DATAOFFSET + 4);
 #endif
+
     if (!skb)
     {
-        printk("%s(%d) alloc skb fail\n",__func__,__LINE__);
+        ERROR_DEBUG_OUT("alloc skb fail\n");
         return NULL;
     }
 
@@ -1705,8 +1576,9 @@ struct sk_buff *hal_fill_priv(struct hi_tx_priv_hdr* HI_TxPriv,unsigned char que
     pTxDescFiFo->pTxDPape =pTxDPape;
 
     hal_tx_desc_build_sub(HI_TxPriv,pTxDPape, pFirstTxDPape);
+    pTxDPape->TxOption.pkt_position = AML_PKT_IN_HAL;
 #if defined (HAL_FPGA_VER)
-    if (g_dbg_info_enable & AML_DBG_TX_SHOW_TXVEC)
+    if (g_dbg_modules & AML_DBG_MODULES_HAL_TX)
     {
         hal_show_txframe(pTxDPape);
     }
@@ -1752,13 +1624,14 @@ int hal_get_agg_pend_cnt(void)
     int id = 0;
     unsigned char queue_id = 0;
     int queueid = 0;
-    struct _CO_SHARED_FIFO *pTxShareFifo = NULL;//
+    struct _CO_SHARED_FIFO *pTxShareFifo = NULL;
     unsigned short STATUS;
     struct fw_txdesc_fifo *pTxDescFiFo = NULL;
     unsigned char *EltPtr = NULL;
     unsigned char *remain_eltptr[HI_AGG_TXD_NUM_PER_QUEUE];
     unsigned char remain_count = 0;
     unsigned char i = 0;
+    unsigned long callback;
 
     memset(&txstatus, 0, sizeof(struct txdonestatus));
     hal_priv->bhaltxdrop = 0;
@@ -1797,12 +1670,10 @@ int hal_get_agg_pend_cnt(void)
 
             if ((pTxDescFiFo->pTxDPape->TxPriv.vid == vid) || (vid == 3)) {
                 txstatus.callbackid = pTxDescFiFo->pTxDPape->TxPriv.hostcallbackid;
+                txstatus.txstatus = TX_DESCRIPTOR_STATUS_SUCCESS;
 
-                hal_free_tx_id(hal_priv, &txstatus, &(pTxDescFiFo->callback), &queue_id);
-
-                AML_TXLOCK_UNLOCK();
+                hal_free_tx_id(hal_priv, &txstatus, &callback, &queue_id);
                 hal_priv->hal_call_back->intr_tx_handle(hal_priv->drv_priv, &txstatus, pTxDescFiFo->callback, queue_id);
-                AML_TXLOCK_LOCK();
 
                 hif->HiStatus.Tx_Done_num++;
                 hif->HiStatus.Tx_Free_num++;
@@ -1819,14 +1690,15 @@ int hal_get_agg_pend_cnt(void)
             STATUS = CO_SharedFifoPut(&hal_priv->txds_trista_fifo[queueid],CO_TX_BUFFER_GET, 1);
         }
 
-        printk("%s copy remain:%d, queueid:%d\n", __func__, remain_count, queueid);
         remain_count = 0;
     }
     AML_TXLOCK_UNLOCK();
 
-    hal_priv->bhaltxdrop = 0;
-    printk("recover bhaltxdrop to 0, tx_frames_map:%lx, %lx, page:%d, vid:%d\n",
-        hal_priv->tx_frames_map[0], hal_priv->tx_frames_map[1], hal_priv->txPageFreeNum, vid);
+    if (hal_priv->bhaltxdrop == 1) {
+        hal_priv->bhaltxdrop = 0;
+        printk("recover bhaltxdrop to 0, tx_frames_map:%lx, %lx, page:%d, vid:%d\n",
+            hal_priv->tx_frames_map[0], hal_priv->tx_frames_map[1], hal_priv->txPageFreeNum, vid);
+    }
     return 0;
 }
 
@@ -1957,7 +1829,7 @@ int hal_probe()
 #if defined (HAL_FPGA_VER)
     while(hal_priv->hst_if_init_ok == 0)
     {
-        PRINT("------------->host interface init failed! \n");
+        ERROR_DEBUG_OUT("------------->host interface init failed! \n");
         goto __exit_err;
     }
 #endif
@@ -1966,7 +1838,9 @@ int hal_probe()
     {
         goto __exit_err;
     }
-
+#ifdef SDIO_BUILD_IN
+    wifi_in_insmod = 0;
+#endif
     if(hal_host_init(hal_priv) != true)
     {
         goto __exit_err;
@@ -2570,7 +2444,9 @@ int hal_txok_thread(void *param)
                     continue;
                 }
                 /* to procesess drv_intr_tx_ok*/
-                hal_priv->hal_call_back->intr_tx_handle(hal_priv->drv_priv, txstatus, callback, queue_id);
+                if (hal_priv->hal_call_back != NULL) {
+                    hal_priv->hal_call_back->intr_tx_handle(hal_priv->drv_priv, txstatus, callback, queue_id);
+                }
             }
             tx_status_node_free(txok_status_node,txok_status_list);
             txok_status_node = NULL;
@@ -2590,7 +2466,7 @@ int hal_rx_thread(void *param)
     struct hal_private * hal_priv = (struct hal_private *)param;
     struct hw_interface* hif = hal_priv->hif;
     struct sched_param sch_param;
-    OS_SKBBUF *skb = NULL;
+    struct sk_buff *skb = NULL;
     unsigned int remain_num = 0;
     unsigned char rxtmpbuffer[RX_TMP_MAX_LEN] = {0};
     V_HW_RxDescripter_bit* pVRxDesc = NULL;
@@ -2666,7 +2542,7 @@ int hal_rx_thread(void *param)
                 continue;
             }
 
-            skb = OS_SKBBUF_ALLOC((pVRxDesc->RxLength + RX_PRIV_HDR_LEN));
+            skb = os_skb_alloc(pVRxDesc->RxLength + RX_PRIV_HDR_LEN);
             if (skb == NULL)
             {
                 printk("Couldn't allocate RX frame");
@@ -2687,7 +2563,7 @@ int hal_rx_thread(void *param)
             }
 
             mpdu_len = RX_PRIV_HDR_LEN + pVRxDesc->RxLength;
-            OS_SKBBUF_PUT(skb, mpdu_len);
+            os_skb_put(skb, mpdu_len);
             mpdu_len = ALIGN(mpdu_len, 4);
             rx_fifo_fdh = CIRCLE_Addition2(rx_fifo_fdh,  mpdu_len, hif->rx_fifo.FDN);
 
@@ -2697,7 +2573,7 @@ int hal_rx_thread(void *param)
             sn =  (sn << 4) | ((*(pVRxDesc->data + 22) & 0xf0) >> 4);
 
             if (frame_control != 0x80) {
-                __D(BIT(17), "%s:%d, frame type:0x%x, seq:%d, %04x:%04x\n", __func__, __LINE__, frame_control, sn,
+                AML_PRINT(AML_DBG_MODULES_TX, "frame type:0x%x, seq:%d, %04x:%04x\n", frame_control, sn,
                     *((unsigned short *)(pVRxDesc->data) + 15), *((unsigned short *)(pVRxDesc->data) + 16));
             } else {
                 //__D(BIT(17), "%s:%d, beacon:0x%x, seq:%d\n", __func__, __LINE__, frame_control, sn);
@@ -2828,7 +2704,7 @@ int hal_create_thread(void)
 
     if (IS_ERR(hal_priv->work_thread))
     {
-        PRINT_ERR("aml wifi to create work_thread thread error!!!!\n");
+        ERROR_DEBUG_OUT("aml wifi to create work_thread thread error!!!!\n");
         hal_priv->work_thread = NULL;
         goto create_thread_error;
     }
@@ -2839,7 +2715,7 @@ int hal_create_thread(void)
 
     if (IS_ERR(hal_priv->rx_thread))
     {
-        PRINT_ERR("aml wifi to create rx_thread thread error!!!!\n");
+        ERROR_DEBUG_OUT("aml wifi to create rx_thread thread error!!!!\n");
         hal_priv->rx_thread = NULL;
         goto create_thread_error;
     }
@@ -2849,7 +2725,7 @@ int hal_create_thread(void)
     hal_priv->txok_thread = kthread_run(hal_txok_thread, hal_priv, "txok amlwifi");
     if (IS_ERR(hal_priv->txok_thread))
     {
-        PRINT_ERR("aml wifi to create txok_thread thread error!!!!\n");
+        ERROR_DEBUG_OUT("aml wifi to create txok_thread thread error!!!!\n");
         hal_priv->txok_thread = NULL;
         goto create_thread_error;
     }
@@ -2859,7 +2735,7 @@ int hal_create_thread(void)
     hal_priv->hi_irq_thread = kthread_run(hi_irq_thread, hal_priv, "hi_irq amlwifi");
     if(IS_ERR(hal_priv->hi_irq_thread))
     {
-        PRINT_ERR("aml wifi to create irq_thread thread error!!!!\n");
+        ERROR_DEBUG_OUT("aml wifi to create irq_thread thread error!!!!\n");
         hal_priv->hi_irq_thread = NULL;
         goto create_thread_error;
     }
@@ -3345,7 +3221,7 @@ void hal_dpd_memory_download(void)
      */
     reg_tmp = hif->hif_ops.hi_read_word(RG_SDIO_IF_MISC_CTRL);
 
-    if ((reg_tmp & BIT(23)) != 1)
+    if (!(reg_tmp & BIT(23)))
     {
         reg_tmp |= BIT(23);
         hif->hif_ops.hi_write_word(RG_SDIO_IF_MISC_CTRL , reg_tmp);
@@ -3416,7 +3292,7 @@ void hal_get_fwlog(void)
      */
     reg_tmp = hif->hif_ops.hi_read_word(RG_SDIO_IF_MISC_CTRL);
 
-    if ((reg_tmp & BIT(23)) != 1)
+    if (!(reg_tmp & BIT(23)))
     {
         reg_tmp |= BIT(23);
         hif->hif_ops.hi_write_word(RG_SDIO_IF_MISC_CTRL , reg_tmp);

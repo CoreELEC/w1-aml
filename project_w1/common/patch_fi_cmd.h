@@ -11,6 +11,7 @@
 #define PHY_INTERFACE_CMD  0x29
 #define WF2G_TXPWR_PARAM_CMD  0x2b
 #define WF5G_TXPWR_PARAM_CMD  0x2c
+#define TXPWR_CFFC_CFG_CMD 0x2d
 
 #define TSSI_5G_CAL_NUM 4
 
@@ -28,6 +29,7 @@ enum {
     CHANNEL_CONNECT_FLAG = BIT(1),
     CHANNEL_NO_EVENT_FLAG = BIT(2),
     CHANNEL_RSSI_FLAG = BIT(3),
+    CHANNEL_RSSI_PWR_FLAG = BIT(4),
 };
 
 typedef struct Channel_Switch
@@ -47,15 +49,14 @@ typedef struct DPD_Memory_Downlod
 {
     unsigned char Cmd;
     unsigned char vid;
-    unsigned char reserved[2];
+    unsigned char reserved[6];
 } DPD_Memory_Downlod;
 
 typedef struct Fwlog_Mode_Control
 {
     unsigned char Cmd;
     unsigned char mode; //0x00:fw  0x01:host
-    unsigned char fwlog_print;
-    unsigned char reserved;
+    unsigned char reserved[6];
 } Fwlog_Mode_Control;
 
 // event
@@ -111,13 +112,20 @@ typedef struct Phy_Interface_Param
     unsigned char Cmd;
     unsigned char vid;
     unsigned char interface_enable;
-    unsigned char reserve;
+    unsigned char reserve[5];
 } Phy_Interface_Param;
 
 typedef struct fwlog_print_event
 {
     struct fw_event_basic_info basic_info;
-    unsigned int fwlog_print;
 } fwlog_print_event;
+
+typedef struct Txpwr_Cffc_Cfg_Param
+{
+    unsigned char Cmd;
+    unsigned char coefficient[57];
+    unsigned char reserve[2];
+    unsigned char band[4];
+} Txpwr_Cffc_Cfg_Param;
 
 #endif

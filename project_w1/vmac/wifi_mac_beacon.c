@@ -248,7 +248,7 @@ int _wifi_mac_beacon_update(struct wifi_station *sta,
         }
         else
         {
-            printk("%s:%d, not support bandwidth %d yet\n", __func__, __LINE__, wnet_vif->vm_bandwidth);
+            ERROR_DEBUG_OUT("not support bandwidth %d yet\n", wnet_vif->vm_bandwidth);
         }
 
     if (IS_APSTA_CONCURRENT(aml_wifi_get_con_mode())) {
@@ -256,7 +256,7 @@ int _wifi_mac_beacon_update(struct wifi_station *sta,
         if (wifi_mac_is_others_wnet_vif_running(wnet_vif) == true) {
             main_vmac_chan = wifi_mac_get_main_vmac_channel(wifimac);
 
-            if ((main_vmac_chan != WIFINET_CHAN_ERR)
+            if ((main_vmac_chan)
                 && (main_vmac_chan->chan_pri_num == wnet_vif->vm_curchan->chan_pri_num)
                 && (main_vmac_chan->chan_bw == wnet_vif->vm_bandwidth)
                 && (center_chan == wifi_mac_Mhz2ieee(main_vmac_chan->chan_cfreq1, 0))) {
@@ -273,7 +273,7 @@ int _wifi_mac_beacon_update(struct wifi_station *sta,
             struct wlan_net_vif *main_wnet_vif = wifi_mac_running_main_wnet_vif(wifimac);
 
             /*sta connect to 5G ap, softap need update channel/band/mac_mode as  sta*/
-            if (main_wnet_vif != NULL) {
+            if (main_wnet_vif && main_vmac_chan) {
                 wnet_vif->vm_curchan = main_vmac_chan;
                 wnet_vif->vm_bandwidth = main_vmac_chan->chan_bw;
                 wnet_vif->vm_mac_mode = main_wnet_vif->vm_mac_mode;
@@ -402,7 +402,7 @@ int _wifi_mac_beacon_update(struct wifi_station *sta,
         wh = (struct wifi_frame  *)os_skb_data(skb);
         if (wh == NULL)
         {
-            printk("<running> %s %d ERROR!!\n",__func__,__LINE__);
+            ERROR_DEBUG_OUT("<running> ERROR!!\n");
 
         } else {
             bo->bo_bcn_seq = (bo->bo_bcn_seq < 4095) ? (bo->bo_bcn_seq + 1) : 0;

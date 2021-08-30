@@ -66,7 +66,6 @@ struct drv_txdesc
     struct drv_txdesc *txdesc_queue_lastframe;
     struct drv_txdesc *txdesc_queue_next;     /* next subframe in the aggregate */
     struct sk_buff *txdesc_mpdu;     /* enclosing frame structure */
-    struct sk_buff *txdesc_mpdu_hal;
     void *txdesc_sta;     /* pointer to the nsta = struct aml_driver_nsta */
     unsigned short txdesc_flag;    /* tx descriptor flags */
     struct wifi_mac_tx_info *txinfo;

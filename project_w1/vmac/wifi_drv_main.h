@@ -84,6 +84,12 @@ enum drv_rx_type
 #define DRV_TX_QUEUE_LOCK(_sc) do {OS_SPIN_LOCK_IRQ(&(_sc)->drv_tx_queue_lock, (_sc)->drv_tx_queue_lock_flags);}while(0)
 #define DRV_TX_QUEUE_UNLOCK(_sc) do{OS_SPIN_UNLOCK_IRQ(&(_sc)->drv_tx_queue_lock,(_sc)->drv_tx_queue_lock_flags);}while(0)
 
+#define DRV_HRTIMER_LOCK_INIT(_tq) spin_lock_init(&(_tq)->hr_timer_lock)
+#define DRV_HRTIMER_LOCK_DESTROY(_tq)
+#define DRV_HRTIMER_LOCK(_tq) do { OS_SPIN_LOCK(&(_tq)->hr_timer_lock);} while(0)
+#define DRV_HRTIMER_UNLOCK(_tq) do { OS_SPIN_UNLOCK(&(_tq)->hr_timer_lock);} while(0)
+
+
 /*
  * returns delimiter padding required given the packet length
  */
@@ -281,6 +287,7 @@ struct drv_config
     unsigned int cfg_aggr_prot;
     int cfg_countrycode;    /* country code */
     unsigned short cfg_txpowlimit;
+    unsigned char cfg_txpoweplan; /*0:default 1:CE 2:FCC*/
     unsigned char cfg_ampduackpolicy;                   /* 0: noack;1:ack */
     unsigned char cfg_txaggr;/* enable 11n tx aggregation */
     unsigned char cfg_rxaggr;         /* enable 11n rx aggregation */
@@ -347,6 +354,7 @@ struct driver_ops
 
     /* set channel */
     void        (*set_channel)(struct drv_private *, struct hal_channel *, unsigned char flag, unsigned char vid);
+    void        (*rf_channel_restore)(struct drv_private *,  unsigned short channel, int bw);
 
     /* scan notifications */
     void        (*scan_start)(struct drv_private *);
@@ -356,6 +364,7 @@ struct driver_ops
     void        (*connect_start)(struct drv_private *);
     void        (*connect_end)(struct drv_private *);
     void        (*set_channel_rssi)(struct drv_private *, unsigned char rssi);
+    void        (*set_tx_power_accord_rssi)(struct drv_private *, struct hal_channel *, unsigned char rssi, unsigned char power_mode);
 
     /* tx callbacks */
     int         (*tx_init)(struct drv_private *, int nbufs);
@@ -479,6 +488,7 @@ struct driver_ops
     void (*tx_show)(void);
     void (*tx_show_clear)(void);
     void (*phy_stc)(void);
+    int (*get_snr)(void);
     unsigned int(* cca_busy_check)(void);
 
     void (*drv_get_sts)(struct drv_private *drv_priv, unsigned int op_code, unsigned int ctrl_code);
@@ -508,6 +518,7 @@ struct driver_ops
 
     void (*drv_interface_enable)(unsigned char enable, unsigned char vid);
     void (*drv_cfg_cali_param)(void);
+    void (*drv_cfg_txpwr_cffc_param)(struct wifi_channel * ,struct tx_power_plan *);
     void (*drv_print_fwlog)(unsigned char *logbuf_ptr, int databyte);
 } ;
 
@@ -579,6 +590,7 @@ struct drv_private
     unsigned char drv_ratectrl_mrr;/* multi-rate retry support */
     const struct drv_rate_table *drv_currratetable;   /* current rate table */
     struct aml_ratecontrol minstrel_sample_rate[DRV_TXDESC_RATE_NUM];
+    spinlock_t hr_timer_lock;
 };
 
 #ifdef CONFIG_P2P

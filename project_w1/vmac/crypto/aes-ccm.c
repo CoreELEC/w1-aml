@@ -203,7 +203,7 @@ int aes_ccm_ad(const u8 *key, size_t key_len, const u8 *nonce,
 	aes_encrypt_deinit(aes);
 
 	if (os_memcmp_const(x, t, M) != 0) {
-		printk("CCM: Auth mismatch");
+		ERROR_DEBUG_OUT("CCM: Auth mismatch");
 		return -1;
 	}
 

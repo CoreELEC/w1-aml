@@ -44,7 +44,9 @@ static void ccmp_aad_nonce(const struct ieee80211_hdr *hdr, const u8 *data,
 	fc |= WLAN_FC_ISWEP;
 	WPA_PUT_LE16(aad, fc);
 	pos = aad + 2;
-	os_memcpy(pos, hdr->addr1, 3 * ETH_ALEN);
+	os_memcpy(pos, hdr->addr1, ETH_ALEN);
+	os_memcpy(pos + ETH_ALEN, hdr->addr2, ETH_ALEN);
+	os_memcpy(pos + 2 * ETH_ALEN, hdr->addr3,ETH_ALEN);
 	pos += 3 * ETH_ALEN;
 	seq = (hdr->seq_ctrl);
 	seq &= ~0xfff0; /* Mask Seq#; do not modify Frag# */

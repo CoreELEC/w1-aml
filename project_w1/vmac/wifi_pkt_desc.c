@@ -13,7 +13,7 @@ struct drv_txdesc *wifi_mac_alloc_txdesc(struct wifi_mac *wifimac)
     TX_DESC_BUF_LOCK(wifimac);
     if (list_empty(&wifimac->txdesc_freequeue)) {
         TX_DESC_BUF_UNLOCK(wifimac);
-        if (!(print_count++ % 2000)) {
+        if (!(print_count++ % 20000)) {
             DPRINTF(AML_DEBUG_WARNING, "%s no tx_desc, bhaltxdrop:%d, bhalPowerSave:%d, page:%d, drv_ps_status:%d, fw_ps_status:%d\n",
                 __func__, hal_priv->bhaltxdrop, hal_priv->bhalPowerSave, hal_priv->txPageFreeNum, hal_priv->hal_drv_ps_status, hal_priv->hal_fw_ps_status);
         }

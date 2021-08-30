@@ -18,7 +18,7 @@
 #define SYMBOL_TIME_HALFGI(_ns) (((_ns) * 18 + 4) / 5)  // ns * 3.6 us
 #define NUM_SYMBOLS_PER_USEC(_usec) (_usec >> 2)
 #define NUM_SYMBOLS_PER_USEC_HALFGI(_usec) (((_usec*5)-4)/18)
-#define IS_11B_RATE(_r) (((_r) >= WIFI_11B_1M) && ((_r) <= WIFI_11B_11M))
+#define IS_11B_RATE(_r) ((_r) <= WIFI_11B_11M)
 
 enum
 {
@@ -38,7 +38,7 @@ int drv_tx_get_mgmt_frm_rate(struct drv_private *drv_priv, struct wlan_net_vif *
     unsigned char *rate, unsigned short *flag);
 
 unsigned int drv_txlist_qcnt(struct drv_private *drv_priv, int);
-void drv_txdesc_set_bw(struct drv_private *drv_priv, struct drv_txdesc *ptxdesc);
+void drv_txdesc_set_rts_cts(struct drv_private *drv_priv, struct drv_txdesc *ptxdesc);
 void drv_update_tx_pwr(struct drv_private *drv_priv, unsigned short txpowerdb);
 void drv_set_tx_pwr_limit(struct drv_private * drv_priv, unsigned int limit, unsigned short txpowerdb);
 int drv_reset_start(void *, unsigned int);
@@ -50,7 +50,7 @@ struct drv_txlist *drv_txlist_initial(struct drv_private *drv_priv, int subtype)
 void drv_txlist_destory(struct drv_private *drv_priv, struct drv_txlist *txlist);
 int drv_txlist_setup(struct drv_private *drv_priv);
 int drv_update_wmmq_param( struct drv_private *drv_priv, unsigned char wnet_vif_id,int ac, int  aifs,int cwmin,int cwmax,int txoplimit);
-void drv_tx_irq_tasklet(struct drv_private *drv_priv, struct txdonestatus *tx_done_status, SYS_TYPE callback, unsigned char queue_id);
+void drv_tx_irq_tasklet(void *drv_priv, struct txdonestatus *tx_done_status, SYS_TYPE callback, unsigned char queue_id);
 void drv_txlist_flushfree(struct drv_private *drv_priv, unsigned char vid);
 void free_txlist_when_free_sta(struct drv_private *drv_priv, void *nsta);
 void drv_set_pkt_drop(struct drv_private *drv_priv, unsigned char vid, unsigned char enable);
@@ -93,8 +93,6 @@ int drv_get_amsdu_supported(struct drv_private *drv_priv, void * nsta, int tid_i
 int drv_hal_tx_frm_pause(struct drv_private *drv_priv, int pause);
 unsigned int drv_low_add_worktask( struct drv_private *drv_priv,void *func,void *func_cb,
     SYS_TYPE param1,SYS_TYPE param2,SYS_TYPE param3, SYS_TYPE param4,SYS_TYPE param5);
-
-int drv_rate_findindex_form_kbps(const struct drv_rate_table *rt, int rate);
 unsigned int drv_lookup_rate(struct drv_private *drv_priv, struct aml_driver_nsta *drv_sta,   struct aml_ratecontrol *txdesc_rateinfo);
 
 

@@ -1,6 +1,5 @@
 #ifndef __DRV_STATISTIC_H
 #define __DRV_STATISTIC_H
-#include "wifi_drv_capture.h"
 
 /////////////////////////////// global statistic defination////////////////////////
 
@@ -275,6 +274,7 @@ struct sts_iw_if
 
 void sts_sw_probe(unsigned int sts_idx, unsigned int unit) ;
 void phy_stc(void);
+int get_snr(void);
 void get_phy_stc_info(unsigned int *arr);
 
 unsigned int cca_busy_check(void);

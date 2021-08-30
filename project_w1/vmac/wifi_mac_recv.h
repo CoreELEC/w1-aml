@@ -49,6 +49,7 @@
 int iswpsoui(const unsigned char *frm);
 int iswfdoui(const unsigned char *frm);
 int isp2poui(const unsigned char *frm);
+int is_only_11b_rates(const unsigned char *frm);
 
 void wifi_mac_forward_data(struct wlan_net_vif *wnet_vif);
 void wifi_mac_forward_init(struct drv_private *drv_priv, struct sk_buff *skb, struct wlan_net_vif *wnet_vif, int hdrspace);

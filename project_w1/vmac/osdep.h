@@ -137,7 +137,7 @@ static __inline void FREE(void *a, char *name)
 
     printk("kfree %p:%s\n", a, name);
     if (kfree_count >= 64) {
-        printk("amlogic WIFI:<ERROR>Array Overflow, please make sure array "
+        ERROR_DEBUG_OUT("amlogic WIFI:<ERROR>Array Overflow, please make sure array "
             "length big enough in debug malloc process\n");
     }
 }

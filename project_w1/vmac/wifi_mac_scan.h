@@ -211,7 +211,7 @@ struct wifi_scan_info
 #define WIFINET_SCAN_TIME_IDLE_DEFAULT 80
 #define WIFINET_SCAN_PROTECT_TIME 1000
 #define WIFINET_SCAN_TIME_CHANNEL_SWITCH 500
-#define WIFINET_SCAN_TIME_BEFORE_CONNECT 35
+#define WIFINET_SCAN_TIME_BEFORE_CONNECT 200
 
 #ifndef FW_RF_CALIBRATION
 #define WIFINET_SCAN_TIME_CONNECT_DEFAULT 50
@@ -241,11 +241,11 @@ struct scaninfo_entry
     struct list_head se_list;
     struct list_head se_hash;
 
-    unsigned char  connectcnt; //
-    unsigned char  se_notseen;
+    unsigned char connectcnt; //
+    unsigned char se_valid;
     unsigned int se_avgrssi;
-    unsigned long   LastUpdateTime;
-    unsigned long   ConnectTime;
+    unsigned long LastUpdateTime;
+    unsigned long ConnectTime;
 };
 
 void wifi_mac_scan_attach(struct wifi_mac *);

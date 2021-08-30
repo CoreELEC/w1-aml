@@ -14,7 +14,8 @@ struct sk_buff g_skbuffer[MAX_SKB_NUM];
 #include <linux/slab.h>
 #include <net/mac80211.h>
 #include "wifi_mac_com.h"
-#endif 
+#endif
+
 #include "osdep.h"
 #include "rc80211_minstrel.h"
 #include "rc80211_minstrel_ht.h"
@@ -97,6 +98,18 @@ static struct ieee80211_supported_band aml_band_5ghz = {
 	.bitrates = aml_legacy_rates + 4,/*Eliminate 11b rate*/
 	.ht_cap.cap = 0,  /*Need to be initialized later*/
 	.ht_cap.ht_supported = true,
+};
+
+short rssi_threshold[3][10] = {
+	{555, -70, -75, -76, -77, -82, -85, -89, -94},
+	{-66, -67, -72, -73, -74, -79, -82, -86, -88},
+	{-62, -64, -68, -69, -71, -76, -79, -82, -85},
+};
+
+short snr_threshold[3][10] = {
+	{555, 26, 21, 20, 18, 13, 11, 7, 5},
+	{27, 26, 21, 20, 19, 14, 11, 7, 5},
+	{27, 26, 22, 20, 19, 14, 11, 8, 5},
 };
 
 static struct ieee80211_sta_ht_cap aml_get_ht_cap(struct aml_rate_adaptation_dev *aml_minstrel_dev, struct ieee80211_sta_ht_cap *p_ht_cap)
@@ -201,17 +214,14 @@ static struct wiphy g_wiphy;
 static struct ieee80211_sta g_sta;
 #ifdef AUTO_RATE_SIM
     static struct ieee80211_sta_rates g_rates[4];
+    int g_rate_mode = 0;	/*0: legacy rate, 1:ht rate, 2:vht rate*/
 #endif
+
  /* allocate memory and init in alloc_sta*/
 struct minstrel_ht_sta_priv *g_minstrel_ht_sta_priv = NULL;
 struct minstrel_sta_info *g_minstrel_sta_info = NULL;
-unsigned int g_channel_band = IEEE80211_BAND_5GHZ;
 struct minstrel_priv *g_minstel_pri = NULL;
-bool g_mcs_rate_support = true;
-//struct ieee80211_tx_rate_control txrc;
-int g_rate_mode = 0;   /*0: legacy rate, 1:ht rate, 2:vht rate*/
 
-struct file *fp = NULL;
 void aml_minstrel_attach(void)
 {
     struct minstrel_rate_control_ops* p_rate_control_ops_ht = NULL;
@@ -294,7 +304,7 @@ unsigned int support_legacy_rate_init( struct wifi_station *sta ,  struct ieee80
                 bit_val |= 0x800;
                 break;
             default :
-                printk("%s, %d input rate error\n", __func__, __LINE__);
+                ERROR_DEBUG_OUT("input rate error\n");
                break;
         }
     }
@@ -306,10 +316,10 @@ unsigned int support_legacy_rate_init( struct wifi_station *sta ,  struct ieee80
         p_ieee_sta->supp_rates[IEEE80211_BAND_5GHZ] = (bit_val >> 4);
 
     } else {
-        printk("%s, %d input channel_band error\n", __func__, __LINE__);
+        ERROR_DEBUG_OUT("input channel_band error\n");
     }
 
-    printk("%s, %d channel_band=%d, bit_val=0x%04x\n", __func__, __LINE__, channel_band, bit_val);
+    AML_OUTPUT("channel_band=%d, bit_val=0x%04x\n", channel_band, bit_val);
     return 0;
 }
 
@@ -350,14 +360,105 @@ void aml_rate_adaptation_dev_init(struct wifi_station *sta, int rate_mode, unsig
         g_aml_rate_adaptation_dev.sband = &aml_band_5ghz;
         g_aml_rate_adaptation_dev.sband->vht_cap = aml_create_vht_cap(&g_aml_rate_adaptation_dev, rate_mode);
     }
-
 }
-void aml_minstrel_init( 
-#ifdef AUTO_RATE_SIM    
+
+unsigned char get_fitable_bw(struct wifi_station *sta) {
+    unsigned char bw;
+
+    if (sta->sta_avg_bcn_rssi < sta->sta_wmac->wm_signal_power_bw_change_thresh_narrow) {
+        bw = CHAN_BW_20M;
+
+    } else if (sta->sta_avg_bcn_rssi < sta->sta_wmac->wm_signal_power_bw_change_thresh_wide) {
+        bw = CHAN_BW_40M;
+
+    } else {
+        bw = CHAN_BW_80M;
+    }
+
+    if (bw <= sta->sta_chbw) {
+        return bw;
+    }
+
+    return sta->sta_chbw;
+}
+
+unsigned char get_fitable_mcs_rate(struct wifi_station *sta, unsigned char bw) {
+    unsigned char max_rate_rssi = 0;
+    unsigned char max_rate_snr = 0;
+    unsigned char max_rate = 0;
+    char rssi_offset = 6;
+    char snr_offset = 0;
+
+    if (sta->sta_avg_bcn_rssi >= rssi_threshold[bw][0] + rssi_offset) {
+        max_rate_rssi = 9;
+
+    } else if (sta->sta_avg_bcn_rssi >= rssi_threshold[bw][1] + rssi_offset) {
+        max_rate_rssi = 8;
+
+    } else if (sta->sta_avg_bcn_rssi >= rssi_threshold[bw][2] + rssi_offset) {
+        max_rate_rssi = 7;
+
+    } else if (sta->sta_avg_bcn_rssi >= rssi_threshold[bw][3] + rssi_offset) {
+        max_rate_rssi = 6;
+
+    } else if (sta->sta_avg_bcn_rssi >= rssi_threshold[bw][4] + rssi_offset) {
+        max_rate_rssi = 5;
+
+    } else if (sta->sta_avg_bcn_rssi >= rssi_threshold[bw][5] + rssi_offset) {
+        max_rate_rssi = 4;
+
+    } else if (sta->sta_avg_bcn_rssi >= rssi_threshold[bw][6] + rssi_offset) {
+        max_rate_rssi = 3;
+
+    } else if (sta->sta_avg_bcn_rssi >= rssi_threshold[bw][7] + rssi_offset) {
+        max_rate_rssi = 2;
+
+    } else if (sta->sta_avg_bcn_rssi >= rssi_threshold[bw][8] + rssi_offset) {
+        max_rate_rssi = 1;
+    }
+
+    //max rate according snr
+    if (sta->sta_avg_snr >= snr_threshold[bw][0] + snr_offset) {
+        max_rate_snr = 9;
+
+    } else if (sta->sta_avg_snr >= snr_threshold[bw][1] + snr_offset) {
+        max_rate_snr = 8;
+
+    } else if (sta->sta_avg_snr >= snr_threshold[bw][2] + snr_offset) {
+        max_rate_snr = 7;
+
+    } else if (sta->sta_avg_snr >= snr_threshold[bw][3] + snr_offset) {
+        max_rate_snr = 6;
+
+    } else if (sta->sta_avg_snr >= snr_threshold[bw][4] + snr_offset) {
+        max_rate_snr = 5;
+
+    } else if (sta->sta_avg_snr >= snr_threshold[bw][5] + snr_offset) {
+        max_rate_snr = 4;
+
+    } else if (sta->sta_avg_snr >= snr_threshold[bw][6] + snr_offset) {
+        max_rate_snr = 3;
+
+    } else if (sta->sta_avg_snr >= snr_threshold[bw][7] + snr_offset) {
+        max_rate_snr = 2;
+
+    } else if (sta->sta_avg_snr >= snr_threshold[bw][8] + snr_offset) {
+        max_rate_snr = 1;
+    }
+
+    max_rate = max_rate_rssi;
+    if (max_rate > max_rate_snr)
+        max_rate = max_rate_snr;
+
+    return max_rate;
+}
+
+void aml_minstrel_init(
+#ifdef AUTO_RATE_SIM
     void
-#else    
+#else
     void *p_sta
-#endif     
+#endif
 )
 {
     struct minstrel_rate_control_ops *p_rate_control_ops = NULL;
@@ -369,6 +470,7 @@ void aml_minstrel_init(
     unsigned int channel_band = IEEE80211_BAND_5GHZ;
     bool mcs_rate_support = true;
     int rate_mode = 0;   /*0: legacy rate, 1:ht rate, 2:vht rate*/
+    unsigned char fitable_bw;
 
 #ifdef AUTO_RATE_SIM
     memset(&g_rates, 0, sizeof(g_rates));
@@ -377,16 +479,13 @@ void aml_minstrel_init(
     g_sta.rates = g_rates;
     p_ieee_sta = &g_sta;
 #else
-    DPRINTF(AML_DEBUG_WARNING, "%s: sta=%p\n", __func__, sta);
     p_ieee_sta = &(sta->ieee_sta);
-    DPRINTF(AML_DEBUG_RATE, "%s(%d): p_ieee_sta=%p\n", __func__, __LINE__, p_ieee_sta);
     p_ieee_sta->smps_mode = IEEE80211_SMPS_OFF;
     p_ieee_sta->rates = &(sta->sta_ieee_rates);
     p_ieee_sta->bandwidth = sta->sta_chbw;
-    DPRINTF(AML_DEBUG_RATE,"aml_minstrel_init,bandwidth=%d\n",  p_ieee_sta->bandwidth);
-
+    AML_OUTPUT("bw=%d, sta:%p,p_ieee_sta=%p\n", p_ieee_sta->bandwidth, sta,p_ieee_sta);
     if (sta->sta_wnet_vif->vm_curchan == NULL) {
-        printk("%s vm_curchan is NULL, just return\n", __func__);
+        ERROR_DEBUG_OUT("vm_curchan is NULL, just return\n");
         return;
     }
 
@@ -405,33 +504,34 @@ void aml_minstrel_init(
 
     /*0: legacy rate, 1:ht rate, 2:vht rate*/
     if (rate_mode) {
-        g_mcs_rate_support = mcs_rate_support = true;
+        mcs_rate_support = true;
 
     } else {
-        g_mcs_rate_support = mcs_rate_support = false;
+        mcs_rate_support = false;
     }
 
-    DPRINTF(AML_DEBUG_WARNING, "%s(%d): channel_band=%d, rate_mode=%d\n", __func__, __LINE__, channel_band, rate_mode);
-
+    AML_OUTPUT("channel_band=%d, rate_mode=%d\n", channel_band, rate_mode);
     support_legacy_rate_init(sta, p_ieee_sta, channel_band);
 
     aml_rate_adaptation_dev_init(sta, rate_mode, channel_band, p_ieee_sta);
 
     if (channel_band == IEEE80211_BAND_5GHZ) {
         p_ieee_sta->vht_cap = g_aml_rate_adaptation_dev.sband->vht_cap;
-        DPRINTF(AML_DEBUG_RATE, "%s(%d):vht_supported = %d\n", __func__, __LINE__, p_ieee_sta->vht_cap.vht_supported);
+        AML_OUTPUT("vht_supported = %d\n", p_ieee_sta->vht_cap.vht_supported);
     }
 
     aml_get_ht_cap(&g_aml_rate_adaptation_dev, &(g_aml_rate_adaptation_dev.sband->ht_cap));
     p_ieee_sta->ht_cap = g_aml_rate_adaptation_dev.sband->ht_cap;
 
-    DPRINTF(AML_DEBUG_WARNING, "%s, ht_supported:%d, minstel_pri=%p, p_ieee_sta=%p\n", __func__, p_ieee_sta->ht_cap.ht_supported, g_minstel_pri, p_ieee_sta);
-
+    AML_OUTPUT("ht_supported:%d, minstel_pri=%p, p_ieee_sta=%p\n", p_ieee_sta->ht_cap.ht_supported, g_minstel_pri, p_ieee_sta);
     p_rate_control_ops = get_rate_control_ops();
     p_rate_control_ops_ht = get_rate_control_ops_ht();
     if (mcs_rate_support) {
         p_minstrel_ht_sta_priv = p_rate_control_ops_ht->alloc_sta(g_minstel_pri, p_ieee_sta, GFP_ATOMIC);
         p_rate_control_ops_ht->rate_init(g_minstel_pri, g_aml_rate_adaptation_dev.sband, p_ieee_sta, p_minstrel_ht_sta_priv);
+        fitable_bw = get_fitable_bw(sta);
+        minstrel_init_start_stats(g_minstel_pri, p_minstrel_ht_sta_priv, get_fitable_mcs_rate(sta, fitable_bw), fitable_bw);
+
     } else {
         p_minstrel_sta_info = p_rate_control_ops->alloc_sta(g_minstel_pri, p_ieee_sta, GFP_ATOMIC);
         p_rate_control_ops->rate_init(g_minstel_pri, g_aml_rate_adaptation_dev.sband, p_ieee_sta, p_minstrel_sta_info);
@@ -446,9 +546,9 @@ void aml_minstrel_init(
     sta->minstrel_init_flag = 1;
 
     if (mcs_rate_support) {
-        DPRINTF(AML_DEBUG_WARNING, "%s: sta:%p, sta_minstrel_ht_priv:%p\n", __func__, sta, sta->sta_minstrel_ht_priv);
+        AML_OUTPUT("sta:%p, sta_minstrel_ht_priv:%p\n", sta, sta->sta_minstrel_ht_priv);
     } else {
-        DPRINTF(AML_DEBUG_WARNING, "%s: sta:%p, sta_minstrel_info:%p\n", __func__, sta, sta->sta_minstrel_info);
+        AML_OUTPUT("sta:%p, sta_minstrel_info:%p\n", sta, sta->sta_minstrel_info);
     }
 #endif
 }
@@ -473,18 +573,6 @@ void aml_minstrel_deinit(void *p_sta)
         sta->sta_minstrel_info = NULL;
     }
     sta->minstrel_init_flag = 0;
-}
-
-void fix_rate_set( unsigned int mcs)
-{
-	if (mcs != 0) {
-		g_minstel_pri->fixed_rate_idx = mcs;
-		//g_minstel_pri->fixed_rate_idx = (unsigned int)( unsigned int)25*10  +( (unsigned int)mcs&0xf  );
-		DPRINTF(AML_DEBUG_RATE, "%s(%d):set static rate=%d\n", __func__, __LINE__, mcs);
-	} else {
-		g_minstel_pri->fixed_rate_idx = (u32) -1;
-		DPRINTF(AML_DEBUG_RATE, "%s(%d): set auto rate\n", __func__, __LINE__);
-	}
 }
 
 static void rate_control_fill_sta_table(struct ieee80211_sta *sta,
@@ -519,16 +607,50 @@ static void rate_control_fill_sta_table(struct ieee80211_sta *sta,
     rates[3].idx = -1;
     rates[3].count = 0;
     rates[3].flags  = 0;
+}
 
-    for (i = 0; i < max_rates; i++) {
-        if (rates[i].idx < 0) {
+int check_is_rate_fitable(struct wifi_station *sta, struct ieee80211_tx_info *info, void *priv_sta) {
+    struct minstrel_ht_sta_priv *msp = priv_sta;
+    struct minstrel_ht_sta *mi = &msp->ht;
+    int max_rate = 0;
+    int i;
+    unsigned char fitable_bw = 0;
+    unsigned char bw = 0;
+    int rate_index = -1;
+
+    for (i = 0; i < IEEE80211_TX_RATE_TABLE_SIZE; i++) {
+        if ((info->control.rates[i].idx >= 0) && (info->control.rates[i].count)) {
+            bw = info->control.rates[i].flags & IEEE80211_TX_RC_80_MHZ_WIDTH ? BW_80
+                : info->control.rates[i].flags & IEEE80211_TX_RC_40_MHZ_WIDTH ? BW_40 : BW_20;
+            rate_index = info->control.rates[i].idx;
+
+        } else {
             continue;
         }
-        //DPRINTF(AML_DEBUG_RATE, "%s(%d): rates[%d].idx=%d,count=%d, flags=%d\n", __func__, __LINE__, i, rates[i].idx, rates[i].count, rates[i].flags);
+    }
+
+    if (rate_index == -1)
+        return -1;
+
+    fitable_bw = get_fitable_bw(sta);
+    if (bw < fitable_bw) {
+        AML_PRINT(AML_DBG_MODULES_RATE_CTR, "bandwidth too low, no need to sample. bw:%d, fitable_bw:%d\n", bw, fitable_bw);
+        return -1;
+    }
+
+    max_rate = get_fitable_mcs_rate(sta, bw);
+    if (max_rate < rate_index) {
+        AML_PRINT(AML_DBG_MODULES_RATE_CTR, "snr or rssi not fit, rssi:%d, snr:%d, max_rate:%d, rate_index:%d\n",
+             sta->sta_avg_bcn_rssi, sta->sta_avg_snr, max_rate, rate_index);
+        minstrel_clear_unfitable_rate_stats(mi, max_rate);
+        return -1;
+
+    } else {
+        return 0;
     }
 }
 
-int minsstrel_rate_index_to_vendor_rate_code(int minstrel_rate_idx, struct ieee80211_sta *p_ieee80211_sta)
+int minstrel_rate_index_to_vendor_rate_code(int minstrel_rate_idx, struct ieee80211_sta *p_ieee80211_sta)
 {
     enum ieee80211_band band = g_aml_rate_adaptation_dev.sband->band;
 
@@ -548,7 +670,7 @@ int minsstrel_rate_index_to_vendor_rate_code(int minstrel_rate_idx, struct ieee8
         }
     }
 
-    DPRINTF(AML_DEBUG_RATE,"rate convert error function %s, line =%d\n",__func__, __LINE__ );
+    AML_OUTPUT("rate convert error\n");
     return 0;
 }
 
@@ -598,7 +720,7 @@ unsigned int protocol_rate_to_vendor_rate(unsigned int protocol_rate)
              ret = WIFI_11G_54M ;
             break;
         default:
-            printk("protocol rate to vendor rate convert errore protocol_rate = 0x%x %s(%d)\n", protocol_rate, __func__, __LINE__);
+            ERROR_DEBUG_OUT("protocol rate to vendor rate convert errore protocol_rate = 0x%x \n", protocol_rate);
             ret =  0;
             break;
 
@@ -639,7 +761,7 @@ unsigned char minstrel_find_rate(
     p_minstrel_sta_info = sta->sta_minstrel_info;
 
     if (!sta->minstrel_init_flag) {
-        printk("%s minstrel not init, sta:%p\n", __func__, sta);
+        ERROR_DEBUG_OUT("minstrel not init, sta:%p\n", sta);
         return 0;
     }
 
@@ -652,11 +774,12 @@ unsigned char minstrel_find_rate(
     }
 
     if (sta->sta_wnet_vif->vm_fixed_rate.mode == WIFINET_FIXED_RATE_MCS) {
-        if ((sta->sta_wnet_vif->vm_fixed_rate.rateinfo)&0x80) {
+        if ((sta->sta_wnet_vif->vm_fixed_rate.rateinfo) & 0x80) {
             g_minstel_pri->fixed_rate_idx = sta->sta_wnet_vif->vm_fixed_rate.rateinfo;
         } else {
             g_minstel_pri->fixed_rate_idx = protocol_rate_to_vendor_rate(sta->sta_wnet_vif->vm_fixed_rate.rateinfo);
         }
+
     } else {
         g_minstel_pri->fixed_rate_idx = ((u32) -1);
     }
@@ -669,22 +792,25 @@ unsigned char minstrel_find_rate(
     memset(&tx_info, 0,sizeof(struct ieee80211_tx_info));
     for (i = 0; i < IEEE80211_TX_MAX_RATES; i++) {
         info->control.rates[i].idx = -1;
-        info->control.rates[i].flags = 0;
-        info->control.rates[i].count = 0;
     }
 
     if (g_minstel_pri->fixed_rate_idx != ((u32) -1)) {
         for (i = 0; i < IEEE80211_TX_MAX_RATES-1; i++) {
             ratectrl[i].vendor_rate_code = g_minstel_pri->fixed_rate_idx;
-            sta->sta_vendor_rate_code[i] = ratectrl[i].vendor_rate_code;
             ratectrl[i].rate_index = g_minstel_pri->fixed_rate_idx&0xf;
             info->control.rates[i].idx = ratectrl[i].rate_index;
             ratectrl[i].flags |= HAL_RATECTRL_USE_FIXED_RATE;
+            ratectrl[i].bw = (sta->sta_chbw < WIFINET_BWC_WIDTH80) ? sta->sta_chbw : IS_HT_RATE(ratectrl[i].vendor_rate_code) ? WIFINET_BWC_WIDTH40 : sta->sta_chbw;
             ratectrl[i].trynum = 2;
             ratectrl[i].maxampdulen = max_4ms_framelen[0][HT_RC_2_MCS(ratectrl[i].vendor_rate_code )];
-            // DPRINTF(AML_DEBUG_RATE, "%s(%d): vendor_rate_code=0x%x, rate_index=%d, maxampdulen=%d\n", 
-            //                 __func__, __LINE__,  ratectrl[i].vendor_rate_code, ratectrl[i].rate_index,  ratectrl[i].maxampdulen); 
         }
+
+        sta->sta_vendor_bw = ratectrl[0].bw;
+        sta->sta_vendor_rate_code = ratectrl[0].vendor_rate_code;
+
+        ratectrl[0].trynum = 10;
+        ratectrl[1].trynum = 30;
+        ratectrl[2].trynum = 60;
 
         return 1;
     }
@@ -702,16 +828,23 @@ unsigned char minstrel_find_rate(
         DPRINTF(AML_DEBUG_WARNING, "%s: mcs_rate=%d, sta:%p\n", __func__,  mcs_rate, sta);
     }
 
-    p_rate_control_ops->get_rate(g_minstel_pri, p_ieee_sta , priv_sta, info);
-    rate_control_fill_sta_table(p_ieee_sta, info, info->control.rates, ARRAY_SIZE(info->control.rates) - 1) ;
+    p_rate_control_ops->get_rate(g_minstel_pri, p_ieee_sta, priv_sta, info);
+    if (mcs_rate && check_is_rate_fitable(sta, info, priv_sta)) {
+        memset(&tx_info, 0,sizeof(struct ieee80211_tx_info));
+        for (i = 0; i < IEEE80211_TX_MAX_RATES; i++) {
+            info->control.rates[i].idx = -1;
+        }
+    }
 
+    rate_control_fill_sta_table(p_ieee_sta, info, info->control.rates, ARRAY_SIZE(info->control.rates) - 1);
     for (i = 0; i < ARRAY_SIZE(info->control.rates); i++) {
         ratectrl[i].rate_index = info->control.rates[i].idx;
         ratectrl[i].shortgi_en = info->control.rates[i].flags & IEEE80211_TX_RC_SHORT_GI ? 1: 0;
-        ratectrl[i].vendor_rate_code = minsstrel_rate_index_to_vendor_rate_code(ratectrl[i].rate_index, p_ieee_sta);
-        sta->sta_vendor_rate_code[i] = ratectrl[i].vendor_rate_code;
+        ratectrl[i].vendor_rate_code = minstrel_rate_index_to_vendor_rate_code(ratectrl[i].rate_index, p_ieee_sta);
         ratectrl[i].trynum = info->control.rates[i].count;
         ratectrl[i].flags = info->control.rates[i].flags;
+        ratectrl[i].bw = info->control.rates[i].flags & IEEE80211_TX_RC_80_MHZ_WIDTH ? BW_80
+            : info->control.rates[i].flags & IEEE80211_TX_RC_40_MHZ_WIDTH ? BW_40 : BW_20;
 
         if (IS_MCS_RATE(ratectrl[i].vendor_rate_code)) {
             ratectrl[i].maxampdulen = max_4ms_framelen[0][HT_RC_2_MCS(ratectrl[i].vendor_rate_code)];
@@ -720,22 +853,27 @@ unsigned char minstrel_find_rate(
         if (info->control.rates[i].idx < 0) {
             continue;
         }
-        DPRINTF(AML_DEBUG_RATE, "%s(%d): ratectrl[%d].rate_index =%d, vendor_rate_code =0x%x, trynum =%d, maxampdulen=%d, flags=%d\n", __func__, __LINE__, i,
-            ratectrl[i].rate_index,ratectrl[i].vendor_rate_code,ratectrl[i].trynum,ratectrl[i].maxampdulen, info->control.rates[i].flags);
+        //AML_OUTPUT("ratectrl[%d].rate_index =%d, vendor_rate_code =0x%x, maxampdulen=%d, flags=%x\n", i,
+        //    ratectrl[i].rate_index,ratectrl[i].vendor_rate_code, ratectrl[i].maxampdulen, info->control.rates[i].flags);
     }
-
-    ratectrl[0].trynum = 30;
-    ratectrl[1].trynum = 30;
-    ratectrl[2].trynum = 40;
 
     if (info->flags & IEEE80211_TX_CTL_RATE_CTRL_PROBE) {
         ratectrl[0].flags  |= HAL_RATECTRL_USE_SAMPLE_RATE;
+        ratectrl[0].trynum = 3;
+        ratectrl[1].trynum = 5;
+        ratectrl[2].trynum = 92;
+
+    } else {
+        ratectrl[0].trynum = 5;
+        ratectrl[1].trynum = 15;
+        ratectrl[2].trynum = 80;
     }
+
+    sta->sta_vendor_bw = ratectrl[0].bw;
+    sta->sta_vendor_rate_code = ratectrl[0].vendor_rate_code;
 
     return 1;
 }
-
-
 
 void minstrel_tx_complete( 
     struct aml_ratecontrol *rc
@@ -765,7 +903,7 @@ void minstrel_tx_complete(
     p_minstrel_sta_info = sta->sta_minstrel_info; 
 
     if (!sta->minstrel_init_flag) {
-        printk("%s minstrel not init, sta:%p\n", __func__, sta);
+        ERROR_DEBUG_OUT("minstrel not init, sta:%p\n", sta);
         return;
     }
 
@@ -800,7 +938,6 @@ void minstrel_tx_complete(
             /*only used in vht debug*/
             //ar[i].flags |= IEEE80211_TX_RC_VHT_MCS;
         }
-        //DPRINTF(AML_DEBUG_RATE, "%s(%d): ar[%d].idx=%d, count=%d, flags=%d\n", __func__, __LINE__,  i, ar[i].idx, ar[i].count, ar[i].flags);
     }
 
     if (mcs_rate == 1) {

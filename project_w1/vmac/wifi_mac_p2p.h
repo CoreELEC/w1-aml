@@ -374,7 +374,7 @@ struct wifi_mac_p2p
     unsigned char change_intent_flag;
     unsigned char act_pkt_retry_count;
     unsigned char send_tx_status_flag;
-    unsigned char raw_action_pkt[MAX_ACTION_LEN];
+    unsigned char raw_action_pkt[P2P_MAX_ACTION_LEN];
     unsigned int  raw_action_pkt_len;
     enum wifi_mac_tx_status_mode tx_status_flag;
     unsigned long long cookie;

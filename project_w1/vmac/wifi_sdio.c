@@ -472,7 +472,7 @@ static int amlw_sdio_alloc_prep_scat_req(struct amlw_hwif_sdio *hif_sdio)
     scat_req = ZMALLOC(sizeof(struct amlw_hif_scatter_req), "sdio_alloc_prep_scat_req", GFP_ATOMIC|GFP_DMA);
     if (scat_req == NULL)
     {
-        printk("[sdio sg alloc_scat_req]: no mem\n");
+        ERROR_DEBUG_OUT("[sdio sg alloc_scat_req]: no mem\n");
         return 1;
     }
 
@@ -697,7 +697,7 @@ int aml_sdio_bottom_read(unsigned char  func_num, int addr, void *buf, size_t le
 
     if (hal_wake_fw_req() == 0)
     {
-        printk("%s:%d wake up failed\n", __func__, __LINE__);
+        ERROR_DEBUG_OUT("wake up failed\n");
         return -1;
     }
 
@@ -721,7 +721,7 @@ int aml_sdio_bottom_read(unsigned char  func_num, int addr, void *buf, size_t le
     }
     if(kmalloc_buf == NULL)
     {
-        printk("kmalloc buf fail\n");
+        ERROR_DEBUG_OUT("kmalloc buf fail\n");
         return SDIOH_API_RC_FAIL;
     }
 
@@ -745,14 +745,14 @@ int aml_sdio_bottom_write(unsigned char  func_num,int addr, void *buf, size_t le
 
     if (hal_wake_fw_req() == 0)
     {
-        printk("%s:%d wake up failed\n", __func__, __LINE__);
+        ERROR_DEBUG_OUT("wake up failed\n");
         return -1;
     }
 
     kmalloc_buf =  (unsigned char *)ZMALLOC(len, "sdio_bottom_write", GFP_DMA|GFP_ATOMIC);//virt_to_phys(fwICCM);
     if(kmalloc_buf == NULL)
     {
-        printk("kmalloc buf fail\n");
+        ERROR_DEBUG_OUT("kmalloc buf fail\n");
         return SDIOH_API_RC_FAIL;
     }
     memcpy(kmalloc_buf, buf, len);
@@ -859,7 +859,7 @@ void aml_sdio_scat_complete (struct amlw_hif_scatter_req * scat_req)
     }
     else
     {
-        printk("error: no complete function\n");
+        ERROR_DEBUG_OUT("error: no complete function\n");
     }
 
     scat_req->free = true;
@@ -891,29 +891,6 @@ int aml_sdio_scat_req_rw(struct amlw_hif_scatter_req *scat_req)
     int result = SDIOH_API_RC_FAIL;
 
     ASSERT(scat_req != NULL);
-
-    if (g_dbg_info_enable & AML_DBG_HAL_TX_DW)
-    {
-        struct hi_tx_desc *tx_page = NULL;
-
-        tx_page = (struct hi_tx_desc *)scat_req->scat_list[0].packet;
-        hal_show_txframe(tx_page);
-    }
-
-    if(g_dbg_info_enable & AML_DBG_TX_VIP_INFO)
-    {
-        struct hi_tx_desc *tx_page = NULL;
-
-        tx_page = (struct hi_tx_desc *)scat_req->scat_list[0].packet;
-        PRINT("tv_preamble_type=%d\n", tx_page->TxVector.tv_ht.htbit.tv_preamble_type);
-        PRINT("tv_GI_type=%d\n", tx_page->TxVector.tv_ht.htbit.tv_GI_type);
-        PRINT("tv_tx_rate=0x%x \n", tx_page->TxVector.tv_ht.htbit.tv_tx_rate);
-        PRINT("tv_Channel_BW=%d\n", tx_page->TxVector.tv_ht.htbit.tv_Channel_BW);
-        PRINT("tv_FEC_coding=%d(0:BCC;1:LDPC)\n", tx_page->TxVector.tv_FEC_coding);
-        PRINT("TID=%d\n", tx_page->TxPriv.TID);
-        PRINT("agg_len=%d\n", tx_page->TxPriv.AggrLen);
-    }
-
     if (scat_req->req & HIF_WRITE)
         func_num = SDIO_FUNC4;
     else
@@ -1042,7 +1019,7 @@ int aml_sdio_scat_req_rw(struct amlw_hif_scatter_req *scat_req)
         */
         if (mmc_cmd.error || mmc_dat.error)
         {
-            printk("ERROR CMD53 %s cmd_error = %d data_error=%d\n",
+            ERROR_DEBUG_OUT("ERROR CMD53 %s cmd_error = %d data_error=%d\n",
                 (scat_req->req & HIF_WRITE) ? "write" : "read", mmc_cmd.error, mmc_dat.error);
         }
         else
@@ -1064,7 +1041,7 @@ int aml_sdio_scat_req_rw(struct amlw_hif_scatter_req *scat_req)
     scat_req->result = result;
 
     if (scat_req->result)
-        printk("Scatter write request failed:%d\n", scat_req->result);
+        ERROR_DEBUG_OUT("Scatter write request failed:%d\n", scat_req->result);
 
     if (scat_req->req & HIF_ASYNCHRONOUS)
         aml_sdio_scat_complete(scat_req);
@@ -1147,7 +1124,7 @@ int amlhal_gpio_open(struct hal_private * hal_priv)
 
     if (ret != 0)
     {
-        printk("%s(%d) request_gpio ERR!\n ", __FUNCTION__, __LINE__);
+        ERROR_DEBUG_OUT("request_gpio ERR!\n");
         return ret;
     }
     else
@@ -1442,6 +1419,7 @@ extern unsigned char set_wifi_bt_sdio_driver_bit(bool is_register, int shift);
 extern unsigned char w1_sdio_driver_insmoded;
 extern unsigned char w1_sdio_after_porbe;
 extern int  aml_w1_sdio_init(void);
+extern void  aml_w1_sdio_exit(void);
 
 int aml_sdio_init(void)
 {
@@ -1454,18 +1432,24 @@ int aml_sdio_init(void)
     aml_customer_gpio_wlan_ctrl(WLAN_POWER_ON);
 
     if (!w1_sdio_after_porbe) {
-        printk("sdio not probe, need set power\n");
-        set_usb_wifi_power(0);
-        msleep(500);
-        set_usb_wifi_power(1);
-        msleep(500);
+          printk("sdio not probe, need set power \n");
+          set_usb_wifi_power(0);
+          msleep(100);
+          set_usb_wifi_power(1);
+          msleep(200);
     }
 
     if (!w1_sdio_driver_insmoded) {
         aml_w1_sdio_init();
+        msleep(200);
     }
 
-    msleep(10);
+    if (!w1_sdio_after_porbe) {
+        ERROR_DEBUG_OUT("can't probe sdio!\n");
+        //aml_w1_sdio_exit();
+        return -ENODEV;
+    }
+
     func = aml_priv_to_func(SDIO_FUNC7);
     set_wifi_bt_sdio_driver_bit(AML_W1_WIFI_POWER_ON, WIFI_POWER_CHANGE_SHIFT);
 
@@ -1483,7 +1467,7 @@ int aml_sdio_init(void)
     /*set parent dev for net dev. */
     vm_cfg80211_set_parent_dev(&func->dev);
     if (!(hif->hif_ops.hi_bottom_write8)) {
-        printk("%s %d not found w1 wifi\n", __func__, __LINE__);
+        ERROR_DEBUG_OUT("not found w1 wifi\n");
         goto create_thread_error;
     }
     aml_sdio_calibration();
@@ -1509,8 +1493,10 @@ int aml_sdio_init(void)
     printk("aml_sdio_probe-- ret %d\n", ret);
 
 #ifdef DRV_PT_SUPPORT
-    mib_init();
-    driver_open();
+    if (aml_wifi_is_enable_rf_test()) {
+        mib_init();
+        driver_open();
+    }
 #endif
 
     return ret;
@@ -1536,7 +1522,8 @@ void aml_sdio_exit(void) {
 
     set_usb_wifi_power(0);
 #ifdef DRV_PT_SUPPORT
-    b2b_tx_thread_remove();
+    if (aml_wifi_is_enable_rf_test())
+        b2b_tx_thread_remove();
 #endif
     vm_cfg80211_clear_parent_dev();
 }
@@ -1550,8 +1537,6 @@ int aml_sdio_pm_suspend(struct device *device)
     int ret = 0, cnt = 0;
 
     func = dev_to_sdio_func(device);
-    if (func == NULL)
-        return -1;
 
     while (atomic_read(&hal_priv->drv_suspend_cnt) == 0)
     {
@@ -1559,7 +1544,7 @@ int aml_sdio_pm_suspend(struct device *device)
         cnt++;
         if (cnt > 20)
         {
-            printk("%s:%d, wifi suspend fail \n", __func__, __LINE__);
+            ERROR_DEBUG_OUT("wifi suspend fail \n");
             return -1;
         }
     }
@@ -1577,7 +1562,7 @@ int aml_sdio_pm_suspend(struct device *device)
 
         if (ret != 0)
         {
-            printk("%s:%d host can't keep power while suspend \n", __func__,__LINE__);
+            ERROR_DEBUG_OUT("host can't keep power while suspend \n");
             return -1;
         }
 
@@ -1591,7 +1576,7 @@ int aml_sdio_pm_suspend(struct device *device)
 
         if (ret != 0)
         {
-            printk("%s:%d host can't set irq while suspend \n", __func__,__LINE__);
+            ERROR_DEBUG_OUT("host can't set irq while suspend \n");
             return -1;
         }
     }
@@ -1610,8 +1595,8 @@ int aml_sdio_pm_resume(struct device *device)
     struct hal_private * hal_priv = hal_get_priv();
 
     func = dev_to_sdio_func(device);
-    if (func == NULL)
-        return -1;
+//    if (func == NULL)
+//        return -1;
 
     atomic_dec(&hal_priv->sdio_suspend_cnt);
     //printk("%s:%d, func num %d, no resume 0x%x \n", __func__, __LINE__,
@@ -1703,8 +1688,10 @@ int aml_sdio_probe(struct sdio_func *func, const struct sdio_device_id *id)
 
 
 #ifdef DRV_PT_SUPPORT
-    mib_init();
-	driver_open();
+    if (aml_wifi_is_enable_rf_test()) {
+        mib_init();
+        driver_open();
+    }
 #endif
 
     return ret;
@@ -1715,7 +1702,7 @@ create_thread_error:
     sdio_disable_func(func);
 
 sdio_enable_error:
-    printk("sdio_enable_error:  line %d\n",__LINE__);
+    ERROR_DEBUG_OUT("sdio_enable_error\n");
     sdio_release_host(func);
     return ret;
 }
@@ -1739,7 +1726,8 @@ static void  aml_sdio_remove(struct sdio_func *func)
     {
         hal_kill_thread();
 #ifdef DRV_PT_SUPPORT
-        b2b_tx_thread_remove();
+        if (aml_wifi_is_enable_rf_test())
+            b2b_tx_thread_remove();
 #endif
         vm_cfg80211_clear_parent_dev();
     }
@@ -1795,7 +1783,7 @@ int  aml_sdio_init(void)
 
     err = sdio_register_driver(&aml_sdio_driver);
     if (err)
-        PRINT("failed to register sdio driver: %d \n", err);
+        ERROR_DEBUG_OUT("failed to register sdio driver: %d \n", err);
 
     return err;
 }

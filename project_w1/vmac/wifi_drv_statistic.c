@@ -420,37 +420,36 @@ it is used to get the tag information for log showing, indexed by the address
     char** ret = NULL;
 
     if (tag_info == SYS_STS_PRT_INFO)
-        {
-            ret = sts_sys_prt_info;
-            return ret;
-        }
-
-    if(IS_MAC_STS(addr))
     {
-        switch (addr)
-        {
-            case RG_MAC_CNT_CTRL_FIQ:
-                ret=   sts_mac_irq_prt_tag ;
-                break;
-            case RG_MAC_FRM_TYPE_CNT_CTRL :
-                ret= sts_mac_11frm_prt_tag;
-                break;
-            case RG_MAC_TX_STT_CHK :
-            case RG_MAC_TX_END_CHK:
-            case RG_MAC_TX_EN_CHK:
-            case RG_MAC_TX_ENWR_CHK:
-                ret=  sts_mac_tx_prt_tag;
-                break;
+        ret = sts_sys_prt_info;
+        return ret;
+    }
 
-            case RG_MAC_RX_DATA_LOCAL_CNT:
-            case RG_MAC_RX_DATA_OTHER_CNT:
-            case RG_MAC_RX_DATA_MUTIL_CNT:
-                ret = sts_mac_rx_prt_tag ;
-                    break;
-            default:
-                printk("%s,%d, statistic address 0x%x not supported\n", __func__, __LINE__, addr);
-                break;
-        }
+    switch (addr)
+    {
+        case RG_MAC_CNT_CTRL_FIQ:
+            ret=   sts_mac_irq_prt_tag ;
+            break;
+        case RG_MAC_FRM_TYPE_CNT_CTRL :
+            ret= sts_mac_11frm_prt_tag;
+            break;
+        case RG_MAC_TX_STT_CHK :
+        case RG_MAC_TX_END_CHK:
+        case RG_MAC_TX_EN_CHK:
+        case RG_MAC_TX_ENWR_CHK:
+            ret=  sts_mac_tx_prt_tag;
+            break;
+
+        case RG_MAC_RX_DATA_LOCAL_CNT:
+        case RG_MAC_RX_DATA_OTHER_CNT:
+        case RG_MAC_RX_DATA_MUTIL_CNT:
+            ret = sts_mac_rx_prt_tag ;
+            break;
+
+        default:
+            printk("%s,%d, statistic address 0x%x not supported\n", __func__, __LINE__, addr);
+            break;
+
     }
 
     if(IS_AGC_STS(addr))
@@ -662,104 +661,95 @@ it is used to clear statistic register by address
 */
 void sts_clr_cnt(unsigned short addr)
 {
-       int i = 0;
-       int chg_data = 0;
-       int bk_data = 0;
-       struct  cnt_ctrl_bits* cnt_ctrl = NULL;
-       struct  tx_cnt_ctrl_bits* tx_cnt_ctrl = NULL;
-       struct data_rx_local_cnt_bits* data_rx_local_cnt = NULL;
-       struct data_rx_cnt_bits* data_rx_cnt = NULL;
+    int i = 0;
+    int chg_data = 0;
+    int bk_data = 0;
+    struct  cnt_ctrl_bits* cnt_ctrl = NULL;
+    struct  tx_cnt_ctrl_bits* tx_cnt_ctrl = NULL;
+    struct data_rx_local_cnt_bits* data_rx_local_cnt = NULL;
+    struct data_rx_cnt_bits* data_rx_cnt = NULL;
 
-       struct hw_interface* hif = hif_get_hw_interface();
-       struct hal_private* hal_priv = hal_get_priv();
+    struct hw_interface* hif = hif_get_hw_interface();
+    struct hal_private* hal_priv = hal_get_priv();
 
-       chg_data = hif->hif_ops.hi_read_word(addr);
+    chg_data = hif->hif_ops.hi_read_word(addr);
+    bk_data = chg_data;
 
-       bk_data = chg_data;
+    switch (addr) {
+        case RG_MAC_CNT_CTRL_FIQ:
+        case RG_MAC_FRM_TYPE_CNT_CTRL:
+            cnt_ctrl = (struct  cnt_ctrl_bits*)&chg_data;
+            cnt_ctrl->en0 = 1;
+            cnt_ctrl->en1 = 1;
+            cnt_ctrl->en2 = 1;
+            cnt_ctrl->en3 = 1;
 
-        if(IS_MAC_STS(addr))
-        {
-                 switch (addr )
-                {
-                    case RG_MAC_CNT_CTRL_FIQ:
-                    case RG_MAC_FRM_TYPE_CNT_CTRL:
-                       cnt_ctrl = (struct  cnt_ctrl_bits*)&chg_data;
-                       cnt_ctrl->en0 = 1;
-                       cnt_ctrl->en1 = 1;
-                       cnt_ctrl->en2 = 1;
-                       cnt_ctrl->en3 = 1;
+            cnt_ctrl->clr0 = 1;
+            cnt_ctrl->clr1 = 1;
+            cnt_ctrl->clr2 = 1;
+            cnt_ctrl->clr3 = 1;
 
-                       cnt_ctrl->clr0 = 1;
-                       cnt_ctrl->clr1 = 1;
-                       cnt_ctrl->clr2 = 1;
-                       cnt_ctrl->clr3 = 1;
+            hif->hif_ops.hi_write_word(addr , chg_data);
 
-                       hif->hif_ops.hi_write_word(addr , chg_data);
+            /*recover the previous setting */
+            chg_data = bk_data;
 
-                      /*recover the previous setting */
-                       chg_data = bk_data;
+            cnt_ctrl->clr0 = 0;
+            cnt_ctrl->clr1 = 0;
+            cnt_ctrl->clr2 = 0;
+            cnt_ctrl->clr3 = 0;
+            break;
 
-                       cnt_ctrl->clr0 = 0;
-                       cnt_ctrl->clr1 = 0;
-                       cnt_ctrl->clr2 = 0;
-                       cnt_ctrl->clr3 = 0;
-                    break;
+        case RG_MAC_TX_STT_CHK:
+        case RG_MAC_TX_END_CHK:
+        case RG_MAC_TX_EN_CHK:
+        case RG_MAC_TX_ENWR_CHK:
+            tx_cnt_ctrl = (struct tx_cnt_ctrl_bits*)&chg_data;
+            tx_cnt_ctrl->en = 1;
+            tx_cnt_ctrl->clr = 1;
 
-                    case RG_MAC_TX_STT_CHK:
-                    case RG_MAC_TX_END_CHK:
-                    case RG_MAC_TX_EN_CHK:
-                    case RG_MAC_TX_ENWR_CHK:
-                        tx_cnt_ctrl = (struct tx_cnt_ctrl_bits*)&chg_data;
-                        tx_cnt_ctrl->en = 1;
-                        tx_cnt_ctrl->clr = 1;
+            hif->hif_ops.hi_write_word(addr , chg_data);
 
-                         hif->hif_ops.hi_write_word(addr , chg_data);
+            chg_data = bk_data;
+            tx_cnt_ctrl->clr = 0;
+            break;
 
-                         chg_data = bk_data;
-                         tx_cnt_ctrl->clr = 0;
-                    break;
+        case RG_MAC_RX_DATA_LOCAL_CNT:
+            data_rx_local_cnt = ( struct data_rx_local_cnt_bits*)&chg_data;
+            data_rx_local_cnt->data_local_cnt_en = 1;
+            data_rx_local_cnt->data_local_cnt_clr = 1;
 
-                    case RG_MAC_RX_DATA_LOCAL_CNT:
-                        data_rx_local_cnt = ( struct data_rx_local_cnt_bits*)&chg_data;
-                        data_rx_local_cnt->data_local_cnt_en = 1;
-                        data_rx_local_cnt->data_local_cnt_clr = 1;
+            hif->hif_ops.hi_write_word(addr , chg_data);
 
-                        hif->hif_ops.hi_write_word(addr , chg_data);
+            chg_data = bk_data;
+            data_rx_local_cnt->data_local_cnt_clr = 0;
+            break;
 
-                        chg_data = bk_data;
-                        data_rx_local_cnt->data_local_cnt_clr = 0;
-                        break;
+        case RG_MAC_RX_DATA_OTHER_CNT:
+        case RG_MAC_RX_DATA_MUTIL_CNT:
+            data_rx_cnt = (struct data_rx_cnt_bits*)&chg_data;
+            data_rx_cnt->en = 1;
+            data_rx_cnt->clr = 1;
 
-                    case RG_MAC_RX_DATA_OTHER_CNT:
-                    case RG_MAC_RX_DATA_MUTIL_CNT:
-                        data_rx_cnt = (struct data_rx_cnt_bits*)&chg_data;
-                        data_rx_cnt->en = 1;
-                        data_rx_cnt->clr = 1;
+            hif->hif_ops.hi_write_word(addr , chg_data);
 
-                        hif->hif_ops.hi_write_word(addr , chg_data);
+            chg_data = bk_data;
+            data_rx_cnt->clr = 0;
+            break;
 
-                        chg_data = bk_data;
-                        data_rx_cnt->clr = 0;
-
-                        break;
-
-                    default:
-                         printk("%s,%d, statistic address 0x%x not supported\n", __func__, __LINE__, addr);
-                        break;
-                }
-            }
+        default:
+            printk("%s,%d, statistic address 0x%x not supported\n", __func__, __LINE__, addr);
+            break;
+   }
 
 
-        hif->hif_ops.hi_write_word(addr , chg_data);
+   hif->hif_ops.hi_write_word(addr , chg_data);
 
-        if(IS_HOST_SW_STS(addr) )
-            {
-                 for(i= sts_hst_irq_tx_error_idx;  i < sts_hst_sw_max_idx; i++)
-                    {
-                        hal_priv->sts_hst_sw[i].cnt = 0;
-                    }
-            }
-
+   if(IS_HOST_SW_STS(addr)) {
+      for(i= sts_hst_irq_tx_error_idx;  i < sts_hst_sw_max_idx; i++) {
+         hal_priv->sts_hst_sw[i].cnt = 0;
+      }
+   }
 }
 
 
@@ -777,7 +767,6 @@ void sts_start_cnt(unsigned short addr,
                              char obj_0,char obj_1,char obj_2,char obj_3)
 {
     int i = 0;
-
     struct  cnt_ctrl_bits* cnt_irq_ctrl = NULL;
     struct  tx_cnt_ctrl_bits* tx_cnt_ctrl = NULL;
 
@@ -787,75 +776,70 @@ void sts_start_cnt(unsigned short addr,
     struct hw_interface* hif = hif_get_hw_interface();
     struct data_rx_local_cnt_bits* data_rx_local_cnt = NULL;
     struct data_rx_cnt_bits* data_rx_cnt = NULL;
-      /**for irq status cnt**/
-        chg_data = hif->hif_ops.hi_read_word(addr);
+    /**for irq status cnt**/
+    chg_data = hif->hif_ops.hi_read_word(addr);
 
-  if(IS_MAC_STS(addr))
+    switch (addr)
     {
-        switch (addr)
-            {
-                case RG_MAC_CNT_CTRL_FIQ:
-                case RG_MAC_FRM_TYPE_CNT_CTRL:
-                //set the frame type index
-                    cnt_irq_ctrl = (struct cnt_ctrl_bits*)&chg_data;
+        case RG_MAC_CNT_CTRL_FIQ:
+        case RG_MAC_FRM_TYPE_CNT_CTRL:
+            //set the frame type index
+            cnt_irq_ctrl = (struct cnt_ctrl_bits*)&chg_data;
 
-                    cnt_irq_ctrl->type_idx0 =  obj_0;
-                    cnt_irq_ctrl->type_idx1 =  obj_1;
-                    cnt_irq_ctrl->type_idx2 =  obj_2;
-                    cnt_irq_ctrl->type_idx3 =  obj_3;
+            cnt_irq_ctrl->type_idx0 =  obj_0;
+            cnt_irq_ctrl->type_idx1 =  obj_1;
+            cnt_irq_ctrl->type_idx2 =  obj_2;
+            cnt_irq_ctrl->type_idx3 =  obj_3;
 
-                    cnt_irq_ctrl->en0=   1;
-                    cnt_irq_ctrl->en1 =  1;
-                    cnt_irq_ctrl->en2 =  1;
-                    cnt_irq_ctrl->en3 =  1;
+            cnt_irq_ctrl->en0=   1;
+            cnt_irq_ctrl->en1 =  1;
+            cnt_irq_ctrl->en2 =  1;
+            cnt_irq_ctrl->en3 =  1;
 
-                    cnt_irq_ctrl->clr0=   0;
-                    cnt_irq_ctrl->clr1 =  0;
-                    cnt_irq_ctrl->clr2 =  0;
-                    cnt_irq_ctrl->clr3 =  0;
-                break;
+            cnt_irq_ctrl->clr0=   0;
+            cnt_irq_ctrl->clr1 =  0;
+            cnt_irq_ctrl->clr2 =  0;
+            cnt_irq_ctrl->clr3 =  0;
+            break;
 
-                case RG_MAC_TX_STT_CHK:
-                case RG_MAC_TX_END_CHK:
-                case RG_MAC_TX_EN_CHK:
-                case RG_MAC_TX_ENWR_CHK:
-                    tx_cnt_ctrl = (struct tx_cnt_ctrl_bits*)&chg_data;
-                    tx_cnt_ctrl->en = 1;
-                    tx_cnt_ctrl->clr = 0;
-                break;
+        case RG_MAC_TX_STT_CHK:
+        case RG_MAC_TX_END_CHK:
+        case RG_MAC_TX_EN_CHK:
+        case RG_MAC_TX_ENWR_CHK:
+            tx_cnt_ctrl = (struct tx_cnt_ctrl_bits*)&chg_data;
+            tx_cnt_ctrl->en = 1;
+            tx_cnt_ctrl->clr = 0;
+            break;
 
-                 case RG_MAC_RX_DATA_LOCAL_CNT:
-                    data_rx_local_cnt = ( struct data_rx_local_cnt_bits*)&chg_data;
-                    data_rx_local_cnt->data_local_cnt_qos = 1;
-                    data_rx_local_cnt->data_local_cnt_en = 1;
-                    data_rx_local_cnt->data_local_cnt_clr = 0;
-                    break;
+         case RG_MAC_RX_DATA_LOCAL_CNT:
+            data_rx_local_cnt = ( struct data_rx_local_cnt_bits*)&chg_data;
+            data_rx_local_cnt->data_local_cnt_qos = 1;
+            data_rx_local_cnt->data_local_cnt_en = 1;
+            data_rx_local_cnt->data_local_cnt_clr = 0;
+            break;
 
-                case RG_MAC_RX_DATA_OTHER_CNT:
-                case RG_MAC_RX_DATA_MUTIL_CNT:
-                    data_rx_cnt = (struct data_rx_cnt_bits*)&chg_data;
-                    data_rx_cnt->en = 1;
-                    data_rx_cnt->clr = 0;
-                    break;
+        case RG_MAC_RX_DATA_OTHER_CNT:
+        case RG_MAC_RX_DATA_MUTIL_CNT:
+            data_rx_cnt = (struct data_rx_cnt_bits*)&chg_data;
+            data_rx_cnt->en = 1;
+            data_rx_cnt->clr = 0;
+            break;
 
-                default:
-                    printk("%s,%d: statistic address 0x%x not supported\n", __func__, __LINE__,addr);
-                    break;
-            }
+        default:
+            printk("%s,%d: statistic address 0x%x not supported\n", __func__, __LINE__,addr);
+            break;
     }
 
+    // start to the counter
+    hif->hif_ops.hi_write_word(addr , chg_data);
 
-      // start to the counter
-
-        hif->hif_ops.hi_write_word(addr , chg_data);
-
-          if(IS_HOST_SW_STS(addr))
-            {
-                for(i= sts_hst_irq_tx_error_idx;  i < sts_hst_sw_max_idx; i++)
-                    {
-                        hal_priv->sts_hst_sw[i].func_code = SYS_STS_START;
-                    }
-            }
+    if(IS_HOST_SW_STS(addr))
+    {
+        for(i= sts_hst_irq_tx_error_idx;  i < sts_hst_sw_max_idx; i++)
+        {
+            hal_priv->sts_hst_sw[i].func_code = SYS_STS_START;
+        }
+    }
 
 }
 
@@ -1027,86 +1011,83 @@ void sts_read_cnt(unsigned short addr,
     struct hw_interface* hif = hif_get_hw_interface();
     struct hal_private * hal_priv = hal_get_priv();
 
-    if (IS_MAC_STS(addr))
+    switch (addr)
     {
-        switch (addr)
+        case RG_MAC_CNT_CTRL_FIQ:
         {
-            case RG_MAC_CNT_CTRL_FIQ:
-            {
-                prt_idx0 = val_to_idx(idx_val, (unsigned int)addr << 16 | (unsigned int)obj_0);
-                prt_idx1 = val_to_idx(idx_val, (unsigned int)addr << 16 | (unsigned int)obj_1);
-                prt_idx2 = val_to_idx(idx_val, (unsigned int)addr << 16 | (unsigned int)obj_2);
-                prt_idx3 = val_to_idx(idx_val, (unsigned int)addr << 16 | (unsigned int)obj_3);
+            prt_idx0 = val_to_idx(idx_val, (unsigned int)addr << 16 | (unsigned int)obj_0);
+            prt_idx1 = val_to_idx(idx_val, (unsigned int)addr << 16 | (unsigned int)obj_1);
+            prt_idx2 = val_to_idx(idx_val, (unsigned int)addr << 16 | (unsigned int)obj_2);
+            prt_idx3 = val_to_idx(idx_val, (unsigned int)addr << 16 | (unsigned int)obj_3);
 
-                sts_read_reg_array(&rd_data0,&rd_data1,&rd_data2,&rd_data3,
-                    RG_MAC_IRQ_STATUS_CNT0,RG_MAC_IRQ_STATUS_CNT1,RG_MAC_IRQ_STATUS_CNT2,RG_MAC_IRQ_STATUS_CNT3);
+            sts_read_reg_array(&rd_data0,&rd_data1,&rd_data2,&rd_data3,
+                RG_MAC_IRQ_STATUS_CNT0,RG_MAC_IRQ_STATUS_CNT1,RG_MAC_IRQ_STATUS_CNT2,RG_MAC_IRQ_STATUS_CNT3);
 
-                 printk("[%s]: %s=%8d,%s=%8d,%s=%8d,%s=%8d\n",
-                    func_code==SYS_STS_STOP ? sts_tag[SYS_STS_STOP]:sts_tag[SYS_STS_READ],
-                    sts_info[prt_idx0],rd_data0,
-                    sts_info[prt_idx1],rd_data1,
-                    sts_info[prt_idx2],rd_data2,
-                    sts_info[prt_idx3],rd_data3);
-            }
-            break;
-
-            case RG_MAC_FRM_TYPE_CNT_CTRL:
-            {
-                prt_idx0 = val_to_idx(idx_val, (unsigned int)addr << 16 | (unsigned int)obj_0);
-                prt_idx1 = val_to_idx(idx_val, (unsigned int)addr << 16 | (unsigned int)obj_1);
-                prt_idx2 = val_to_idx(idx_val, (unsigned int)addr << 16 | (unsigned int)obj_2);
-                prt_idx3 = val_to_idx(idx_val, (unsigned int)addr << 16 | (unsigned int)obj_3);
-
-
-                 sts_read_reg_array(&rd_data0,&rd_data1,&rd_data2,&rd_data3,
-                    RG_MAC_FRM_TYPE_CNT0,RG_MAC_FRM_TYPE_CNT1,RG_MAC_FRM_TYPE_CNT2,RG_MAC_FRM_TYPE_CNT3);
-
-                printk("[%s]: %s=%8d,%s=%8d,%s=%8d,%s=%8d\n",
+             printk("[%s]: %s=%8d,%s=%8d,%s=%8d,%s=%8d\n",
                 func_code==SYS_STS_STOP ? sts_tag[SYS_STS_STOP]:sts_tag[SYS_STS_READ],
                 sts_info[prt_idx0],rd_data0,
                 sts_info[prt_idx1],rd_data1,
                 sts_info[prt_idx2],rd_data2,
-                sts_info[prt_idx3],rd_data3
-                );
-            }
-            break;
-
-            case RG_MAC_TX_STT_CHK:
-            case RG_MAC_TX_END_CHK:
-            case RG_MAC_TX_EN_CHK:
-            case RG_MAC_TX_ENWR_CHK:
-
-                prt_idx0 = val_to_idx(idx_val, addr);
-
-                 rd_data0 = hif->hif_ops.hi_read_word(addr);
-
-                 printk("[%s]: %s=%8d\n",
-                 func_code==SYS_STS_STOP ? sts_tag[SYS_STS_STOP]:sts_tag[SYS_STS_READ],
-                 sts_info[prt_idx0 ],(rd_data0 << 6 ) >> 6);
-            break;
-
-            case RG_MAC_RX_DATA_LOCAL_CNT:
-            case RG_MAC_RX_DATA_OTHER_CNT:
-            case RG_MAC_RX_DATA_MUTIL_CNT:
-                prt_idx0 = val_to_idx(idx_val, addr);
-                rd_data0 = hif->hif_ops.hi_read_word(addr);
-                if(addr == RG_MAC_RX_DATA_LOCAL_CNT)
-                {
-                    rd_show = (rd_data0 << 3 ) >> 3;
-                }
-                else
-                {
-                    rd_show = (rd_data0 << 2 ) >> 2;
-                }
-
-                 printk("[%s]: %s=%8d\n",
-                 func_code==SYS_STS_STOP ? sts_tag[SYS_STS_STOP]:sts_tag[SYS_STS_READ],
-                 sts_info[prt_idx0],rd_show);
-                break;
-            default:
-                 printk("%s,%d, statistic address 0x%x not supported\n", __func__, __LINE__, addr);
-                break;
+                sts_info[prt_idx3],rd_data3);
         }
+        break;
+
+        case RG_MAC_FRM_TYPE_CNT_CTRL:
+        {
+            prt_idx0 = val_to_idx(idx_val, (unsigned int)addr << 16 | (unsigned int)obj_0);
+            prt_idx1 = val_to_idx(idx_val, (unsigned int)addr << 16 | (unsigned int)obj_1);
+            prt_idx2 = val_to_idx(idx_val, (unsigned int)addr << 16 | (unsigned int)obj_2);
+            prt_idx3 = val_to_idx(idx_val, (unsigned int)addr << 16 | (unsigned int)obj_3);
+
+
+             sts_read_reg_array(&rd_data0,&rd_data1,&rd_data2,&rd_data3,
+                RG_MAC_FRM_TYPE_CNT0,RG_MAC_FRM_TYPE_CNT1,RG_MAC_FRM_TYPE_CNT2,RG_MAC_FRM_TYPE_CNT3);
+
+            printk("[%s]: %s=%8d,%s=%8d,%s=%8d,%s=%8d\n",
+            func_code==SYS_STS_STOP ? sts_tag[SYS_STS_STOP]:sts_tag[SYS_STS_READ],
+            sts_info[prt_idx0],rd_data0,
+            sts_info[prt_idx1],rd_data1,
+            sts_info[prt_idx2],rd_data2,
+            sts_info[prt_idx3],rd_data3
+            );
+        }
+        break;
+
+        case RG_MAC_TX_STT_CHK:
+        case RG_MAC_TX_END_CHK:
+        case RG_MAC_TX_EN_CHK:
+        case RG_MAC_TX_ENWR_CHK:
+
+            prt_idx0 = val_to_idx(idx_val, addr);
+
+             rd_data0 = hif->hif_ops.hi_read_word(addr);
+
+             printk("[%s]: %s=%8d\n",
+             func_code==SYS_STS_STOP ? sts_tag[SYS_STS_STOP]:sts_tag[SYS_STS_READ],
+             sts_info[prt_idx0 ],(rd_data0 << 6 ) >> 6);
+        break;
+
+        case RG_MAC_RX_DATA_LOCAL_CNT:
+        case RG_MAC_RX_DATA_OTHER_CNT:
+        case RG_MAC_RX_DATA_MUTIL_CNT:
+            prt_idx0 = val_to_idx(idx_val, addr);
+            rd_data0 = hif->hif_ops.hi_read_word(addr);
+            if(addr == RG_MAC_RX_DATA_LOCAL_CNT)
+            {
+                rd_show = (rd_data0 << 3 ) >> 3;
+            }
+            else
+            {
+                rd_show = (rd_data0 << 2 ) >> 2;
+            }
+
+             printk("[%s]: %s=%8d\n",
+             func_code==SYS_STS_STOP ? sts_tag[SYS_STS_STOP]:sts_tag[SYS_STS_READ],
+             sts_info[prt_idx0],rd_show);
+            break;
+        default:
+             printk("%s,%d, statistic address 0x%x not supported\n", __func__, __LINE__, addr);
+            break;
     }
 
     if(IS_AGC_STS(addr))
@@ -1135,77 +1116,72 @@ it is used to stop statistic register by address
 */
 void sts_stop_cnt(unsigned short addr)
 {
-       int i = 0;
-       unsigned int chg_data = 0;
-       struct  cnt_ctrl_bits* cnt_ctrl = NULL;
-       struct  tx_cnt_ctrl_bits* tx_cnt_ctrl = NULL;
-       struct data_rx_local_cnt_bits* data_rx_local_cnt = NULL;
-       struct data_rx_cnt_bits* data_rx_cnt = NULL;
+    int i = 0;
+    unsigned int chg_data = 0;
+    struct  cnt_ctrl_bits* cnt_ctrl = NULL;
+    struct  tx_cnt_ctrl_bits* tx_cnt_ctrl = NULL;
+    struct data_rx_local_cnt_bits* data_rx_local_cnt = NULL;
+    struct data_rx_cnt_bits* data_rx_cnt = NULL;
 
-       struct hw_interface* hif = hif_get_hw_interface();
-       struct hal_private* hal_priv = hal_get_priv();
+    struct hw_interface* hif = hif_get_hw_interface();
+    struct hal_private* hal_priv = hal_get_priv();
 
-        chg_data = hif->hif_ops.hi_read_word(addr);
+    chg_data = hif->hif_ops.hi_read_word(addr);
 
-         if(IS_MAC_STS(addr))
-            {
-                //to set clear bit
-                switch (addr )
-                {
-                    case RG_MAC_CNT_CTRL_FIQ:
-                    case RG_MAC_FRM_TYPE_CNT_CTRL:
-                        cnt_ctrl = (struct  cnt_ctrl_bits*)&chg_data;
-                        cnt_ctrl->en0 = 0;
-                        cnt_ctrl->en1 = 0;
-                        cnt_ctrl->en2 = 0;
-                        cnt_ctrl->en3 = 0;
+    //to set clear bit
+    switch (addr )
+    {
+        case RG_MAC_CNT_CTRL_FIQ:
+        case RG_MAC_FRM_TYPE_CNT_CTRL:
+            cnt_ctrl = (struct  cnt_ctrl_bits*)&chg_data;
+            cnt_ctrl->en0 = 0;
+            cnt_ctrl->en1 = 0;
+            cnt_ctrl->en2 = 0;
+            cnt_ctrl->en3 = 0;
 
-                        cnt_ctrl->clr0 = 0;
-                        cnt_ctrl->clr1 = 0;
-                        cnt_ctrl->clr2 = 0;
-                        cnt_ctrl->clr3 = 0;
+            cnt_ctrl->clr0 = 0;
+            cnt_ctrl->clr1 = 0;
+            cnt_ctrl->clr2 = 0;
+            cnt_ctrl->clr3 = 0;
+            break;
 
-                    break;
+        case RG_MAC_TX_STT_CHK:
+        case RG_MAC_TX_END_CHK:
+        case RG_MAC_TX_EN_CHK:
+        case RG_MAC_TX_ENWR_CHK:
+            tx_cnt_ctrl = (struct tx_cnt_ctrl_bits*)&chg_data;
+            tx_cnt_ctrl->en = 0;
+            tx_cnt_ctrl->clr = 0;
+            break;
 
-                    case RG_MAC_TX_STT_CHK:
-                    case RG_MAC_TX_END_CHK:
-                    case RG_MAC_TX_EN_CHK:
-                    case RG_MAC_TX_ENWR_CHK:
-                        tx_cnt_ctrl = (struct tx_cnt_ctrl_bits*)&chg_data;
-                        tx_cnt_ctrl->en = 0;
-                        tx_cnt_ctrl->clr = 0;
+        case RG_MAC_RX_DATA_LOCAL_CNT:
+            data_rx_local_cnt = ( struct data_rx_local_cnt_bits*)&chg_data;
+            data_rx_local_cnt->data_local_cnt_en = 0;
+            data_rx_local_cnt->data_local_cnt_clr = 0;
+            break;
 
-                    break;
+        case RG_MAC_RX_DATA_OTHER_CNT:
+        case RG_MAC_RX_DATA_MUTIL_CNT:
+            data_rx_cnt = ( struct data_rx_cnt_bits*)&chg_data;
+            data_rx_cnt->en = 0;
+            data_rx_cnt->clr = 0;
+            break;
 
-                    case RG_MAC_RX_DATA_LOCAL_CNT:
-                        data_rx_local_cnt = ( struct data_rx_local_cnt_bits*)&chg_data;
-                        data_rx_local_cnt->data_local_cnt_en = 0;
-                        data_rx_local_cnt->data_local_cnt_clr = 0;
-                        break;
+        default:
+            printk("%s,%d: statistic address 0x%x not supported\n", __func__, __LINE__, addr);
+            break;
 
-                    case RG_MAC_RX_DATA_OTHER_CNT:
-                    case RG_MAC_RX_DATA_MUTIL_CNT:
-                        data_rx_cnt = ( struct data_rx_cnt_bits*)&chg_data;
-                        data_rx_cnt->en = 0;
-                        data_rx_cnt->clr = 0;
-                        break;
+    }
 
-                    default:
-                        printk("%s,%d: statistic address 0x%x not supported\n", __func__, __LINE__, addr);
-                        break;
-                }
-            }
+    hif->hif_ops.hi_write_word(addr , chg_data);
 
-
-        hif->hif_ops.hi_write_word(addr , chg_data);
-
-          if(IS_HOST_SW_STS(addr))
-            {
-                 for(i= sts_hst_irq_tx_error_idx;  i < sts_hst_sw_max_idx; i++)
-                    {
-                        hal_priv->sts_hst_sw[i].func_code = SYS_STS_STOP;
-                    }
-            }
+    if(IS_HOST_SW_STS(addr))
+    {
+        for(i= sts_hst_irq_tx_error_idx;  i < sts_hst_sw_max_idx; i++)
+        {
+            hal_priv->sts_hst_sw[i].func_code = SYS_STS_STOP;
+        }
+    }
 }
 
 
@@ -1277,8 +1253,7 @@ void sts_opt_by_cfg(struct sts_cfg_data* cfg_data, unsigned  char func_code)
                         }
                 break;
                 default :
-                    printk("%s,%d: not support the function code 0x%x\n",
-                    __func__, __LINE__, func_code);
+                    ERROR_DEBUG_OUT("not support the function code 0x%x\n", func_code);
                 break;
             }
     }
@@ -1290,4 +1265,4 @@ static unsigned int _get_tv_us (const struct timeval  *tvnew, const struct timev
     return ((tvnew->tv_sec-tvold->tv_sec)*1000000+(tvnew->tv_usec - tvold->tv_usec));
 }
 #endif
- 
+

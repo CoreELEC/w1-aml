@@ -6,7 +6,7 @@
 unsigned char wifi_mac_pmkid_vattach(struct wlan_net_vif *wnet_vif) {
     wnet_vif->pmk_list = (void *)NET_MALLOC(sizeof(struct aml_pmk_list), GFP_KERNEL, "pmk_list");
     if (unlikely(!wnet_vif->pmk_list)) {
-        printk("pmk list alloc failed\n");
+        ERROR_DEBUG_OUT("pmk list alloc failed\n");
         return -1;
     }
 
@@ -30,7 +30,7 @@ int aml_cfg80211_set_pmksa(struct wiphy *wiphy, struct net_device *dev, struct c
             pmksa->bssid[1], pmksa->bssid[2], pmksa->bssid[3], pmksa->bssid[4], pmksa->bssid[5]);
 
     } else {
-        DPRINTF(AML_DEBUG_CFG80211, "%s bssid wrong\n", __func__);
+        ERROR_DEBUG_OUT( "bssid wrong\n");
         return -EINVAL;
     }
 
@@ -103,13 +103,13 @@ int aml_cfg80211_del_pmksa(struct wiphy *wiphy, struct net_device *dev, struct c
     unsigned char find_entry = 0;
 
     if (!pmksa) {
-        DPRINTF(AML_DEBUG_CFG80211, "%s pmksa is not initialized\n", __func__);
+        ERROR_DEBUG_OUT("pmksa is not initialized\n");
         return -1;
     }
 
     if (!npmkids) {
         /* nmpkids = 0, nothing to delete */
-        DPRINTF(AML_DEBUG_CFG80211, "%s npmkids=0. skip del\n", __func__);
+        ERROR_DEBUG_OUT("npmkids=0. skip del\n");
         return 0;
     }
 
@@ -118,7 +118,7 @@ int aml_cfg80211_del_pmksa(struct wiphy *wiphy, struct net_device *dev, struct c
             pmksa->bssid[1], pmksa->bssid[2], pmksa->bssid[3], pmksa->bssid[4], pmksa->bssid[5]);
 
     } else {
-        DPRINTF(AML_DEBUG_CFG80211, "%s bssid wrong\n", __func__);
+        ERROR_DEBUG_OUT("bssid wrong\n");
         return -EINVAL;
     }
 
@@ -153,7 +153,7 @@ void aml_del_pmksa_by_index(struct wlan_net_vif *wnet_vif, const unsigned char *
         return;
 
     } else {
-        memset(wnet_vif->pmk_list->pmkid_cache[pmkid_index].pmkid, 0, sizeof(aml_pmkid_cache));
+        memset(wnet_vif->pmk_list->pmkid_cache[pmkid_index].pmkid, 0, sizeof(char)*16);
         wnet_vif->pmk_list->pmkid_count--;
     }
 

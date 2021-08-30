@@ -23,6 +23,10 @@
 #include "wifi_mac_sae.h"
 #include "wifi_common.h"
 #include "wifi_mac_action.h"
+#include "wifi_mac_tx_reg.h"
+
+unsigned char tpc_mode = 0;
+extern unsigned char g_wftx_pwrtbl_en;
 
 const char *wifi_mac_state_name[WIFINET_S_MAX] =
 {
@@ -85,14 +89,13 @@ void *wifi_mac_alloc_ndev(unsigned int len)
     wnet_vif = netdev_priv(dev);
     wnet_vif->vm_ndev = dev;
 
-    DPRINTF(AML_DEBUG_INIT,"<running> %s %d \n",__func__,__LINE__);
+    AML_OUTPUT("<running>\n");
     return wnet_vif;
 }
 
 void wifi_mac_free_vmac(void *netif)
 {
-     DPRINTF(AML_DEBUG_INIT,"<running> %s %d \n",__func__,__LINE__);
-
+     AML_OUTPUT("<running>\n");
 }
 
 void
@@ -215,38 +218,136 @@ wifi_mac_connect_end(struct wifi_mac *wifimac)
 
 void wifi_mac_set_channel_rssi(struct wifi_mac *wifimac, unsigned char rssi)
 {
-    DPRINTF(AML_DEBUG_WARNING, "%s channnel rssi:%d\n", __func__, rssi);
-    wifimac->drv_priv->drv_ops.set_channel_rssi(wifimac->drv_priv, rssi);
+    if (wifimac->is_need_set_gain) {
+        DPRINTF(AML_DEBUG_WARNING, "%s channel rssi:%d\n", __func__, rssi);
+        wifimac->drv_priv->drv_ops.set_channel_rssi(wifimac->drv_priv, rssi);
+    }
 }
 
-void wifi_mac_change_channel_rssi(struct wifi_mac *wifimac, int *rssi)
+int wifi_mac_if_in_noisy_enviroment(struct wifi_mac *wifimac)
+{
+    int ret = 0;
+    if ((wifimac->wm_nrunning == 0 && wifimac->wm_scan->scan_ssid_count >= UNCONNECT_MIN_GIAN_THRESHOLD)
+        || (wifimac->wm_nrunning != 0 && wifimac->wm_scan->scan_ssid_count >= CONNECTED_MIN_GIAN_THRESHOLD)) {
+        ret = 1;
+    } else {
+        ret = 0;
+    }
+
+    return ret;
+}
+
+/* if wifimac->wm_scan->scan_ssid_count >= MIN_GIAN_THRESHOLD always use MAC_MIN_GAIN
+   if wifimac->wm_scan->scan_ssid_count <  MAX_GIAN_THRESHOLD always use MAC_MAX_GAIN
+   if MAX_GIAN_THRESHOLD < wifimac->wm_scan->scan_ssid_count < IN_GIAN_THRESHOLD use MAC_MID_GAIN
+*/
+void wifi_mac_get_channel_rssi_before_scan(struct wifi_mac *wifimac, int *rssi)
 {
     int channel_set_rssi = 0;
 
+    DPRINTF(AML_DEBUG_WARNING, "%s last rssi:%d\n", __func__, *rssi);
     switch (*rssi) {
-        case -82:
-            if (wifimac->wm_scan->scan_ssid_count > 10) {
-                channel_set_rssi = -65; //low power scan
+        case MAC_MAX_GAIN:
+            if (wifimac->is_need_set_gain) {
+                //enviroment may be noisy now, set to min gain
+                channel_set_rssi = MAC_MIN_GAIN;
             } else {
-                channel_set_rssi = -82; //default
+                //clear environment, always use max gain
+                if(aml_wifi_get_platform_verid() == 2) {
+                    /*this is for gva_mrt version, fix gain on -65dbm*/
+                    channel_set_rssi = MAC_MIN_GAIN;
+                } else {
+                    channel_set_rssi = MAC_MAX_GAIN;
+                }
             }
             break;
-        case -65:
-            if ((wifimac->wm_nrunning == 0 && wifimac->wm_scan->scan_ssid_count >= 100)
-                || (wifimac->wm_nrunning != 0 && wifimac->wm_scan->scan_ssid_count >= 25)) {
-                channel_set_rssi = -65; //low power scan
+
+        case MAC_MID_GAIN:
+            if (wifi_mac_if_in_noisy_enviroment(wifimac)) {
+                 // enviroment may be noisy now, set to min gain
+                channel_set_rssi = MAC_MIN_GAIN;
+            } else if (!wifimac->is_need_set_gain) {
+                //environment may be clear now, try to set max gain
+                channel_set_rssi = MAC_MAX_GAIN;
             } else {
-                channel_set_rssi = -82; //default
+               if(aml_wifi_get_platform_verid() == 2) {
+                  /*this is for gva_mrt version, fix gain on -65dbm*/
+                    channel_set_rssi = MAC_MIN_GAIN;
+                } else {
+                    channel_set_rssi = MAC_MID_GAIN;
+                }
+            }
+            break;
+
+        case MAC_MIN_GAIN:
+            if (wifi_mac_if_in_noisy_enviroment(wifimac)) {
+                //noisy enviroment, always use min gian
+                channel_set_rssi = MAC_MIN_GAIN;
+            } else {
+                // enviroment may not be noisy now, try to use mid gian
+               if(aml_wifi_get_platform_verid() == 2) {
+                  /*this is for gva_mrt version, fix gain on -65dbm*/
+                    channel_set_rssi = MAC_MIN_GAIN;
+                } else {
+                    channel_set_rssi = MAC_MID_GAIN;
+                }
             }
             break;
         default:
-            channel_set_rssi = -65; //low power scan
+            // don't know what kind of environment it is, use min gian
+            channel_set_rssi = MAC_MIN_GAIN;
             break;
     }
 
-    wifi_mac_set_channel_rssi(wifimac, (unsigned char)channel_set_rssi);
+    DPRINTF(AML_DEBUG_WARNING, "%s current rssi:%d\n", __func__, channel_set_rssi);
     *rssi = channel_set_rssi;
 }
+
+void wifi_mac_set_tx_power_accord_rssi(struct wifi_mac *wifimac, unsigned char rssi)
+{
+    struct hal_channel hchan;
+    unsigned char power_mode = 0;
+    static unsigned char rssi_increase_num = 0;
+    static unsigned char rssi_diminish_num = 0;
+
+    if (rssi <= 186) { /* -70dbm */
+        rssi_diminish_num++;
+        rssi_increase_num = 0;
+
+    } else if (rssi >= 196) { /* -60dbm */
+        rssi_increase_num++;
+        rssi_diminish_num = 0;
+
+    } else {
+        rssi_diminish_num = 0;
+        rssi_increase_num = 0;
+        return;
+    }
+
+    if (rssi_diminish_num == 10) {
+        power_mode = 2;
+
+    } else if (rssi_increase_num == 10) {
+        power_mode = 1;
+    }
+
+    if (power_mode && (power_mode != tpc_mode)) {
+        hchan.channel = wifi_mac_Mhz2ieee(wifimac->wm_curchan->chan_cfreq1, 0);
+        hchan.chan_bw = wifimac->wm_curchan->chan_bw;
+        DPRINTF(AML_DEBUG_INFO, "%s tx_power_accord rssi:%d\n", __func__, rssi - 256);
+        wifimac->drv_priv->drv_ops.set_tx_power_accord_rssi(wifimac->drv_priv, &hchan, rssi, power_mode);
+        tpc_mode = power_mode;
+    }
+
+    if (rssi_diminish_num > 20) {
+        rssi_diminish_num = 20;
+    }
+
+    if (rssi_increase_num > 20) {
+        rssi_increase_num = 20;
+    }
+}
+
 
 int
 wifi_mac_wmm_update2hal(struct wifi_mac *wifimac, struct wlan_net_vif *wnet_vif)
@@ -552,7 +653,7 @@ int wifi_mac_tx_send(struct sk_buff *skbbuf)
         next_wbuf = os_skb_next(skbbuf);
 
         if (wifi_mac_build_txinfo(wifimac, skbbuf, txinfo) != 0) {
-            DPRINTF(AML_DEBUG_ANY,"<running> %s %d \n",__func__,__LINE__);
+            ERROR_DEBUG_OUT("<running>\n");
             goto bad;
         }
 
@@ -599,8 +700,10 @@ int wifi_mac_tx_mgmt_frm(struct wifi_mac *wifimac, struct sk_buff *skbbuf)
     unsigned char is_robust_mgmt = 0;
 
 #ifdef DRV_PT_SUPPORT
-    wifi_mac_complete_wbuf(skbbuf, 0);
-    return error;
+    if (aml_wifi_is_enable_rf_test()) {
+        wifi_mac_complete_wbuf(skbbuf, 0);
+        return error;
+    }
 #endif
 
     txinfo = (struct wifi_mac_tx_info *)os_skb_cb(skbbuf);
@@ -608,7 +711,7 @@ int wifi_mac_tx_mgmt_frm(struct wifi_mac *wifimac, struct sk_buff *skbbuf)
     ASSERT(sizeof(struct wifi_mac_tx_info) <= OS_SKB_CB_MAXLEN);
     memset(&txinfo->wnet_vif_id, 0, sizeof(struct wifi_mac_tx_info)-sizeof(struct wifi_skb_callback)-sizeof(struct drv_txdesc *));
     wifi_mac_pwrsave_txpre(skbbuf);
-    wh = (struct wifi_frame *)OS_SKBBUF_DATA(skbbuf);
+    wh = (struct wifi_frame *)os_skb_data(skbbuf);
     is_robust_mgmt = is_robust_management_frame(wh);
 
     if ((sta->sta_flags_ext & WIFINET_NODE_MFP) && is_robust_mgmt) {
@@ -902,12 +1005,12 @@ void wifi_mac_roaming_trigger(struct wlan_net_vif * wnet_vif)
     }
 
     if (wnet_vif->vm_wmac->wm_scan->roaming_candidate_chans_cnt <= 1) {
-        printk("Can't find roaming candidate channel\n");
+        ERROR_DEBUG_OUT("Can't find roaming candidate channel\n");
         return;
     }
 
     if (IS_APSTA_CONCURRENT(aml_wifi_get_con_mode())) {
-        printk("ap sta concurrent, not trigger roaming\n");
+        ERROR_DEBUG_OUT("ap sta concurrent, not trigger roaming\n");
         return;
     }
 
@@ -996,6 +1099,7 @@ int wifi_mac_rx_complete(void *ieee,struct sk_buff *skbbuf, struct wifi_mac_rx_s
     struct wifi_mac_rx_cb *rx_cb;
     int type;
     struct wifi_mac_ops *net_ops;
+    unsigned char cur_snr;
 
     int frame_type, frame_subtype;
     enum drv_rx_type status;
@@ -1024,7 +1128,6 @@ int wifi_mac_rx_complete(void *ieee,struct sk_buff *skbbuf, struct wifi_mac_rx_s
     rx_cb->wnet_vif_id = rs->rs_wnet_vif_id;
 
     if (WIFINET_IS_PROBEREQ(wh)) {
-        __D(AML_DEBUG_RX, "%s:%d, probe req\n", __func__, __LINE__);
         return wifi_mac_input_all(wifimac, skbbuf, rs);
     }
 
@@ -1032,9 +1135,9 @@ int wifi_mac_rx_complete(void *ieee,struct sk_buff *skbbuf, struct wifi_mac_rx_s
     if (sta == NULL)
     {
         /*sta is null, this is first frame except probe req */
-        __D(AML_DEBUG_CNT, "%s:%d, auth or probe resp\n", __func__, __LINE__);
         return wifi_mac_input_all(wifimac, skbbuf, rs);
     }
+    sta->cur_fratype = wh->i_fc[0];
 
     if ((frame_type == WIFINET_FC0_TYPE_MGT) && (frame_subtype == WIFINET_FC0_SUBTYPE_AUTH)
         && !WIFINET_ADDR_EQ(sta->sta_bssid, wh->i_addr3))
@@ -1062,15 +1165,24 @@ int wifi_mac_rx_complete(void *ieee,struct sk_buff *skbbuf, struct wifi_mac_rx_s
         rs->rs_rssi = wifi_mac_average_rssi(rs->rs_rssi);
         sta->sta_avg_bcn_rssi =  (sta->sta_avg_bcn_rssi + (rs->rs_rssi -256) * 3) / 4; //dbm
 
-        if ((wnet_vif->vm_opmode == WIFINET_M_STA) && (wnet_vif->vm_state == WIFINET_S_CONNECTED)
-            && !(wifimac->wm_flags & WIFINET_F_SCAN)) {
-            recv_beacon_count++;
-            if (recv_beacon_count == 20) {
-                recv_beacon_count = 0;
-                if ((sta->sta_avg_bcn_rssi - auto_gain_base) > 5 || (auto_gain_base - sta->sta_avg_bcn_rssi) > 5) {
-                    auto_gain_base = sta->sta_avg_bcn_rssi;
-                    wifi_mac_set_channel_rssi(wifimac, (unsigned char)(auto_gain_base));
+        if ((wnet_vif->vm_opmode == WIFINET_M_STA) && (wnet_vif->vm_state == WIFINET_S_CONNECTED)) {
+            if (!(wifimac->wm_flags & WIFINET_F_SCAN)) {
+                recv_beacon_count++;
+                if (recv_beacon_count == 20) {
+                    recv_beacon_count = 0;
+                    if ((sta->sta_avg_bcn_rssi - auto_gain_base) > 5 || (auto_gain_base - sta->sta_avg_bcn_rssi) > 5) {
+                        auto_gain_base = sta->sta_avg_bcn_rssi;
+                        wifi_mac_set_channel_rssi(wifimac, (unsigned char)(auto_gain_base));
+                    }
                 }
+
+                cur_snr = wifimac->drv_priv->drv_ops.get_snr() / 4;
+                if (cur_snr != 0) {
+                    sta->sta_avg_snr = (sta->sta_avg_snr * 3 + cur_snr) / 4;
+                }
+            }
+            if (g_wftx_pwrtbl_en != 2) {
+                wifi_mac_set_tx_power_accord_rssi(wifimac, (unsigned char)(wnet_vif->vm_mainsta->sta_avg_bcn_rssi));
             }
         }
     }
@@ -1221,7 +1333,7 @@ int wifi_mac_netdev_open(void * ieee)
     /*call ha layer funct to set fpga info, init rf and set channel. */
     error = wifimac->drv_priv->drv_ops.drv_open(wifimac->drv_priv);
     if (error) {
-        printk("%s(%d) err= %d \n",__func__,__LINE__, error);
+        ERROR_DEBUG_OUT("err= %d \n",error);
         return error;
     }
 
@@ -1240,14 +1352,14 @@ int wifi_mac_netdev_stop(void * ieee)
     struct wifi_mac *wifimac = NET80211_HANDLE(ieee);
     int ret;
 
-    DPRINTF( AML_DEBUG_INIT,"<running> %s++ %d \n",__func__,__LINE__);
+    AML_OUTPUT("<running>++\n");
     if (NET80211_IF_RUNNING(wifimac)==0)
         return 0 ;
 
     wifimac->wm_dev_flags &= ~NETCOM_NETIF_IFF_RUNNING;
     ret = wifimac->drv_priv->drv_ops.drv_stop(wifimac->drv_priv);
-    DPRINTF( AML_DEBUG_INIT,"<running> %s-- %d, wm_dev_flags  = %x \n",
-        __func__,__LINE__, wifimac->wm_dev_flags );
+    AML_OUTPUT("<running> wm_dev_flags  = %x \n",
+        wifimac->wm_dev_flags );
     return ret;
 }
 
@@ -1429,6 +1541,9 @@ int wifi_mac_cap_attach(struct wifi_mac *wifimac, struct drv_private* drv_priv)
     INIT_LIST_HEAD(&wifimac->wm_free_entryq);
     WIFINET_NODE_FREE_LOCK_INIT(wifimac);
 
+    wifimac->gain_set_threshold = MAX_GIAN_THRESHOLD;
+    wifimac->is_need_set_gain = 1;
+
     wifimac->wm_txpowlimit = WIFINET_TXPOWER_MAX;
     wifimac->wm_rx_streams = WIFINET_RXSTREAM;
     wifimac->wm_tx_streams = WIFINET_TXSTREAM;
@@ -1462,17 +1577,16 @@ int wifi_mac_cap_attach(struct wifi_mac *wifimac, struct drv_private* drv_priv)
         concurrent_change_channel_timeout, wifimac);
 #endif
 
-    DPRINTF( AML_DEBUG_INIT,"<running> %s %d \n",__func__,__LINE__);
+    AML_OUTPUT("<running>\n");
     return 0;
 }
 
 int wifi_mac_cap_detach(struct wifi_mac *wifimac)
 {
     struct wlan_net_vif *wnet_vif;
-    DPRINTF( AML_DEBUG_INIT,"<running> %s %d \n",__func__,__LINE__);
     wifi_mac_stop_running(wifimac);
 
-    DPRINTF(AML_DEBUG_INIT,"<running> %s %d \n",__func__,__LINE__);
+    AML_OUTPUT("<running>\n");
 
     while (!list_empty(&wifimac->wm_wnet_vifs))
     {
@@ -1498,7 +1612,7 @@ int wifi_mac_cap_detach(struct wifi_mac *wifimac)
 
     wifi_mac_tx_lock_timer_cancel();
 
-    DPRINTF(AML_DEBUG_INIT,"<running> %s %d \n",__func__,__LINE__);
+    AML_OUTPUT("<running>\n");
     wifimac->drv_priv = NULL;
 
     return 0;
@@ -1557,7 +1671,7 @@ int wifi_mac_entry(struct wifi_mac *wifimac, void *drv_priv)
 {
     int error = 0;
 
-    DPRINTF(AML_DEBUG_INIT,"<running> %s %d++ \n",__func__,__LINE__);
+    AML_OUTPUT("<running>++ \n");
 
     error = wifi_mac_cap_attach(wifimac,(struct drv_private*)drv_priv);
     if (error != 0)
@@ -1578,7 +1692,7 @@ bad2:
 bad1:
     wifi_mac_cap_detach(wifimac);
 bad:
-    DPRINTF(AML_DEBUG_INIT,"%s %d bad!\n",__func__,__LINE__);
+    AML_OUTPUT("bad!\n");
     return error;
 }
 
@@ -1786,7 +1900,7 @@ bad:
 
 int wifi_mac_mac_exit(struct wifi_mac *wifimac)
 {
-    DPRINTF( AML_DEBUG_INIT,"%s %d ------>\n",__func__,__LINE__);
+    AML_OUTPUT("------>\n");
     wifimac->wm_mac_exit =1;
     wifi_mac_tx_cleanup(wifimac);
 
@@ -2144,6 +2258,24 @@ wifi_mac_wme_updateparams(struct wlan_net_vif *wnet_vif)
     }
 }
 
+int wifi_mac_check_main_sta(struct wlan_net_vif *wnet_vif)
+{
+    int return_val = 0;
+    if (!wnet_vif->vm_mainsta) {
+        DPRINTF(AML_DEBUG_WARNING, "%s vid:%d vm_mainsta is NULL, alloc new sta\n", __func__, wnet_vif->wnet_vif_id);
+
+        /*sta side allocate a sta buffer to save ap capabilities and information */
+        wnet_vif->vm_mainsta = wifi_mac_get_sta_node(&wnet_vif->vm_sta_tbl, wnet_vif, wnet_vif->vm_myaddr);
+        if (wnet_vif->vm_mainsta == NULL)
+        {
+            DPRINTF(AML_DEBUG_ERROR, "ERROR::%s %d alloc sta FAIL!!! \n",__func__,__LINE__);
+            return_val = 1;
+        }
+    }
+   return  return_val;
+}
+
+
 int wifi_mac_initial(struct net_device *dev, int forcescan)
 {
     struct wlan_net_vif *wnet_vif = netdev_priv(dev);
@@ -2155,14 +2287,19 @@ int wifi_mac_initial(struct net_device *dev, int forcescan)
 
     wifi_mac_preempt_scan(wifimac, 100, 100);
 
+    if (1 == wifi_mac_check_main_sta(wnet_vif)) {
+        return 1;
+    }
+
     hal_priv->powersave_init_flag = 0;
+    wifimac->is_need_set_gain = 1;
     if (wifimac->drv_priv->drv_config.cfg_txamsdu) {
         os_timer_ex_start_period(&wifimac->drv_priv->drv_txtimer, NET80211_AMSDU_TIMEOUT);
     }
 
     /*dev/interface is not up. */
     if ((dev->flags & IFF_RUNNING) == 0) {
-        DPRINTF(AML_DEBUG_INIT, "<%s>:%s wm_nopened =%d\n", wnet_vif->vm_ndev->name, __func__, wifimac->wm_nopened);
+        AML_OUTPUT("<%s>wm_nopened =%d\n", wnet_vif->vm_ndev->name, wifimac->wm_nopened);
         /*set power save state */
         wifi_mac_pwrsave_wakeup(wnet_vif, WKUP_FROM_VMAC_UP);
 
@@ -2216,7 +2353,7 @@ int wifi_mac_initial(struct net_device *dev, int forcescan)
 int wifi_mac_open(struct net_device *dev)
 {
     if (!aml_insmod_flag) {
-        printk("<running> %s %d dev = %p, aml insmod not complete\n",__func__,__LINE__,dev);
+        ERROR_DEBUG_OUT("<running> dev = %p, aml insmod not complete\n",dev);
         return -1;
     }
 
@@ -2231,7 +2368,7 @@ int wifi_mac_stop(struct net_device *dev)
     int index = 0;
 
     if (!aml_insmod_flag) {
-        printk("<running> %s %d dev = %p, aml insmod not complete\n",__func__,__LINE__,dev);
+        ERROR_DEBUG_OUT("<running> dev = %p, aml insmod not complete\n", dev);
         return -1;
     }
 
@@ -2452,11 +2589,8 @@ static void wifi_mac_check_special_ap(struct wlan_net_vif *wnet_vif)
 
     for (i = 0; i < ARRAY_SIZE(special_dev_manu_addr); i++) {
         if (!(memcmp(wnet_vif->vm_des_bssid, special_dev_manu_addr[i], 3))) {
-            wnet_vif->vm_wmac->wm_signal_power_weak_thresh_narrow = WIFINET_SIGNAL_POWER_WEAK_THRESH_NARROW + 5;
-            wnet_vif->vm_wmac->wm_signal_power_weak_thresh_wide = WIFINET_SIGNAL_POWER_WEAK_THRESH_WIDE + 18;
-
-            wnet_vif->vm_wmac->wm_signal_power_bw_change_thresh_narrow = WIFINET_SIGNAL_POWER_BW_CHANGE_THRESH_NARROW + 1;
-            wnet_vif->vm_wmac->wm_signal_power_bw_change_thresh_wide = WIFINET_SIGNAL_POWER_BW_CHANGE_THRESH_WIDE + 7;
+            wnet_vif->vm_wmac->wm_signal_power_weak_thresh_narrow = WIFINET_SIGNAL_POWER_WEAK_THRESH_NARROW + 8;
+            wnet_vif->vm_wmac->wm_signal_power_weak_thresh_wide = WIFINET_SIGNAL_POWER_WEAK_THRESH_WIDE + 31;
 
             break;
         }
@@ -2624,7 +2758,7 @@ wifi_mac_sub_sm(struct wlan_net_vif *wnet_vif, enum wifi_mac_state nstate, int a
                         wifi_mac_send_mgmt(sta, WIFINET_FC0_SUBTYPE_DISASSOC, (void *)&mgmt_arg);
                         wifi_mac_sta_leave(sta, 0);
                         wnet_vif->vm_flags &= ~WIFINET_F_SIBSS;
-                        wnet_vif->vm_scanchan_rssi = -82;
+                        wnet_vif->vm_scanchan_rssi = MAC_MAX_GAIN;
                     }
                     else if (wnet_vif->vm_opmode == WIFINET_M_IBSS)
                     {
@@ -3114,6 +3248,7 @@ void wifi_mac_set_reg_val(unsigned int reg_addr, enum wifi_mac_bwc_width bw)
         reg_val = hw_if->hif_ops.hi_read_word(MAC_RXPKT_CONTROL45);
         reg_val &= ~(1<<31);
         reg_val |= 0x800848;//bit23 & bit11 & bit6 & bit3 set to 1
+        reg_val &= ~(1 << 17 | 1 << 18);
         hw_if->hif_ops.hi_write_word(MAC_RXPKT_CONTROL45, reg_val | (bw << 17));//bit17 & bit18 set ap's bw
 
     } else {
@@ -3128,8 +3263,6 @@ int wifi_mac_setup(struct wifi_mac *wifimac,
     wnet_vif->vm_flags = wifimac->wm_flags;
     wnet_vif->vm_flags_ext = wifimac->wm_flags_ext;
 
-    wnet_vif->vm_specific_packet_rate_fixed = 0;
-    wnet_vif->vm_specific_packet_rate_kbps = 1000;
     wnet_vif->vm_caps = wifimac->wm_caps &
         ~(WIFINET_C_IBSS | WIFINET_C_HOSTAP  |WIFINET_C_MONITOR);
 
@@ -3268,8 +3401,7 @@ vm_wlan_net_vif_register(struct wlan_net_vif *wnet_vif, char* name)
     }
     /*register a wireless net dev for cfg80211 */
     if (wifi_mac_alloc_wdev(wnet_vif, vm_cfg80211_get_parent_dev()) < 0)
-        DPRINTF(AML_DEBUG_ERROR|AML_DEBUG_INIT|AML_DEBUG_CFG80211,
-                "%s %d ERROR alloc wdev\n", __FUNCTION__, __LINE__);
+        ERROR_DEBUG_OUT("ERROR alloc wdev\n");
 
     DPRINTF(AML_DEBUG_CONNECT, "%s %d\n",__func__,__LINE__);
     wifi_mac_pwrsave_latevattach(wnet_vif);
@@ -3280,10 +3412,10 @@ vm_wlan_net_vif_register(struct wlan_net_vif *wnet_vif, char* name)
     WIFINET_QUNLOCK(wifimac);
 
     WIFINET_ADDR_COPY(dev->dev_addr, wnet_vif->vm_myaddr);
-    DPRINTF(AML_DEBUG_INIT,"<running> %s %d \n",__func__,__LINE__);
+    AML_OUTPUT("<running>\n");
     if (register_netdev(dev))
     {
-        DPRINTF(AML_DEBUG_ERROR, "ERROR::%s: unable to register device\n", dev->name);
+        ERROR_DEBUG_OUT("ERROR::%s: unable to register device\n", dev->name);
         return 0;
     }
     return 1;
@@ -3432,13 +3564,11 @@ void wifi_mac_delt_vmac_id(struct wifi_mac *wifimac,int vid)
     ASSERT(vid < WIFI_MAX_VID);
     if (test_and_clear_bit(vid, (unsigned long *)&wifimac->wm_wnet_vif_mask))
     {
-        DPRINTF(AML_DEBUG_INIT,"<WARNING> %s %d vid %d free success\n",
-                __func__,__LINE__,vid);
+        AML_OUTPUT("<WARNING> vid %d free success\n", vid);
     }
     else
     {
-        DPRINTF(AML_DEBUG_INIT,"<WARNING> %s %d vid %d has been free\n",
-                __func__,__LINE__,vid);
+        AML_OUTPUT("<WARNING> vid %d has been free\n", vid);
     }
 }
 
@@ -3594,7 +3724,7 @@ int wifi_mac_create_vmac(struct wifi_mac *wifimac, void *ifr, int cmdFromwhr)
     strncpy(name, vmparam.vm_param_name, sizeof(name) - 1);
     vid = wifi_mac_get_new_vmac_id(wifimac);
     if (vid < 0) {
-       printk("%s(%d) alloc wnet_vif id %d <%s>  < fail > \n", __func__,  __LINE__, vid, vmparam.vm_param_name);
+       ERROR_DEBUG_OUT("alloc wnet_vif id %d <%s>  < fail > \n",vid, vmparam.vm_param_name);
         return -EIO;
     }
 
@@ -3612,8 +3742,7 @@ int wifi_mac_create_vmac(struct wifi_mac *wifimac, void *ifr, int cmdFromwhr)
         case WIFINET_M_MONITOR:
             if (wifimac->wnet_vif_num != 0)
             {
-                DPRINTF(AML_DEBUG_ERROR,"Can't Create opmode=%d.\n",
-                        vmparam.vm_param_opmode);
+                ERROR_DEBUG_OUT("Can't Create opmode=%d.\n",vmparam.vm_param_opmode);
                 return   -EIO;
             }
             vm_opmode = vmparam.vm_param_opmode;
@@ -3623,15 +3752,14 @@ int wifi_mac_create_vmac(struct wifi_mac *wifimac, void *ifr, int cmdFromwhr)
             vm_opmode = WIFINET_M_HOSTAP;
             break;
         default:
-            DPRINTF(AML_DEBUG_ERROR,"<running> %s %d opmode=%d\n",
-                    __func__,__LINE__, vmparam.vm_param_opmode);
+            ERROR_DEBUG_OUT("<running> opmode=%d\n",vmparam.vm_param_opmode);
             return  -EIO;
     }
 
     wnet_vif = (struct wlan_net_vif *)wifi_mac_alloc_ndev(sizeof(struct wlan_net_vif ));
     if (wnet_vif == NULL)
     {
-        printk("%s(%d) allocate wnet_vif fail \n", __func__, __LINE__);
+        ERROR_DEBUG_OUT("allocate wnet_vif fail \n");
         wifi_mac_delt_vmac_id(wifimac,vid);
         return  -EIO;
     }
@@ -3660,7 +3788,7 @@ int wifi_mac_create_vmac(struct wifi_mac *wifimac, void *ifr, int cmdFromwhr)
     if ( wifimac->drv_priv->drv_ops.add_interface(wifimac->drv_priv, vid, wnet_vif,
                 wifi_mac_opmode_2_halmode(vm_opmode), myaddr, ipv4))
     {
-        printk("%s(%d) add interface < fail > \n", __func__, __LINE__);
+        ERROR_DEBUG_OUT("add interface < fail > \n");
         wifi_mac_free_vmac(wnet_vif);
         return  -EIO;
     }
@@ -3679,7 +3807,7 @@ int wifi_mac_create_vmac(struct wifi_mac *wifimac, void *ifr, int cmdFromwhr)
     wnet_vif->vif_ops.pt_rx_start = wifi_mac_pt_rx_start;
     wnet_vif->vif_ops.pt_rx_stop = wifi_mac_pt_rx_stop;
 
-    DPRINTF(AML_DEBUG_INIT, "%s wnet_vif->vm_mac_mode=%d, wnet_vif:%p\n", __func__, wnet_vif->vm_mac_mode, wnet_vif);
+    AML_OUTPUT("wnet_vif->vm_mac_mode=%d, wnet_vif:%p\n", wnet_vif->vm_mac_mode, wnet_vif);
     return 0;
 }
 
@@ -3711,7 +3839,7 @@ enum wifi_mac_macmode p2p_phy_mode_filter (enum wifi_mac_macmode in)
     }
     if (change == true)
     {
-        DPRINTF(AML_DEBUG_P2P,"%s rm 11b for p2p, macmode=%d\n", __func__, out);
+        AML_PRINT(AML_DBG_MODULES_P2P,"rm 11b for p2p, macmode=%d\n", out);
     }
     return out;
 }
@@ -3758,7 +3886,7 @@ enum wifi_mac_macmode wifi_mac_get_sta_mode(struct wifi_scan_info *se)
 
     if (se == NULL)
     {
-        printk("%s(%d): se == NULL\n", __func__, __LINE__);
+        ERROR_DEBUG_OUT("se == NULL\n");
         return false;
     }
 
@@ -3839,7 +3967,7 @@ int wifi_mac_mode_vattach_ex (struct wlan_net_vif *wnet_vif,
         wnet_vif->vm_mac_mode = WIFINET_MODE_11GNAC;
     }
 
-    DPRINTF(AML_DEBUG_INIT, "%s wnet_vif->vm_mac_mode=%d\n", __func__, wnet_vif->vm_mac_mode);
+    AML_OUTPUT("wnet_vif->vm_mac_mode=%d\n", wnet_vif->vm_mac_mode);
     return 1;
 }
 
