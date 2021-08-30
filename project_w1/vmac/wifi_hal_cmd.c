@@ -22,15 +22,15 @@ namespace FW_NAME
 
 #include "wifi_hal_com.h"
 #include "wifi_hif.h"
+#include "wifi_common.h"
 #include "wifi_hal_cmd.h"
 #include "wifi_hal_txdesc.h"
 #include "wifi_hal.h"
-#include "t9023_calb.h"
 #include "patch_fi_cmd.h"
 #include "wifi_mac_if.h"
+#include "wifi_mac_chan.h"
 
 #if defined (HAL_FPGA_VER)
-#include "rf_t9026/t9026_top.h"
 #include "wifi_drv_statistic.h"
 #endif
 
@@ -40,6 +40,12 @@ namespace FW_NAME
 static char * conf_path = WIFI_CONF_PATH;
 module_param(conf_path, charp, S_IRUGO);
 
+unsigned char g_tx_power_change_disable = 0;
+unsigned char g_wftx_pwrtbl_en = 0;
+unsigned char g_initial_gain_change_disable = 0;
+static struct WF2G_Txpwr_Param g_wf2g_txpwr_param;
+static struct WF5G_Txpwr_Param g_wf5g_txpwr_param;
+extern unsigned char tpc_mode;
 
 //set cmd to firmware
 unsigned int phy_set_param_cmd(unsigned char cmd,unsigned char vid,unsigned int data)
@@ -515,16 +521,6 @@ unsigned int phy_switch_chan(unsigned short channel, unsigned char bw, unsigned 
     // fix me, it works,but why len = sizeof(unsigned int) for read unsigned short channel
 
     hif->hif_ops.hi_write_word(RG_MAC_CHANNEL_INDEX, channel);
-
-#ifdef HAL_FPGA_VER
-    #ifdef RF_T9026
-        t9026_channel_switch(channel, bw, restore);
-    #endif
-    #ifdef RF_T9023
-        t9023_channel_switch(channel);
-    #endif
-#endif
-
     return 1;
 }
 
@@ -537,7 +533,7 @@ unsigned int phy_set_rf_chan(struct hal_channel *hchan, unsigned char flag, unsi
 
 #else
     struct PHY_PRIMARY_CHANNEL_BIT primary_chan;
-    struct Channel_Switch channel_switch;
+    struct Channel_Switch channel_switch = {0};
 
     channel_switch.Cmd = CHANNEL_SWITCH_CMD;
     channel_switch.channel = hchan->cchan_num;
@@ -568,7 +564,7 @@ unsigned int phy_set_rf_chan(struct hal_channel *hchan, unsigned char flag, unsi
             break;
         default:
             primary_chan.def_pri_ch = SW_COFF_0;
-            printk("%s(%d) channel relation err!!!\n", __func__, __LINE__);
+            ERROR_DEBUG_OUT("channel relation err!!!\n");
             break;
     }
 
@@ -634,7 +630,7 @@ unsigned int phy_set_chan_support_type(struct hal_channel *chan)
             break;
         default:
             to_change->def_pri_ch = SW_COFF_0;
-            printk("%s(%d) channel relation err!!!\n", __func__, __LINE__);
+            ERROR_DEBUG_OUT("channel relation err!!!\n");
             break;
     }
 
@@ -826,7 +822,9 @@ unsigned int phy_set_rekey_data(unsigned char wnet_vif_id, void *rekey_data, uns
     rekey_cmd->Cmd = Rekey_Data_Set_Cmd;
     rekey_cmd->vid = wnet_vif_id;
     rekey_cmd->StaId= StaAid;
-    memcpy((void *)(&rekey_cmd->kek[0]), rekey_data, 40);
+    memcpy((void *)(&rekey_cmd->kek[0]), rekey_data, KEY_KEK_LENGTH);
+    memcpy((void *)(&rekey_cmd->kck[0]), rekey_data + KEY_KEK_LENGTH, KEY_KEK_LENGTH);
+    memcpy((void *)(&rekey_cmd->replay_counter[0]), rekey_data + 32, KEY_REPLAY_CTR_LENGTH);
 
     HAL_BEGIN_LOCK();
     hi_set_cmd((unsigned char *)rekey_cmd, sizeof(struct RekeyDataCmd));
@@ -891,14 +889,18 @@ void  phy_scan_cmd(unsigned int data)
 
 void phy_set_channel_rssi(unsigned char rssi)
 {
-    struct Channel_Switch channel_switch;
+    struct Channel_Switch channel_switch = {0};
 
     channel_switch.Cmd = CHANNEL_SWITCH_CMD;
     channel_switch.rssi = rssi;
     channel_switch.flag = 0;
     channel_switch.flag |= CHANNEL_RSSI_FLAG;
 
-    DPRINTF(AML_DEBUG_WARNING, "%s channnel rssi:%d\n", __func__, rssi);
+    if (g_initial_gain_change_disable) {
+        return;
+    }
+
+    DPRINTF(AML_DEBUG_WARNING, "%s channel rssi:%d\n", __func__, rssi);
 
     HAL_BEGIN_LOCK();
     hi_set_cmd((unsigned char*)&channel_switch, sizeof(struct Channel_Switch));
@@ -1181,7 +1183,7 @@ int phy_set_suspend(unsigned char vid, unsigned char enable,
     /* if last suspend fail,this time is resume,just return */
     if ((enable == 0) && (atomic_read(&hal_priv->drv_suspend_cnt) == 0))
     {
-        printk("last suspend fail,don't need resume, just return -1\n");
+        ERROR_DEBUG_OUT("last suspend fail,don't need resume, just return -1\n");
         return -1;
     }
 
@@ -1303,7 +1305,7 @@ void phy_set_bmfm_info(int wnet_vif_id, unsigned char *group_id,
     }
 #else
     if (group_id == NULL) {
-        printk("%s:%d, group id null\n", __func__, __LINE__);
+        ERROR_DEBUG_OUT("group id null\n");
         return;
     }
 #endif
@@ -1487,7 +1489,7 @@ unsigned int phy_coexist_config(const void *data, int data_len)
     }
     else
     {
-        printk("%s:%d, coex cmd len error\n", __func__, __LINE__);
+        ERROR_DEBUG_OUT("coex cmd len error\n");
         return -1;
     }
 
@@ -1543,6 +1545,7 @@ unsigned int phy_interface_enable(unsigned char enable, unsigned char vid)
     return 0;
 }
 
+unsigned char print_type = 0;
 unsigned int hal_set_fwlog_cmd(unsigned char mode)
 {
     struct hw_interface* hif = hif_get_hw_interface();
@@ -1554,23 +1557,30 @@ unsigned int hal_set_fwlog_cmd(unsigned char mode)
     if (mode == 0)
     {
         fwlog_mode.mode = 0;
-        fwlog_mode.fwlog_print = 0;
         /* reset ram share */
         hif->hif_ops.hi_write_word(0x00a0d0e4, 0x0000007f);
     }
     else
     {
         fwlog_mode.mode = mode;
-        fwlog_mode.fwlog_print = 1;
         if (mode == 1)
         {
             /* set ram share */
             hif->hif_ops.hi_write_word(0x00a0d0e4, 0x8000007f);
+            print_type = 0;
         }
         else if (mode == 3)
         {
             hal_get_fwlog();
-        }      
+        }
+        else if (mode == 4) //open auto print
+        {
+            print_type = 1;
+        }
+        else if (mode == 5) //close auto print
+        {
+            print_type = 0;
+        }
     }
 
     HAL_BEGIN_LOCK();
@@ -1673,7 +1683,7 @@ unsigned char get_s8_item(char *varbuf, int len, char *item, char *item_value)
 unsigned char get_s16_item(char *varbuf, int len, char *item, short *item_value)
 {
     unsigned int n;
-    char tmpbuf[20];
+    char tmpbuf[60];
     short *p = item_value;
     int ret = 0;
     unsigned int pos = 0;
@@ -1713,12 +1723,69 @@ unsigned char get_s16_item(char *varbuf, int len, char *item, short *item_value)
     return 1;
 }
 
+unsigned char parse_tx_power_coefficient(char *varbuf, int len, char str_pwr_coefficien[])
+{
+    int i = 0;
+    unsigned short pwr_coefficient[57];
+    memset(pwr_coefficient,0,sizeof(pwr_coefficient));
+
+    get_s16_item(varbuf, len, str_pwr_coefficien, &pwr_coefficient[0]);
+
+    if (pwr_coefficient[0]) {
+        printk("======>>>>>>%s:",str_pwr_coefficien);
+        for (i=0; i<57; i++) {
+            printk(" %d",pwr_coefficient[i]);
+        }
+        printk("\n");
+
+        if (memcmp(str_pwr_coefficien,"ce_pwr_coefficient",strlen(str_pwr_coefficien)) == 0) {
+            update_tx_power_coefficient_plan(TX_POWER_CE, pwr_coefficient);
+        }
+
+        if (memcmp(str_pwr_coefficien,"fcc_pwr_coefficient",strlen(str_pwr_coefficien)) == 0) {
+            update_tx_power_coefficient_plan(TX_POWER_FCC, pwr_coefficient);
+        }
+
+        if (memcmp(str_pwr_coefficien,"arib_pwr_coefficient",strlen(str_pwr_coefficien)) == 0) {
+        update_tx_power_coefficient_plan(TX_POWER_ARIB, pwr_coefficient);
+        }
+
+        if (memcmp(str_pwr_coefficien,"srrc_pwr_coefficient",strlen(str_pwr_coefficien)) == 0) {
+        update_tx_power_coefficient_plan(TX_POWER_SRRC, pwr_coefficient);
+        }
+
+        if (memcmp(str_pwr_coefficien,"anatel_pwr_coefficient",strlen(str_pwr_coefficien)) == 0) {
+        update_tx_power_coefficient_plan(TX_POWER_ANATEL, pwr_coefficient);
+        }
+    }
+
+    return 0;
+}
+
+unsigned char parse_tx_power_band(char *varbuf, int len, char str_pwr_plan[])
+{
+    unsigned short band_pwr_table[4];
+    memset(band_pwr_table,0,sizeof(band_pwr_table));
+
+    get_s16_item(varbuf, len, str_pwr_plan, &band_pwr_table[0]);
+
+    printk("======>>>>>>%s: %d\n",str_pwr_plan, band_pwr_table[3]);
+
+    if (memcmp(str_pwr_plan,"ce_band_pwr_tbl",strlen(str_pwr_plan)) == 0) {
+    update_tx_power_band(TX_POWER_CE, band_pwr_table);
+    }
+
+    return 0;
+}
 
 unsigned char parse_cali_param(char *varbuf, int len, struct Cali_Param *cali_param)
 {
     unsigned short platform_verid = 0; // default: 0
+    unsigned short cali_config[1] = {0};
+
     get_s8_item(varbuf, len, "version", &cali_param->version);
-    get_s16_item(varbuf, len, "cali_config", &cali_param->cali_config);
+    get_s16_item(varbuf, len, "cali_config", cali_config);
+    cali_param->cali_config = cali_config[0];
     get_s8_item(varbuf, len, "freq_offset", &cali_param->freq_offset);
     get_s8_item(varbuf, len, "htemp_freq_offset", &cali_param->htemp_freq_offset);
     get_s8_item(varbuf, len, "cca_ed_det", &cali_param->cca_ed_det);
@@ -1731,6 +1798,16 @@ unsigned char parse_cali_param(char *varbuf, int len, struct Cali_Param *cali_pa
     get_s16_item(varbuf, len, "spur_freq", &cali_param->spur_freq);
     get_s8_item(varbuf, len, "rf_count", &cali_param->rf_num);
     get_s8_item(varbuf, len, "wftx_pwrtbl_en", &cali_param->wftx_pwrtbl_en);
+    get_s8_item(varbuf, len, "wftx_power_change_disable", &g_tx_power_change_disable);
+    get_s8_item(varbuf, len, "initial_gain_change_disable", &g_initial_gain_change_disable);
+
+    g_wftx_pwrtbl_en = cali_param->wftx_pwrtbl_en;
+
+    if (g_wftx_pwrtbl_en != 2) {
+        tpc_mode = 1;
+    } else {
+        tpc_mode = 2;
+    }
 
     /* maybe get from txt */
 #ifdef HAL_FPGA_VER
@@ -1753,6 +1830,17 @@ unsigned char parse_cali_param(char *varbuf, int len, struct Cali_Param *cali_pa
     printk("======>>>>>> rf_count = %d\n", cali_param->rf_num);
     printk("======>>>>>> wftx_pwrtbl_en = %d\n", cali_param->wftx_pwrtbl_en);
     printk("======>>>>>> platform_versionid = %d\n", cali_param->platform_versionid);
+    printk("======>>>>>> wftx_power_change_disable = %d\n", g_tx_power_change_disable);
+    printk("======>>>>>> initial_gain_change_disable = %d\n", g_initial_gain_change_disable);
+
+    parse_tx_power_band(varbuf, len, "ce_band_pwr_tbl");
+    parse_tx_power_coefficient(varbuf, len, "ce_pwr_coefficient");
+    parse_tx_power_coefficient(varbuf, len, "fcc_pwr_coefficient");
+    parse_tx_power_coefficient(varbuf, len, "arib_pwr_coefficient");
+    parse_tx_power_coefficient(varbuf, len, "srrc_pwr_coefficient");
+    parse_tx_power_coefficient(varbuf, len, "anatel_pwr_coefficient");
+
+    hal_cfg_txpwr_cffc_param_init(0);
 
     return 0;
 }
@@ -1778,6 +1866,9 @@ unsigned char parse_tx_power_param(char *varbuf, int len, struct WF2G_Txpwr_Para
     get_s8_item(varbuf, len, "wf5g_40M_pwr_tbl", &wf5g_txpwr_param->wf5g_pwr_tbl[1][0]);
     get_s8_item(varbuf, len, "wf5g_80M_pwr_tbl", &wf5g_txpwr_param->wf5g_pwr_tbl[2][0]);
 
+    memcpy(&g_wf2g_txpwr_param.wf2g_pwr_tbl, wf2g_txpwr_param->wf2g_pwr_tbl, sizeof(wf2g_txpwr_param->wf2g_pwr_tbl));
+    memcpy(&g_wf5g_txpwr_param.wf5g_pwr_tbl, wf5g_txpwr_param->wf5g_pwr_tbl, sizeof(wf5g_txpwr_param->wf5g_pwr_tbl));
+
     printk("======>>>>>> %s ===>>> aml_wifi_rf txt => 2g 20/40 5g 20/40/80\n", __func__);
 
     return 0;
@@ -1785,11 +1876,20 @@ unsigned char parse_tx_power_param(char *varbuf, int len, struct WF2G_Txpwr_Para
 
 unsigned char set_tx_power_param_enhance(struct WF2G_Txpwr_Param *wf2g_txpwr_param, struct WF5G_Txpwr_Param *wf5g_txpwr_param)
 {
-    unsigned char wf2g_pwr_tbl_dft[2][16] = {{0xBA,0xBA,0xf8,0xea,0xB5,0xB5,0xf8,0xea,0xA1,0xA1,0x84,0x7C,0x6C,0x6C,0x63,0x58},
-                                                                  {0xBA,0xBA,0xf8,0xea,0xB5,0xB5,0xe8,0xd4,0x94,0x94,0x7C,0x75,0x6C,0x66,0x5D,0x58}};
-    unsigned char wf5g_pwr_tbl_dft[3][16] = {{0xBA,0xBA,0xa6,0x94,0x75,0x75,0xb0,0x96,0x6C,0x6C,0xa2,0x86,0x6C,0x6C,0x63,0x58},
-                                                                  {0xBA,0xBA,0xa6,0x94,0x75,0x75,0xa8,0x8e,0x6C,0x6C,0x8a,0x75,0x6C,0x66,0x5D,0x58},
-                                                                  {0xBA,0xBA,0xa6,0x94,0x75,0x75,0xa8,0x8e,0x6C,0x6C,0x98,0x82,0x60,0x60,0x60,0x58}};
+#ifndef GVA_TPC_PARAM
+    unsigned char wf2g_pwr_tbl_dft[2][16] = {{0xda,0xda,0xda,0x86,0x72,0x72,0xe0,0x88,0x6e,0x6e,0x84,0x7C,0x6C,0x6C,0x63,0x58},
+                                                                  {0xBA,0xBA,0xCB,0xCB,0xB5,0xB5,0xb4,0x78,0x64,0x64,0x7C,0x75,0x6C,0x66,0x5D,0x58}};
+    unsigned char wf5g_pwr_tbl_dft[3][16] = {{0xBA,0xBA,0xab,0x6a,0x51,0x51,0xab,0x62,0x52,0x52,0xaa,0x72,0x5C,0x5C,0x53,0x58},
+                                                                  {0xBA,0xBA,0x84,0x84,0x75,0x75,0xab,0x68,0x52,0x52,0x9a,0x70,0x6C,0x66,0x5D,0x4b},
+                                                                  {0xBA,0xBA,0x84,0x84,0x75,0x75,0x7C,0x75,0x6C,0x6C,0x98,0x6a,0x60,0x60,0x5a,0x4b}};
+#else
+    unsigned char wf2g_pwr_tbl_dft[2][16] = {{0xea,0xea,0xea,0xb6,0x9e,0x7e,0xea,0xae,0x9b,0x78,0x84,0x7C,0x6C,0x6C,0x63,0x58},
+                                                                  {0xBA,0xBA,0xCB,0xCB,0xB5,0xB5,0xda,0xae,0x9b,0x78,0x7C,0x75,0x6C,0x66,0x5D,0x58}};
+    unsigned char wf5g_pwr_tbl_dft[3][16] = {{0xBA,0xBA,0xbe,0x7a,0x6a,0x6a,0xbe,0x7C,0x62,0x62,0xb8,0x7a,0x6C,0x6C,0x5c,0x58},
+                                                                  {0xBA,0xBA,0x84,0x84,0x75,0x75,0xaC,0x6a,0x62,0x62,0xae,0x75,0x6a,0x66,0x66,0x5c},
+                                                                  {0xBA,0xBA,0x84,0x84,0x75,0x75,0x7C,0x75,0x6C,0x6C,0xae,0x6b,0x60,0x60,0x60,0x58}};
+
+#endif
 
     memcpy(&wf2g_txpwr_param->wf2g_pwr_tbl, wf2g_pwr_tbl_dft, sizeof(wf2g_txpwr_param->wf2g_pwr_tbl));
     memcpy(&wf5g_txpwr_param->wf5g_pwr_tbl, wf5g_pwr_tbl_dft, sizeof(wf5g_txpwr_param->wf5g_pwr_tbl));
@@ -1820,6 +1920,89 @@ static void set_cca_energy_detection(unsigned int reg_addr)
     return;
 }
 
+void phy_rf_channel_restore(unsigned short channel, int bw)
+{
+    struct Channel_Switch channel_switch = {0};
+
+    channel_switch.Cmd = CHANNEL_SWITCH_CMD;
+    channel_switch.bw = bw;
+    channel_switch.channel = channel;
+    channel_switch.flag = 0;
+    channel_switch.flag |= CHANNEL_RSSI_PWR_FLAG;
+
+    HAL_BEGIN_LOCK();
+    hi_set_cmd((unsigned char*)&channel_switch, sizeof(struct Channel_Switch));
+    HAL_END_LOCK();
+}
+
+void phy_set_tx_power_accord_rssi(int bw, unsigned short channel, unsigned char rssi, unsigned char power_mode)
+{
+    struct WF2G_Txpwr_Param wf2g_txpwr_param;
+    struct WF5G_Txpwr_Param wf5g_txpwr_param;
+    struct Channel_Switch channel_switch = {0};
+
+    memset((void *)&wf2g_txpwr_param, 0, sizeof(struct WF2G_Txpwr_Param));
+    memset((void *)&wf5g_txpwr_param, 0, sizeof(struct WF5G_Txpwr_Param));
+
+    wf2g_txpwr_param.Cmd = WF2G_TXPWR_PARAM_CMD;
+    wf5g_txpwr_param.Cmd = WF5G_TXPWR_PARAM_CMD;
+    g_wf2g_txpwr_param.Cmd = WF2G_TXPWR_PARAM_CMD;
+    g_wf5g_txpwr_param.Cmd = WF5G_TXPWR_PARAM_CMD;
+
+    channel_switch.Cmd = CHANNEL_SWITCH_CMD;
+    channel_switch.bw = bw;
+    channel_switch.channel = channel;
+    channel_switch.flag = 0;
+    channel_switch.flag |= CHANNEL_RSSI_PWR_FLAG;
+
+    if (!g_tx_power_change_disable) {
+
+        if (power_mode == 2) {
+            printk("\n*** %s, change power enhance,bw %d channel %d \n", __func__, channel_switch.bw, channel_switch.channel);
+            set_tx_power_param_enhance(&wf2g_txpwr_param, &wf5g_txpwr_param);
+
+            HAL_BEGIN_LOCK();
+            hi_set_cmd((unsigned char *)&wf2g_txpwr_param, sizeof(struct WF2G_Txpwr_Param));
+            hi_set_cmd((unsigned char *)&wf5g_txpwr_param, sizeof(struct WF5G_Txpwr_Param));
+            HAL_END_LOCK();
+
+            HAL_BEGIN_LOCK();
+            hi_set_cmd((unsigned char*)&channel_switch, sizeof(struct Channel_Switch));
+            HAL_END_LOCK();
+            return;
+        }
+
+        if (power_mode == 1) {
+            if (g_wftx_pwrtbl_en == 0) {
+                printk("\n*** %s, change power default,bw %d channel %d \n", __func__, channel_switch.bw, channel_switch.channel);
+                set_tx_power_param_default(&wf2g_txpwr_param, &wf5g_txpwr_param);
+
+                HAL_BEGIN_LOCK();
+                hi_set_cmd((unsigned char *)&wf2g_txpwr_param, sizeof(struct WF2G_Txpwr_Param));
+                hi_set_cmd((unsigned char *)&wf5g_txpwr_param, sizeof(struct WF5G_Txpwr_Param));
+                HAL_END_LOCK();
+
+            } else if (g_wftx_pwrtbl_en == 1){
+                printk("\n*** %s, change power mode 1,bw %d channel %d \n", __func__, channel_switch.bw, channel_switch.channel);
+                printk("\n*** %s, change power mode 1,0x%x  0x%x \n", __func__, g_wf2g_txpwr_param.wf2g_pwr_tbl[0][0] , g_wf2g_txpwr_param.wf2g_pwr_tbl[0][1]);
+                HAL_BEGIN_LOCK();
+                hi_set_cmd((unsigned char *)&g_wf2g_txpwr_param, sizeof(struct WF2G_Txpwr_Param));
+                hi_set_cmd((unsigned char *)&g_wf5g_txpwr_param, sizeof(struct WF5G_Txpwr_Param));
+                HAL_END_LOCK();
+            }
+
+            HAL_BEGIN_LOCK();
+            hi_set_cmd((unsigned char*)&channel_switch, sizeof(struct Channel_Switch));
+            HAL_END_LOCK();
+           return;
+        }
+
+
+    } else {
+        return;
+    }
+
+}
 
 unsigned char get_cali_param(struct Cali_Param *cali_param, struct WF2G_Txpwr_Param *wf2g_txpwr_param, 
                                                              struct WF5G_Txpwr_Param *wf5g_txpwr_param)
@@ -1836,20 +2019,25 @@ unsigned char get_cali_param(struct Cali_Param *cali_param, struct WF2G_Txpwr_Pa
 
     chip_id_l = efuse_manual_read(0xf);
     chip_id_l = chip_id_l & 0xffff;
-    switch ((chip_id_l & 0xff00) >> 8) {
-        case MODULE_ITON:
-            sprintf(chip_id_buf, "%s/aml_wifi_rf_iton.txt", conf_path);
-            break;
-        case MODULE_AMPAK:
-            sprintf(chip_id_buf, "%s/aml_wifi_rf_ampak.txt", conf_path);
-            break;
-        case MODULE_FN_LINK:
-            sprintf(chip_id_buf, "%s/aml_wifi_rf_fn_link.txt", conf_path);
-            break;
-        default:
-            sprintf(chip_id_buf, "%s/aml_wifi_rf.txt", conf_path);
-    }
-    printk("aml wifi module SN:%04x  the rf config: %s\n", chip_id_l, chip_id_buf);
+    sprintf(chip_id_buf, "%s/aml_wifi_rf_%04x.txt", conf_path, chip_id_l);
+    if (isFileReadable(chip_id_buf, NULL) != 0) {
+        memset(chip_id_buf,'\0',sizeof(chip_id_buf));
+        switch ((chip_id_l & 0xff00) >> 8) {
+            case MODULE_ITON:
+                sprintf(chip_id_buf, "%s/aml_wifi_rf_iton.txt", conf_path);
+                break;
+            case MODULE_AMPAK:
+                sprintf(chip_id_buf, "%s/aml_wifi_rf_ampak.txt", conf_path);
+                break;
+            case MODULE_FN_LINK:
+                sprintf(chip_id_buf, "%s/aml_wifi_rf_fn_link.txt", conf_path);
+                break;
+            default:
+                sprintf(chip_id_buf, "%s/aml_wifi_rf.txt", conf_path);
+        }
+        printk("aml wifi module SN:%04x  sn txt not found, the rf config: %s\n", chip_id_l, chip_id_buf);
+    } else
+        printk("aml wifi module SN:%04x  the rf config: %s\n", chip_id_l, chip_id_buf);
     fs = get_fs();
     set_fs(KERNEL_DS);
 
@@ -1929,6 +2117,42 @@ err:
     return 1;
 }
 
+unsigned int hal_cfg_txpwr_cffc_param(void * chan, void * txpwr_plan)
+{
+    struct wifi_channel * s_chan = (struct wifi_channel *)chan;
+    struct tx_power_plan * s_txpwr_plan = ( struct tx_power_plan *)txpwr_plan;
+    struct Txpwr_Cffc_Cfg_Param txpwr_cffc_param={0};
+    unsigned short center_channel = 0;
+    int i = 0;
+
+    txpwr_cffc_param.Cmd = TXPWR_CFFC_CFG_CMD;
+    memcpy(txpwr_cffc_param.band, s_txpwr_plan->band_pwr_table, 4);
+    memcpy(txpwr_cffc_param.coefficient, s_txpwr_plan->coefficient, s_txpwr_plan->cffc_num);
+
+    printk("%s coefficient[%d]:\n", __func__, s_txpwr_plan->cffc_num);
+
+    for (i=0; i < 4; i++) {
+       printk(" %d",txpwr_cffc_param.band[i]);
+    }
+
+    for (i=0; i < s_txpwr_plan->cffc_num; i++) {
+       printk(" %d",txpwr_cffc_param.coefficient[i]);
+    }
+    printk("\n");
+
+    HAL_BEGIN_LOCK();
+    hi_set_cmd((unsigned char *)&txpwr_cffc_param, sizeof(struct Txpwr_Cffc_Cfg_Param));
+    HAL_END_LOCK();
+
+    if (chan) {
+        center_channel =  wifi_mac_Mhz2ieee(s_chan->chan_cfreq1, 0);
+        printk("restore chan:%d bw:%d \n", center_channel, s_chan->chan_bw);
+        phy_rf_channel_restore(center_channel, s_chan->chan_bw);
+    }
+
+    return 0;
+}
+
 unsigned int hal_cfg_cali_param(void)
 {
     struct Cali_Param cali_param;
@@ -1958,7 +2182,7 @@ unsigned int hal_cfg_cali_param(void)
         HAL_END_LOCK();
     }
     else {
-        printk("%s:%d, set calibration parameter failed\n", __func__, __LINE__);
+        ERROR_DEBUG_OUT("set calibration parameter failed\n");
     }
 
     return 0;

@@ -69,6 +69,20 @@ enum aml_iwpriv_subcmd
     AML_IWP_SET_FETCH_PKT_METHOD = 61,
     AML_IWP_SET_FRAG_THRESHOLD = 62,
     AML_IWP_SET_PREAMBLE_TYPE = 63,
+    AML_IWP_SET_FIX_BAND = 64,
+    AML_IWP_SET_GAIN = 65,
+    AML_IWP_SET_TPC = 66,
+    AML_IWP_SET_DEV_SN = 67,
+    AML_IWP_GET_DEV_SN = 68,
+    AML_IWP_SET_WIFI_MAC = 69,
+    AML_IWP_GET_WIFI_MAC = 70,
+    AML_IWP_SET_BT_MAC = 71,
+    AML_IWP_GET_BT_MAC = 72,
+    AML_IWP_SET_TXPW_PLAN = 73,
 };
+
+extern unsigned char set_conn_band;
+extern unsigned char aml_iwpriv_get_conn_band(void);
+int aml_set_debug_modules(char *debug_str);
 
 #endif

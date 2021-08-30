@@ -45,5 +45,6 @@ extern int aml_wifi_get_vif0_opmode(void);
 extern int aml_wifi_get_vif1_opmode(void);
 extern unsigned int aml_wifi_get_con_mode(void);
 extern unsigned int aml_wifi_get_platform_verid(void);
+extern unsigned int aml_wifi_is_enable_rf_test(void);
 
 #endif

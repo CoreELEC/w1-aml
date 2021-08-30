@@ -79,8 +79,8 @@ void Driver_intr_rx_handle(void *drv_prv,struct sk_buff *skb, unsigned char Rssi
 {
     recv_frame_num++;
 
-    Net_Receive( (unsigned char*)OS_SKBBUF_DATA(skb),OS_SKBBUF_LEN(skb),Rssi);
-    OS_SKBBUF_FREE(skb);
+    Net_Receive( (unsigned char*)os_skb_data(skb), os_skb_get_pktlen(skb), Rssi);
+    os_skb_free(skb);
     return;
 }
 
@@ -132,10 +132,10 @@ int Do_HI_AGG_TxPriv_TYPE_AMSDU(struct _HI_TxPrivDescripter_chain* HI_TxPriv[],
 
         buffer = &os_skb_data((struct sk_buff *)skbptr[i]);
 
-        Do_make_amsdu_header(htframe,buffer[i]+headerlength,length[i]-headerlength);
+        Do_make_amsdu_header(htframe, *(unsigned char **)((unsigned long)buffer + i) + headerlength, length[i] - headerlength);
         msdulen = ALIGN(length[i] - headerlength +14,4);
         total += msdulen;
-        memcpy(os_skb_data((struct sk_buff *)skbptr[0])+total,buffer[i]+headerlength,msdulen);
+        memcpy(os_skb_data((struct sk_buff *)skbptr[0]) + total, *(unsigned char **)((unsigned long)buffer + i) + headerlength, msdulen);
     }
     length[0] = total;
     Do_HI_AGG_TxPriv_TYPE_AMPDU(HI_TxPriv,skbptr,length,1);

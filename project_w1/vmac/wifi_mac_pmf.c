@@ -128,7 +128,7 @@ int wifi_mac_parse_mmie(struct wifi_station *sta, struct sk_buff *skb, unsigned 
     }
 
     frm = skb->data;
-    wh = (struct wifi_frame *)OS_SKBBUF_DATA(skb);
+    wh = (struct wifi_frame *)os_skb_data(skb);
 
     #ifdef PMF_PKT_PRINT
         /* dump the packet content before decrypt */
@@ -138,7 +138,7 @@ int wifi_mac_parse_mmie(struct wifi_station *sta, struct sk_buff *skb, unsigned 
 
 
     if ((pkt_len < hdr_len) || (pkt_len - hdr_len < mic_len)) {
-        printk("pkt_len too small\n");
+        ERROR_DEBUG_OUT("pkt_len too small\n");
         return -1;
     }
 
@@ -146,7 +146,7 @@ int wifi_mac_parse_mmie(struct wifi_station *sta, struct sk_buff *skb, unsigned 
     mme = frm + pkt_len - mme_offset;
 
     if (*mme != MME_IE_ID) {
-        printk("not mmie:%d\n", *mme);
+        ERROR_DEBUG_OUT("not mmie:%d\n", *mme);
         return -1;
     }
 
@@ -154,7 +154,7 @@ int wifi_mac_parse_mmie(struct wifi_station *sta, struct sk_buff *skb, unsigned 
     memcpy(&pkt_keyid, mme + 2, 2);
     pkt_keyid = le16_to_cpu(pkt_keyid);
     if (pkt_keyid != sta->pmf_key.wk_keyix) {
-        printk("BIP key index error!\n");
+        ERROR_DEBUG_OUT("BIP key index error!\n");
         return -1;
     }
 
@@ -164,14 +164,14 @@ int wifi_mac_parse_mmie(struct wifi_station *sta, struct sk_buff *skb, unsigned 
     local_ipn = (unsigned long *)(sta->pmf_key.wk_keyrsc);
     /* BIP packet number should bigger than previous BIP packet */
     if (pkt_ipn <= *local_ipn) { /* wrap around? */
-        printk("replay BIP packet, pkt_ipn%08x, local_ipn:%08x\n", pkt_ipn, *local_ipn);
+        ERROR_DEBUG_OUT("replay BIP packet, pkt_ipn%08x, local_ipn:%08x\n", pkt_ipn, *local_ipn);
         return -1;
     }
 
     ori_len = pkt_len - hdr_len + BIP_AAD_SIZE;
     bip_aad = ZMALLOC(ori_len, "bip_add", GFP_ATOMIC);
     if (bip_aad == NULL) {
-        printk("BIP AAD allocate fail\n");
+        ERROR_DEBUG_OUT("BIP AAD allocate fail\n");
         return -1;
     }
 
@@ -184,7 +184,9 @@ int wifi_mac_parse_mmie(struct wifi_station *sta, struct sk_buff *skb, unsigned 
     clear_pwr_mgt(bip_aad);
     clear_more_data(bip_aad);
     /* conscruct AAD, copy address 1 to address 3 */
-    memcpy(bip_aad + 2, wh->i_addr1, 18);
+    memcpy(bip_aad + 2, wh->i_addr1, 6);
+    memcpy(bip_aad + 8, wh->i_addr2, 6);
+    memcpy(bip_aad + 14, wh->i_addr3, 6);
 
     printk("%s bip_add before\n", __func__);
     for (i = 0; i < ori_len; ++i) {
@@ -201,7 +203,7 @@ int wifi_mac_parse_mmie(struct wifi_station *sta, struct sk_buff *skb, unsigned 
         *local_ipn = pkt_ipn;
         res = 1;
     } else {
-        printk("BIP MIC error!\n");
+        ERROR_DEBUG_OUT("BIP MIC error!\n");
     }
 
     #ifdef PMF_PKT_PRINT
@@ -227,7 +229,7 @@ int aml_aes_decrypt(struct wifi_station *sta, struct sk_buff *skb, unsigned char
     size_t plain_len = 0;
 
     frm = skb->data;
-    hdr = (struct ieee80211_hdr *)OS_SKBBUF_DATA(skb);
+    hdr = (struct ieee80211_hdr *)os_skb_data(skb);
     hdr_len = sizeof(struct wifi_frame);
     key_len = sta->sta_ucastkey.wk_keylen;
     key = sta->sta_ucastkey.wk_key;
@@ -242,7 +244,7 @@ int aml_aes_decrypt(struct wifi_station *sta, struct sk_buff *skb, unsigned char
     }
 
     if (plain == NULL) {
-        printk("%s fail\n", __func__);
+        ERROR_DEBUG_OUT("fail\n");
         return 1;
     }
 
@@ -388,7 +390,7 @@ int wifi_mac_mgmt_validate(struct wifi_station *sta, struct sk_buff *skb, unsign
     unsigned short decrypt_res;
 
     frm = skb->data;
-    wh = (struct wifi_frame *)OS_SKBBUF_DATA(skb);
+    wh = (struct wifi_frame *)os_skb_data(skb);
     hdr_len = sizeof(struct wifi_frame);
     is_bmc = (WIFINET_IS_MULTICAST(wh->i_addr1));
 
@@ -404,7 +406,7 @@ int wifi_mac_mgmt_validate(struct wifi_station *sta, struct sk_buff *skb, unsign
     data_len = skb->len - hdr_len - iv_len - icv_len;
     mgmt_data = ZMALLOC(data_len, "mgmt_data", GFP_ATOMIC);
     if (mgmt_data == NULL) {
-        printk("mgmt_data alloc fail\n");
+        ERROR_DEBUG_OUT("mgmt_data alloc fail\n");
         goto fail;
     }
 
@@ -416,7 +418,8 @@ int wifi_mac_mgmt_validate(struct wifi_station *sta, struct sk_buff *skb, unsign
 
     decrypt_res = aml_pkt_decrypt(sta, skb);
     if (decrypt_res) {
-        printk("decrypt mgmt pkt fail\n");
+        ERROR_DEBUG_OUT("decrypt mgmt pkt fail\n");
+        FREE(mgmt_data, "mgmt_data");
         goto fail;
     }
     /* save actual management data frame body */
@@ -459,13 +462,13 @@ int wifi_mac_add_mmie(struct wifi_station *sta, struct sk_buff *skb) {
     unsigned short frame_body_len;
 
     frm = skb->data;
-    wh = (struct wifi_frame *)OS_SKBBUF_DATA(skb);
+    wh = (struct wifi_frame *)os_skb_data(skb);
     frame_body_len = skb->len - sizeof(struct wifi_frame);
     ori_len = BIP_AAD_SIZE + frame_body_len;
 
     bip_aad = ZMALLOC(ori_len, "bip_add", GFP_ATOMIC);
     if (bip_aad == NULL) {
-        printk("%s bip alloc fail\n", __func__);
+        ERROR_DEBUG_OUT("bip alloc fail\n");
         return 1;
     }
     printk("%s len:%d, frame_body_len:%d\n", __func__, skb->len, frame_body_len);
@@ -475,8 +478,10 @@ int wifi_mac_add_mmie(struct wifi_station *sta, struct sk_buff *skb) {
         unsigned char mic[16] = {0};
 
         /* IGTK key is not install ex: mesh MFP without IGTK */
-        if (sta->pmf_key.wk_valid != 1)
+        if (sta->pmf_key.wk_valid != 1) {
+            FREE(bip_aad, "bip_aad");
             return 1;
+        }
 
         if (sta->pmf_key.wk_key_type == WIFINET_CIPHER_AES_CMAC) {
             mme_clen = 16;
@@ -512,7 +517,9 @@ int wifi_mac_add_mmie(struct wifi_station *sta, struct sk_buff *skb) {
         clear_pwr_mgt(bip_aad);
         clear_more_data(bip_aad);
         /* conscruct AAD, copy address 1 to address 3 */
-        memcpy(bip_aad + 2, wh->i_addr1, 18);
+        memcpy(bip_aad + 2, wh->i_addr1, 6);
+        memcpy(bip_aad + 8, wh->i_addr2, 6);
+        memcpy(bip_aad + 14, wh->i_addr3, 6);
         /* copy management fram body */
         memcpy(bip_aad + BIP_AAD_SIZE, mgmt_body, frame_body_len);
 
@@ -572,7 +579,7 @@ int _aml_ccmp_encrypt(struct wifi_mac_key *key, unsigned char *pn, unsigned int 
     }
 
     if (enc == NULL) {
-        printk("Failed to encrypt CCMP(%d) frame", key->wk_keylen);
+        ERROR_DEBUG_OUT("Failed to encrypt CCMP(%d) frame", key->wk_keylen);
         return 0;
     }
 
@@ -600,7 +607,7 @@ int wifi_mac_sw_encrypt(struct wifi_station *sta, struct sk_buff *skb) {
     struct hal_private *hal_priv = hal_get_priv();
 
     frm = skb->data;
-    wh = (struct wifi_frame *)OS_SKBBUF_DATA(skb);
+    wh = (struct wifi_frame *)os_skb_data(skb);
     hdr_len = sizeof(struct wifi_frame);
     is_bmc = (WIFINET_IS_MULTICAST(wh->i_addr1));
     key_index = wnet_vif->vm_def_txkey;

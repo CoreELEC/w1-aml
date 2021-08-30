@@ -205,14 +205,14 @@ void drv_rx_delba(
 
 
 static int
-drv_rx_bar(struct drv_private *drv_priv, struct aml_driver_nsta *drv_sta,  struct sk_buff * skbbuf)
+drv_rx_bar(struct drv_private *drv_priv, struct aml_driver_nsta *drv_sta,  struct sk_buff *skbbuf)
 {
     struct wifi_mac_frame_bar *bar;
     int tid_index;
     unsigned short seqnum;
     struct drv_rx_scoreboard *RxTidState;
     int index, desc_id;
-    struct sk_buff * twbuf;
+    struct sk_buff *twbuf;
     struct wifi_mac_rx_status* rs;
 
     drv_priv->drv_stats.rx_bar_cnt++;
@@ -270,13 +270,13 @@ drv_rx_bar(struct drv_private *drv_priv, struct aml_driver_nsta *drv_sta,  struc
 static int
 drv_rx_ampdu( struct drv_private *drv_priv, 
                     struct aml_driver_nsta *drv_sta,  
-                    struct sk_buff * skbbuf, struct wifi_mac_rx_status* rs )
+                    struct sk_buff *skbbuf, struct wifi_mac_rx_status* rs )
 {
-    struct wifi_frame  *wh;
-    struct wifi_qos_frame  *whqos;
+    struct wifi_frame *wh;
+    struct wifi_qos_frame *whqos;
     struct WIFINET_S_FRAME_QOS_ADDR4 *whqos_4addr;
     struct drv_rx_scoreboard *RxTidState;
-    struct drv_rxdesc  *pRxDesc;
+    struct drv_rxdesc *pRxDesc;
     unsigned char type, subtype;
     int b_mcast, tid, index, desc_id, rxdiff, is4addr;
     unsigned short rxseq;
@@ -338,8 +338,6 @@ drv_rx_ampdu( struct drv_private *drv_priv,
     }
 
     index = DRV_BA_INDEX(RxTidState->seq_next, rxseq);
-
-    __D(AML_DEBUG_RX, "%s:%d, rxseq:%d\n", __func__, __LINE__, index);
 
     if (index > (WIFINET_SEQ_MAX - (RxTidState->baw_size << 2)))
     {

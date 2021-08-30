@@ -410,7 +410,7 @@ void hi_rx_fifo_init(void)
     g_rx_fifo = (unsigned char *)ZMALLOC(RX_FIFO_SIZE + 2 * FUNC6_BLKSIZE, "hi_rx_fifo_init", GFP_KERNEL);
 #endif
     if (g_rx_fifo == NULL)
-        printk("%s:%d, rx fifo alloc failed\n", __func__, __LINE__);
+        ERROR_DEBUG_OUT("rx fifo alloc failed\n");
 
     hif->rx_fifo.FDH = 0;
     hif->rx_fifo.FDT = 0;
@@ -435,7 +435,7 @@ int hi_sdio_setup_scat_data(struct scatterlist *sg_list, struct hi_tx_desc **pTx
 
     if (sg_num > SG_NUM_MAX || sg_num == 0)
     {
-        printk("ERROR: sg_num=%d\n", sg_num);
+        ERROR_DEBUG_OUT("ERROR: sg_num=%d\n", sg_num);
         return -1;
     }
 
@@ -455,7 +455,7 @@ int hi_sdio_setup_scat_data(struct scatterlist *sg_list, struct hi_tx_desc **pTx
             /*if there is already mpdu in sg list, just send this sg list firstly. */
             if (sg_total_len == 0)
             {
-                printk("%s:%d, mpdu length too large:%d\n", __func__, __LINE__, sg_data_size);
+                ERROR_DEBUG_OUT("mpdu length too large:%d\n", sg_data_size);
             }
             break;
         }
@@ -474,107 +474,85 @@ int hi_sdio_setup_scat_data(struct scatterlist *sg_list, struct hi_tx_desc **pTx
 /* for fpga ver*/
 int hi_tx_frame(struct hi_tx_desc **pTxDPape, unsigned int mpdu_num,  unsigned int page_num)
 {
-	struct scatterlist sg_list[SG_NUM_MAX] = {{0}};
-	struct hi_tx_desc *tx_page = *pTxDPape;
-	unsigned int sg_remain = 0, sg_num = 0, offset = 0, blkcnt = 0;
-	int loop = 0, ret = 0;
-	struct hw_interface* hif = hif_get_hw_interface();
-       static unsigned int cnt = 0;
-       cnt++;
-	sg_num = mpdu_num;
+    struct scatterlist sg_list[SG_NUM_MAX] = {{0}};
+    unsigned int sg_remain = 0, sg_num = 0, offset = 0, blkcnt = 0;
+    int loop = 0, ret = 0;
+    struct hw_interface* hif = hif_get_hw_interface();
+    static unsigned int cnt = 0;
+    cnt++;
+    sg_num = mpdu_num;
+    
+    do
+    {
+        /*Support wifi host fill many mpdus in sg_list. */
+        if (sg_num > SG_NUM_MAX)
+        {
+            sg_remain = sg_num - SG_NUM_MAX;
+            sg_num = SG_NUM_MAX;
+        }
+        else
+        {
+            sg_remain = 0;
+        }
 
-	if (g_dbg_info_enable & AML_DBG_HAL_TX_DW)
-	{
-	      hal_show_txframe(tx_page);
-	}
-
-	if( (g_dbg_info_enable & AML_DBG_TX_VIP_INFO)  &&( cnt%0x400==0) )
-	{
-            PRINT("tv_preamble_type=%d\n", tx_page->TxVector.tv_ht.htbit.tv_preamble_type);
-            PRINT("tv_GI_type=%d\n", tx_page->TxVector.tv_ht.htbit.tv_GI_type);
-            PRINT("tv_tx_rate=0x%x \n",     tx_page->TxVector.tv_ht.htbit.tv_tx_rate);
-            PRINT("tv_Channel_BW=%d\n", tx_page->TxVector.tv_ht.htbit.tv_Channel_BW);
-            PRINT("tv_FEC_coding=%d(0:BCC;1:LDPC)\n", tx_page->TxVector.tv_FEC_coding);
-            PRINT("TID=%d\n", tx_page->TxPriv.TID);
-            PRINT("agg_len=%d\n", tx_page->TxPriv.AggrLen);
-            PRINT("AggrNum=%d\n", tx_page->TxPriv.AggrNum);
-            PRINT("mpdu_len=%d\n", HW_MPDU_LEN_GET(tx_page->MPDUBufFlag) );
-            PRINT("tv_dyn_bw_nonht=%d\n", tx_page->TxVector.tv_dyn_bw_nonht);
-            PRINT("tv_check_cca_bw=%d\n", tx_page->TxVector.tv_ht.htbit.tv_check_cca_bw );
-            PRINT("tv_ch_bw_nonht=%d\n", tx_page->TxVector.tv_ch_bw_nonht);
-	}
-
-	do
-	{
-		/*Support wifi host fill many mpdus in sg_list. */
-		if (sg_num > SG_NUM_MAX)
-		{
-			sg_remain = sg_num - SG_NUM_MAX;
-			sg_num = SG_NUM_MAX;
-		}
-		else
-		{
-			sg_remain = 0;
-		}
-
-		/* one mpdu will fill in sg item, so mpdu_num is sg_num. But when mpdu len is greater than 'max_seg_size',
+        /* one mpdu will fill in sg item, so mpdu_num is sg_num. But when mpdu len is greater than 'max_seg_size',
               * there are many mpdus will be remained*/
-		blkcnt = hi_sdio_setup_scat_data(sg_list, &pTxDPape[offset], sg_num, SDIO_FUNC4);
-		if (remain_mpdu_num > 0)
-		{
-			sg_remain += remain_mpdu_num;
-			sg_num    -= remain_mpdu_num;
-		}
-		if (blkcnt <= 0)
-		{
-			printk("sg init fail.\n\n");
-			ret = -1;
-			break;
-		}
-		/* addr (0x0) is flag for FUNC4 and addr is not a actual phy or virtual address. */
-		while ((ret = hif->hif_ops.hi_scat_rw(sg_list, sg_num, blkcnt, SDIO_FUNC4, 0x0, SG_WRITE)) != 0)
-		{
-			if (loop > 4)
-			{
-				printk("sg process fail.\n\n");
-				break;
-			}
-			loop++;
-		}
+        blkcnt = hi_sdio_setup_scat_data(sg_list, &pTxDPape[offset], sg_num, SDIO_FUNC4);
+        if (remain_mpdu_num > 0)
+        {
+            sg_remain += remain_mpdu_num;
+            sg_num    -= remain_mpdu_num;
+        }
+        if (blkcnt <= 0)
+        {
+            ERROR_DEBUG_OUT("sg init fail.\n\n");
+            ret = -1;
+            break;
+        }
+        /* addr (0x0) is flag for FUNC4 and addr is not a actual phy or virtual address. */
+        while ((ret = hif->hif_ops.hi_scat_rw(sg_list, sg_num, blkcnt, SDIO_FUNC4, 0x0, SG_WRITE)) != 0)
+        {
+            if (loop > 4)
+            {
+                ERROR_DEBUG_OUT("sg process fail.\n\n");
+                break;
+            }
+            loop++;
+         }
 
-		if (ret == 0)
-		{
+        if (ret == 0)
+        {
 #if (SDIO_UPDATE_HOST_WRPTR == 0) //if enable host update sdio write pointer, we need set bit9 in SDIO MISC CTRL
-			unsigned int page_tmp = 0;
-			unsigned int reg_tmp = 0;
-			struct hal_private * hal_priv = hal_get_priv();
+            unsigned int page_tmp = 0;
+            unsigned int reg_tmp = 0;
+            struct hal_private * hal_priv = hal_get_priv();
 
-			/*sdio process success, update SDIO write pointer and interrupt FW to read data. */
-			page_tmp += send_page_num;
-			if (page_tmp > page_num)
-			{
-				printk("%s:%d, update host wr ptr failed. page_tmp :%d, all page num%d\n",
+            /*sdio process success, update SDIO write pointer and interrupt FW to read data. */
+            page_tmp += send_page_num;
+            if (page_tmp > page_num)
+            {
+                printk("%s:%d, update host wr ptr failed. page_tmp :%d, all page num%d\n",
                             __func__, __LINE__,page_tmp, page_num);
-			}
-			hal_priv->tx_page_offset = CIRCLE_Addition2(send_page_num, hal_priv->tx_page_offset, TX_ADDRESSTABLE_NUM);
-			send_page_num = 0;
-			/*Bit30 enable TXPAGE TABLE REG flag. */
-			reg_tmp = hal_priv->tx_page_offset;
+            }
+            hal_priv->tx_page_offset = CIRCLE_Addition2(send_page_num, hal_priv->tx_page_offset, TX_ADDRESSTABLE_NUM);
+            send_page_num = 0;
+            /*Bit30 enable TXPAGE TABLE REG flag. */
+            reg_tmp = hal_priv->tx_page_offset;
 
-			hif->hif_ops.hi_write_word(RG_WIFI_IF_MAC_TXTABLE_RD_ID, reg_tmp);
+            hif->hif_ops.hi_write_word(RG_WIFI_IF_MAC_TXTABLE_RD_ID, reg_tmp);
 #endif
-		}
-		else
-		{
-			/* Theroetically,  sdio shall not transmit failed, if fail and fix it. */
-			printk("%s(%d):SDIO try re-transmit %d times, but fail\n",__func__, __LINE__, loop);
-		}
-		/*offset for mpdu in pTxDPape list and continue. */
-		offset += sg_num;
-		sg_num = sg_remain;
-	}
-	while(sg_remain > 0);
-	return ret;
+        }
+        else
+        {
+            /* Theroetically,  sdio shall not transmit failed, if fail and fix it. */
+            printk("%s(%d):SDIO try re-transmit %d times, but fail\n",__func__, __LINE__, loop);
+        }
+        /*offset for mpdu in pTxDPape list and continue. */
+        offset += sg_num;
+        sg_num = sg_remain;
+    }
+    while(sg_remain > 0);
+    return ret;
 }
 
 #elif defined (HAL_SIM_VER)
@@ -618,8 +596,14 @@ void hi_cfg_firmware(void)
 {
     struct  hw_interface* hif = hif_get_hw_interface();
     hif->hw_config.txpagenum = DEFAULT_TXPAGENUM;
-    hif->hw_config.rxpagenum = DEFAULT_RXPAGENUM;;
+    hif->hw_config.rxpagenum = DEFAULT_RXPAGENUM;
     hif->hw_config.bcn_page_num   = DEFAULT_BCN_NUM;
+
+#ifdef DRV_PT_SUPPORT
+    if (aml_wifi_is_enable_rf_test())
+        hif->hw_config.flags = PT_MODE;
+#endif
+
 #if defined (HAL_SIM_VER)
     if( STA1_VMAC0_SEND_RATE <= WIFI_11B_11M)
     {
@@ -668,8 +652,7 @@ unsigned char hi_set_cmd(unsigned char *pdata,unsigned int len)
         {
             printk("err-> f_fdh: %d, f_fdt: %d, d_fdh %d \n", hif->hif_ops.hi_read_word(0x00a10038),
             hif->hif_ops.hi_read_word(0x00a1003c), pCmdDownFifo->FDH);
-            PRINT("hi_set_cmd err, cmd=0x%x, vid=0x%x, data_unsigned char=0x%x\n",
-                pdata[0], pdata[3], pdata[4]);
+            PRINT("hi_set_cmd err, cmd=0x%x, vid=0x%x\n", pdata[0], pdata[3]);
 
             POWER_BEGIN_LOCK();
             hal_priv->hal_drv_ps_status &= ~HAL_DRV_IN_ACTIVE;
@@ -764,7 +747,7 @@ void hi_soft_tx_irq(void)
     }
 
 #if defined (HAL_FPGA_VER)
-    __D(BIT(17), "txPageFreeNum:%d, HalTxPageDoneCounter:%d\n", hal_priv->txPageFreeNum, hal_priv->HalTxPageDoneCounter);
+    AML_PRINT(AML_DBG_MODULES_TX, "txPageFreeNum:%d, HalTxPageDoneCounter:%d\n", hal_priv->txPageFreeNum, hal_priv->HalTxPageDoneCounter);
 #endif
 
     while (hal_priv->txcompletestatus->txdoneframecounter !=  hal_priv->HalTxFrameDoneCounter)
@@ -783,8 +766,13 @@ void hi_soft_tx_irq(void)
 
             tx_null_status = &(txok_status_node->tx_status.tx_null_status);
             if (!((tx_null_status->txstatus == TX_DESCRIPTOR_STATUS_NULL_DATA_OK)
-                || (tx_null_status->txstatus == TX_DESCRIPTOR_STATUS_NULL_DATA_FAIL)))
+                || (tx_null_status->txstatus == TX_DESCRIPTOR_STATUS_NULL_DATA_FAIL)
+                || (tx_null_status->txstatus == TX_DESCRIPTOR_STATUS_NEW)))
             {
+                hif->HiStatus.Tx_Free_num++;
+            }
+
+            if ((tx_null_status->txstatus == TX_DESCRIPTOR_STATUS_NEW) && (hif->HiStatus.Tx_Free_num < hif->HiStatus.Tx_Done_num)) {
                 hif->HiStatus.Tx_Free_num++;
             }
         }
@@ -811,31 +799,34 @@ void hi_soft_fw_event(void)
     struct hal_private *hal_priv = hal_get_priv();
     struct hw_interface *hif = hif_get_hw_interface();
     struct fw_event_to_driver *event = NULL;
-#ifndef DRV_PT_SUPPORT
-    struct fw_event_no_data *normal_event = NULL;
-#endif
     unsigned int hw_event_addr = 0;
 
     hw_event_addr = hif->hw_config.fweventaddress;
     event = hal_priv->fw_event;
-    
+
     hif->hif_ops.hi_read_sram((unsigned char *)event,
         (unsigned char *)(SYS_TYPE)hw_event_addr, (SYS_TYPE)sizeof(struct fw_event_to_driver));
 
-#ifndef DRV_PT_SUPPORT
+#ifdef DRV_PT_SUPPORT
+    if (aml_wifi_is_enable_rf_test())
+        return;
+#endif
+
     while (hal_priv->fw_event->event_counter !=  hal_priv->hal_fw_event_counter)
     {
+        struct fw_event_no_data *normal_event = NULL;
+
         normal_event = &hal_priv->fw_event->event_data[hal_priv->hal_fw_event_counter % WIFI_MAX_FW_EVENT].normal_event;
         hal_priv->hal_fw_event_counter++;
         hal_priv->hal_call_back->intr_fw_event(hal_priv->drv_priv, normal_event);
     }
-#endif
+
     return;
 }
 
 void hi_soft_rx_bcn(struct hal_private *hal_priv, unsigned char vid)
 {
-	OS_SKBBUF *skb = NULL;
+	struct sk_buff *skb = NULL;
 	struct hw_interface *hif = hif_get_hw_interface();
 	unsigned char bcnpage = hif->hw_config.bcn_page_num;
 	/*beacon buffer address in sram */
@@ -868,7 +859,7 @@ void hi_soft_rx_bcn(struct hal_private *hal_priv, unsigned char vid)
 	if (rx_bcn_page != 0)
 		buflen = rx_bcn_page * PAGE_LEN;
 
-	hif->hif_ops.hi_read_sram((unsigned char *)OS_SKBBUF_DATA(skb),
+	hif->hif_ops.hi_read_sram((unsigned char *)os_skb_data(skb),
             (unsigned char *)(SYS_TYPE)bcnaddr, (SYS_TYPE)buflen);
 
 	RxDesc = (HW_RxDescripter_bit *)skb->data;
@@ -877,10 +868,11 @@ void hi_soft_rx_bcn(struct hal_private *hal_priv, unsigned char vid)
 	if ((RxDesc->RxLength + RX_PRIV_HDR_LEN) >= buflen)
 	{
 		PRINT("RecvBcn: RxLength =%lu\n", (SYS_TYPE)RxDesc->RxLength);
-		OS_SKBBUF_FREE(skb);
+		os_skb_free(skb);
 		return;
 	}
-	OS_SKBBUF_PUT(skb, (RxDesc->RxLength + RX_PRIV_HDR_LEN)); /*beacon len and RXVector len */
+	os_skb_put(skb, (RxDesc->RxLength + RX_PRIV_HDR_LEN)); /*beacon len and RXVector len */
+
 #if defined (HAL_FPGA_VER)
 	skb_queue_tail(&hif->bcn_list_head, skb);
 	up(&hal_priv->rx_thread_sem);
@@ -1081,7 +1073,8 @@ void hi_soft_rx_irq(struct hal_private *hal_priv, unsigned int rx_fw_ptr)
                 memcpy(OS_SKBBUF_DATA(skb), &rx_buffer[frame_offset], framelen);
                 RxPrivHdr = (HW_RxDescripter_bit *)OS_SKBBUF_DATA(skb);
 #ifdef DRV_PT_SUPPORT
-                b2b_rx_throughput_calc(RxPrivHdr);
+                if (aml_wifi_is_enable_rf_test())
+                    b2b_rx_throughput_calc(RxPrivHdr);
 #endif
                 /*SKB PUT one by one */
                 OS_SKBBUF_PUT(skb, framelen);
@@ -1099,11 +1092,11 @@ void hi_irq_task(struct hal_private *hal_priv)
 {
     unsigned int intr_status =0;
     unsigned char loop_count = 0;
-    unsigned char rx_loop_num = 0;
     unsigned char int_loop_num = 0;
-    unsigned char i;
     unsigned int gpio_en = 0;
-    unsigned int intr_status_tmp = 0;
+//    unsigned char i;
+//    unsigned char rx_loop_num = 0;
+//    unsigned int intr_status_tmp = 0;
 #ifdef POWER_SAVE_NO_SDIO
     unsigned int ptr = 0;
 #endif
@@ -1119,15 +1112,10 @@ void hi_irq_task(struct hal_private *hal_priv)
         return;
     }
 
-int_loop:
+//int_loop:
 
     intr_status = hi_get_irq_status();
     hal_priv->int_status_copy = intr_status;
-
-    if(g_dbg_info_enable & AML_DBG_TX_HAL)
-    {
-        printk("%s:%d, intr_st:0x%x\n", __func__, __LINE__, (intr_status & ~(FW_RX_PTR_MASK)));
-    }
 
     loop_count += 1;
     if (intr_status & GOTO_WAKEUP_VID1)
@@ -1166,6 +1154,7 @@ int_loop:
         hal_priv->sts_hirq[hirq_rx_ok_idx]++;
         hi_soft_rx_irq(hal_priv, rx_fw_ptr);
 
+#if 0
         for (i = 0; i < rx_loop_num; i++)
         {
             intr_status_tmp = hi_get_irq_status();
@@ -1174,6 +1163,7 @@ int_loop:
             hi_soft_rx_irq(hal_priv, rx_fw_ptr);
             intr_status |= (intr_status_tmp & (~FW_RX_PTR_MASK));
         }
+#endif
         hal_priv->need_scheduling_tx = 1;
     }
 
@@ -1282,7 +1272,7 @@ int_loop:
         hi_clear_irq_status(SDIO_FW2HOST_EN);
         return;
     }
-    goto int_loop;
+//    goto int_loop;
 }
 #elif defined (HAL_SIM_VER)
 {

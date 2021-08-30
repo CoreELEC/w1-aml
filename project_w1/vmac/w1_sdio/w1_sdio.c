@@ -41,8 +41,7 @@ unsigned int aml_w1_bt_hi_read_word(unsigned int addr)
 
     reg_tmp = g_w1_hif_ops.hi_read_word( RG_SDIO_IF_MISC_CTRL);
 
-    if((reg_tmp & BIT(23)) != 1)
-    {
+    if (!(reg_tmp & BIT(23))) {
         reg_tmp |= BIT(23);
         g_w1_hif_ops.hi_write_word( RG_SDIO_IF_MISC_CTRL, reg_tmp);
     }
@@ -67,8 +66,7 @@ void aml_w1_bt_hi_write_word(unsigned int addr,unsigned int data)
      */
     reg_tmp = g_w1_hif_ops.hi_read_word( RG_SDIO_IF_MISC_CTRL);
     
-    if((reg_tmp & BIT(23)) != 1)
-    {
+    if (!(reg_tmp & BIT(23))) {
         reg_tmp |= BIT(23);
         g_w1_hif_ops.hi_write_word( RG_SDIO_IF_MISC_CTRL, reg_tmp);
     }
@@ -134,7 +132,7 @@ static int _aml_w1_sdio_request_byte(unsigned char func_num,
     kmalloc_buf =  (unsigned char *)kzalloc(len, GFP_DMA);//virt_to_phys(fwICCM);
     if (kmalloc_buf == NULL)
     {
-        printk("kmalloc buf fail\n");
+        ERROR_DEBUG_OUT("kmalloc buf fail\n");
         AML_W1_BT_WIFI_MUTEX_OFF();
         return SDIOH_API_RC_FAIL;
     }
@@ -225,7 +223,7 @@ int aml_w1_sdio_bottom_read(unsigned char func_num, int addr, void *buf, size_t 
     {
         if (host_wake_w1_req() == 0)
         {
-            printk("aml_w1_sdio_bottom_read, host wake w1 fail\n");
+            ERROR_DEBUG_OUT("aml_w1_sdio_bottom_read, host wake w1 fail\n");
             return -1;
         }
     }
@@ -251,7 +249,7 @@ int aml_w1_sdio_bottom_read(unsigned char func_num, int addr, void *buf, size_t 
 
     if (kmalloc_buf == NULL)
     {
-        printk("kmalloc buf fail\n");
+        ERROR_DEBUG_OUT("kmalloc buf fail\n");
         AML_W1_BT_WIFI_MUTEX_OFF();
         return SDIOH_API_RC_FAIL;
     }
@@ -281,7 +279,7 @@ int aml_w1_sdio_bottom_write(unsigned char func_num, int addr, void *buf, size_t
     {
         if (host_wake_w1_req() == 0)
         {
-            printk("aml_w1_sdio_bottom_write, host wake w1 fail\n");
+            ERROR_DEBUG_OUT("aml_w1_sdio_bottom_write, host wake w1 fail\n");
             return -1;
         }
     }
@@ -290,7 +288,7 @@ int aml_w1_sdio_bottom_write(unsigned char func_num, int addr, void *buf, size_t
     kmalloc_buf =  (unsigned char *)kzalloc(len, GFP_DMA);//virt_to_phys(fwICCM);
     if(kmalloc_buf == NULL)
     {
-        printk("kmalloc buf fail\n");
+        ERROR_DEBUG_OUT("kmalloc buf fail\n");
         AML_W1_BT_WIFI_MUTEX_OFF();
         return SDIOH_API_RC_FAIL;
     }
@@ -525,7 +523,7 @@ static int amlw_w1_sdio_alloc_prep_scat_req(struct amlw1_hwif_sdio *hif_sdio)
     scat_req = kzalloc(sizeof(struct amlw_hif_scatter_req), GFP_KERNEL);
     if (scat_req == NULL)
     {
-        printk("[sdio sg alloc_scat_req]: no mem\n");
+        ERROR_DEBUG_OUT("[sdio sg alloc_scat_req]: no mem\n");
         return 1;
     }
 
@@ -618,7 +616,7 @@ void aml_w1_sdio_scat_complete (struct amlw_hif_scatter_req * scat_req)
     }
     else
     {
-        printk("error: no complete function\n");
+        ERROR_DEBUG_OUT("error: no complete function\n");
     }
 
     scat_req->free = true;
@@ -822,6 +820,8 @@ void  aml_w1_sdio_exit(void)
     w1_sdio_after_porbe = 0;
     PRINT("*****************aml sdio common driver is rmmoded********************\n");
 }
+//EXPORT_SYMBOL(aml_w1_sdio_exit);
+
 EXPORT_SYMBOL(w1_sdio_driver_insmoded);
 EXPORT_SYMBOL(wifi_in_insmod);
 EXPORT_SYMBOL(w1_sdio_after_porbe);

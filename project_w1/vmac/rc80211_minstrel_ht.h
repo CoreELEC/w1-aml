@@ -277,6 +277,8 @@ struct minstrel_ht_sta_priv {
 };
 
 int minstrel_ht_get_tp_avg(struct minstrel_ht_sta *mi, int group, int rate, int prob_ewma);
-struct minstrel_rate_control_ops * get_rate_control_ops_ht(void);
+struct minstrel_rate_control_ops *get_rate_control_ops_ht(void);
+void minstrel_clear_unfitable_rate_stats(struct minstrel_ht_sta *mi, unsigned char rate_index);
+void minstrel_init_start_stats(void *priv, void *priv_sta, unsigned char max_rate, unsigned char bw);
 
 #endif

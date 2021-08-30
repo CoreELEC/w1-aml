@@ -16,11 +16,12 @@ struct aml_ratecontrol
     unsigned char vendor_rate_code;/* hardware rate code */
     unsigned char trynum;
     unsigned char shortgi_en;
+    unsigned char bw;
     unsigned short flags;
     unsigned int maxampdulen;
 };
 
-#define WIFINET_TX_ERROR          0x01
+#define WIFINET_TX_ERROR 0x01
 struct wifi_mac_tx_status
 {
     int ts_flags;

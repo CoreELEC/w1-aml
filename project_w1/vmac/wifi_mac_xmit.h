@@ -73,5 +73,6 @@ int wifi_mac_send_disassoc(struct wlan_net_vif *wnet_vif, struct wifi_station *s
 int wifi_mac_send_actionframe(struct wlan_net_vif *wnet_vif, struct wifi_station *sta,void *arg);
 int wifi_mac_send_mgmt(struct wifi_station *, int, void *);
 int wifi_mac_udp_send_timeout_ex(void *arg);
+void wifi_mac_check_opt_ie(struct wlan_net_vif *wnet_vif);
 
 #endif

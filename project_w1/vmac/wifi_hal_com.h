@@ -445,6 +445,7 @@ struct  hal_work_task
 #else
 #define DEFAULT_RXPAGENUM 224
 #endif
+#define PT_MODE 1
 #define DEFAULT_BCN_NUM             4
 #define DEFAULT_SRAM_LEN        (100*1024)
 #define PAGE_DELT                                 0   /**/
@@ -711,6 +712,7 @@ struct  hw_interface
     #ifdef DRV_PT_SUPPORT
     unsigned short     	PrivDmaAddr;
     #endif
+    unsigned char          EncryptType;
 } ;
 
  struct hi_agg_tx_desc
@@ -753,8 +755,8 @@ struct  hw_interface
 #define DPD_MEMORY_LEN (1024 * 4)
 
 //(0x00b00000 + (512 * PAGE_LEN) - (64 * PAGE_LEN))
-#define SRAM_FWLOG_BUFFER (0x00b38000)
-#define SRAM_FWLOG_BUFFER_LEN (1024 * 8) //8K
+#define SRAM_FWLOG_BUFFER (0x00b00000 + (512 * PAGE_LEN) - (16 * PAGE_LEN))
+#define SRAM_FWLOG_BUFFER_LEN (1024 * 4) //4K
 
 struct hal_layer_ops
 {
@@ -818,6 +820,7 @@ struct hal_layer_ops
     unsigned char  (*hal_tx_empty)(void);
     unsigned char *  (*hal_get_config)(void);
     void  (*phy_scan_cmd)(unsigned int data);// 1 start,0 end
+    void (*phy_set_tx_power_accord_rssi)(int bw, unsigned short channel, unsigned char rssi, unsigned char power_mode);
     void (*phy_set_channel_rssi)(unsigned char rssi);
     unsigned int (*phy_pwr_save_mode)(unsigned char wnet_vif_id,unsigned int data);// 1 start,0 end
     unsigned int (*phy_set_rd_support)(unsigned char wnet_vif_id, unsigned int data);
@@ -874,6 +877,7 @@ struct hal_layer_ops
     unsigned int (*phy_interface_enable)(unsigned char enable, unsigned char vid);
     unsigned int (*hal_set_fwlog_cmd)(unsigned char mode);
     unsigned int (*hal_cfg_cali_param)(void);
+    unsigned int (*hal_cfg_txpwr_cffc_param)(void * chan,void * txpwr_plan);
 };
 
 #define HAL_FW_IN_ACTIVE  BIT(0)
@@ -957,8 +961,8 @@ struct hal_layer_ops
     void *drv_priv;
     struct aml_hal_call_backs * hal_call_back;
     void *Hi_TxAgg[WIFI_MAX_TXQUEUE_ID];  //save the pointer of TxPageInfo
-    struct tx_complete_status * txcompletestatus;
-    struct Tx_FrameDesc tx_frames[WIFI_MAX_TXFRAME];
+    struct tx_complete_status *txcompletestatus;
+    struct fw_txdesc_fifo *tx_frames[WIFI_MAX_TXFRAME];
     unsigned long tx_frames_map[BITS_TO_LONGS(WIFI_MAX_TXFRAME)];
     unsigned int txPageFreeNum;  //the num of free tx pages
     struct unicastReplayCnt  uRepCnt[WIFI_MAX_VID][WIFI_MAX_STA];

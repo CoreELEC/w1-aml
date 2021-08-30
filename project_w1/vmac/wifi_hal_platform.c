@@ -94,7 +94,7 @@ int platform_wifi_request_gpio_irq (void *data)
 
     irq_num = wifi_irq_num();
 
-    if (wifi_irq_trigger_level() == GPIO_IRQ_LOW)
+    if (1)
         irq_flag = IORESOURCE_IRQ | IORESOURCE_IRQ_LOWLEVEL | IORESOURCE_IRQ_SHAREABLE;
     else
         irq_flag = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHLEVEL | IORESOURCE_IRQ_SHAREABLE;
@@ -170,7 +170,7 @@ static void reset_wifi (void)
     if (ret < 0){
         gpio_free(gpio_wifi_reset);
         ret = gpio_request(gpio_wifi_reset,  OWNER_NAME); //retry
-        printk("%s(%d) request gpio fail ret=%d\n", __func__, __LINE__, ret);
+        ERROR_DEBUG_OUT("request gpio fail ret=%d\n", ret);
     }
     
     ret = gpio_direction_output(gpio_wifi_reset, 1);
@@ -521,7 +521,7 @@ unsigned int bbpll_start (void)
     }
     else
     {
-        printk("bbpll start failed !\n");
+        ERROR_DEBUG_OUT("bbpll start failed !\n");
         return 0;
     }
 }
@@ -609,7 +609,7 @@ unsigned char hal_download_wifi_fw_img(void)
         printk("bbpll  init ok!\n");
 
     } else {
-        printk("bbpll  already init,not need to init!\n");
+        ERROR_DEBUG_OUT("bbpll  already init,not need to init!\n");
     }
 
     hal_set_sys_clk_for_fpga();
@@ -677,7 +677,7 @@ unsigned char hal_download_wifi_fw_img(void)
     } while(len > 0);
 
     if (memcmp(buf_iccm_rd, bufferICCM, ICCM_CHECK_LEN)) {
-        PRINT("Host HAL: write ICCM ERROR!!!! \n");
+        ERROR_DEBUG_OUT("Host HAL: write ICCM ERROR!!!! \n");
         return false;
 
     } else {
@@ -754,7 +754,8 @@ unsigned char hal_download_wifi_fw_img(void)
     /* mac clock 160 Mhz */
     hif->hif_ops.hi_write_word(RG_INTF_MAC_CLK, 0x00030001);
 #ifdef DRV_PT_SUPPORT
-    hal_dpd_memory_download();
+    if (aml_wifi_is_enable_rf_test())
+        hal_dpd_memory_download();
 #endif
 #endif
 
@@ -785,19 +786,22 @@ int mac_addr5 = 0xcc;
 
 static int vif0opmode = -1;
 static int vif1opmode = -1;
-static char * vmac0 = NULL;
-static char * vmac1 = NULL;
+static char * vmac0 = "wlan0";
+static char * vmac1 = "p2p0";
 static unsigned int con_mode = ((1 << WIFINET_M_STA) | (1 << WIFINET_M_P2P_DEV));
+static int en_rf_test = 0;
 
 static char * plt_ver = NULL;
 struct version_info version_map[] = {
-    {"gva", 1}
+    {"gva", 1},
+    {"gva_mrt", 2}
+
 };
 
 int aml_debug = AML_DEBUG_LEVEL;
 const unsigned char BROADCAST_ADDRESS[WIFINET_ADDR_LEN] =  {0xff,0xff,0xff,0xff,0xff,0xff};
 static char * mac_addr = "00:01:02:58:00:CC";
-static char * country_code = "CN";
+static char * country_code = "WW";
 unsigned short dhcp_offload = 0;
 static int sdblksize = BLKSIZE;
 unsigned char aml_insmod_flag = 0;
@@ -926,9 +930,15 @@ unsigned int aml_wifi_get_platform_verid(void)
     return 0;
 }
 
+unsigned int aml_wifi_is_enable_rf_test(void)
+{
+    return en_rf_test;
+}
+
 extern unsigned char wifi_in_insmod;
 static int aml_insmod(void)
 {
+    int ret = 0;
     struct hw_interface * hif = hif_get_hw_interface();
 
 #ifdef SDIO_BUILD_IN
@@ -947,27 +957,36 @@ static int aml_insmod(void)
 
     if(hif == NULL)
     {
-        printk("%s(%d) hif = %p \n",__func__, __LINE__, hif);
-        return -1;
+        ERROR_DEBUG_OUT("hif = %p\n",hif);
+        ret =  -1;
+        goto insmod_failed;
     }
     memset(hif, 0, sizeof(struct hw_interface));
 
     //dma interface or sdio interface init
-    aml_sdio_init();
-
-#ifdef SDIO_BUILD_IN
-    wifi_in_insmod = 0;
-#endif
+    ret = aml_sdio_init();
+    if (ret) {
+        goto  insmod_failed;
+    }
 
 #ifdef DRV_PT_SUPPORT
-    printk("---Aml drv---:Before calling %s:(%d) \n",__func__,__LINE__);
-    Init_B2B_Resource();
+    if (aml_wifi_is_enable_rf_test()) {
+        printk("---Aml drv---:Before calling %s:(%d) \n",__func__,__LINE__);
+        Init_B2B_Resource();
+    }
 #endif
 
     aml_insmod_flag = 1;
 
     printk("%s(%d) start...\n",__func__, __LINE__);
     return 0;
+
+insmod_failed:
+#ifdef SDIO_BUILD_IN
+    wifi_in_insmod = 0;
+#endif
+
+    return ret;
 }
 
 static void aml_rmmod(void)
@@ -1005,9 +1024,9 @@ module_param(vmac0, charp, S_IRUGO);
 module_param(vmac1, charp, S_IRUGO);
 module_param(con_mode, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 module_param(plt_ver, charp, S_IRUGO);
-
-
 module_param(sdblksize, int, S_IRUGO);
+module_param(en_rf_test, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+
 
 /*Added for pass mac address when load wifi driver
  *Usage: insmod ***.ko mac_addr=xx:xx:xx:xx:xx:xx

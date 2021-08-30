@@ -79,14 +79,12 @@ enum vm_vendor_command_attr{
     VM_NL80211_VENDER_SUBCMD_B2BTESTYPE=0x08,
     VM_NL80211_VENDER_SUBCMD_GETREG=0x09,
     VM_NL80211_VENDER_SUBCMD_SETREG=0x0a,
-    VM_NL80211_VENDER_SUBCMD_DRV_GET_RX_STATUS=0x0b,
     VM_NL80211_VENDER_SUBCMD_DRV_B2B_SET_LOCAL_MAC_ADDR=0x0c,
     VM_NL80211_VENDER_SUBCMD_DRV_B2B_GET_LOCAL_MAC_ADDR=0x0d,
     VM_NL80211_VENDER_SUBCMD_DRV_B2B_SET_PEER_MAC_ADDR=0x0e,
     VM_NL80211_VENDER_SUBCMD_DRV_B2B_GET_PEER_MAC_ADDR=0x0f,
     VM_NL80211_VENDER_SUBCMD_DRV_B2B_SET_BSSID_MAC_ADDR=0x10,
     VM_NL80211_VENDER_SUBCMD_DRV_B2B_GET_BSSID_MAC_ADDR=0x11,
-    VM_NL80211_VENDER_SUBCMD_DRV_B2B_INIT=0x12,
     VM_NL80211_VENDER_SUBCMD_DRV_SET_SHORT_GI=0x13,
     VM_NL80211_VENDER_SUBCMD_DRV_B2B_SET_CHL=0x14,
     VM_NL80211_VENDER_SUBCMD_DRV_B2B_PKT_LENGTH=0x15,
@@ -98,10 +96,6 @@ enum vm_vendor_command_attr{
     VM_NL80211_VENDER_I2C_GETREG=0x19,
     VM_NL80211_VENDER_I2C_SETREG=0x20,
 
-    VM_NL80211_SSV5890_RF_MODE=0x22,
-    VM_NL80211_SSV5890_TX_GAIN=0x23,
-    VM_NL80211_SSV5890_FREQ=0x24,
-    VM_NL80211_SSV5890_SET_BW=0x27,
     VM_NL80211_PHY_STATISTIC=0x28,
     VM_NL80211_CCA_BUSY_CHECK=0x2a,
 
@@ -112,7 +106,6 @@ enum vm_vendor_command_attr{
 
     VM_NL80211_SENDTEST=0x35,
     VM_NL80211_SET_LDPC = 0x36,
-    VM_NL80211_VENDOR_SET_RF_CHN_BW=0x37,
     VM_NL80211_VENDOR_ENABLE_AUTO_RATE = 0x38,
     VM_NL80211_BT_REG_READ = 0x39,
     VM_NL80211_BT_REG_WRITE = 0x3a,
@@ -123,11 +116,6 @@ enum vm_vendor_command_attr{
 
     VM_NL80211_VENDER_BCN_INTERVAL=0x43,
     VM_NL80211_VENDOR_GET_STA_RSSI_NOISE=0x44,
-
-    VM_NL80211_T9023_CALB_TOP = 0x50,
-    VM_NL80211_T9023_SET_TXM_CT= 0x51,
-    VM_NL80211_T9023_SET_TX_PARA_CFG = 0x52,
-    VM_NL80211_T9023_SET_RX_PARA_CFG = 0x53,
     VM_NL80211_T9026_DUMP_RXIRR_REG = 0x54,
 #ifdef WIFI_CAPTURE
     VM_NL80211_SET_CAP_GAIN = 0x55,
@@ -144,9 +132,6 @@ enum vm_vendor_command_attr{
     VM_NL80211_SET_COEXIST_IRQ_END_TIM  = 0x5d,
     VM_NL80211_SET_COEXIST_SCAN_PRI_RANGE = 0x5e,
     VM_NL80211_SET_COEXIST_BE_BK_NOQOS_PRI_RANGE = 0x5f,
-
-    VM_NL80211_SPECTRUM_ANA = 0x60,
-
 
     VM_NL80211_VENDER_SYS_INFO_STATISTIC_DEFAULT_CFG=0x96,
     VM_NL80211_VENDER_SYS_INFO_STATISTIC_UPDATE_CFG=0x97,
@@ -172,7 +157,6 @@ enum vm_vendor_command_attr{
     VM_NL80211_SCAN_TIME_CONNECT = 0xa6,
     VM_NL80211_SCAN_HANG = 0xa7,
     VM_NL80211_PRINT_VERSION = 0xa8,
-    VM_NL80211_PRINT_PKT = 0xa9,
     VM_NL80211_GET_EFUSE_DATA = 0xaa,
     VM_NL80211_GET_FW_LOG = 0xab,
 
@@ -359,11 +343,9 @@ void vm_cfg80211_indicate_sta_assoc(const struct wifi_station *sta);
 void vm_cfg80211_indicate_sta_disassoc(const struct wifi_station *sta, unsigned short reason);
 int vm_cfg80211_send_mgmt(struct wlan_net_vif *wnet_vif,const unsigned char * buf,int len);
 
-int  netdev_setcsum( struct net_device *dev,int data);
+int netdev_setcsum( struct net_device *dev,int data);
 int wifi_mac_preempt_scan( struct wifi_mac *wifimac, int max_grace, int max_wait);
 char preempt_scan(struct net_device *dev, int max_grace, int max_wait);
-int vm_cfg80211_vendor_event(struct wiphy *wiphy, IN int event, IN unsigned char *data, IN int len);
-
 void vm_wlan_net_vif_mode_change(struct wlan_net_vif *wnet_vif, struct vm_wlan_net_vif_params *cp);
 int wifi_mac_rm_app_ie(struct wifi_mac_app_ie_t  * app_ie);
 int wifi_mac_save_app_ie(struct wifi_mac_app_ie_t  * app_ie, const unsigned char *app_buf,int app_buflen);

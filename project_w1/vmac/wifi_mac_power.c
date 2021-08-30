@@ -29,12 +29,8 @@ static void wifi_mac_pwrsave_presleep(struct work_struct *work)
     struct wifi_mac *wifimac = NULL;
 
     ps = container_of(work, struct wifi_mac_pwrsave_t, ips_work_presleep);
-    if (ps == NULL)
-        return;
 
     wnet_vif = container_of(ps, struct wlan_net_vif, vm_pwrsave);
-    if (wnet_vif == NULL)
-        return;
 
     wifimac = wnet_vif->vm_wmac;
     if (wifimac == NULL)
@@ -447,7 +443,7 @@ void wifi_mac_pwrsave_attach(void)
 
     pwrsave_sleep_wq = create_singlethread_workqueue("aml_pwrsave_wq");
     if (pwrsave_sleep_wq == NULL)
-        DPRINTF(AML_DEBUG_INIT|AML_DEBUG_ERROR, "%s %d init wq err\n", __func__,__LINE__);
+        AML_OUTPUT("init wq err\n");
 }
 
 void wifi_mac_pwrsave_vattach(struct wlan_net_vif *wnet_vif)
@@ -528,7 +524,7 @@ void wifi_mac_pwrsave_detach(void)
 {
     if (pwrsave_sleep_wq != NULL)
     {
-        DPRINTF(AML_DEBUG_INIT|AML_DEBUG_PWR_SAVE, "%s %d \n", __func__,__LINE__);
+        AML_OUTPUT("++\n");
         destroy_workqueue(pwrsave_sleep_wq);
         pwrsave_sleep_wq = NULL;
     }
@@ -1680,8 +1676,8 @@ int wifi_mac_pwrsave_wow_suspend(SYS_TYPE param1,
         msleep(20);
         if (cnt++ > 20)
         {
-            printk("<%s>:%s %d wait scan end fail when host suspend \n",
-                wnet_vif->vm_ndev->name, __func__, __LINE__);
+            ERROR_DEBUG_OUT("<%s>:wait scan end fail when host suspend \n",
+                wnet_vif->vm_ndev->name);
             WIFINET_PWRSAVE_MUTEX_UNLOCK(wnet_vif);
             return -1;
         }
@@ -1812,7 +1808,7 @@ int wifi_mac_pwrsave_wow_resume(SYS_TYPE param1,
         if (ret == 0)
             wnet_vif_tmp->vm_pwrsave.ips_state = WIFINET_PWRSAVE_AWAKE;
         else
-            printk("%s:%d, ret -1 \n", __func__, __LINE__);
+            ERROR_DEBUG_OUT("ret -1 \n");
         WIFINET_PWRSAVE_UNLOCK(wnet_vif);
     }
 

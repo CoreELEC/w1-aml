@@ -233,7 +233,7 @@ unsigned int minstrel_legacy_rate_convert_to_ordinary(unsigned int rate)
                 ret = 54;
                 break;
             default:
-                printk("input rate error\n");
+                ERROR_DEBUG_OUT("input rate error\n");
                 break;
         }
 
@@ -488,8 +488,8 @@ static void minstrel_get_rate(void *priv, struct ieee80211_sta *sta, void *priv_
 
 	rate->idx = mi->r[ndx].rix;
 	rate->count = minstrel_get_retry_count(&mi->r[ndx], info);
-	DPRINTF(AML_DEBUG_RATE, "%s:sample rate->idx =%d, rate->count:%d, msr->perfect_tx_time:%d, mr->perfect_tx_time:%d\n",
-		__func__, rate->idx, rate->count, msr->perfect_tx_time, mr->perfect_tx_time);
+    AML_PRINT(AML_DBG_MODULES_RATE_CTR, "sample rate->idx =%d, rate->count:%d, msr->perfect_tx_time:%d, mr->perfect_tx_time:%d\n",
+        rate->idx, rate->count, msr->perfect_tx_time, mr->perfect_tx_time);
 }
 
 static inline int ieee80211_chandef_get_shift(struct cfg80211_chan_def *chandef)

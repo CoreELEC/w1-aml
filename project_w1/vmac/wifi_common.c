@@ -110,7 +110,7 @@ static int writeFile(struct file *fp, char *buf, int len)
 * @param path the path of the file to test
 * @return Linux specific error code
 */
-static int isFileReadable(const char *path, u32 *sz)
+int isFileReadable(const char *path, u32 *sz)
 {
     struct file *fp;
     int ret = 0;
@@ -176,10 +176,10 @@ static int retriveFromFile(const char *path, u8 *buf, u32 sz)
 
             printk("readFile, ret:%d\n", ret);
         } else {
-            printk("openFile path:%s Fail, ret:%d\n", path, ret);
+            ERROR_DEBUG_OUT("openFile path:%s Fail, ret:%d\n", path, ret);
         }
     } else {
-        printk("NULL pointer\n");
+        ERROR_DEBUG_OUT("NULL pointer\n");
         ret = -EINVAL;
     }
     return ret;
@@ -214,10 +214,10 @@ static int storeToFile(const char *path, u8 *buf, u32 sz)
             closeFile(fp);
             printk("writeFile, ret:%d\n", ret);
         } else {
-            printk("%s openFile path:%s Fail, ret:%d\n", __FUNCTION__, path, ret);
+            ERROR_DEBUG_OUT("openFile path:%s Fail, ret:%d\n", path, ret);
         }
     } else {
-        printk("%s NULL pointer\n", __FUNCTION__);
+        ERROR_DEBUG_OUT("NULL pointer\n");
         ret =  -EINVAL;
     }
     return ret;

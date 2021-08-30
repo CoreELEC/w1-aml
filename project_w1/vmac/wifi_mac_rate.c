@@ -806,8 +806,7 @@ void wifi_mac_rate_init(void * ieee,
         }
     }
 
-    DPRINTF(AML_DEBUG_INIT,"%s %d maxrates %d mode %d \n",
-        __func__,__LINE__, maxrates,mode);
+    AML_OUTPUT("maxrates %d mode %d \n", maxrates,mode);
 }
 
 int wifi_mac_iserp_rateset(struct wifi_mac *wifimac, struct wifi_mac_rateset *rs)

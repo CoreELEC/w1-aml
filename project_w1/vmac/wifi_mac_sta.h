@@ -203,6 +203,8 @@ struct wifi_station
     unsigned int sta_mpdudensity;
 
     unsigned char sta_update_rate_flag;
+    unsigned char cur_fratype;
+    unsigned long bcn_stamp;
     unsigned long sta_rstamp;
 
     union {
@@ -235,6 +237,7 @@ struct wifi_station
 
     int32_t sta_avg_bcn_rssi;    // dbm
     int32_t sta_avg_rssi;
+    int32_t sta_avg_snr;
     unsigned int sta_last_txrate;  //kbps
     unsigned int sta_last_rxrate;  //kbps
 
@@ -297,7 +300,8 @@ struct wifi_station
     struct minstrel_priv *sta_minstel_pri;
     struct minstrel_sta_info *sta_minstrel_info;
     struct ieee80211_sta ieee_sta;
-    unsigned char sta_vendor_rate_code[IEEE80211_TX_MAX_RATES];
+    unsigned char sta_vendor_bw;
+    unsigned char sta_vendor_rate_code;
 };
 
 #define WDS_AGING_TIME 600
@@ -392,8 +396,7 @@ struct wifi_station *wifi_mac_get_sta(struct wifi_station_tbl *, const unsigned 
 struct wifi_station * wifi_mac_find_rx_sta(struct wifi_mac *, const struct wifi_mac_frame_min *,int);
 struct wifi_station *wifi_mac_find_tx_sta(struct wlan_net_vif *, const unsigned char *);
 int wifi_mac_add_wds_addr(struct wifi_station_tbl *, struct wifi_station *, const unsigned char *);
-void wifi_mac_rm_wds_addr(struct wifi_station_tbl *, const unsigned char *);
-void wifi_mac_delt_wds_sta(struct wifi_station_tbl *, struct wifi_station *);
+int wifi_mac_rm_wds_addr(struct wifi_station_tbl *, const unsigned char *);
 struct wifi_station *wifi_mac_find_wds_sta(struct wifi_station_tbl *, const unsigned char *);
 int wifi_mac_rm_all_staWds(struct wifi_station_tbl *, struct wifi_station *);
 void wifi_mac_func_to_task_cb(SYS_TYPE param1, SYS_TYPE param2, SYS_TYPE param3, SYS_TYPE param4, SYS_TYPE param5);

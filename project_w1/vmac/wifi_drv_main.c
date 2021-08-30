@@ -27,6 +27,8 @@
 #include "wifi_hal_platform.h"
 #include "wifi_mac_action.h"
 #include "wifi_mac_main_reg.h"
+#include "wifi_mac_tx_reg.h"
+#include "wifi_mac_xmit.h"
 
 const unsigned char drv_bcast_mac[WIFINET_ADDR_LEN] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 
@@ -49,7 +51,7 @@ struct drv_private* drv_get_drv_priv(void)
 
     if (rt == NULL)
     {
-        printk("<running> %s %d\n",__func__,__LINE__);
+        ERROR_DEBUG_OUT("<running> error \n");
         return 0;
     }
 
@@ -195,11 +197,25 @@ drv_scan_end( struct drv_private *drv_priv)
         NULL, (SYS_TYPE)drv_priv, 0, 0, 0, 0);
 }
 
+unsigned char print_ctl = 0;
+extern unsigned char print_type;
 static void drv_print_fwlog_ex( SYS_TYPE param1,SYS_TYPE param2,SYS_TYPE param3,
     SYS_TYPE param4,SYS_TYPE param5)
 {
     unsigned char* logbuf_ptr = (unsigned char *)param1;
     int databyte = (int)param2;
+
+    if (print_type == 1) //auto
+    {
+        /*rotate print*/
+        print_ctl = print_ctl ^ 1;
+        databyte = databyte >> 1;
+        if (print_ctl == 0)
+        {
+            logbuf_ptr += databyte;
+        }
+    }
+
     /* print process */
     printk("logbuf_ptr 0x%x\n", logbuf_ptr);
     printk("fw_log:\n");
@@ -273,6 +289,31 @@ static void drv_set_channel_rssi_ex( SYS_TYPE param1,SYS_TYPE param2,SYS_TYPE pa
 static void drv_set_channel_rssi( struct drv_private *drv_priv, unsigned char rssi)
 {
     drv_hal_add_workitem((WorkHandler)drv_set_channel_rssi_ex, NULL, (SYS_TYPE)rssi, 0, 0, 0, 0);
+}
+
+static void drv_set_tx_power_accord_rssi_ex( SYS_TYPE param1,SYS_TYPE param2,SYS_TYPE param3, SYS_TYPE param4,SYS_TYPE param5)
+{
+    struct hal_private* hal_priv = hal_get_priv();
+
+    hal_priv->hal_ops.phy_set_tx_power_accord_rssi(param1, param2, param3, param4);
+}
+
+
+static void drv_set_tx_power_accord_rssi( struct drv_private *drv_priv, struct hal_channel *hchan, unsigned char rssi, unsigned char power_mode)
+{
+    drv_hal_add_workitem((WorkHandler)drv_set_tx_power_accord_rssi_ex, NULL, (SYS_TYPE)hchan->chan_bw, (SYS_TYPE)hchan->channel, (SYS_TYPE)rssi, (SYS_TYPE)power_mode, 0);
+}
+
+static void drv_cfg_txpwr_cffc_param_ex(SYS_TYPE param1,SYS_TYPE param2,SYS_TYPE param3, SYS_TYPE param4,SYS_TYPE param5)
+{
+    struct hal_private* hal_priv = hal_get_priv();
+
+    hal_priv->hal_ops.hal_cfg_txpwr_cffc_param((void*)param1, (void*)param2);
+}
+
+static void drv_cfg_txpwr_cffc_param(struct wifi_channel * chan, struct tx_power_plan * txpwr_plan)
+{
+    drv_hal_add_workitem((WorkHandler)drv_cfg_txpwr_cffc_param_ex, NULL, (SYS_TYPE)chan, (SYS_TYPE)txpwr_plan, 0, 0, 0);
 }
 
 
@@ -584,7 +625,7 @@ drv_open( struct drv_private *drv_priv)
 
     if (!drv_hal_reset())
     {
-        printk("%s: unable to reset chip\n",__func__);
+        ERROR_DEBUG_OUT("unable to reset chip\n");
         error = -EIO;
         goto done;
     }
@@ -676,7 +717,7 @@ int drv_reset( void * dev)
 
     if (!drv_hal_reset())
     {
-        printk("%s: unable to reset chip\n",__func__);
+        ERROR_DEBUG_OUT("unable to reset chip\n");
         error = -EIO;
     }
 
@@ -701,7 +742,7 @@ static int drv_suspend( void * dev)
 
     drv_priv->drv_not_init_flag = 1;
 
-    DPRINTF(AML_DEBUG_INIT,"<running> %s %d \n",__func__,__LINE__);
+    AML_OUTPUT("<running>\n");
 
     return 0;
 }
@@ -788,8 +829,7 @@ static int drv_add_wnet_vif(struct drv_private *drv_priv,
     if (wnet_vif_id >= DEFAULT_MAX_VMAC
         || drv_priv->drv_wnet_vif_table[wnet_vif_id] != NULL)
     {
-        DPRINTF( AML_DEBUG_ERROR,"%s: Invalid interface id = %u\n",
-            __func__, wnet_vif_id);
+        ERROR_DEBUG_OUT("Invalid interface id = %u\n", wnet_vif_id);
         return -EINVAL;
     }
     driv_ps_wakeup(drv_priv);
@@ -805,8 +845,8 @@ static int drv_add_wnet_vif(struct drv_private *drv_priv,
     wnet_vif = (struct wlan_net_vif *)if_data;
     /* Set the VMAC opmode */
     wnet_vif->vm_hal_opmode = vm_opmode;
-    DPRINTF(AML_DEBUG_INIT,"<%s>  %s %d hal_opmode=%d \n",
-            VMAC_DEV_NAME(wnet_vif), __func__,__LINE__,wnet_vif->vm_hal_opmode);
+    AML_OUTPUT("<%s> hal_opmode=%d \n",
+            VMAC_DEV_NAME(wnet_vif), wnet_vif->vm_hal_opmode);
 
     drv_priv->drv_wnet_vif_table[wnet_vif_id] = wnet_vif;
     drv_priv->drv_wnet_vif_num++;
@@ -859,8 +899,7 @@ drv_change_wnet_vif(struct drv_private * drv_priv, int wnet_vif_id,
     if (wnet_vif_id >= DEFAULT_MAX_VMAC
         || drv_priv->drv_wnet_vif_table[wnet_vif_id] == NULL)
     {
-        DPRINTF(AML_DEBUG_ERROR,"%s %d: Invalid interface id = %u\n",
-                __func__,__LINE__, wnet_vif_id);
+        ERROR_DEBUG_OUT("Invalid interface id = %u\n", wnet_vif_id);
         return -EINVAL;
     }
     driv_ps_wakeup(drv_priv);
@@ -887,7 +926,7 @@ drv_nsta_attach( struct drv_private *drv_priv, int wnet_vif_id, void* sta)
     drv_sta = (struct aml_driver_nsta *)NET_MALLOC(sizeof(struct aml_driver_nsta), GFP_ATOMIC, "drv_nsta_attach.drv_sta");
     if (drv_sta == NULL)
     {
-        printk("<running> %s %d  \n",__func__,__LINE__);
+        ERROR_DEBUG_OUT("<running> drv_sta is NULL \n");
         return NULL;
     }
 
@@ -897,7 +936,7 @@ drv_nsta_attach( struct drv_private *drv_priv, int wnet_vif_id, void* sta)
 
     if (drv_sta->sta_rc_nsta == NULL)
     {
-        printk("<running> %s %d  \n",__func__,__LINE__);
+        ERROR_DEBUG_OUT("<running> drv_sta->sta_rc_nsta == NULL\n");
         FREE(drv_sta, "drv_nsta_attach.drv_sta");
         return NULL;
     }
@@ -1058,6 +1097,7 @@ drv_set_country(struct drv_private * drv_priv, char *isoName)
     }
 
     drv_priv->drv_config.cfg_countrycode = tmpi;
+    drv_priv->drv_config.cfg_txpoweplan = wifimac_get_tx_pwr_plan(tmpi);
 
     printk("<running> %s %d %d\n",__func__,__LINE__, drv_priv->drv_config.cfg_countrycode );
     wMode = drv_priv->drv_config.cfg_modesupport;
@@ -1201,6 +1241,7 @@ static void drv_init_ops(struct drv_private *drv_priv)
     drv_priv->drv_ops.connect_start = drv_connect_start;             /*connect_start */
     drv_priv->drv_ops.connect_end = drv_connect_end;               /* connect_end */
     drv_priv->drv_ops.set_channel_rssi = drv_set_channel_rssi;    /* set_channel_rssi */
+    drv_priv->drv_ops.set_tx_power_accord_rssi = drv_set_tx_power_accord_rssi;    /* set_tx_power_accord_rssi */
     drv_priv->drv_ops.tx_init = drv_tx_init;                /* tx_init */
     drv_priv->drv_ops.tx_cleanup = drv_txlist_cleanup;             /* tx_cleanup */
     drv_priv->drv_ops.tx_wmm_queue_update = drv_update_wmmq_param;             /* tx_wmm_queue_update */
@@ -1263,6 +1304,7 @@ static void drv_init_ops(struct drv_private *drv_priv)
     drv_priv->drv_ops.drv_p2p_client_opps_cwend_may_spleep = drv_p2p_client_opps_cwend_may_spleep;
     drv_priv->drv_ops.drv_txq_backup_send = drv_txq_backup_send;
     drv_priv->drv_ops.phy_stc = phy_stc;
+    drv_priv->drv_ops.get_snr = get_snr;
     drv_priv->drv_ops.cca_busy_check = cca_busy_check;
     drv_priv->drv_ops.drv_send_null_data = drv_send_null_data;
     drv_priv->drv_ops.drv_keep_alive = drv_keep_alive;
@@ -1291,6 +1333,7 @@ static void drv_init_ops(struct drv_private *drv_priv)
     drv_priv->drv_ops.drv_set_bmfm_info = drv_set_bmfm_info;
     drv_priv->drv_ops.drv_interface_enable = drv_interface_enable;
     drv_priv->drv_ops.drv_cfg_cali_param = drv_cfg_cali_param;
+    drv_priv->drv_ops.drv_cfg_txpwr_cffc_param = drv_cfg_txpwr_cffc_param;
     drv_priv->drv_ops.drv_print_fwlog = drv_print_fwlog;
 }
 
@@ -1309,7 +1352,7 @@ int aml_driv_attach( struct drv_private *drv_priv, struct wifi_mac* wmac)
     char *country_code = NULL;
     int country_index = DEFAULT_CONTRY;
 
-    DPRINTF(AML_DEBUG_INIT, "enter Here %s %d \n",__func__,__LINE__);
+    AML_OUTPUT("enter Here\n");
 
     drv_init_ops(drv_priv);
 
@@ -1338,10 +1381,13 @@ int aml_driv_attach( struct drv_private *drv_priv, struct wifi_mac* wmac)
 
     country_index = find_country_code((unsigned char *)country_code);
     if (country_index != 0xff) {
-      drv_priv->drv_config.cfg_countrycode  = country_index;
+        drv_priv->drv_config.cfg_countrycode = country_index;
+
+    } else {
+        drv_priv->drv_config.cfg_countrycode = 0;
     }
 
-    drv_priv->drv_config.cfg_countrycode    = country_index;
+    drv_priv->drv_config.cfg_txpoweplan     = wifimac_get_tx_pwr_plan(drv_priv->drv_config.cfg_countrycode);
     drv_priv->drv_config.cfg_ampduackpolicy     = DEFAULT_AMPDUACKPOLICY;
     drv_priv->drv_config.cfg_htsupport      = DEFAULT_HT_ENABLE;
     drv_priv->drv_config.cfg_vhtsupport      = DEFAULT_VHT_ENABLE;
@@ -1412,9 +1458,11 @@ int aml_driv_attach( struct drv_private *drv_priv, struct wifi_mac* wmac)
     if (error != 0)
     {
         driv_ps_sleep(drv_priv);
-         printk("<running> %s %d error!!!\n",__func__,__LINE__);
+         ERROR_DEBUG_OUT("<running> error!!!\n");
         goto bad;
     }
+
+    wifi_mac_set_tx_power_coefficient(drv_priv, NULL, drv_priv->drv_config.cfg_txpoweplan);
 
     drv_priv->net_ops->wifi_mac_rate_ratmod_attach(drv_priv);
     printk("<running> %s %d  drv_priv->drv_ratectrl_size = %d\n",
@@ -1447,7 +1495,7 @@ void aml_driv_detach( struct drv_private * drv_priv)
         if (DRV_TXQUEUE_VALUE(drv_priv, i))
             drv_txlist_destory(drv_priv, &drv_priv->drv_txlist_table[i]);
 
-    DPRINTF(AML_DEBUG_INIT,"<running> %s %d \n",__func__,__LINE__);
+    AML_OUTPUT("<running>\n");
     drv_hal_detach();
 }
 
@@ -1497,14 +1545,6 @@ drv_mic_error_event(void * dpriv,const void* frm,
 #endif
 }
 
-
-/* callbacks for hal layer */
-static void
-drv_intr_tx_ok(void *drv_priv,struct txdonestatus *tx_done_status,SYS_TYPE callback, unsigned char queue_id)
-{
-    drv_tx_irq_tasklet(drv_priv, tx_done_status, callback, queue_id);
-}
-
 static void drv_tx_ok_timeout(void *drv_priv)
 {
     struct drv_private *drv_private = (struct drv_private *)(drv_priv);
@@ -1512,7 +1552,7 @@ static void drv_tx_ok_timeout(void *drv_priv)
     if (drv_private != NULL) {
         DRV_TX_TIMEOUT_LOCK(drv_private);
         drv_private->wait_mpdu_timeout = 1;
-        __D(BIT(17), "%s, waiting_pkt_timeout:%d\n", __func__, drv_private->wait_mpdu_timeout);
+        AML_PRINT(AML_DBG_MODULES_TX, "waiting_pkt_timeout:%d\n", drv_private->wait_mpdu_timeout);
         DRV_TX_TIMEOUT_UNLOCK(drv_private);
     }
 }
@@ -1530,11 +1570,10 @@ static void
 drv_intr_rx_ok(void * dpriv,struct sk_buff *skb, unsigned char Rssi,unsigned char vendor_rate_code,
     unsigned char channel, unsigned char aggr, unsigned char wnet_vif_id, unsigned char keyid)
 {
+    struct wifi_mac *wifimac;
+    struct drv_private *drv_priv = (struct drv_private *)dpriv;
 
-    struct wifi_mac       *wifimac;
-    struct drv_private   *drv_priv= (struct drv_private *)dpriv;
-
-    struct sk_buff * skbbuf = ( struct sk_buff *)skb;
+    struct sk_buff *skbbuf = (struct sk_buff *)skb;
     struct wifi_frame *wh;
     struct wifi_mac_rx_status rxstatus;
     int type;
@@ -1554,7 +1593,6 @@ drv_intr_rx_ok(void * dpriv,struct sk_buff *skb, unsigned char Rssi,unsigned cha
 
 
     wh = (struct wifi_frame *)os_skb_data(skb);
-    __D(AML_DEBUG_RX, "%s:%d, frame type:0x%x\n", __func__, __LINE__, wh->i_fc[0]);
     if (!list_empty(&wifimac->wm_wnet_vifs))
     {
         drv_priv->drv_stats.rx_indicate_cnt++;
@@ -1562,8 +1600,6 @@ drv_intr_rx_ok(void * dpriv,struct sk_buff *skb, unsigned char Rssi,unsigned cha
     }
     else
     {
-        __D(AML_DEBUG_RX, "%s:%d, wnet_vif empty, frame type:0x%x\n",
-            __func__, __LINE__, wh->i_fc[0]);
         drv_priv->drv_stats.rx_free_skb_cnt++;
         os_skb_free(skb);
     }
@@ -1612,13 +1648,11 @@ static int pmf_encrypt_pkt_handle(void *dpriv, struct sk_buff *skb, unsigned cha
     rxstatus.rs_wnet_vif_id = wnet_vif_id;
     rxstatus.rs_keyid = keyid ;
 
-    __D(AML_DEBUG_RX, "%s:%d, frame type:0x%x\n", __func__, __LINE__, wh->i_fc[0]);
     if (!list_empty(&wifimac->wm_wnet_vifs)) {
         drv_priv->drv_stats.rx_indicate_cnt++;
         type = drv_rx_indicate(drv_priv, skbbuf, &rxstatus);
 
     } else {
-        __D(AML_DEBUG_RX, "%s:%d, wnet_vif empty, frame type:0x%x\n", __func__, __LINE__, wh->i_fc[0]);
         drv_priv->drv_stats.rx_free_skb_cnt++;
         os_skb_free(skb);
     }
@@ -1650,8 +1684,8 @@ void p2p_noa_start_irq (struct wifi_mac_p2p *p2p, struct drv_private *drv_priv)
 
     if (P2P_NoA_START_FLAG(HiP2pNoaCountNow)) {
         /* if noa start */
-        DPRINTF(AML_DEBUG_PWR_SAVE, "%s %d noa start HiP2pNoaCountNow=%d\n",
-            __func__,__LINE__, HiP2pNoaCountNow);
+        AML_PRINT(AML_DBG_MODULES_P2P, "noa start HiP2pNoaCountNow=%d\n",
+              HiP2pNoaCountNow);
         /*
             check power save precedence of GO as follow:
             1. Highest: Absence due to a non-periodic Notice of Absence (Count = 1).
@@ -1787,7 +1821,7 @@ static void p2p_opps_ctw_start_irq (struct wifi_mac_p2p *p2p)
 {
     if (p2p->p2p_flag & P2P_OPPPS_START_FLAG_HI)
     {
-        DPRINTF(AML_DEBUG_PWR_SAVE, "%s %d\n",__func__,__LINE__);
+        AML_PRINT(AML_DBG_MODULES_P2P, "++\n");
         p2p->p2p_flag &= (~P2P_OPPPS_CWEND_FLAG_HI);
 
         /* wakeup and tx */
@@ -1813,13 +1847,13 @@ static void drv_intr_bcn_send_ok(void * dpriv,unsigned char vma_id)
     struct drv_private *drv_priv = (struct drv_private *)dpriv;
     struct wlan_net_vif  *wnet_vif = NULL;
     struct wifi_mac *wifimac;
-    struct sk_buff *skb ;
+    struct sk_buff *skb;
     unsigned char rate = 0;
     unsigned short flag;
 
     wnet_vif  = drv_priv->drv_wnet_vif_table[vma_id];
     if((wnet_vif== NULL)||(wnet_vif->vm_state != WIFINET_S_CONNECTED))
-        return ;
+        return;
     wifimac = wnet_vif->vm_wmac;
 
     if ((wnet_vif->vm_opmode == WIFINET_M_HOSTAP)||
@@ -2001,7 +2035,7 @@ static void drv_intr_p2p_opps_cwend (void * dpriv,unsigned char wnet_vif_id)
         if (p2p->p2p_flag & P2P_OPPPS_START_FLAG_HI)
         {
             wnet_vif->vm_p2p->p2p_flag |= P2P_OPPPS_CWEND_FLAG_HI;
-            DPRINTF(AML_DEBUG_PWR_SAVE, "%s %d vma_id=%d\n",__func__,__LINE__, wnet_vif_id);
+            AML_PRINT(AML_DBG_MODULES_P2P, "vma_id=%d\n", wnet_vif_id);
 
             do
             {
@@ -2133,7 +2167,6 @@ static void drv_intr_tx_null_data(void *dpriv, struct tx_nulldata_status * tx_nu
 
             }
             drv_priv->net_ops->wifi_mac_notify_ap_success(wnet_vif);
-            printk("fw send null data fail\n");
         }
     }
 }
@@ -2272,7 +2305,7 @@ drv_dev_probe(void)
 
     /*2 init hal, download fw, host init */
     if ((hal_priv->hal_ops.hal_probe != NULL) && (!hal_priv->hal_ops.hal_probe())) {
-        DPRINTF(AML_DEBUG_ERROR, "init hal error %s %d \n", __func__,__LINE__);
+        ERROR_DEBUG_OUT("init hal error\n");
         goto err_ret;
     }
 
@@ -2287,23 +2320,19 @@ drv_dev_probe(void)
 
     /*3 init driver */
     if(aml_driv_attach(drv_priv, wm_mac)) {
-        DPRINTF(AML_DEBUG_ERROR, "init driver error %s %d \n", __func__,__LINE__);
+        ERROR_DEBUG_OUT("init driver error\n");
         goto err_ret;
     }
 
     /*4 init wifimac */
     if (wifi_mac_entry(wm_mac, drv_priv) != 0) {
-        DPRINTF(AML_DEBUG_ERROR, "init wifimac error %s %d \n", __func__,__LINE__);
+        ERROR_DEBUG_OUT( "init wifimac error\n");
         goto err_ret;
     }
 
     /*5 create vmac 'wlan0' and 'p2p0' */
     vmac0 = aml_wifi_get_vif0_name();
-    if (vmac0 == NULL) {
-        memcpy(&vm_param.vm_param_name, "wlan0", sizeof("wlan0"));
-    } else {
-        memcpy(&vm_param.vm_param_name, vmac0, IFNAMSIZ);
-    }
+    memcpy(&vm_param.vm_param_name, vmac0, IFNAMSIZ);
 
     vif0opmode = aml_wifi_get_vif0_opmode();
     if ((vif0opmode >= WIFINET_M_IBSS) && (vif0opmode <= WIFINET_M_P2P_DEV)) {
@@ -2314,11 +2343,7 @@ drv_dev_probe(void)
     ret = drv_priv->net_ops->wifi_mac_create_vmac(wm_mac, &vm_param,0);
 
     vmac1 = aml_wifi_get_vif1_name();
-    if (vmac1 == NULL) {
-        memcpy(&vm_param.vm_param_name, "p2p0", sizeof("p2p0"));
-    } else {
-        memcpy(&vm_param.vm_param_name, vmac1, IFNAMSIZ);
-    }
+    memcpy(&vm_param.vm_param_name, vmac1, IFNAMSIZ);
 
     vif1opmode = aml_wifi_get_vif1_opmode();
     if ((vif1opmode >= WIFINET_M_IBSS) && (vif1opmode <= WIFINET_M_P2P_DEV)) {
@@ -2353,7 +2378,7 @@ int drv_dev_remove(void)
     drv_priv->net_ops->wifi_mac_mac_exit(wm_mac);
     aml_driv_detach(drv_priv);
 
-    DPRINTF(AML_DEBUG_INIT,"<running> %s %d \n",__func__,__LINE__);
+    AML_OUTPUT("<running>\n");
     return 0;
 }
 
@@ -2362,7 +2387,7 @@ struct aml_hal_call_backs hal_call_back_table =
     /* Callback Functions */
     .get_defaultcfg = drv_get_default_cfg,
     .mic_error_event = drv_mic_error_event,
-    .intr_tx_handle = drv_intr_tx_ok,
+    .intr_tx_handle = drv_tx_irq_tasklet,
     .intr_tx_ok_timeout = drv_tx_ok_timeout,
     .intr_tx_pkt_clear = drv_tx_pkt_clear,
     .intr_rx_handle = drv_intr_rx_ok,

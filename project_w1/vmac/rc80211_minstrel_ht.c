@@ -349,6 +349,38 @@ minstrel_ht_prob_rate_reduce_streams(struct minstrel_ht_sta *mi)
     }
 }
 
+void minstrel_clear_unfitable_rate_stats(struct minstrel_ht_sta *mi, unsigned char rate_index)
+{
+    struct minstrel_mcs_group_data *mg;
+    struct minstrel_rate_stats *mrs;
+    int group, i;
+
+    for (group = 0; group < ARRAY_SIZE(minstrel_mcs_groups); group++) {
+        mg = &mi->groups[group];
+        if (!mi->supported[group] || ((rate_index + 2) > MCS_GROUP_RATES))
+            continue;
+
+        for (i = rate_index + 2; i < MCS_GROUP_RATES; i++) {
+            if (!(mi->supported[group] & BIT(i)))
+                continue;
+
+            mrs = &mg->rates[i];
+            if (mrs->succ_hist != 0) {
+                printk("clear rate:%d, input:%d\n", i, rate_index);
+                mrs->attempts = 1;
+                mrs->last_attempts = 0;
+                mrs->att_hist = 0;
+
+                mrs->success = 0;
+                mrs->last_success = 0;
+                mrs->succ_hist = 0;
+                mrs->tp_avg = 0;
+            }
+        }
+    }
+}
+
+
 /*
  * Update rate statistics and select new primary rates
  *
@@ -370,8 +402,6 @@ minstrel_ht_update_stats(struct minstrel_priv *mp, struct minstrel_ht_sta *mi)
     if (mi->ampdu_packets > 0) {
         mi->avg_ampdu_len = minstrel_ewma(mi->avg_ampdu_len,
             MINSTREL_FRAC(mi->ampdu_len, mi->ampdu_packets), EWMA_LEVEL);
-        //DPRINTF(AML_DEBUG_RATE, "%s(%d):ampdu_packets=%d, avg_ampdu_len =%d,  ampdu_len=%d,overhead=%d\n",
-        //    __func__, __LINE__, mi->ampdu_packets, mi->avg_ampdu_len, mi->ampdu_len,mi->overhead);
         mi->ampdu_len = 0;
         mi->ampdu_packets = 0;
     }
@@ -420,8 +450,11 @@ minstrel_ht_update_stats(struct minstrel_priv *mp, struct minstrel_ht_sta *mi)
 
             /* Find max probability rate per group and global */
             minstrel_ht_set_best_prob_rate(mi, index);
-            __D(BIT(23), "%s(%d):group=%d,rate idx =%d, success=%4d,attempts=%4d, succ_hist=%6d, att_hist=%7d,%3d%%, prob_ewma=%4d,tp_avg=%3d,duration=%d\n",
-                __func__, __LINE__,group, i, mrs->last_success, mrs->last_attempts, mrs->succ_hist,mrs->att_hist,mrs->succ_hist*100/mrs->att_hist, mrs->prob_ewma,  mrs->tp_avg,   minstrel_mcs_groups[group].duration[i] );
+
+            if ((mrs->att_hist != 0) && (mrs->succ_hist != 0)) {
+                AML_PRINT(AML_DBG_MODULES_RATE_CTR, "group=%d,rate idx =%d, success=%4d,attempts=%4d, succ_hist=%6d, att_hist=%7d,%3d%%, prob_ewma=%4d,tp_avg=%3d,duration=%d\n",
+                     group, i, mrs->last_success, mrs->last_attempts, mrs->succ_hist,mrs->att_hist,mrs->succ_hist*100/mrs->att_hist, mrs->prob_ewma, mrs->tp_avg, minstrel_mcs_groups[group].duration[i]);
+            }
         }
 
         memcpy(mg->max_group_tp_rate, tmp_group_tp_rate, sizeof(mg->max_group_tp_rate));
@@ -430,16 +463,13 @@ minstrel_ht_update_stats(struct minstrel_priv *mp, struct minstrel_ht_sta *mi)
     /* Assign new rate set per sta */
     minstrel_ht_assign_best_tp_rates(mi, tmp_mcs_tp_rate, tmp_cck_tp_rate);
     memcpy(mi->max_tp_rate, tmp_mcs_tp_rate, sizeof(mi->max_tp_rate));
-
-
-    __D(BIT(23), "%s best_tp:%d, max_tp_rate:%d:%d:%d:%d\n", __func__, mi->max_prob_rate,
+    AML_PRINT(AML_DBG_MODULES_RATE_CTR, " best_tp:%d, max_tp_rate:%d:%d:%d:%d\n", mi->max_prob_rate,
         mi->max_tp_rate[0], mi->max_tp_rate[1], mi->max_tp_rate[2], mi->max_tp_rate[3]);
-
     /* Try to increase robustness of max_prob_rate*/
     minstrel_ht_prob_rate_reduce_streams(mi);
 
     /* try to sample all available rates during each interval */
-    mi->sample_count *= 64;
+    mi->sample_count *= 10;
 
 #ifdef CONFIG_MAC80211_DEBUGFS
     /* use fixed index if set */
@@ -453,6 +483,45 @@ minstrel_ht_update_stats(struct minstrel_priv *mp, struct minstrel_ht_sta *mi)
     /* Reset update timer */
     mi->last_stats_update = jiffies;
 }
+
+void minstrel_init_start_stats(void *priv, void *priv_sta, unsigned char max_rate, unsigned char bw)
+{
+    struct minstrel_priv *mp = priv;
+    struct minstrel_mcs_group_data *mg;
+    struct minstrel_ht_sta_priv *msp = priv_sta;
+    struct minstrel_ht_sta *mi = &msp->ht;
+    struct minstrel_rate_stats *mrs;
+    int group;
+    unsigned char group_bw = 0;
+
+    for (group = 0; group < ARRAY_SIZE(minstrel_mcs_groups); group++) {
+        group_bw = minstrel_mcs_groups[group].flags & IEEE80211_TX_RC_80_MHZ_WIDTH ? BW_80
+            : minstrel_mcs_groups[group].flags & IEEE80211_TX_RC_40_MHZ_WIDTH ? BW_40 : BW_20;
+
+        mg = &mi->groups[group];
+        if (!mi->supported[group] || (group_bw != bw))
+            continue;
+
+        if (!(mi->supported[group] & BIT(max_rate)))
+            continue;
+
+        printk("%s rate_index:%d, bw:%d\n", __func__, max_rate, bw);
+        mrs = &mg->rates[max_rate];
+        mrs->attempts = 2;
+        mrs->att_hist = 3;
+        mrs->success = 2;
+        mrs->succ_hist = 3;
+
+        mrs = &mg->rates[2];
+        mrs->attempts = 1;
+        mrs->att_hist = 1;
+        mrs->success = 1;
+        mrs->succ_hist = 1;
+    }
+
+    minstrel_ht_update_stats(mp, mi);
+}
+
 
 static bool
 minstrel_ht_txstat_valid(struct minstrel_priv *mp, struct ieee80211_tx_rate *rate)
@@ -548,10 +617,9 @@ minstrel_ht_tx_status(void *priv, struct ieee80211_supported_band *sband,
     mi->ampdu_packets++;
     mi->ampdu_len += info->status.ampdu_len;
 
-
     if (!mi->sample_wait && !mi->sample_tries && mi->sample_count > 0) {
-        mi->sample_wait = 16;
-        mi->sample_tries = 1;
+        mi->sample_wait = 10;
+        mi->sample_tries = 2;
         mi->sample_count--;
         //DPRINTF(AML_DEBUG_RATE, "%s(%d):reinit sample_wait and sample_tries, sample_wait=%d,mi->sample_count=%d\n",  __func__, __LINE__,mi->sample_wait,mi->sample_count);
     }
@@ -568,9 +636,6 @@ minstrel_ht_tx_status(void *priv, struct ieee80211_supported_band *sband,
         if (last) {
             rate->success += info->status.ampdu_ack_len;
         }
-
-        DPRINTF(AML_DEBUG_RATE, "%s(%d):i=%d,idx=%d, count=%d,ampdu_len=%d, ack_len=%d, success:%d, attempts:%d\n",
-            __func__, __LINE__,i,ar[i].idx,ar[i].count, info->status.ampdu_len,info->status.ampdu_ack_len, rate->success, rate->attempts);
 
         if (last) {
             break;
@@ -601,13 +666,7 @@ minstrel_ht_tx_status(void *priv, struct ieee80211_supported_band *sband,
     }
 
     if (update) {
-        int i = 0;
         minstrel_ht_update_rates(mp, mi);
-        for (i = 0; i < 4; i++) {
-            DPRINTF(AML_DEBUG_RATE, "%s(%d):  sta used rate i = %d, rate idx=%d\n",  __func__, __LINE__, i, mi->sta->rates->rate[i].idx);
-        }
-
-        //DPRINTF(AML_DEBUG_RATE, "%s(%d):  max_tp_rate = %d, max_tp_rate2=%d, max_prob_rate=%d\n", __func__, __LINE__, mi->max_tp_rate, mi->max_tp_rate2,mi->max_prob_rate);
     }
 }
 
@@ -770,6 +829,8 @@ minstrel_get_sample_rate(struct minstrel_priv *mp, struct minstrel_ht_sta *mi, s
     unsigned int sample_dur, sample_group, cur_max_tp_streams;
     int tp_rate1, tp_rate2;
     int sample_idx = 0;
+    int mcs_idx = 0;
+    int tp_rate1_idx = 0;
     struct ieee80211_tx_rate *rate;
     const struct mcs_group *sample_mcs_group;
 
@@ -792,6 +853,7 @@ minstrel_get_sample_rate(struct minstrel_priv *mp, struct minstrel_ht_sta *mi, s
     }
 
     mrs = &mg->rates[sample_idx];
+    mcs_idx = sample_idx;
     sample_idx += sample_group * MCS_GROUP_RATES;
 
     /* Set tp_rate1, tp_rate2 to the highest / second highest max_tp_rate */
@@ -803,6 +865,13 @@ minstrel_get_sample_rate(struct minstrel_priv *mp, struct minstrel_ht_sta *mi, s
         tp_rate1 = mi->max_tp_rate[0];
         tp_rate2 = mi->max_tp_rate[1];
     }
+
+    tp_rate1_idx = tp_rate1 % MCS_GROUP_RATES;
+    if (mcs_idx - tp_rate1_idx > 1) {
+        mcs_idx = tp_rate1_idx + (tp_rate1 % 2) + 1;
+        sample_idx = mcs_idx + sample_group * MCS_GROUP_RATES;
+    }
+    AML_PRINT(AML_DBG_MODULES_RATE_CTR, "tp_rate1:%d, sample_idx:%d\n", tp_rate1, sample_idx);
 
     /*
     * Sampling might add some overhead (RTS, no aggregation)
@@ -818,14 +887,13 @@ minstrel_get_sample_rate(struct minstrel_priv *mp, struct minstrel_ht_sta *mi, s
     */
     cur_max_tp_streams = minstrel_mcs_groups[tp_rate1 / MCS_GROUP_RATES].streams;
     sample_dur = minstrel_get_duration(sample_idx);
-    if (sample_dur >= minstrel_get_duration(tp_rate2) &&
-        (cur_max_tp_streams - 1 < minstrel_mcs_groups[sample_group].streams ||
-        sample_dur >= minstrel_get_duration(mi->max_prob_rate))) {
-        //printk("%s, sample rate slower than max_tp_rate:%d\n", __func__, sample_idx);
+    if (sample_dur >= minstrel_get_duration(tp_rate2)
+        && (cur_max_tp_streams - 1 < minstrel_mcs_groups[sample_group].streams
+        || sample_dur >= minstrel_get_duration(mi->max_prob_rate))
+        && (tp_rate1_idx - mcs_idx > 1)) {
         rate = &info->status.rates[1];
 
     } else {
-        //printk("%s, sample rate faster than max_tp_rate:%d\n", __func__, sample_idx);
         rate = &info->status.rates[0];
     }
 
@@ -954,7 +1022,7 @@ minstrel_ht_update_caps(void *priv, struct ieee80211_supported_band *sband,
 
 	/* When using MRR, sample more on the first attempt, without delay */
 	if (mp->has_mrr) {
-		mi->sample_count = 16;
+		mi->sample_count = 32;
 		mi->sample_wait = 0;
 	} else {
 		mi->sample_count = 8;
@@ -1009,6 +1077,7 @@ minstrel_ht_update_caps(void *priv, struct ieee80211_supported_band *sband,
 				continue;
 #endif
 			mi->supported[i] = mcs->rx_mask[nss - 1];
+			printk("mi->supported:%08x:%d\n", mi->supported[i], i);
 			if (mi->supported[i])
 				n_supported++;
 			continue;
@@ -1036,10 +1105,12 @@ minstrel_ht_update_caps(void *priv, struct ieee80211_supported_band *sband,
 		else
 			bw = BW_20;
 
-		if (sta->bandwidth != bw) {
+		if (sta->bandwidth < bw) {
 			continue;
 		}
-		mi->supported[i] = minstrel_get_valid_vht_rates(bw, nss,	vht_cap->vht_mcs.tx_mcs_map);
+
+		mi->supported[i] = minstrel_get_valid_vht_rates(bw, nss, vht_cap->vht_mcs.tx_mcs_map);
+		printk("mi->supported:%08x:%d\n", mi->supported[i], i);
 
 		if (mi->supported[i])
 			n_supported++;
@@ -1065,7 +1136,6 @@ use_legacy:
 
 static void
 minstrel_ht_rate_init(void *priv, struct ieee80211_supported_band *sband,
-		      /*struct cfg80211_chan_def *chandef,*/
                       struct ieee80211_sta *sta, void *priv_sta)
 {
 	minstrel_ht_update_caps(priv, sband, /*chandef,*/ sta, priv_sta);
@@ -1083,40 +1153,39 @@ minstrel_ht_rate_update(void *priv, struct ieee80211_supported_band *sband,
 static void *
 minstrel_ht_alloc_sta(void *priv, struct ieee80211_sta *sta, gfp_t gfp)
 {
-	struct ieee80211_supported_band *sband;
-	struct minstrel_ht_sta_priv *msp;
-	struct minstrel_priv *mp = priv;
-	struct ieee80211_hw *hw = mp->hw;
-	int max_rates = 0;
-	int i;
-    
-	DPRINTF(AML_DEBUG_RATE, "%s(%d):priv = %p\n",  __func__, __LINE__,  priv);
-	for (i = 0; i < IEEE80211_BAND_60GHZ; i++) {
-		sband = hw->wiphy->bands[i];
-		DPRINTF(AML_DEBUG_RATE, "%s(%d):sband = %p\n",  __func__, __LINE__,  sband);
-		if (sband && sband->n_bitrates > max_rates)
-			max_rates = sband->n_bitrates;
-	}
+    struct ieee80211_supported_band *sband;
+    struct minstrel_ht_sta_priv *msp;
+    struct minstrel_priv *mp = priv;
+    struct ieee80211_hw *hw = mp->hw;
+    int max_rates = 0;
+    int i;
 
-	msp = (struct minstrel_ht_sta_priv *)ZMALLOC(sizeof(*msp), "minstrel_ht_sta_priv", gfp);
-	if (!msp)
-		return NULL;
+    AML_OUTPUT("priv = %p\n", priv);
+    for (i = 0; i < IEEE80211_BAND_60GHZ; i++) {
+        sband = hw->wiphy->bands[i];
+        if (sband && sband->n_bitrates > max_rates)
+        max_rates = sband->n_bitrates;
+    }
 
-	msp->ratelist = ZMALLOC(sizeof(struct minstrel_rate) * max_rates, "minstrel_ratelist", gfp);
-	if (!msp->ratelist)
-		goto error;
+    msp = (struct minstrel_ht_sta_priv *)ZMALLOC(sizeof(*msp), "minstrel_ht_sta_priv", gfp);
+    if (!msp)
+        return NULL;
 
-	msp->sample_table = ZMALLOC(SAMPLE_COLUMNS * max_rates, "minstrel_ht_sample_table", gfp);
-	if (!msp->sample_table)
-		goto error1;
+    msp->ratelist = ZMALLOC(sizeof(struct minstrel_rate) * max_rates, "minstrel_ratelist", gfp);
+    if (!msp->ratelist)
+        goto error;
 
-	return msp;
+    msp->sample_table = ZMALLOC(SAMPLE_COLUMNS * max_rates, "minstrel_ht_sample_table", gfp);
+    if (!msp->sample_table)
+        goto error1;
+
+    return msp;
 
 error1:
-	FREE(msp->ratelist, "minstrel_ratelist");
+    FREE(msp->ratelist, "minstrel_ratelist");
 error:
-	FREE(msp, "minstrel_ht_sta_priv");
-	return NULL;
+    FREE(msp, "minstrel_ht_sta_priv");
+    return NULL;
 }
 
 static void
@@ -1185,30 +1254,19 @@ static  struct minstrel_rate_control_ops mac80211_minstrel_ht = {
 
 static void  init_sample_table(void)
 {
-	int col, i, new_idx;
-	u8 rnd[MCS_GROUP_RATES];
+    int col, i, new_idx;
+    u8 rnd[MCS_GROUP_RATES];
 
-	memset(sample_table, 0xff, sizeof(sample_table));
-	for (col = 0; col < SAMPLE_COLUMNS; col++) {
-		prandom_bytes(rnd, sizeof(rnd));
-		for (i = 0; i < MCS_GROUP_RATES; i++) {
-			new_idx = (i + rnd[i]) % MCS_GROUP_RATES;
-			while (sample_table[col][new_idx] != 0xff)
-				new_idx = (new_idx + 1) % MCS_GROUP_RATES;
-
-			sample_table[col][new_idx] = i;
-		}
-	}
-
-      DPRINTF(AML_DEBUG_RATE, "%s(%d):  print sample table start\n", __func__, __LINE__);
-      for (col = 0; col < SAMPLE_COLUMNS; col++) {
-		for (i = 0; i < MCS_GROUP_RATES; i++) {
-			DPRINTF(AML_DEBUG_RATE, "0x%x  ",sample_table[col][i]);
-		}
-		DPRINTF(AML_DEBUG_RATE,"\n");
-	}
-
-      DPRINTF(AML_DEBUG_RATE, "%s(%d):  print sample table end\n", __func__, __LINE__);
+    memset(sample_table, 0xff, sizeof(sample_table));
+    for (col = 0; col < SAMPLE_COLUMNS; col++) {
+        prandom_bytes(rnd, sizeof(rnd));
+        for (i = 0; i < MCS_GROUP_RATES; i++) {
+            new_idx = (i + rnd[i]) % MCS_GROUP_RATES;
+            while (sample_table[col][new_idx] != 0xff)
+            new_idx = (new_idx + 1) % MCS_GROUP_RATES;
+            sample_table[col][new_idx] = i;
+        }
+    }
 }
 
 struct minstrel_rate_control_ops* get_rate_control_ops_ht(void)

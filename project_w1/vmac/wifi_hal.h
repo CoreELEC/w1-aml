@@ -5,7 +5,7 @@
 #include "wifi_aon_addr.h"
 #include "wifi_skbbuf.h"
 
-#define WIFI_ADDR_ISGROUP(wh)           (((unsigned char *)wh)[4] & 1)
+#define WIFI_ADDR_ISGROUP(wh) (((unsigned char *)wh)[4] & 1)
 enum irqreturn  hal_irq_top(int irq, void *dev_id);
 #ifdef CONFIG_AML_USE_STATIC_BUF
 enum aml_prealloc_index {
@@ -18,6 +18,11 @@ enum aml_key_type {
     AML_UCAST_TYPE = 0,
     AML_MCAST_TYPE = 1,
     AML_TYPE_MAX
+};
+
+enum aml_pkt_position {
+    AML_PKT_NOT_IN_HAL = 0,
+    AML_PKT_IN_HAL = 1
 };
 
 
@@ -72,8 +77,7 @@ void hal_enable_gpio_int(unsigned char enable);
                                  + PAGE_LEN - 1) / PAGE_LEN) * PAGE_LEN * STA1_VMAC0_AGG_NUM)
 #endif
 
-
-void hal_soft_rx_cs(struct hal_private *hal_priv,OS_SKBBUF * skb );
+void hal_soft_rx_cs(struct hal_private *hal_priv, struct sk_buff *skb);
 void show_rxvector (HW_RxDescripter_bit *RxPrivHdr);
 void hal_free_txcmp_buf(struct hal_private *hal_priv);
 unsigned char hal_alloc_txcmp_buf(struct hal_private *hal_priv);

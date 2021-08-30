@@ -69,49 +69,49 @@ enum
 
 extern int aml_debug;
 extern unsigned long long g_dbg_info_enable;
+extern unsigned long long g_dbg_modules;
+
 #define DPRINTF( _m,  ...) do {         \
                 if (aml_debug& (_m))                \
                         printk(__VA_ARGS__);      \
         } while (0)
 
-/* shijie.chen add printk class for debug */
 enum
 {
-    AML_DEBUG_TX = BIT(0),
-    AML_DEBUG_RX = BIT(1),
-    AML_DBG_TCP_IP_DOWN = BIT(2),
-    AML_DBG_TXLIST_CNT = BIT(3),
-    AML_DBG_TX_DROP = BIT(4),
-    AML_DBG_HAL_FULL = BIT(5),
-    AML_DBG_TX_ITVL = BIT(6),
-    AML_DEBUG_AGG = BIT(7),
-    AML_DBG_TXPKT_ITVL = BIT(8),
-    AML_DBG_TX_PATH_LOCKS=BIT(9),
-    AML_DBG_TX_SN=BIT(10),
-    AML_DBG_TX_SHOW_TXVEC=BIT(11),
-    AML_DBG_TX_HAL = BIT(12),
-    AML_DBG_TX_BA_RECYCLE = BIT(14),
-    AML_DBG_TX_FLOW = BIT(15),
-    AML_DBG_TX_AGG_CNT = BIT(16),
-    AML_DEBUG_CNT = BIT(18), /*log for connecting  */
-    AML_DBG_P2P_GO=BIT(19),
-    AML_DBG_HAL_TX_DW=BIT(20),
-    AML_DBG_HAL_RX_FRM=BIT(21),
-    AML_DBG_TX_VIP_INFO=BIT(22),
-    AML_DBG_DUMP_BCN = BIT(28),
-
-    AML_DBG_CT=BIT(31),
-    AML_DEBUG_ALL = 0xffffffffffffffff,
+    AML_DBG_OFF = 0,
+    AML_DBG_ON = 1,
 };
 
+enum
+{
+    AML_DBG_MODULES_P2P = BIT(0),         /* p2p */
+    AML_DBG_MODULES_RATE_CTR = BIT(1),    /* minstrel rate */
+    AML_DBG_MODULES_TX = BIT(2),    /* tx */
+    AML_DBG_MODULES_HAL_TX = BIT(3),    /* hal_tx */
+    AML_DEBUG_MODDULES_ALL = 0xffffffffffffffff,
+};
 
-#define __D( _m, ...) do {         \
-                if (g_dbg_info_enable & (_m)) \
-					{ printk(__VA_ARGS__);}      \
+#define AML_PRINT( _m,format,...) do {         \
+                if (g_dbg_modules & (_m)) \
+                { \
+                    if(_m == AML_DBG_MODULES_P2P) \
+                        printk("[p2p] <%s> %d "format"",__FUNCTION__, __LINE__, ##__VA_ARGS__); \
+                    else if(_m == AML_DBG_MODULES_RATE_CTR) \
+                        printk("[mi_rate] <%s> %d "format"",__FUNCTION__, __LINE__, ##__VA_ARGS__); \
+                    else if(_m == AML_DBG_MODULES_TX) \
+                        printk("[TX] <%s> %d "format"",__FUNCTION__, __LINE__, ##__VA_ARGS__); \
+                }    \
+        } while (0)
+
+#define ERROR_DEBUG_OUT(format,...) do {    \
+                 printk("FUNCTION: %s LINE: %d:"format"",__FUNCTION__, __LINE__, ##__VA_ARGS__); \
+        } while (0)
+
+#define AML_OUTPUT(format,...) do {    \
+                 printk("<%s> %d:"format"",__FUNCTION__, __LINE__, ##__VA_ARGS__); \
         } while (0)
 
 
-				
 #ifdef DRV_PT_SUPPORT
 #include "wifi_pt_init.h"
 extern struct _B2B_Platform_Conf gB2BPlatformConf;

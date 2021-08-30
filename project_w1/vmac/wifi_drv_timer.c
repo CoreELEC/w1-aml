@@ -146,7 +146,7 @@ unsigned char os_timer_ex_cancel (struct os_timer_ext* timer_object, enum timer_
     if (! OS_CANCEL_TIMER(&timer_object->os_timer))
     {
         canceled = 0;
-        printk("OS_CANCEL_TIMER failed!!\n");
+        ERROR_DEBUG_OUT("OS_CANCEL_TIMER failed!!\n");
     }
 
     timer_object->active_flag = 0;

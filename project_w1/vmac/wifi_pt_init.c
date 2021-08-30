@@ -288,7 +288,7 @@ Do_HI_AGG_TxDP(struct _HI_AGG_TxDescripter_chain  *HI_AGG_chain,
     }
     else
     {
-            printk("%s (%d) not support, bw in flag 0x%x\n",__func__, __LINE__, (HI_AGG_TxDP->FLAG >> 8) & 0x3);
+            ERROR_DEBUG_OUT("not support, bw in flag 0x%x\n", (HI_AGG_TxDP->FLAG >> 8) & 0x3);
      }
 
     //printk("%s (%d) bw in flag 0x%x\n",__func__, __LINE__, (HI_AGG_TxDP->FLAG >> 8) & 0x3);
@@ -391,12 +391,13 @@ int HostSendTYPE_AMSDU(unsigned char* buffer[],int length[],
                 return 0;
         }
         Hi_TxAgg = Driver_GetAGG();
+        if (Hi_TxAgg==NULL)
+                return false;
+
         Driver_ListInit(Hi_TxAgg);
 
         HI_TxPriv[0] = Driver_GetTxPriv();
 
-        if (Hi_TxAgg==NULL)
-                return false;
         //Do_HI_AGG_TxDP(Hi_TxAgg,HI_TxPriv,*buffer,length,TID,FLAG,packetNum  +  1,1, vmac_id);
         Do_HI_AGG_TxPriv_TYPE_AMSDU( HI_TxPriv,buffer,length,packetNum);
         Do_HI_AGG_TxDP(Hi_TxAgg,HI_TxPriv,length,TID,FLAG,prinum,1);
@@ -417,15 +418,17 @@ int HostSendTYPE_AMPDU(unsigned char* buffer[],int length[],
                 return 0;
         }
         Hi_TxAgg = Driver_GetAGG();
+        //NULL will be returned
+        if (Hi_TxAgg==NULL)
+                return false;
+
         Driver_ListInit(Hi_TxAgg);
         HI_TxPriv = (struct _HI_TxPrivDescripter_chain**)ZMALLOC(sizeof(struct _HI_TxPrivDescripter_chain*)*(packetNum),"hst_ampdu", GFP_ATOMIC);//xman modified
         for ( i = 0; i < packetNum ; i ++) {
                 HI_TxPriv[i] =  Driver_GetTxPriv();
                 ASSERT(HI_TxPriv[i]!= NULL);
         }
-        //NULL will not be returned
-        if (Hi_TxAgg==NULL)
-                return false;
+
         Do_HI_AGG_TxPriv_TYPE_AMPDU(HI_TxPriv,buffer, length, packetNum);
         Do_HI_AGG_TxDP(Hi_TxAgg,HI_TxPriv,length,TID,FLAG,privnum,packetNum);
         Driver_FillAgg(Hi_TxAgg);
@@ -448,12 +451,12 @@ int  HostSendTYPE_COMMO(unsigned char* buffer,int length,unsigned char TID,unsig
     }
 
     Hi_TxAgg = Driver_GetAGG();
-    ASSERT(Hi_TxAgg!=NULL);
+    if (Hi_TxAgg==NULL)
+            return false;
+
     Driver_ListInit(Hi_TxAgg);
     HI_TxPriv[0] =  Driver_GetTxPriv();
     ASSERT(HI_TxPriv[0]!= NULL);
-    if (Hi_TxAgg==NULL)
-        return false;
     Do_HI_AGG_TxPriv_TYPE_COMMO(HI_TxPriv[0],buffer,length,1);
     Do_HI_AGG_TxDP(Hi_TxAgg,HI_TxPriv,&length,TID,FLAG,privnum,1);
     Driver_FillAgg(Hi_TxAgg);
@@ -492,10 +495,9 @@ void HostSendDataPacket(int type, int packetNum, unsigned short FLAG)
                 TxDescriptor_Destroy(descriptor);
             }
             packetNum = i;
-            if (packetNum ==0)
-            {
+            if (packetNum ==0) {
                 printk(" HostSendDataPacket packetNum=0\n");
-                return;
+                goto end;
             }
         }
 
@@ -503,13 +505,22 @@ void HostSendDataPacket(int type, int packetNum, unsigned short FLAG)
         case TYPE_COMMON_NOACK:
                 FLAG |= WIFI_IS_NOACK;
                 FLAG &= (~WIFI_IS_AGGR);
+                descriptor1 = (struct _TxDescriptor*)Net_GetNextPacketDes();
+                ASSERT(descriptor1 != NULL);
+                if (descriptor1 == NULL)
+                    goto end;
+                //if (TrcConfMib.dot11FragmentationThreshold < descriptor1->len )
+                 //       FLAG = WIFI_IS_FRAGMENT;
+                //printk("---b2b debug ---Common type before HostSendTYPE_COMMO, FLAG is : %d\n", FLAG);
+                HostSendTYPE_COMMO((unsigned char *)descriptor1->skb,descriptor1->len, descriptor1->Tid,FLAG);
+                TxDescriptor_Destroy(descriptor1);
+                break;
         case TYPE_COMMON:
                 FLAG &= (~WIFI_IS_AGGR);
                 descriptor1 = (struct _TxDescriptor*)Net_GetNextPacketDes();
                 ASSERT(descriptor1 != NULL);
-                if (descriptor1 == NULL) {
-                        return;
-                }
+                if (descriptor1 == NULL)
+                    goto end;
                 //if (TrcConfMib.dot11FragmentationThreshold < descriptor1->len )
                  //       FLAG = WIFI_IS_FRAGMENT;
                 //printk("---b2b debug ---Common type before HostSendTYPE_COMMO, FLAG is : %d\n", FLAG);
@@ -527,12 +538,14 @@ void HostSendDataPacket(int type, int packetNum, unsigned short FLAG)
                 break;
         case  TYPE_AMSDU_AMPDU:
                 FLAG |= WIFI_IS_BLOCKACK|WIFI_IS_AGGR;
-                printk("TYPE_AMSDU_AMPDU, Not supported yet!!!\n");
+                ERROR_DEBUG_OUT("TYPE_AMSDU_AMPDU, Not supported yet!!!\n");
                 break;
         default:
-                printk( "Unknown NET_MESSAGE type\n" );
+                ERROR_DEBUG_OUT( "Unknown NET_MESSAGE type\n" );
                 break;
         }
+
+end:
         for(i = 0; i < packetNum; i++){
             if(buffer[i] != NULL){
                 buffer[i] = NULL;
@@ -646,7 +659,7 @@ void Task_Schedule(int usrtesttype)
             break;
         // 4
         case TYPE_AMSDU_AMPDU:
-            printk("---Not supported yet---!!!\n");
+            ERROR_DEBUG_OUT("---Not supported yet---!!!\n");
             up(&b2b_tx_struct.b2b_quite_semph);
             return;
             //break;
@@ -786,15 +799,9 @@ void driver_open(void)
         FiOpt2Driver->phy_addba_ok(vmac_id,1,TrcConfMib.tid,
             TrcConfMib.SN[TrcConfMib.tid],64,
             BA_INITIATOR,immidiate_BA_TYPE);
-        FiOpt2Driver->phy_addba_ok(vmac_id,1,TrcConfMib.tid,
-            TrcConfMib.SN[TrcConfMib.tid],64,
-            BA_RESPONDER,immidiate_BA_TYPE);
     }
     else
     {
-        FiOpt2Driver->phy_addba_ok(vmac_id,1,TrcConfMib.tid,
-            TrcConfMib.SN[TrcConfMib.tid],64,
-            BA_INITIATOR,immidiate_BA_TYPE);
         FiOpt2Driver->phy_addba_ok(vmac_id,1,TrcConfMib.tid,
             TrcConfMib.SN[TrcConfMib.tid],64,
             BA_RESPONDER,immidiate_BA_TYPE);
@@ -891,7 +898,7 @@ void driver_open(void)
     }
 
 b2b_tx_thread_create_fail:
-    printk("B2B: Create b2b tx task failed ++\n");
+    ERROR_DEBUG_OUT("B2B: Create b2b tx task failed ++\n");
     if ( b2b_tx_struct.b2b_tx_thread )
     {
         b2b_tx_struct.b2b_tx_quit = 1;
@@ -942,10 +949,10 @@ void Pool_Create( struct _Pool* my, unsigned short size,
 
 struct sk_buff* TxBuffer_Alloc(void)
 {
-    struct sk_buff *skb = OS_SKBBUF_ALLOC(TX_BUFFER_SIZE+HI_TXDESC_DATAOFFSET);
+    struct sk_buff *skb = os_skb_alloc(TX_BUFFER_SIZE+HI_TXDESC_DATAOFFSET);
 
     while (!skb) {
-        skb = OS_SKBBUF_ALLOC(TX_BUFFER_SIZE+HI_TXDESC_DATAOFFSET);
+        skb = os_skb_alloc(TX_BUFFER_SIZE+HI_TXDESC_DATAOFFSET);
     }
 
     ASSERT(skb);

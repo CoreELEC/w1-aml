@@ -3,9 +3,6 @@
 #ifdef WIFI_CAPTURE
 
 unsigned char readbuf[TESTBUSBUF_LEN];
-unsigned char testbuf[TESTBUSBUF_LEN * 5] = {0};
-unsigned char testbuf_sw[TESTBUSBUF_LEN * 5] = {0};
-int testbuf_sw_len = 0;
 int g_test_bus = 0;
 int g_bcap_name = 0;
 int g_test_gain = 0;
@@ -31,6 +28,7 @@ unsigned int dut_get_reg_frag(int address, int high_bit, int low_bit)
 }
 
 #define BASE_AHB_TESTBUS_CAPTURE 0x00b00000
+#if 0
 int dut_v32_tx(unsigned int *outbuffer, unsigned int *inbufer, const unsigned long long bitnum)
 {
     int inoffset = 0;
@@ -65,7 +63,7 @@ int dut_v32_tx(unsigned int *outbuffer, unsigned int *inbufer, const unsigned lo
     }
     return len * 4;
 }
-
+#endif
 
 int dut_dump_data(unsigned int addr, unsigned char *data, int len)
 {
@@ -323,16 +321,12 @@ int  dut_stop_tbus_to_get_sram(struct file *filep, int stop_ctrl, int save_file)
     unsigned int read_tmp = 0;
     unsigned int stopaddr = 0;
     unsigned int *pdata = 0;
-    int len = 0;
     unsigned int i = 0;
     int cap_len = 0;
     int temp_addr = 0;
     unsigned int stop_flag = 0;
     int testbitwidth = 0;
     loff_t  file_pos = 0;
-    char wt_file[8];
-    int j = 0;
-    char enter = '\n';
     struct hw_interface* hif = hif_get_hw_interface();
 
     mm_segment_t fs;
@@ -349,7 +343,7 @@ int  dut_stop_tbus_to_get_sram(struct file *filep, int stop_ctrl, int save_file)
         stop_flag = stop_flag & (1 << 24);
         if (stop_flag == 0) {
             dut_set_reg_frag(TBC_OFFSET_114, 8, 8, 0);//testbus capture disable
-            printk("NO DATA !!! Testbus Capture Disable!!!\n");
+            ERROR_DEBUG_OUT("NO DATA !!! Testbus Capture Disable!!!\n");
             return 0;
         }
     }
@@ -363,51 +357,89 @@ int  dut_stop_tbus_to_get_sram(struct file *filep, int stop_ctrl, int save_file)
         temp_addr = stopaddr;
         msleep(20);
         stopaddr = hif->hif_ops.hi_read_word(TBC_OFFSET_120);
-        printk(" read stop addr....\n");
+        AML_OUTPUT(" read stop addr....\n");
     }
 
     stopaddr = (stopaddr & 0x1c) ? (stopaddr + 4) : stopaddr ;
     if (stopaddr > cap_len) {
-        printk("stopaddr>cap_len !!, stopaddr=0x%x, cap_len=0x%x\n", stopaddr, cap_len);
+        ERROR_DEBUG_OUT("stopaddr>cap_len !!, stopaddr=0x%x, cap_len=0x%x\n", stopaddr, cap_len);
         return 0;
     }
 
     hif->hif_ops.hi_write_word(TBC_RAM_SHARE, TBC_RAM_SHARE_MASK); //ram share enable
 
     dut_dump_data(stopaddr, &readbuf[0], cap_len-stopaddr);
-    printk("cap_len=0x%08x, stopaddr=0x%08x\n", cap_len, stopaddr);
-    // dut_dump_data(TBC_ADDR_END_OFFSET,testbuf_sw,1024);
+    AML_OUTPUT("cap_len=0x%08x, stopaddr=0x%08x\n", cap_len, stopaddr);
     dut_dump_data(TBC_ADDR_BEGIN_OFFSET, &readbuf[cap_len-stopaddr], stopaddr - TBC_ADDR_BEGIN_OFFSET);
 
     pdata = (unsigned int *)&readbuf[0];
 
-    printk("testbitwidth=0x%08x\n", testbitwidth);
-    for (i = 0; i < (TBC_ADDR_END_OFFSET-TBC_ADDR_BEGIN_OFFSET); i += INBUFFER_LEN) {
-        len += dut_v32_tx((unsigned int *)&testbuf[len], (unsigned int *)&readbuf[i], testbitwidth);
-    }
-
-    pdata = (unsigned int *)&testbuf[0];
-    testbuf_sw_len = len;
-
-    memcpy(testbuf_sw, testbuf, len);
+    AML_OUTPUT("testbitwidth=0x%08x\n", testbitwidth);
 
     if (save_file) {
-        for (i = 0; i < len; i += 4) {
-            str_2_acsi_32bits((char*)pdata, wt_file);
-            for (j = 0 ; j < 8; j++) {
-                vfs_write(filep, &wt_file[j], sizeof(unsigned char), &file_pos);
-            }
-            pdata++;
-            vfs_write(filep, (char*)&enter, sizeof(unsigned char), &file_pos);
+        for(i = 0; i < 1024 * 4 * 10; i++) {
+            vfs_write(filep, &readbuf[i], sizeof(unsigned char), &file_pos);
         }
+        vfs_write(filep, (char*)&testbitwidth, sizeof(unsigned int), &file_pos);
     }
 
     vfs_fsync(filep, 0);
     set_fs(fs);
-    printk("handle capture data complete\n");
+    AML_OUTPUT("handle capture data complete\n");
     return 1;
 }
 
+//0:use sw stop   1:use hw stop
+int iwp_stop_tbus_to_get_sram(short *buf)
+{
+    #define HARDWARE_CONTROL 1
+    unsigned int read_tmp = 0;
+    unsigned int stopaddr = 0;
+    unsigned int *pdata = 0;
+    unsigned int i = 0;
+    int cap_len = 0;
+    int temp_addr = 0;
+    int testbitwidth = 0;
+    struct hw_interface* hif = hif_get_hw_interface();
+
+    cap_len = hif->hif_ops.hi_read_word(TBC_OFFSET_110);
+    read_tmp = hif->hif_ops.hi_read_word(TBC_OFFSET_114);
+
+    testbitwidth = (read_tmp & 0x1f) + 1;
+
+
+    read_tmp = hif->hif_ops.hi_read_word(TBC_OFFSET_114);
+    read_tmp = (read_tmp | (1 << 10) );  // tbc_stop
+    hif->hif_ops.hi_write_word(TBC_OFFSET_114, read_tmp);
+
+    stopaddr = hif->hif_ops.hi_read_word(TBC_OFFSET_120);
+    while (temp_addr != stopaddr) {
+        temp_addr = stopaddr;
+        msleep(20);
+        stopaddr = hif->hif_ops.hi_read_word(TBC_OFFSET_120);
+        AML_OUTPUT(" read stop addr....\n");
+    }
+
+    stopaddr = (stopaddr & 0x1c) ? (stopaddr + 4) : stopaddr ;
+    if (stopaddr > cap_len) {
+        ERROR_DEBUG_OUT("stopaddr>cap_len !!, stopaddr=0x%x, cap_len=0x%x\n", stopaddr, cap_len);
+        return 0;
+    }
+
+    hif->hif_ops.hi_write_word(TBC_RAM_SHARE, TBC_RAM_SHARE_MASK); //ram share enable
+
+    AML_OUTPUT("cap_len=0x%08x, stopaddr=0x%08x\n", cap_len, stopaddr);
+    dut_dump_data(stopaddr, &readbuf[0], 1024);
+
+    pdata = (unsigned int *)&readbuf[0];
+
+    for(i = 0; i < 1024; i++) {
+        *buf = readbuf[i];
+        buf++;
+    }
+
+    return 1;
+}
 unsigned char dut_set_reg_frag(int address, int bit_end, int bit_start, int value)
 {
     unsigned int tmp = 0;
@@ -486,7 +518,7 @@ int dut_bt_stop_capture(void)
     fp = filp_open(fp_path,O_RDWR | O_CREAT | O_APPEND | O_TRUNC, 0777);
 
     if (IS_ERR(fp)) {
-        printk("create file error/n");
+        ERROR_DEBUG_OUT("create file error/n");
         return -1;
     }
 

@@ -17,7 +17,6 @@
 #include "wifi_mac_sta.h"
 #include "wifi_mac_power.h"
 #include "wifi_mac_scan.h"
-#include "wifi_mac_xmit.h"
 #include "wifi_mac_action.h"
 
 struct wifi_mac_statistic
@@ -116,10 +115,12 @@ struct vm_wlan_net_vif_params
 };
 
 #define WIFINET_SIGNAL_POWER_WEAK_THRESH_NARROW -75
-#define WIFINET_SIGNAL_POWER_WEAK_THRESH_WIDE -70
+//When RSSI is less than -70, selecting a fixed rate when entering a weak signal
+// will lead to a sudden drop in throughput
+#define WIFINET_SIGNAL_POWER_WEAK_THRESH_WIDE -80
 
-#define WIFINET_SIGNAL_POWER_BW_CHANGE_THRESH_NARROW -75
-#define WIFINET_SIGNAL_POWER_BW_CHANGE_THRESH_WIDE -70
+#define WIFINET_SIGNAL_POWER_BW_CHANGE_THRESH_NARROW -74
+#define WIFINET_SIGNAL_POWER_BW_CHANGE_THRESH_WIDE -63
 
 
 #define WIFINET_TXPOWER_MAX  100
@@ -420,6 +421,9 @@ struct wifi_mac
     struct _wifi_mac_country_iso wm_country;
     struct wifi_mac_country_ie* wm_11dinfo;
 
+    unsigned char gain_set_threshold;
+    unsigned char is_need_set_gain;
+
     unsigned char wm_doth_tbtt;
     unsigned char wm_doth_channel;
     unsigned char wm_tx_streams;
@@ -553,7 +557,7 @@ struct wlan_net_vif
     enum wifi_mac_bwc_width vm_bandwidth;
     unsigned char vm_scan_before_connect_flag;
     int vm_scanchan_rssi;
-    struct wifi_scan_info *vm_connect_scaninfo;
+    struct scaninfo_entry vm_connect_scan_entry;
     unsigned char vm_chan_simulate_scan_flag;
     unsigned char vm_chan_switch_scan_flag;
     unsigned char vm_chan_switch_scan_count;
@@ -609,9 +613,6 @@ struct wlan_net_vif
     unsigned char vm_chanchange_count;
     unsigned char vm_bmiss_count;
     unsigned char vm_cur_authmode;
-
-    unsigned char vm_specific_packet_rate_fixed;
-    unsigned int vm_specific_packet_rate_kbps;
     struct wifi_mac_rateset vm_legacy_rates;
 
     struct wifi_mac_wmm_ac_params vm_wmm_ac_params;

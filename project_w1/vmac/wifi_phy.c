@@ -82,6 +82,16 @@ static const struct reg_table wifi_fpga_regtable[] =
 #endif
 };
 
+int get_snr(void) {
+    int snr = 0;
+    struct hw_interface* hif = hif_get_hw_interface();
+    unsigned int reg_tmp = 0x01;
+
+    hif->hif_ops.hi_write_word(RG_PHY_ADR_2C20, reg_tmp);
+    snr = hif->hif_ops.hi_read_word(RG_PHY_STS_REG_0 + 3 *sizeof(unsigned int));
+
+    return (snr & 0xffff);
+}
 
 void phy_stc(void)
 {

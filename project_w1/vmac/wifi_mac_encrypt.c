@@ -509,7 +509,7 @@ tkip_enmic(struct wifi_mac_key *k, struct sk_buff *skb0, int force)
                                      wh->i_addr1,
                                      "No room for Michael MIC, tailroom %u",
                                      skb_tailroom(skb));
-            printk("No room for Michael MIC, tailroom \n");
+            ERROR_DEBUG_OUT("No room for Michael MIC, tailroom \n");
 
             return 0;
         }

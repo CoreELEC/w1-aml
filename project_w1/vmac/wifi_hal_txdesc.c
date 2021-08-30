@@ -744,7 +744,6 @@ void hal_tx_desc_build(struct hi_agg_tx_desc* HiTxDesc,
 {
     struct hal_private * hal_priv = hal_get_priv();
     unsigned long long  *PN = NULL;
-    int i =0;
     struct hw_tx_vector_bits * TxVector_Bit= (struct hw_tx_vector_bits * )&pTxDPape->TxVector;
     unsigned short bw  = ( HiTxDesc->FLAG & WIFI_CHANNEL_BW_MASK)>>WIFI_CHANNEL_BW_OFFSET;
     struct wifi_qos_frame *wh = NULL;
@@ -910,12 +909,12 @@ void hal_tx_desc_build(struct hi_agg_tx_desc* HiTxDesc,
 
             case WIFI_TKIP:
                 memcpy(&pTxDPape->TxOption.PN[0],(unsigned char *)PN,8);
-                *PN = (*PN) + HiTxDesc->MpduNum;
+                *PN = (*PN) + 1;
                 break;
 
             case WIFI_AES:
                 memcpy(&pTxDPape->TxOption.PN[0],(unsigned char *)PN,8);
-                *PN = (*PN) + HiTxDesc->MpduNum;
+                *PN = (*PN) + 1;
                 break;
 
             case WIFI_WEP128:
@@ -923,13 +922,11 @@ void hal_tx_desc_build(struct hi_agg_tx_desc* HiTxDesc,
 
             case WIFI_WPI:
                 memcpy(&pTxDPape->TxOption.PN[0],(unsigned char *)PN,MAX_PN_LEN);
-                for (i = 0; i < HiTxDesc->MpduNum; i++) {
-                    if ( HiTxDesc->FLAG & WIFI_IS_Group) {
-                        hal_wpi_pn_self_plus(PN);
+                if ( HiTxDesc->FLAG & WIFI_IS_Group) {
+                    hal_wpi_pn_self_plus(PN);
 
-                    } else {
-                        hal_wpi_pn_self_plus_plus(PN);
-                    }
+                } else {
+                    hal_wpi_pn_self_plus_plus(PN);
                 }
                 break;
         }
@@ -994,6 +991,9 @@ void hal_tx_desc_build(struct hi_agg_tx_desc* HiTxDesc,
 void hal_tx_desc_build_sub(struct hi_tx_priv_hdr* HI_TxPriv,
     struct hi_tx_desc *pTxDPape, struct hi_tx_desc *pFirstTxDPape)
 {
+    struct hal_private * hal_priv = hal_get_priv();
+    unsigned long long  *PN = NULL;
+
     ASSERT(HI_TxPriv);
     ASSERT(pTxDPape);
     ASSERT(pFirstTxDPape);
@@ -1015,6 +1015,45 @@ void hal_tx_desc_build_sub(struct hi_tx_priv_hdr* HI_TxPriv,
     {
         pTxDPape->MPDUBufFlag |= HW_LAST_MPDUBUF_FLAG;
     }
+
+
+    if (HI_TxPriv->EncryptType !=  WIFI_NO_WEP)
+    {
+        pTxDPape->TxOption.KeyIdex = pFirstTxDPape->TxOption.KeyIdex;
+        if (pFirstTxDPape->TxPriv.Flag & WIFI_IS_Group) {
+            PN  = (unsigned long long *)hal_priv->mRepCnt[pFirstTxDPape->TxPriv.vid].txPN;
+        } else {
+            PN = (unsigned long long *)hal_priv->uRepCnt[pFirstTxDPape->TxPriv.vid][pFirstTxDPape->TxPriv.StaId].txPN[TX_UNICAST_REPCNT_ID];
+        }
+        switch (HI_TxPriv->EncryptType)
+        {
+            case WIFI_WEP64:
+                break;
+
+            case WIFI_TKIP:
+                memcpy(&pTxDPape->TxOption.PN[0],(unsigned char *)PN,8);
+                *PN = (*PN) + 1;
+                break;
+
+            case WIFI_AES:
+                memcpy(&pTxDPape->TxOption.PN[0],(unsigned char *)PN,8);
+                *PN = (*PN) + 1;
+                break;
+
+            case WIFI_WEP128:
+                break;
+
+            case WIFI_WPI:
+                memcpy(&pTxDPape->TxOption.PN[0],(unsigned char *)PN,MAX_PN_LEN);
+                if (pFirstTxDPape->TxPriv.Flag & WIFI_IS_Group) {
+                    hal_wpi_pn_self_plus(PN);
+
+                } else {
+                    hal_wpi_pn_self_plus_plus(PN);
+                }
+                break;
+        }
+    }
 }
 
 
@@ -1035,7 +1074,7 @@ unsigned int max_send_packet_len(unsigned char rate,unsigned char bw, unsigned c
     }
     else
     {
-        printk("function (%s), line %d rate error, rate=0x%x\n", __func__, __LINE__, rate);
+        ERROR_DEBUG_OUT("rate error, rate=0x%x\n", rate);
         return 0;
     }
 
@@ -1054,7 +1093,7 @@ unsigned int max_send_packet_len(unsigned char rate,unsigned char bw, unsigned c
     mcs = GET_MCS(rate);
     if ((mcs > 9) || (bw > 2))
     {
-        printk("function (%s), line %d mcs or bw error, rate=0x%x, bw=%d\n", __func__, __LINE__, rate, bw);
+        ERROR_DEBUG_OUT("mcs or bw error, rate=0x%x, bw=%d\n", rate, bw);
         return 0;
     }
 
