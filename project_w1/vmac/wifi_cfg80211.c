@@ -1869,7 +1869,7 @@ vm_cfg80211_change_vif(struct wiphy *wiphy,
         DPRINTF(AML_DEBUG_CFG80211, "%s %d\n", __func__, __LINE__);
         memset(&cp, 0, sizeof(struct vm_wlan_net_vif_params));
         preempt_scan(wnet_vif->vm_ndev, 100, 100);
-        strncpy(cp.vm_param_name,wnet_vif->vm_ndev->name, sizeof(wnet_vif->vm_ndev->name));
+        strncpy(cp.vm_param_name,wnet_vif->vm_ndev->name, strlen(wnet_vif->vm_ndev->name));
         cp.vm_param_opmode = networkType;
         vm_wlan_net_vif_mode_change(wnet_vif,&cp);
 

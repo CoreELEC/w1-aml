@@ -2893,8 +2893,8 @@ wifi_mac_sub_sm(struct wlan_net_vif *wnet_vif, enum wifi_mac_state nstate, int a
                         wnet_vif->vm_opmode == WIFINET_M_HOSTAP)
                     {
                         wifi_mac_create_wifi(wnet_vif, wnet_vif->vm_curchan);
-                        break;
                     }
+                    break;
                 case WIFINET_S_CONNECTING:
                     if (wnet_vif->vm_opmode == WIFINET_M_IBSS)
                     {
