@@ -1039,7 +1039,7 @@ int hal_free_tx_id(struct hal_private * hal_priv, struct txdonestatus *txstatus,
 {
     struct hw_interface *hif = hif_get_hw_interface();
     unsigned char id = txstatus->callbackid;
-    struct fw_txdesc_fifo *pTxFrameDesc;
+    struct Tx_FrameDesc *pTxFrameDesc;
     int ret = 0;
     *callback = 0;
 
@@ -1047,14 +1047,10 @@ int hal_free_tx_id(struct hal_private * hal_priv, struct txdonestatus *txstatus,
     COMMON_LOCK();
     if (test_and_clear_bit(id, hal_priv->tx_frames_map))
     {
-        pTxFrameDesc = hal_priv->tx_frames[id];
-        hal_priv->tx_frames[id] = NULL;
-
-        if (pTxFrameDesc) {
-            hif->HiStatus.TX_SEND_OK_EVENT_num[pTxFrameDesc->txqueueid]++;
-            *callback = pTxFrameDesc->callback;
-            *queue_id = pTxFrameDesc->txqueueid;
-        }
+        pTxFrameDesc = &hal_priv->tx_frames[id];
+        hif->HiStatus.TX_SEND_OK_EVENT_num[pTxFrameDesc->txqueueid]++;
+        *callback = pTxFrameDesc->callback;
+        *queue_id = pTxFrameDesc->txqueueid;
 
         if (hal_priv->bhaltxdrop) {
             if (hal_is_empty_tx_id(hal_priv) == 0) {
@@ -1091,7 +1087,11 @@ static int hal_alloc_tx_id(struct hal_private * hal_priv,struct fw_txdesc_fifo *
     }
 
     set_bit(id, hal_priv->tx_frames_map);
-    hal_priv->tx_frames[id] = pTxDescFiFo;
+    hal_priv->tx_frames[id].SN = pTxDescFiFo->SN;
+    hal_priv->tx_frames[id].txqueueid= pTxDescFiFo->txqueueid;
+    hal_priv->tx_frames[id].callback= pTxDescFiFo->callback;
+    hal_priv->tx_frames[id].skb = NULL;
+    hal_priv->tx_frames[id].valid = 1;
     hif->HiStatus.TX_REQ_EVENT_num[pTxDescFiFo->txqueueid]++;
 
 __alloc_fail:

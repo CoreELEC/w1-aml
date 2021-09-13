@@ -1,1 +1,1 @@
-#define DRIVERVERSION    "v1.0.1_20210906-r driver:29eae25d21eccad37858fd98af654954b06790f0"
+#define DRIVERVERSION    "v1.0.2_20210913-r driver:29eae25d21eccad37858fd98af654954b06790f0"
