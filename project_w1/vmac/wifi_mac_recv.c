@@ -55,7 +55,7 @@ void wifi_mac_forward_init(struct drv_private *drv_priv, struct sk_buff *skb, st
 {
     wnet_vif->vm_forward.skb = NULL;
     if (wnet_vif->vm_sta_assoc > 1) {
-        wnet_vif->vm_forward.skb = os_skb_copy(skb, GFP_ATOMIC);
+        wnet_vif->vm_forward.skb = os_skb_copy(skb, GFP_ATOMIC, wnet_vif->vm_forward.skb);
         if (wnet_vif->vm_forward.skb == NULL) {
             ERROR_DEBUG_OUT("skb is NULL\n");
             return;
@@ -137,6 +137,7 @@ int wifi_mac_input(void *station, struct sk_buff *skb, struct wifi_mac_rx_status
     unsigned short rxseq = 0;
     int is_amsdu = 0;
     unsigned char *bssid = NULL;
+    type = -1;
 
     KASSERT(sta != NULL, ("null nsta"));
     sta->sta_inact = sta->sta_inact_reload;
@@ -147,11 +148,11 @@ int wifi_mac_input(void *station, struct sk_buff *skb, struct wifi_mac_rx_status
 
     if (wnet_vif == NULL) {
         ERROR_DEBUG_OUT("sta:%p\n", sta);
-        return 0;
+        goto out;
     }
+
     dev = wnet_vif->vm_ndev;
     wifimac = wnet_vif->vm_wmac;
-    type = -1;
     drv_priv = wifimac->drv_priv;
     if (wnet_vif->vm_opmode == WIFINET_M_MONITOR)
         goto out;
@@ -628,56 +629,54 @@ out:
     return type;
 }
 
-int wifi_mac_input_all(struct wifi_mac *wifimac,
-                      struct sk_buff *skb, struct wifi_mac_rx_status *rs)
+int wifi_mac_input_all(struct wifi_mac *wifimac, struct sk_buff *skb, struct wifi_mac_rx_status *rs)
 {
-    struct wlan_net_vif *wnet_vif = NULL, *wnet_vif_next = NULL;
+    struct wlan_net_vif *wnet_vif = NULL;
+    struct wlan_net_vif *wnet_vif_next = NULL;
     int type = -1;
-    struct wifi_frame *wh;
+    struct wifi_frame *wh = NULL;
+    unsigned char *bssid = NULL;
+    unsigned char *dst = NULL;
+
+    if (!skb) {
+        return type;
+    }
 
     wh = (struct wifi_frame *)os_skb_data(skb);
-    list_for_each_entry_safe(wnet_vif,wnet_vif_next,&wifimac->wm_wnet_vifs,vm_next)
-    {
-        struct wifi_station *sta;
-        struct sk_buff *skb1;
-
-        if (wnet_vif->vm_state == WIFINET_S_INIT) {
+    //AML_OUTPUT("fc:%02x:%02x, id:%d, multi:%d\n", wh->i_fc[0], wh->i_fc[1], rs->rs_wnet_vif_id, WIFINET_IS_MULTICAST(wh->i_addr1));
+    list_for_each_entry_safe(wnet_vif, wnet_vif_next,  &wifimac->wm_wnet_vifs, vm_next) {
+        if ((wnet_vif->vm_state == WIFINET_S_INIT) || (wnet_vif->vm_mainsta == NULL)) {
             continue;
         }
 
-        if (!WIFINET_IS_MULTICAST(wh->i_addr1)&&(wnet_vif->wnet_vif_id != rs->rs_wnet_vif_id)) {
-            continue;
+        if ((wnet_vif->vm_opmode == WIFINET_M_STA) || (wnet_vif->vm_opmode == WIFINET_M_P2P_CLIENT)) {
+            bssid = &wh->i_addr2[0];
+            dst = &wh->i_addr1[0];
+
+        } else {
+            bssid = &wh->i_addr1[0];
+            dst = &wh->i_addr3[0];
         }
 
-        if (!list_is_last(&wnet_vif->vm_next, &wifimac->wm_wnet_vifs))
-        {
-            skb1 = os_skb_copy(skb, GFP_ATOMIC);
-            if (skb1 == NULL)
-            {
+        if (WIFINET_IS_MULTICAST(dst)) {
+            if (memcmp(bssid, wnet_vif->vm_mainsta->sta_bssid, WIFINET_ADDR_LEN)) {
                 continue;
             }
 
         } else {
-            skb1 = skb;
-            skb = NULL;
-        }
-
-        /*vm_mainsta is pointer to itself both ap and sta */
-        if (wnet_vif->vm_mainsta != NULL) {
-            sta = wnet_vif->vm_mainsta;
-            if (skb1 != NULL) {
-                type = wifi_mac_input(sta, skb1, rs);
-            }
-
-        } else {
-            if (skb1 != NULL) {
-                os_skb_free(skb1);
+            if (wnet_vif->wnet_vif_id != rs->rs_wnet_vif_id) {
+                continue;
             }
         }
+
+        type = wifi_mac_input(wnet_vif->vm_mainsta, skb, rs);
+        skb = NULL;
     }
 
-    if (skb != NULL)
+    if (skb) {
         os_skb_free(skb);
+    }
+
     return type;
 }
 
@@ -732,21 +731,18 @@ wifi_mac_defrag(struct wifi_station *sta, struct sk_buff *skb, int hdrlen)
         {
             if (skb_is_nonlinear(skb))
             {
-                sta->sta_rxfrag[0] = os_skb_copy(skb, GFP_ATOMIC);
+                sta->sta_rxfrag[0] = os_skb_copy(skb, GFP_ATOMIC, sta->sta_rxfrag[0]);
                 os_skb_free(skb);
 
             }
-			#if defined (SYSTEM64)
-            else if (skb_end_offset(skb) < sta->sta_wnet_vif->vm_ndev->mtu +
-                     hdrlen)
-            #else
-			else if (skb->end - skb->head < sta->sta_wnet_vif->vm_ndev->mtu +
-                     hdrlen)
-			#endif
+        #if defined (SYSTEM64)
+            else if (skb_end_offset(skb) < sta->sta_wnet_vif->vm_ndev->mtu + hdrlen)
+        #else
+            else if (skb->end - skb->head < sta->sta_wnet_vif->vm_ndev->mtu + hdrlen)
+        #endif
             {
                 sta->sta_rxfrag[0] = os_skb_copy_expand(skb, 32,
-                                                     (sta->sta_wnet_vif->vm_ndev->mtu + hdrlen)
-                                                     +32 - os_skb_get_pktlen(skb), GFP_ATOMIC);
+                    (sta->sta_wnet_vif->vm_ndev->mtu + hdrlen) + 32 - os_skb_get_pktlen(skb), GFP_ATOMIC, sta->sta_rxfrag[0]);
                 os_skb_free(skb);
             }
         }
@@ -766,7 +762,6 @@ wifi_mac_defrag(struct wifi_station *sta, struct sk_buff *skb, int hdrlen)
         }
 
         os_skb_free(skb);
-
     }
 
     if (more_frag)
@@ -990,6 +985,7 @@ wifi_mac_deliver_data(struct wifi_station *sta, struct sk_buff *skb)
         else
         {
             netif_rx(skb);
+            os_skb_count_free(skb);
             wnet_vif->vif_sts.sts_rx_msdu++;
             wnet_vif->vif_sts.sts_rx_msdu_time_stamp = jiffies;
         }
@@ -1057,13 +1053,14 @@ wifi_mac_decap(struct wlan_net_vif *wnet_vif, struct sk_buff *skb, int hdrlen, i
     {
         struct sk_buff *n;
 
-        n = os_skb_copy(skb, GFP_ATOMIC);
+        n = os_skb_copy(skb, GFP_ATOMIC, n);
         os_skb_free(skb);
         if (n == NULL)
             return NULL;
         skb = n;
         eh = (struct ether_header *) os_skb_data(skb);
     }
+
     if (llc != NULL)
     {
         /* if rx packet is not LLC SNAP, then ether_type should be included in upper layer.
@@ -1729,7 +1726,7 @@ int wifi_mac_parse_wpa(struct wifi_mac_Rsnparms *rsn, unsigned char *frm, unsign
     } else {
         w &= rsn->rsn_keymgmtset;
     }
-    
+
     if (w == 0) {
         ERROR_DEBUG_OUT("WPA no acceptable key mgmt alg\n");
         return WIFINET_REASON_IE_INVALID;

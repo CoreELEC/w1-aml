@@ -21,17 +21,30 @@
 #define os_skb_put(_skb, _len) skb_put(_skb, _len)
 
 #ifdef SKBBUF_DEBUG
-static int skb_alloc_time = 0;
-static int skb_free_time = 0;
-#define os_skb_alloc(_len) do { dev_alloc_skb(ALIGN(_len, 4)); } while(0)
-#define os_skb_free(skbbuf) do { consume_skb(skbbuf);  skbbuf = NULL; } while(0)
-#define os_skb_copy(skb, priority) do { skb_copy(skb, priority); } while(0)
-#define os_skb_copy_expand(skb, header_len, tail_len, priority) do { skb_copy_expand(skb, header_len, tail_len, priority); } while(0)
+extern int skb_alloc_time;
+extern int skb_free_time;
+
+#define os_skb_count_alloc(skb) AML_OUTPUT("%s skb:%p, skb_alloc_time:%d\n", __func__, skb, skb_alloc_time++);
+#define os_skb_count_free(skb) AML_OUTPUT("%s skb:%p, skb_free_time:%d\n", __func__, skb, skb_free_time++);
+
+#define os_skb_alloc(len) dev_alloc_skb(ALIGN(len, 4)); \
+    AML_OUTPUT("%s skb:%p, skb_alloc_time:%d\n", __func__, skb, skb_alloc_time++);
+#define os_skb_copy(ori_skb, priority, skb) skb_copy(ori_skb, priority);\
+    AML_OUTPUT("%s skb:%p, skb_alloc_time:%d\n", __func__, skb, skb_alloc_time++);
+#define os_skb_copy_expand(ori_skb, header_len, tail_len, priority, skb) skb_copy_expand(ori_skb, header_len, tail_len, priority);\
+    AML_OUTPUT("%s skb:%p, skb_alloc_time:%d\n", __func__, skb, skb_alloc_time++);
+
+#define os_skb_free(skb) consume_skb(skb);\
+    AML_OUTPUT("%s skb:%p, skb_free_time:%d\n", __func__, skb, skb_free_time++);
+
 #else
-#define os_skb_alloc(_len) dev_alloc_skb(ALIGN(_len, 4))
-#define os_skb_free(skbbuf) do { consume_skb(skbbuf);  skbbuf = NULL; } while(0)
-#define os_skb_copy(skb, priority) skb_copy(skb, priority)
-#define os_skb_copy_expand(skb, header_len, tail_len, priority) skb_copy_expand(skb, header_len, tail_len, priority)
+
+#define os_skb_count_alloc(skb)
+#define os_skb_count_free(skb)
+#define os_skb_alloc(_len) dev_alloc_skb(ALIGN(_len, 4));
+#define os_skb_free(skbbuf) { consume_skb(skbbuf);  skbbuf = NULL; }
+#define os_skb_copy(ori_skb, priority, skb) skb_copy(ori_skb, priority);
+#define os_skb_copy_expand(ori_skb, header_len, tail_len, priority, skb) skb_copy_expand(ori_skb, header_len, tail_len, priority);
 #endif
 
 #endif//_WIFI_SKBBUF_H_

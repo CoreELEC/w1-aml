@@ -1028,16 +1028,16 @@ static int aml_iwpriv_start_capture(struct net_device *dev,
 static int aml_iwpriv_get_csi_info(struct net_device *dev,
     struct iw_request_info *info, union iwreq_data *wrqu, char *extra)
 {
-#ifndef DRV_PT_SUPPORT
     struct wlan_net_vif *wnet_vif = NULL;
     struct wifi_mac *wifimac = NULL;
-    csi_stream_t csi_info;
+    csi_stream_t *csi_info = NULL;
     unsigned int band = 0;
     unsigned int csi_len = 0;
     unsigned int mac_mode = 0;
     short phase_incr = 0;
     unsigned int arr[8] = {0};
     static unsigned int pkg_idx = 0;
+
     AML_OUTPUT("%s start++\n", __func__);
 
     wifimac = wifi_mac_get_mac_handle();
@@ -1048,6 +1048,12 @@ static int aml_iwpriv_get_csi_info(struct net_device *dev,
         || (wnet_vif->vm_mainsta == NULL)) {
 
         ERROR_DEBUG_OUT("%s curchan or mainsta not avilable\n", __func__);
+        return 0;
+    }
+
+    csi_info = ZMALLOC(sizeof(csi_stream_t), "csi_info", GFP_KERNEL);
+    if (csi_info == NULL) {
+        ERROR_DEBUG_OUT("%s no memory!\n", __func__);
         return 0;
     }
 
@@ -1086,38 +1092,38 @@ static int aml_iwpriv_get_csi_info(struct net_device *dev,
     phase_incr = (phase_incr >> 12) & 0x0fff;
 
     pkg_idx++;
-    memset(&csi_info, 0, sizeof(csi_stream_t));
-    csi_info.time_stamp = wnet_vif->vm_mainsta->bcn_stamp;
-    WIFINET_ADDR_COPY(csi_info.mac_ra, wnet_vif->vm_myaddr);
-    WIFINET_ADDR_COPY(csi_info.mac_ta, wnet_vif->vm_des_bssid);
-    csi_info.frequency_band = band;
-    csi_info.bw = wnet_vif->vm_bandwidth;
-    csi_info.rssi = wnet_vif->vm_mainsta->sta_avg_bcn_rssi;
-    csi_info.protocol_mode = mac_mode;
-    csi_info.frame_type = wnet_vif->vm_mainsta->cur_fratype;
-    csi_info.chain_num = 1;
-    csi_info.csi_len = csi_len;
-    csi_info.snr = arr[1];
-    csi_info.primary_channel_index = wifi_mac_Mhz2ieee(wnet_vif->vm_curchan->chan_cfreq1, 0);
-    csi_info.noise = arr[4];
-    csi_info.phyerr = 0;
-    csi_info.rate = wnet_vif->vm_mainsta->sta_vendor_rate_code & 0xf;
-    csi_info.extra_information = 0;
-    csi_info.agc_code = 0;
-    csi_info.phase_incr = phase_incr;
-    csi_info.channel = wnet_vif->vm_curchan->chan_pri_num;
-    //csi_info.reserved = 0;
-    csi_info.packet_idx = pkg_idx;
-    iwp_stop_tbus_to_get_sram(csi_info.csi);
+    memset(csi_info, 0, sizeof(csi_stream_t));
+    csi_info->time_stamp = wnet_vif->vm_mainsta->bcn_stamp;
+    WIFINET_ADDR_COPY(csi_info->mac_ra, wnet_vif->vm_myaddr);
+    WIFINET_ADDR_COPY(csi_info->mac_ta, wnet_vif->vm_des_bssid);
+    csi_info->frequency_band = band;
+    csi_info->bw = wnet_vif->vm_bandwidth;
+    csi_info->rssi = wnet_vif->vm_mainsta->sta_avg_bcn_rssi;
+    csi_info->protocol_mode = mac_mode;
+    csi_info->frame_type = wnet_vif->vm_mainsta->cur_fratype;
+    csi_info->chain_num = 1;
+    csi_info->csi_len = csi_len;
+    csi_info->snr = arr[1];
+    csi_info->primary_channel_index = wifi_mac_Mhz2ieee(wnet_vif->vm_curchan->chan_cfreq1, 0);
+    csi_info->noise = arr[4];
+    csi_info->phyerr = 0;
+    csi_info->rate = wnet_vif->vm_mainsta->sta_vendor_rate_code & 0xf;
+    csi_info->extra_information = 0;
+    csi_info->agc_code = 0;
+    csi_info->phase_incr = phase_incr;
+    csi_info->channel = wnet_vif->vm_curchan->chan_pri_num;
+    //csi_info->reserved = 0;
+    csi_info->packet_idx = pkg_idx;
+    iwp_stop_tbus_to_get_sram(csi_info->csi);
 
     wrqu->data.length = sizeof(csi_stream_t);
-    if (copy_to_user(wrqu->data.pointer,  (void*)&csi_info, wrqu->data.length)) {
+    if (copy_to_user(wrqu->data.pointer,  (void*)csi_info, wrqu->data.length)) {
         ERROR_DEBUG_OUT("copy to user failed %s %d\n", __func__, __LINE__);
+        FREE(csi_info,"csi_info");
         return -EFAULT;
     }
-
+    FREE(csi_info,"csi_info");
     AML_OUTPUT("%s end++\n", __func__);
-#endif
     return 0;
 }
 

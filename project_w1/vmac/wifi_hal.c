@@ -231,17 +231,19 @@ void hal_soft_rx_cs(struct hal_private *hal_priv, struct sk_buff *skb)
         if (!(print_count++ % 100))
             PRINT("mic_err = %d, keymiss_err %d wnet_vif_id %d\n",RxPrivHdr_bit->mic_err, RxPrivHdr_bit->keymiss_err,wnet_vif_id);
 
-        if (RxPrivHdr_bit->mic_err)
-        {
+        if (RxPrivHdr_bit->mic_err) {
             pkt_drop = hal_priv->hal_call_back->pmf_encrypt_pkt_handle(hal_priv->drv_priv, skb, RxPrivHdr_bit->RxRSSI_ant0,
                 RxPrivHdr_bit->RxRate, RxPrivHdr_bit->RxChannel, RxPrivHdr_bit->aggregation, wnet_vif_id,RxPrivHdr_bit->key_id);
 
             hal_priv->hal_call_back->mic_error_event(hal_priv->drv_priv,RxPrivHdr_bit->data,
                 WIFI_ADDR2(RxPrivHdr_bit->data),wnet_vif_id);
+        } else {
+            pkt_drop = 1;
         }
 
-        if (pkt_drop)
+        if (pkt_drop) {
             os_skb_free(skb);
+        }
         return;
     }
     else
@@ -1184,8 +1186,9 @@ void hal_txframe_pre(void)
 void hal_tx_complete(struct sk_buff * skb_buf)
 {
 #ifdef DRV_PT_SUPPORT
-    if (aml_wifi_is_enable_rf_test() && (skb_buf != NULL))
+    if (aml_wifi_is_enable_rf_test() && (skb_buf != NULL)) {
         os_skb_free(skb_buf);
+    }
 #endif
 }
 
