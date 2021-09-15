@@ -396,6 +396,7 @@ int wifi_mac_hardstart(struct sk_buff *skb, struct net_device *dev)
 
     if (skb != NULL) {
         eh = (struct ether_header *)os_skb_data(skb);
+        os_skb_count_alloc(skb);
 
     } else {
         goto bad;
@@ -868,7 +869,7 @@ wifi_mac_skbhdr_adjust(struct wlan_net_vif *wnet_vif, int hdrsize,
 
     if ((os_skb_get_tailroom(pskb) < need_tailroom) || (os_skb_hdrspace(pskb) < need_headroom))
     {
-        pskb = os_skb_copy_expand(skb, need_headroom+32, need_tailroom+32, GFP_ATOMIC);
+        pskb = os_skb_copy_expand(skb, need_headroom+32, need_tailroom+32, GFP_ATOMIC, pskb);
         if (pskb == NULL)
         {
             ERROR_DEBUG_OUT("alloc skb fail.\n");
@@ -3617,7 +3618,7 @@ int wifi_mac_set_arp_rsp(struct wlan_net_vif *wnet_vif) {
         skb->ip_summed = CHECKSUM_UNNECESSARY;
         if (!ALIGNED_POINTER(os_skb_data(skb) + sizeof(*eh), unsigned int)) {
             struct sk_buff *n;
-            n = os_skb_copy(skb, GFP_ATOMIC);
+            n = os_skb_copy(skb, GFP_ATOMIC, n);
             os_skb_free(skb);
             if (n == NULL)
                return 0;

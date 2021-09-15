@@ -902,7 +902,7 @@ int drv_tx_start( struct drv_private *drv_priv, struct sk_buff *skbbuf)
         }
 
         if ((header_room < HI_TXDESC_DATAOFFSET + 32) || (tail_room < 32) || (((unsigned long)skbbuf->data) % 8)) {
-            skb_new = os_skb_copy_expand(skbbuf, HI_TXDESC_DATAOFFSET + 32, 32, GFP_ATOMIC);
+            skb_new = os_skb_copy_expand(skbbuf, HI_TXDESC_DATAOFFSET + 32, 32, GFP_ATOMIC, skb_new);
             ASSERT(skb_new != NULL);
             os_skb_free(skbbuf);
             skbbuf = skb_new;
