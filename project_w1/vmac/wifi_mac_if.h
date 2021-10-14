@@ -185,7 +185,7 @@ wifi_mac_wmm_chanparams(struct wlan_net_vif *wnet_vif,
 #define MAC_MIN_GAIN -65
 
 // when scan ap count less than MAX_GIAN_THRESHOLD, use MAC_MAX_GAIN
-#define MAX_GIAN_THRESHOLD 10
+#define MAX_GIAN_THRESHOLD 80
 // when scan ap count more than MIN_GIAN_THRESHOLD , use MAC_MIN_GAIN
 #define CONNECTED_MIN_GIAN_THRESHOLD 25
 #define UNCONNECT_MIN_GIAN_THRESHOLD 80

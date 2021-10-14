@@ -321,6 +321,47 @@ minstrel_ht_assign_best_tp_rates(struct minstrel_ht_sta *mi,
     }
 }
 
+static void minstrel_ht_modify_tp_rates(struct minstrel_ht_sta *mi, u16 *tp_list, u16 *max_prob_rate)
+{
+    int cur_group, cur_idx, cur_tp_avg, cur_prob;
+    int final_idx, tmp_idx, tmp_tp_avg, tmp_prob;
+    int tp0_group = tp_list[0] / MCS_GROUP_RATES;
+    int tp0_idx = tp_list[0] % MCS_GROUP_RATES;
+    int rate_idx = tp0_idx;
+
+    while (mi->groups[tp0_group].rates[rate_idx].prob_ewma < MINSTREL_FRAC(50, 100)) {
+            if (!rate_idx)
+                break;
+            rate_idx--;
+        }
+
+        tp_list[0] = tp0_group * MCS_GROUP_RATES + rate_idx;
+        tp0_idx = rate_idx;
+
+    if ((*max_prob_rate % MCS_GROUP_RATES) >= tp0_idx) {
+        cur_group = *max_prob_rate / MCS_GROUP_RATES;
+        cur_idx = tp0_idx ? tp0_idx -1 : tp0_idx;
+        cur_prob = mi->groups[cur_group].rates[cur_idx].prob_ewma;
+        cur_tp_avg = minstrel_ht_get_tp_avg(mi, cur_group, cur_idx, cur_prob);
+
+        final_idx = cur_idx;
+
+        for (tmp_idx = cur_idx - 1; tmp_idx >= 0; tmp_idx--) {
+            tmp_prob = mi->groups[cur_group].rates[tmp_idx].prob_ewma;
+            tmp_tp_avg = minstrel_ht_get_tp_avg(mi, cur_group, tmp_idx, tmp_prob);
+
+            if ((cur_tp_avg < tmp_tp_avg) || (cur_tp_avg == tmp_tp_avg && cur_prob <= tmp_prob)) {
+                cur_tp_avg = tmp_tp_avg;
+                cur_prob = tmp_prob;
+                final_idx = tmp_idx;
+            }
+
+        }
+
+        *max_prob_rate = cur_group * MCS_GROUP_RATES + final_idx;
+    }
+
+}
 /*
  * Try to increase robustness of max_prob rate by decrease number of
  * streams if possible.
@@ -777,9 +818,9 @@ minstrel_ht_set_rate(struct minstrel_priv *mp, struct minstrel_ht_sta *mi,
 static inline int
 minstrel_ht_get_prob_ewma(struct minstrel_ht_sta *mi, int rate)
 {
-	int group = rate / MCS_GROUP_RATES;
-	rate %= MCS_GROUP_RATES;
-	return mi->groups[group].rates[rate].prob_ewma;
+    int group = rate / MCS_GROUP_RATES;
+    rate %= MCS_GROUP_RATES;
+    return mi->groups[group].rates[rate].prob_ewma;
 }
 
 
@@ -794,6 +835,8 @@ minstrel_ht_update_rates(struct minstrel_priv *mp, struct minstrel_ht_sta *mi)
     if (!rates)
         return;
 
+    minstrel_ht_modify_tp_rates(mi, mi->max_tp_rate, &mi->max_prob_rate);
+
     /* Start with max_tp_rate[0] */
     minstrel_ht_set_rate(mp, mi, rates, i++, mi->max_tp_rate[0]);
 
@@ -805,8 +848,7 @@ minstrel_ht_update_rates(struct minstrel_priv *mp, struct minstrel_ht_sta *mi)
     if (mp->hw->max_rates >= 2) {
         /*
         * At least 2 tx rates supported, use max_prob_rate next */
-        //minstrel_ht_set_rate(mp, mi, rates, i++, mi->max_prob_rate);
-        minstrel_ht_set_rate(mp, mi, rates, i++, mi->max_tp_rate[2]);
+        minstrel_ht_set_rate(mp, mi, rates, i++, mi->max_prob_rate);
     }
 
     //mi->sta->max_rc_amsdu_len = minstrel_ht_get_max_amsdu_len(mi);
@@ -817,8 +859,34 @@ minstrel_ht_update_rates(struct minstrel_priv *mp, struct minstrel_ht_sta *mi)
 static inline int
 minstrel_get_duration(int index)
 {
-	const struct mcs_group *group = &minstrel_mcs_groups[index / MCS_GROUP_RATES];
-	return group->duration[index % MCS_GROUP_RATES];
+    const struct mcs_group *group = &minstrel_mcs_groups[index / MCS_GROUP_RATES];
+    return group->duration[index % MCS_GROUP_RATES];
+}
+
+static int minstrel_check_sample_idx(int tp_rate1_grp, int tp_rate1_idx, unsigned int *sample_group, int *sample_idx, struct minstrel_ht_sta *mi)
+{
+    struct minstrel_mcs_group_data *mg = &mi->groups[tp_rate1_grp];
+    struct minstrel_rate_stats *mrs = &mg->rates[tp_rate1_idx];
+
+    if ((*sample_idx > tp_rate1_idx) && (mrs->prob_ewma < MINSTREL_FRAC(70, 100))) {
+        while (1) {
+            *sample_group = mi->sample_group;
+            mg = &mi->groups[*sample_group];
+            *sample_idx = sample_table[mg->column][mg->index];
+            minstrel_set_next_sample_idx(mi);
+
+            if (!(mi->supported[*sample_group] & BIT(*sample_idx))) {
+                return -1;
+            }
+
+            if (*sample_idx <= tp_rate1_idx) {
+                break;
+            }
+        }
+    }
+
+    return 0;
+
 }
 
 static int
@@ -830,6 +898,7 @@ minstrel_get_sample_rate(struct minstrel_priv *mp, struct minstrel_ht_sta *mi, s
     int tp_rate1, tp_rate2;
     int sample_idx = 0;
     int mcs_idx = 0;
+    int tp_rate1_grp = 0;
     int tp_rate1_idx = 0;
     struct ieee80211_tx_rate *rate;
     const struct mcs_group *sample_mcs_group;
@@ -852,10 +921,6 @@ minstrel_get_sample_rate(struct minstrel_priv *mp, struct minstrel_ht_sta *mi, s
         return -1;
     }
 
-    mrs = &mg->rates[sample_idx];
-    mcs_idx = sample_idx;
-    sample_idx += sample_group * MCS_GROUP_RATES;
-
     /* Set tp_rate1, tp_rate2 to the highest / second highest max_tp_rate */
     if (minstrel_get_duration(mi->max_tp_rate[0]) > minstrel_get_duration(mi->max_tp_rate[1])) {
         tp_rate1 = mi->max_tp_rate[1];
@@ -866,7 +931,13 @@ minstrel_get_sample_rate(struct minstrel_priv *mp, struct minstrel_ht_sta *mi, s
         tp_rate2 = mi->max_tp_rate[1];
     }
 
+    tp_rate1_grp = tp_rate1 / MCS_GROUP_RATES;
     tp_rate1_idx = tp_rate1 % MCS_GROUP_RATES;
+    minstrel_check_sample_idx(tp_rate1_grp, tp_rate1_idx, &sample_group, &sample_idx, mi);
+
+    mrs = &mg->rates[sample_idx];
+    mcs_idx = sample_idx;
+    sample_idx += sample_group * MCS_GROUP_RATES;
     if (mcs_idx - tp_rate1_idx > 1) {
         mcs_idx = tp_rate1_idx + (tp_rate1 % 2) + 1;
         sample_idx = mcs_idx + sample_group * MCS_GROUP_RATES;
@@ -890,7 +961,8 @@ minstrel_get_sample_rate(struct minstrel_priv *mp, struct minstrel_ht_sta *mi, s
     if (sample_dur >= minstrel_get_duration(tp_rate2)
         && (cur_max_tp_streams - 1 < minstrel_mcs_groups[sample_group].streams
         || sample_dur >= minstrel_get_duration(mi->max_prob_rate))
-        && (tp_rate1_idx - mcs_idx > 1)) {
+        && (tp_rate1_idx - mcs_idx > 1)
+        && (mrs->prob_ewma > MINSTREL_FRAC(70, 100))) {
         rate = &info->status.rates[1];
 
     } else {

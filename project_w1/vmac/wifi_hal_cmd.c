@@ -1723,6 +1723,49 @@ unsigned char get_s16_item(char *varbuf, int len, char *item, short *item_value)
     return 1;
 }
 
+unsigned char get_s32_item(char *varbuf, int len, char *item, long *item_value)
+{
+    unsigned int n;
+    char tmpbuf[60];
+    long *p = item_value;
+    int ret = 0;
+    unsigned int pos = 0;
+    unsigned int index = 0;
+
+    while (pos  < len) {
+        index = pos;
+        ret = 0;
+
+        while ((varbuf[pos] != 0) && (varbuf[pos] != '=')) {
+            if (((pos - index) >= strlen(item)) || (varbuf[pos] != item[pos - index])) {
+                ret = 1;
+                break;
+            }
+            else {
+                pos++;
+            }
+        }
+
+        pos++;
+
+        if ((ret == 0) && (strlen(item) == pos - index - 1)) {
+            do {
+                memset(tmpbuf, 0, sizeof(tmpbuf));
+                n = 0;
+                while ((varbuf[pos] != 0) && (varbuf[pos] != ',') && (pos < len))
+                    tmpbuf[n++] = varbuf[pos++];
+
+                *p++ = (long)simple_strtol(tmpbuf, NULL, 0);
+            }
+            while (varbuf[pos++] == ',');
+
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
 unsigned char parse_tx_power_coefficient(char *varbuf, int len, char str_pwr_coefficien[])
 {
     int i = 0;
@@ -1782,8 +1825,9 @@ unsigned char parse_cali_param(char *varbuf, int len, struct Cali_Param *cali_pa
 {
     unsigned short platform_verid = 0; // default: 0
     unsigned short cali_config[1] = {0};
-
-    get_s8_item(varbuf, len, "version", &cali_param->version);
+    unsigned long version[1] = {0};
+    get_s32_item(varbuf, len, "version", version);
+    cali_param->version = version[0];
     get_s16_item(varbuf, len, "cali_config", cali_config);
     cali_param->cali_config = cali_config[0];
     get_s8_item(varbuf, len, "freq_offset", &cali_param->freq_offset);
@@ -1815,7 +1859,7 @@ unsigned char parse_cali_param(char *varbuf, int len, struct Cali_Param *cali_pa
 #endif
     cali_param->platform_versionid = platform_verid;
 
-    printk("======>>>>>> version = %d\n", cali_param->version);
+    printk("======>>>>>> txt version = %ld\n", cali_param->version);
     printk("======>>>>>> cali_config = %d\n", cali_param->cali_config);
     printk("======>>>>>> freq_offset = %d\n", cali_param->freq_offset);
     printk("======>>>>>> htemp_freq_offset = %d\n", cali_param->htemp_freq_offset);
@@ -2169,7 +2213,7 @@ unsigned int hal_cfg_cali_param(void)
     wf5g_txpwr_param.Cmd = WF5G_TXPWR_PARAM_CMD;
     err = get_cali_param(&cali_param, &wf2g_txpwr_param, &wf5g_txpwr_param);
 
-    printk("calibration parameter: version %d, config %d, freq_offset %d, tssi_2g %d, tssi_5g %d %d %d %d tx_en %d\n",
+    printk("calibration parameter: version %ld, config %d, freq_offset %d, tssi_2g %d, tssi_5g %d %d %d %d tx_en %d\n",
             cali_param.version, cali_param.cali_config, cali_param.freq_offset, cali_param.tssi_2g_offset,
             cali_param.tssi_5g_offset[0], cali_param.tssi_5g_offset[1], cali_param.tssi_5g_offset[2], cali_param.tssi_5g_offset[3], cali_param.wftx_pwrtbl_en);
 

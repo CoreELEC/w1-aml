@@ -532,6 +532,10 @@ cfg80211_informbss_cb(void *arg, const struct wifi_scan_info *se)
     struct timespec ts;
     get_monotonic_boottime(&ts);
 #endif
+
+    if ((lse == NULL) || (lse->SI_chan == NULL))
+        goto exit;
+
     channel = lse->SI_chan->chan_pri_num;
     if (channel <= AML_2G_CHANNELS_NUM)
         freq = aml_ieee80211_chan_to_frq(channel, IEEE80211_BAND_2GHZ);
@@ -3979,7 +3983,7 @@ static int vm_cfg80211_start_ap(struct wiphy *wiphy, struct net_device *ndev,
         DPRINTF(AML_DEBUG_BEACON, "%s %d ssid=%s\n", __func__, __LINE__, ssid_sprintf(settings->ssid, settings->ssid_len));
     }
 
-    if (wnet_vif->vm_mac_mode == WIFINET_MODE_11GNAC) {
+    if ((wnet_vif->vm_mac_mode == WIFINET_MODE_11GNAC) && (drv_priv->drv_config.cfg_dynamic_bw == 1)) {
         #ifdef DYNAMIC_BW
             wifi_mac_set_reg_val(MAC_REG_BASE, wnet_vif->vm_bandwidth);
             wifi_mac_set_reg_val(PHY_AGC_BUSY_FSM, 0);

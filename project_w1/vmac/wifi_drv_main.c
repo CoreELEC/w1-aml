@@ -1396,7 +1396,7 @@ int aml_driv_attach( struct drv_private *drv_priv, struct wifi_mac* wmac)
     drv_priv->drv_config.cfg_aggr_prot      = DEFAULT_TXAGG_PROT;
     drv_priv->drv_config.cfg_disratecontrol     = DEFAULT_RATECONTROL_DIS;
     drv_priv->drv_config.cfg_haswme         = DEFAULT_WMMSUPPORT;
-    drv_priv->drv_config.cfg_dynamic_bw         = DEFAULT_SUPPORT_DYNAMIC_BW;
+    drv_priv->drv_config.cfg_dynamic_bw         = ~DEFAULT_SUPPORT_DYNAMIC_BW;
     drv_priv->drv_config.cfg_wifi_bt_coexist_support = DEFAULT_SUPPORT_WIFI_BT_COEXIST;
 
     /* 11n Capabilities */
@@ -1545,13 +1545,16 @@ drv_mic_error_event(void * dpriv,const void* frm,
 #endif
 }
 
+extern int g_hr_lock_timer_valid;
 static void drv_tx_ok_timeout(void *drv_priv)
 {
     struct drv_private *drv_private = (struct drv_private *)(drv_priv);
 
     if (drv_private != NULL) {
         DRV_TX_TIMEOUT_LOCK(drv_private);
-        drv_private->wait_mpdu_timeout = 1;
+        if (!g_hr_lock_timer_valid) {
+            drv_private->wait_mpdu_timeout = 1;
+        }
         AML_PRINT(AML_DBG_MODULES_TX, "waiting_pkt_timeout:%d\n", drv_private->wait_mpdu_timeout);
         DRV_TX_TIMEOUT_UNLOCK(drv_private);
     }

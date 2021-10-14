@@ -125,9 +125,11 @@ wifi_mac_start_bss_ex(unsigned long arg)
     if (wnet_vif->vm_curchan != WIFINET_CHAN_ERR) {
         wifi_mac_ChangeChannel(wifimac, wnet_vif->vm_curchan, 3, wnet_vif->wnet_vif_id);
         if (wnet_vif->vm_opmode == WIFINET_M_STA) {
-            if (wnet_vif->vm_mainsta->sta_avg_bcn_rssi > MAC_MIN_GAIN)
-                wnet_vif->vm_mainsta->sta_avg_bcn_rssi = MAC_MIN_GAIN;
-            wifi_mac_set_channel_rssi(wifimac, (unsigned char)(wnet_vif->vm_mainsta->sta_avg_bcn_rssi));
+            if (wnet_vif->vm_mainsta->sta_avg_bcn_rssi > MAC_MIN_GAIN) {
+                wifi_mac_set_channel_rssi(wifimac, MAC_MIN_GAIN);
+            } else {
+                wifi_mac_set_channel_rssi(wifimac, (unsigned char)(wnet_vif->vm_mainsta->sta_avg_bcn_rssi));
+            }
         }
 
     } else {

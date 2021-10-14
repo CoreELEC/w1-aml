@@ -107,8 +107,8 @@ short rssi_threshold[3][10] = {
 };
 
 short snr_threshold[3][10] = {
-	{555, 26, 21, 20, 18, 13, 11, 7, 5},
-	{27, 26, 21, 20, 19, 14, 11, 7, 5},
+	{555, 26, 21, 20, 19, 14, 11, 8, 5},
+	{27, 26, 21, 20, 19, 14, 11, 8, 6},
 	{27, 26, 22, 20, 19, 14, 11, 8, 5},
 };
 
@@ -859,14 +859,14 @@ unsigned char minstrel_find_rate(
 
     if (info->flags & IEEE80211_TX_CTL_RATE_CTRL_PROBE) {
         ratectrl[0].flags  |= HAL_RATECTRL_USE_SAMPLE_RATE;
-        ratectrl[0].trynum = 3;
-        ratectrl[1].trynum = 5;
-        ratectrl[2].trynum = 92;
+        ratectrl[0].trynum = 2;
+        ratectrl[1].trynum = 2;
+        ratectrl[2].trynum = 96;
 
     } else {
-        ratectrl[0].trynum = 5;
-        ratectrl[1].trynum = 15;
-        ratectrl[2].trynum = 80;
+        ratectrl[0].trynum = 2;
+        ratectrl[1].trynum = 2;
+        ratectrl[2].trynum = 96;
     }
 
     sta->sta_vendor_bw = ratectrl[0].bw;
