@@ -636,31 +636,40 @@ int wifi_mac_input_all(struct wifi_mac *wifimac, struct sk_buff *skb, struct wif
     int type = -1;
     struct wifi_frame *wh = NULL;
     unsigned char *bssid = NULL;
-    unsigned char *dst = NULL;
+    unsigned char multicast = 0;
+    struct sk_buff *skb1 = NULL;
 
     if (!skb) {
         return type;
     }
 
     wh = (struct wifi_frame *)os_skb_data(skb);
-    //AML_OUTPUT("fc:%02x:%02x, id:%d, multi:%d\n", wh->i_fc[0], wh->i_fc[1], rs->rs_wnet_vif_id, WIFINET_IS_MULTICAST(wh->i_addr1));
+    multicast = WIFINET_IS_MULTICAST(wh->i_addr1);
+    bssid = &wh->i_addr2[0];
+
     list_for_each_entry_safe(wnet_vif, wnet_vif_next,  &wifimac->wm_wnet_vifs, vm_next) {
         if ((wnet_vif->vm_state == WIFINET_S_INIT) || (wnet_vif->vm_mainsta == NULL)) {
             continue;
         }
 
-        if ((wnet_vif->vm_opmode == WIFINET_M_STA) || (wnet_vif->vm_opmode == WIFINET_M_P2P_CLIENT)) {
-            bssid = &wh->i_addr2[0];
-            dst = &wh->i_addr1[0];
-
-        } else {
-            bssid = &wh->i_addr1[0];
-            dst = &wh->i_addr3[0];
-        }
-
-        if (WIFINET_IS_MULTICAST(dst)) {
-            if (memcmp(bssid, wnet_vif->vm_mainsta->sta_bssid, WIFINET_ADDR_LEN)) {
+        if (multicast) {
+            if (((wnet_vif->vm_opmode == WIFINET_M_STA) || (wnet_vif->vm_opmode == WIFINET_M_P2P_CLIENT))
+                && (wnet_vif->vm_state == WIFINET_S_CONNECTED) && !(wifimac->wm_flags & WIFINET_F_SCAN)
+                && memcmp(bssid, wnet_vif->vm_mainsta->sta_bssid, WIFINET_ADDR_LEN)) {
                 continue;
+
+            } else {
+                /* When multiple interfaces use skb_buff at the same time */
+                if ((wifimac->wm_nopened > 1) && !list_is_last(&wnet_vif->vm_next, &wifimac->wm_wnet_vifs)) {
+                    skb1 = os_skb_copy(skb, GFP_ATOMIC,skb1);
+                    if (skb1 == NULL) {
+                        continue;
+                    }
+
+                    type = wifi_mac_input(wnet_vif->vm_mainsta, skb1, rs);
+                    skb1 = NULL;
+                    continue;
+                }
             }
 
         } else {
@@ -671,6 +680,7 @@ int wifi_mac_input_all(struct wifi_mac *wifimac, struct sk_buff *skb, struct wif
 
         type = wifi_mac_input(wnet_vif->vm_mainsta, skb, rs);
         skb = NULL;
+        break;
     }
 
     if (skb) {
@@ -881,7 +891,7 @@ void wifi_mac_recv_pkt_parse(struct wifi_station *sta, struct sk_buff *skb) {
 
     if (eh->ether_type == __constant_htons(ETHERTYPE_IP)) {
         if (iphdrp->protocol == IPPROTO_TCP) {
-            AML_PRINT(AML_DBG_MODULES_TX, "tcp src:%04x, dst:%04x, seq:%08x, tcp ack:%08x\n", th->source, th->dest, th->seq, th->ack_seq);
+            AML_PRINT(AML_DBG_MODULES_TX, "tcp src:%u, dst:%u, seq:%u, tcp ack:%u\n", __constant_htons(th->source), __constant_htons(th->dest), __constant_htonl(th->seq), __constant_htonl(th->ack_seq));
 
             if (!start_flag) {
                 start_flag = 1;
@@ -3127,7 +3137,6 @@ void wifi_mac_recv_beacon(struct wlan_net_vif *wnet_vif,
     }
 
     if(scan.wai != NULL) {
-        ERROR_DEBUG_OUT("not support wapi encrypt ,ssid: %s\n", ssidie_sprintf(scan.ssid));
         wnet_vif->vif_sts.sts_rx_elem_err++;
         return;
     }
@@ -3179,7 +3188,7 @@ void wifi_mac_recv_beacon(struct wlan_net_vif *wnet_vif,
     //    wh->i_addr2[2], wh->i_addr2[3], wh->i_addr2[4], wh->i_addr2[5], sta->sta_associd);
 
     if (wifimac->wm_flags & WIFINET_F_SCAN) {
-        wifi_mac_scan_rx(wnet_vif, &scan, wh, rssi);
+        wifi_mac_scan_rx(wnet_vif, &scan, wh, rssi, NULL);
     }
 
     if ((wnet_vif->vm_opmode == WIFINET_M_STA) && (sta->sta_associd != 0)
@@ -3358,6 +3367,7 @@ void wifi_mac_recv_probersp(struct wlan_net_vif *wnet_vif,
     unsigned char drop = 0;
     struct wifi_mac_scan_param scan = {0};
     struct scaninfo_entry *se = NULL;
+    struct scaninfo_entry *oldse = NULL;
     struct scaninfo_entry *si_next = NULL;
     struct scaninfo_table *st = wifimac->wm_scan->ScanTablePriv;
     struct wifi_frame *wh = (struct wifi_frame *)os_skb_data(skb);
@@ -3376,7 +3386,6 @@ void wifi_mac_recv_probersp(struct wlan_net_vif *wnet_vif,
     }
 
     if(scan.wai != NULL) {
-        ERROR_DEBUG_OUT("not support wapi encrypt ,ssid: %s\n", ssidie_sprintf(scan.ssid));
         wnet_vif->vif_sts.sts_rx_elem_err++;
         return;
     }
@@ -3421,15 +3430,13 @@ void wifi_mac_recv_probersp(struct wlan_net_vif *wnet_vif,
                     WIFI_SCAN_SE_LIST_UNLOCK(st);
                     return;
                 }
-                list_del_init(&se->se_list);
-                list_del_init(&se->se_hash);
-                FREE(se,"sta_add.se");
+                oldse = se;
             }
         }
     }
     WIFI_SCAN_SE_LIST_UNLOCK(st);
 
-    wifi_mac_scan_rx(wnet_vif, &scan, wh, rssi);
+    wifi_mac_scan_rx(wnet_vif, &scan, wh, rssi, oldse);
 }
 
 
@@ -4198,6 +4205,7 @@ void wifi_mac_recv_assoc_rsp(struct wlan_net_vif *wnet_vif,
     unsigned char drop = 0;
     struct wifi_mac_scan_param scan = {0};
     unsigned char qosinfo;
+    struct drv_private *drv_priv = drv_get_drv_priv();
 
     wh = (struct wifi_frame *) os_skb_data(skb);
 
@@ -4304,8 +4312,7 @@ void wifi_mac_recv_assoc_rsp(struct wlan_net_vif *wnet_vif,
 
     wifi_mac_save_app_ie(&wnet_vif->assocrsp_ie, os_skb_data(skb) + 6/*sizeof(capinfo+status+associd)*/,os_skb_get_pktlen(skb) - 6);
     vm_cfg80211_notify_mgmt_rx(wnet_vif, channel, os_skb_data(skb), os_skb_get_pktlen(skb));
-
-    if (sta->sta_flags & WIFINET_NODE_VHT) {
+    if ((sta->sta_flags & WIFINET_NODE_VHT) && (drv_priv->drv_config.cfg_dynamic_bw == 1)) {
         #ifdef DYNAMIC_BW
             wifi_mac_set_reg_val(MAC_REG_BASE, sta->sta_chbw);
             wifi_mac_set_reg_val(PHY_AGC_BUSY_FSM, 0);

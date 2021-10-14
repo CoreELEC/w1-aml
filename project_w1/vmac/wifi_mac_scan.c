@@ -494,7 +494,7 @@ void wifi_mac_update_roaming_candidate_chan(struct wlan_net_vif *wnet_vif,const 
 }
 
 void wifi_mac_scan_rx(struct wlan_net_vif *wnet_vif, const struct wifi_mac_scan_param *sp,
-    const struct wifi_frame *wh, int rssi)
+    const struct wifi_frame *wh, int rssi, struct scaninfo_entry *oldse)
 {
     struct wifi_mac *wifimac = wnet_vif->vm_wmac;
     struct wifi_mac_scan_state *ss = wifimac->wm_scan;
@@ -523,7 +523,12 @@ void wifi_mac_scan_rx(struct wlan_net_vif *wnet_vif, const struct wifi_mac_scan_
         return;
     }
 
-    se = (struct scaninfo_entry *)NET_MALLOC(sizeof(struct scaninfo_entry), GFP_ATOMIC, "sta_add.se");
+    if (oldse != NULL) {
+        se = oldse;
+    } else {
+        se = (struct scaninfo_entry *)NET_MALLOC(sizeof(struct scaninfo_entry), GFP_ATOMIC, "sta_add.se");
+    }
+
     if (se == NULL) {
         return ;
     }
@@ -622,8 +627,10 @@ void wifi_mac_scan_rx(struct wlan_net_vif *wnet_vif, const struct wifi_mac_scan_
     hash = STA_HASH(macaddr);
 
     WIFI_SCAN_SE_LIST_LOCK(st);
-    list_add(&se->se_hash, &st->st_hash[hash]);
-    list_add_tail(&se->se_list, &st->st_entry);
+    if (oldse == NULL) {
+        list_add(&se->se_hash, &st->st_hash[hash]);
+        list_add_tail(&se->se_list, &st->st_entry);
+    }
     WIFI_SCAN_SE_LIST_UNLOCK(st);
 
     if ((ss->scan_CfgFlags & WIFINET_SCANCFG_CONNECT)

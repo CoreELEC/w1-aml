@@ -37,6 +37,7 @@ const char *wifi_mac_state_name[WIFINET_S_MAX] =
     "ASSOC",
     "CONNECTED"
 };
+static int g_auto_gain_base = 0;
 
 static struct wifi_mac wm_mac;
 struct wifi_mac* wifi_mac_get_mac_handle(void)
@@ -324,7 +325,7 @@ void wifi_mac_set_tx_power_accord_rssi(struct wifi_mac *wifimac, unsigned char r
         return;
     }
 
-    if (rssi_diminish_num == 10) {
+    if (rssi_diminish_num == 10 && wifimac->wm_curchan->chan_bw == 2) {
         power_mode = 2;
 
     } else if (rssi_increase_num == 10) {
@@ -613,7 +614,7 @@ int wifi_mac_tx_send(struct sk_buff *skbbuf)
     struct wlan_net_vif *wnet_vif = netdev_priv(skbbuf->dev);
     struct wifi_mac *wifimac = sta->sta_wmac;
     struct sk_buff *next_wbuf;
-    int is_amsdu = 0;
+    unsigned char is_amsdu_support = 0;
     struct wifi_mac_tx_info *txinfo = NULL;
     struct wifi_mac_pkt_info *mac_pkt_info;
 
@@ -621,22 +622,16 @@ int wifi_mac_tx_send(struct sk_buff *skbbuf)
     ASSERT(sizeof(struct wifi_mac_tx_info) <= OS_SKB_CB_MAXLEN);
 
     mac_pkt_info= &txinfo->ptxdesc->drv_pkt_info.pkt_info[0];
-
     if (mac_pkt_info->b_eap == 0) {
         wifi_mac_tx_addba_check(sta, os_skb_get_tid(skbbuf));
     }
-    is_amsdu = wifimac->drv_priv->drv_ops.get_amsdu_supported(wifimac->drv_priv, sta->drv_sta,  os_skb_get_tid(skbbuf));
 
-    if ((sta->sta_flags & WIFINET_NODE_HT) && is_amsdu
-        && !mac_pkt_info->b_dhcp && !mac_pkt_info->b_eap && !mac_pkt_info->b_arp) {
+    is_amsdu_support = wifimac->drv_priv->drv_ops.get_amsdu_supported(wifimac->drv_priv, sta->drv_sta, os_skb_get_tid(skbbuf));
+    if (is_amsdu_support && !mac_pkt_info->b_dhcp && !mac_pkt_info->b_eap && !mac_pkt_info->b_arp) {
         skbbuf = wifi_mac_amsdu_send(skbbuf);
         if (skbbuf == NULL) {
             return NETDEV_TX_OK;
         }
-
-    } else {
-        DPRINTF(AML_DEBUG_XMIT,"amsdu not enable, htsta %d,amsdusupport %d\n",
-            (((sta)->sta_flags & WIFINET_NODE_HT) != 0), is_amsdu);
     }
 
     wnet_vif->vif_sts.sts_tx_non_amsdu_in_msdu[os_skb_get_tid(skbbuf)]++;
@@ -773,28 +768,15 @@ wifi_mac_all_txq_all_qcnt(struct wifi_mac *wifimac)
 static void
 wifi_mac_tx_complete(struct wlan_net_vif *wnet_vif, struct sk_buff *skbbuf, struct wifi_mac_tx_status *ts)
 {
-    struct wifi_station *sta;
-
     if (skbbuf == NULL) {
         return;
     }
-    sta = ((struct wifi_skb_callback *)skbbuf->cb)->sta;
 
-    if (wnet_vif == NULL) {
-        wifi_mac_free_skb(skbbuf);
-        return;
-    }
-
-    if (ts->ts_flags & WIFINET_TX_ERROR) {
+    if ((wnet_vif != NULL) && (ts->ts_flags & WIFINET_TX_ERROR)) {
         wnet_vif->vm_devstats.tx_errors++;
     }
 
-    if ((wnet_vif->vm_opmode == WIFINET_M_STA) && (sta != wnet_vif->vm_mainsta)) {
-        wifi_mac_free_skb(skbbuf);
-
-    } else {
-        wifi_mac_complete_wbuf(skbbuf,0);
-    }
+    wifi_mac_free_skb(skbbuf);
 }
 
 static void
@@ -1104,7 +1086,6 @@ int wifi_mac_rx_complete(void *ieee,struct sk_buff *skbbuf, struct wifi_mac_rx_s
     int frame_type, frame_subtype;
     enum drv_rx_type status;
     static unsigned char recv_beacon_count = 0;
-    static int auto_gain_base = 0;
 
     if (os_skb_get_pktlen(skbbuf) < WIFINET_MIN_LEN)
     {
@@ -1126,10 +1107,6 @@ int wifi_mac_rx_complete(void *ieee,struct sk_buff *skbbuf, struct wifi_mac_rx_s
     rx_cb  = (struct wifi_mac_rx_cb *)os_skb_cb(skbbuf);
     rx_cb->keyid = rs->rs_keyid;
     rx_cb->wnet_vif_id = rs->rs_wnet_vif_id;
-
-    if (WIFINET_IS_PROBEREQ(wh)) {
-        return wifi_mac_input_all(wifimac, skbbuf, rs);
-    }
 
     sta = wifi_mac_find_rx_sta(wifimac, (struct wifi_mac_frame_min *)os_skb_data(skbbuf), rs->rs_wnet_vif_id);
     if (sta == NULL)
@@ -1170,9 +1147,9 @@ int wifi_mac_rx_complete(void *ieee,struct sk_buff *skbbuf, struct wifi_mac_rx_s
                 recv_beacon_count++;
                 if (recv_beacon_count == 20) {
                     recv_beacon_count = 0;
-                    if ((sta->sta_avg_bcn_rssi - auto_gain_base) > 5 || (auto_gain_base - sta->sta_avg_bcn_rssi) > 5) {
-                        auto_gain_base = sta->sta_avg_bcn_rssi;
-                        wifi_mac_set_channel_rssi(wifimac, (unsigned char)(auto_gain_base));
+                    if ((sta->sta_avg_bcn_rssi - g_auto_gain_base) > 5 || (g_auto_gain_base - sta->sta_avg_bcn_rssi) > 5) {
+                        g_auto_gain_base = sta->sta_avg_bcn_rssi;
+                        wifi_mac_set_channel_rssi(wifimac, (unsigned char)(g_auto_gain_base));
                     }
                 }
 
@@ -1376,6 +1353,7 @@ static enum hrtimer_restart wifi_mac_set_tx_lock_timeout(struct hrtimer *timer)
         tasklet_schedule(&drv_priv->ampdu_tasklet);
     }
 
+    g_hr_lock_timer_valid = 0;
     return HRTIMER_NORESTART;
 }
 
@@ -2932,6 +2910,7 @@ wifi_mac_sub_sm(struct wlan_net_vif *wnet_vif, enum wifi_mac_state nstate, int a
                     wnet_vif->vm_des_bssid[0], wnet_vif->vm_des_bssid[1], wnet_vif->vm_des_bssid[2],
                     wnet_vif->vm_des_bssid[3], wnet_vif->vm_des_bssid[4], wnet_vif->vm_des_bssid[5]);
                 printk("****************************************************\n");
+                g_auto_gain_base = 0;
             }
 
             if (sta->sta_authmode != WIFINET_AUTH_8021X)

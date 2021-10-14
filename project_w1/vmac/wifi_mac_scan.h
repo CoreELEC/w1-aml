@@ -255,7 +255,7 @@ void wifi_mac_scan_vdetach(struct wlan_net_vif *);
 int wifi_mac_start_scan(struct wlan_net_vif *, int flags, unsigned int nssid, const struct wifi_mac_ScanSSID ssids[]);
 int wifi_mac_chk_scan(struct wlan_net_vif *, int flags, unsigned int nssid, const struct wifi_mac_ScanSSID ssids[]);
 void wifi_mac_cancel_scan(struct wifi_mac *wifimac);
-void wifi_mac_scan_rx(struct wlan_net_vif *, const struct wifi_mac_scan_param *, const struct wifi_frame *, int rssi);
+void wifi_mac_scan_rx(struct wlan_net_vif *, const struct wifi_mac_scan_param *, const struct wifi_frame *, int rssi, struct scaninfo_entry *oldse);
 void wifi_mac_scan_flush(struct wifi_mac *);
 int wifi_mac_scan_timeout_ex(void *arg);
 

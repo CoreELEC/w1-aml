@@ -577,12 +577,12 @@ static void drv_tx_lower_rate_when_signal_weak(struct wlan_net_vif *wnet_vif, st
     if (!IS_MCS_RATE(ptxdesc->txdesc_rateinfo[0].vendor_rate_code))
         return;
 
-    if (WIFINET_IS_CHAN_5GHZ(wnet_vif->vm_curchan))
+    if ((wnet_vif->vm_curchan != WIFINET_CHAN_ERR) && (WIFINET_IS_CHAN_5GHZ(wnet_vif->vm_curchan)))
         power_weak_thresh = wnet_vif->vm_wmac->wm_signal_power_weak_thresh_wide;
 
     power = wnet_vif->vm_mainsta->sta_avg_bcn_rssi;
     if (power < power_weak_thresh) {
-        if (WIFINET_IS_CHAN_2GHZ(wnet_vif->vm_curchan)) {
+        if ((wnet_vif->vm_curchan != WIFINET_CHAN_ERR) && (WIFINET_IS_CHAN_2GHZ(wnet_vif->vm_curchan))) {
             if (sta_chbw == WIFINET_BWC_WIDTH20) {
                 if (tcp_rx) {
                     rate = (power + 71 > 0) ? WIFI_11N_MCS4 : (power + 78 > 0) ? WIFI_11N_MCS3 : (power + 80 > 0) ? WIFI_11N_MCS2 : (power + 83 >0) ? WIFI_11N_MCS1 : WIFI_11N_MCS0;
@@ -903,7 +903,11 @@ int drv_tx_start( struct drv_private *drv_priv, struct sk_buff *skbbuf)
 
         if ((header_room < HI_TXDESC_DATAOFFSET + 32) || (tail_room < 32) || (((unsigned long)skbbuf->data) % 8)) {
             skb_new = os_skb_copy_expand(skbbuf, HI_TXDESC_DATAOFFSET + 32, 32, GFP_ATOMIC, skb_new);
-            ASSERT(skb_new != NULL);
+            if (skb_new == NULL) {
+                error = -4;
+                break;
+            }
+
             os_skb_free(skbbuf);
             skbbuf = skb_new;
         }
@@ -1213,10 +1217,7 @@ static int drv_tx_complete_task(struct drv_private *drv_priv, struct drv_txlist 
     struct wifi_station *sta;
     unsigned char rt_rate_index;
     unsigned char left_try_num;
-
-#ifdef DRV_TCP_RETRANSMISSION
     struct wifi_mac_pkt_info *mac_pkt_info = &ptxdesc->drv_pkt_info.pkt_info[0];
-#endif
 
     if (drv_sta == NULL) {
         return 0;
@@ -1456,6 +1457,12 @@ static int drv_tx_complete_task(struct drv_private *drv_priv, struct drv_txlist 
 #endif
             drv_tx_complete(drv_priv, ptxdesc, txok);
             break;
+        }
+
+        if (ptxdesc->txinfo->b_datapkt && mac_pkt_info->b_tcp) {
+            AML_PRINT(AML_DBG_MODULES_TX, "seqnum:%d(0x%04x), scr_port:%u, dst_port:%u; seq_num:%u; ack_num:%u, txok:%d\n", ptxdesc->txinfo->seqnum,
+                ptxdesc->txinfo->seqnum, __constant_htons(mac_pkt_info->tcp_src_port), __constant_htons(mac_pkt_info->tcp_dst_port),
+                __constant_htonl(mac_pkt_info->tcp_seqnum), __constant_htonl(mac_pkt_info->tcp_ack_seqnum), txok);
         }
 
         drv_tx_complete(drv_priv, ptxdesc, txok);
@@ -2686,8 +2693,7 @@ static void drv_tx_sched_aggr(struct drv_private *drv_priv, struct drv_txlist *t
                 hal_co_get_cnt = drv_priv->hal_priv->hal_ops.hal_get_priv_cnt(txlist->txlist_qnum);
                 if (HI_AGG_TXD_NUM_PER_QUEUE - hal_co_get_cnt >= drv_priv->drv_config.cfg_ampdu_subframes) {
                     AML_PRINT(AML_DBG_MODULES_TX, "wait more mpdu to form ampdu due to hal_co_get_cnt:%d\n", hal_co_get_cnt);
-                    /* BYPASS */
-                        drv_priv->wait_mpdu_timeout = 0;//wait another tx_ok or pending enough mpdu
+                    drv_priv->wait_mpdu_timeout = 0;//wait another tx_ok or pending enough mpdu
                     break;
                 }
             }
@@ -2721,9 +2727,7 @@ static void drv_tx_sched_aggr(struct drv_private *drv_priv, struct drv_txlist *t
 
         ptxdesc->txdesc_queue_last = bf_last;
         ptxdesc->txinfo->b_11n = 1;
-
-        /* BYPASS */
-            drv_priv->wait_mpdu_timeout = 0;
+        drv_priv->wait_mpdu_timeout = 0;
 
         if (ptxdesc->txdesc_pktnum == 1)
         {

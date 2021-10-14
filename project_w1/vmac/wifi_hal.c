@@ -1303,9 +1303,9 @@ void  hal_tx_frame(void)
                 aggr_page_num += pTxDPape->TxPriv.aggr_page_num;
 #if defined (HAL_FPGA_VER)
                 AML_PRINT(AML_DBG_MODULES_TX, "TxPriv.aggr_page_num:%d <= txPageFreeNum:%d, TxPriv.AggrNum:%d <= q_fifo_set_cnt:%d, "\
-                    "AggrNum:%d + mpdu_num:%d, aggr_page_num:%d, len:%d\n",
-                    pTxDPape->TxPriv.aggr_page_num, hal_priv->txPageFreeNum,
-                    pTxDPape->TxPriv.AggrNum, q_fifo_set_cnt, AggrNum, mpdu_num, aggr_page_num, pTxDPape->TxPriv.AggrLen);
+                    "AggrNum:%d + mpdu_num:%d, aggr_page_num:%d, len:%d, sn:%d(0x%04x)\n",
+                    pTxDPape->TxPriv.aggr_page_num, hal_priv->txPageFreeNum, pTxDPape->TxPriv.AggrNum, q_fifo_set_cnt,
+                    AggrNum, mpdu_num, aggr_page_num, pTxDPape->TxPriv.AggrLen, pTxDescFiFo->SN, pTxDescFiFo->SN);
 #endif
                 do
                 {
@@ -1337,7 +1337,7 @@ void  hal_tx_frame(void)
                     memcpy(tmp+offset, pTxDPape, len);
                     offset += len;
 #endif
-                    hif->HiStatus.Tx_Done_num++;
+                    __sync_fetch_and_add(&hif->HiStatus.Tx_Done_num,1);
                     EltPtr = CO_SharedFifoPick(pTxShareFifo,CO_TX_BUFFER_SET);
                     pTxDescFiFo = ( struct fw_txdesc_fifo *)EltPtr ;
                     pTxDPape = pTxDescFiFo->pTxDPape;
@@ -1517,7 +1517,7 @@ struct sk_buff *hal_fill_agg_start(struct hi_agg_tx_desc *HI_AGG,struct hi_tx_pr
 
     pTxDPape->TxOption.pkt_position = AML_PKT_IN_HAL;
     hal_priv->Hi_TxAgg[txqueueid] = pTxDPape;
-    hif->HiStatus.Tx_Send_num++;
+    __sync_fetch_and_add(&hif->HiStatus.Tx_Send_num,1);
 
     STATUS = CO_SharedFifoPut(&hal_priv->txds_trista_fifo[txqueueid],CO_TX_BUFFER_GET,1);
     ASSERT(STATUS==CO_STATUS_OK)
@@ -1586,7 +1586,8 @@ struct sk_buff *hal_fill_priv(struct hi_tx_priv_hdr* HI_TxPriv,unsigned char que
         hal_show_txframe(pTxDPape);
     }
 #endif
-    hif->HiStatus.Tx_Send_num++;
+    __sync_fetch_and_add(&hif->HiStatus.Tx_Send_num,1);
+
     STATUS = CO_SharedFifoPut(&hal_priv->txds_trista_fifo[txqueueid],CO_TX_BUFFER_GET,1);
     ASSERT(STATUS==CO_STATUS_OK);
 
@@ -1678,8 +1679,8 @@ int hal_get_agg_pend_cnt(void)
                 hal_free_tx_id(hal_priv, &txstatus, &callback, &queue_id);
                 hal_priv->hal_call_back->intr_tx_handle(hal_priv->drv_priv, &txstatus, pTxDescFiFo->callback, queue_id);
 
-                hif->HiStatus.Tx_Done_num++;
-                hif->HiStatus.Tx_Free_num++;
+                __sync_fetch_and_add(&hif->HiStatus.Tx_Done_num,1);
+                __sync_fetch_and_add(&hif->HiStatus.Tx_Free_num,1);
 
             } else {
                 remain_eltptr[remain_count++] = EltPtr;
@@ -2421,6 +2422,10 @@ int hal_txok_thread(void *param)
 
         WAKE_LOCK(hal_priv, WAKE_LOCK_TXOK);
         if (hal_priv->hal_call_back != NULL) {
+            if (hal_priv->hal_call_back->intr_tx_ok_timeout != NULL) {
+                hal_priv->hal_call_back->intr_tx_ok_timeout(hal_priv->drv_priv);
+            }
+
             if ((hal_priv->hal_call_back->intr_tx_pkt_clear != NULL)
                 && (hal_priv->txPageFreeNum == DEFAULT_TXPAGENUM))
                 hal_priv->hal_call_back->intr_tx_pkt_clear(hal_priv->drv_priv);

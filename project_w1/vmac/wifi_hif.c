@@ -769,11 +769,11 @@ void hi_soft_tx_irq(void)
                 || (tx_null_status->txstatus == TX_DESCRIPTOR_STATUS_NULL_DATA_FAIL)
                 || (tx_null_status->txstatus == TX_DESCRIPTOR_STATUS_NEW)))
             {
-                hif->HiStatus.Tx_Free_num++;
+                __sync_fetch_and_add(&hif->HiStatus.Tx_Free_num,1);
             }
 
             if ((tx_null_status->txstatus == TX_DESCRIPTOR_STATUS_NEW) && (hif->HiStatus.Tx_Free_num < hif->HiStatus.Tx_Done_num)) {
-                hif->HiStatus.Tx_Free_num++;
+                __sync_fetch_and_add(&hif->HiStatus.Tx_Free_num,1);
             }
         }
 #elif defined (HAL_SIM_VER)

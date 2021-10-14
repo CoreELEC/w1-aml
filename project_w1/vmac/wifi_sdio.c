@@ -21,6 +21,8 @@ namespace FW_NAME
 
 #include "wifi_hal.h"
 #include "wifi_hif.h"
+#include "chip_intf_reg.h"
+#include "chip_ana_reg.h"
 
 #ifdef DRV_PT_SUPPORT
 #include "wifi_pt_init.h"
@@ -1324,9 +1326,15 @@ static void config_pmu_reg(bool is_power_on)
     int value_pmu_A18 = 0;
     int value_pmu_A20 = 0;
     int value_pmu_A22 = 0;
+    int value_pmu_A24 = 0;
+    int value_aon30 = 0;
 
     unsigned char host_req_status;
     unsigned char wifi_pmu_status;
+    RG_AON_A30_FIELD_T reg_aon30_data;
+    RG_AON_A29_FIELD_T reg_aon29_data;
+    RG_BG_A16_FIELD_T reg_bg16_data;
+    RG_BG_A12_FIELD_T reg_bg12_data;
 
     struct hal_private * halpriv = hal_get_priv();
     struct hw_interface * hif = hif_get_hw_interface();
@@ -1348,9 +1356,31 @@ static void config_pmu_reg(bool is_power_on)
         value_pmu_A18 = hif->hif_ops.hi_read_word(RG_PMU_A18);
         value_pmu_A20 = hif->hif_ops.hi_read_word(RG_PMU_A20);
         value_pmu_A22 = hif->hif_ops.hi_read_word(RG_PMU_A22);
+        value_pmu_A24 = hif->hif_ops.hi_read_word(RG_PMU_A24);
 
-        printk("%s power on: before write A12=0x%x, A13=0x%x, A14=0x%x, A15=0x%x, A17=0x%x, A18=0x%x, A20=0x%x, A22=0x%x\n",
-            __func__, value_pmu_A12, value_pmu_A13, value_pmu_A14, value_pmu_A15,value_pmu_A17,value_pmu_A18,value_pmu_A20,value_pmu_A22);
+        printk("%s power on: before write A12=0x%x, A13=0x%x, A14=0x%x, A15=0x%x, A17=0x%x, A18=0x%x, A20=0x%x, A22=0x%x, A24=0x%x\n",
+            __func__, value_pmu_A12, value_pmu_A13, value_pmu_A14, value_pmu_A15,value_pmu_A17,value_pmu_A18,value_pmu_A20,value_pmu_A22,value_pmu_A24);
+
+        // open bg ldo
+        reg_bg12_data.data = hif->hif_ops.hi_read_word(RG_BG_A12);
+        reg_bg12_data.b.RG_WF_BG_EN = 1;
+        hif->hif_ops.hi_write_word(RG_BG_A12, reg_bg12_data.data);
+
+        // switch rf dig to rf ldo
+        reg_bg16_data.data = hif->hif_ops.hi_read_word(RG_BG_A16);
+        reg_bg16_data.b.RG_WF_DVDD_LDO_EN = 1;
+        hif->hif_ops.hi_write_word(RG_BG_A16, reg_bg16_data.data);
+
+        //delay for rfldo work ok. xosc clock here.
+        msleep(20);
+
+        // switch off rf dig from dvdd09_ao
+        reg_bg16_data.data = hif->hif_ops.hi_read_word(RG_BG_A16);
+        reg_bg16_data.b.RG_WF_SLEEP_ENB = 1;
+        hif->hif_ops.hi_write_word(RG_BG_A16, reg_bg16_data.data);
+
+        //delay for rfldo work ok. xosc clock here.
+        msleep(2);
 
         hif->hif_ops.hi_write_word(RG_PMU_A12, 0x2a2c);
         hif->hif_ops.hi_write_word(RG_PMU_A14, 0x1);
@@ -1358,6 +1388,7 @@ static void config_pmu_reg(bool is_power_on)
         hif->hif_ops.hi_write_word(RG_PMU_A20, 0x0);
         hif->hif_ops.hi_write_word(RG_PMU_A18, 0x1700);
         hif->hif_ops.hi_write_word(RG_PMU_A22, 0x704);
+        hif->hif_ops.hi_write_word(RG_PMU_A24, 0x0);
 
         host_req_status = (PMU_PWR_OFF << 1)| BIT(0);
         hif->hif_ops.hi_bottom_write8(SDIO_FUNC1, RG_SDIO_PMU_HOST_REQ, host_req_status);
@@ -1379,8 +1410,9 @@ static void config_pmu_reg(bool is_power_on)
         value_pmu_A18 = hif->hif_ops.hi_read_word(RG_PMU_A18);
         value_pmu_A20 = hif->hif_ops.hi_read_word(RG_PMU_A20);
         value_pmu_A22 = hif->hif_ops.hi_read_word(RG_PMU_A22);
-        printk("%s power on: after write A15=0x%x, A17=0x%x, A18=0x%x, A20=0x%x, A22=0x%x\n",
-            __func__, value_pmu_A15, value_pmu_A17,value_pmu_A18,value_pmu_A20,value_pmu_A22);
+        value_pmu_A24 = hif->hif_ops.hi_read_word(RG_PMU_A24);
+        printk("%s power on: after write A15=0x%x, A17=0x%x, A18=0x%x, A20=0x%x, A22=0x%x, A24=0x%x\n",
+            __func__, value_pmu_A15, value_pmu_A17,value_pmu_A18,value_pmu_A20,value_pmu_A22,value_pmu_A24);
 
     } else {
         value_pmu_A12 = hif->hif_ops.hi_read_word(RG_PMU_A12);
@@ -1389,16 +1421,50 @@ static void config_pmu_reg(bool is_power_on)
         value_pmu_A18 = hif->hif_ops.hi_read_word(RG_PMU_A18);
         value_pmu_A20 = hif->hif_ops.hi_read_word(RG_PMU_A20);
         value_pmu_A22 = hif->hif_ops.hi_read_word(RG_PMU_A22);
-        printk("%s power off: before write A12=0x%x, A15=0x%x, A17=0x%x, A18=0x%x, A20=0x%x, A22=0x%x\n",
-            __func__, value_pmu_A12,value_pmu_A15,value_pmu_A17,value_pmu_A18,value_pmu_A20,value_pmu_A22);
+        value_pmu_A24 = hif->hif_ops.hi_read_word(RG_PMU_A24);
+        value_aon30 = hif->hif_ops.hi_read_word(RG_AON_A30);
+        printk("%s power off: before write A12=0x%x, A15=0x%x, A17=0x%x, A18=0x%x, A20=0x%x, A22=0x%x, A24=0x%x, AON30=0x%x\n",
+            __func__, value_pmu_A12,value_pmu_A15,value_pmu_A17,value_pmu_A18,value_pmu_A20,value_pmu_A22,value_pmu_A24, value_aon30);
+
+        // switch rf dig to dvdd09_ao
+        reg_bg16_data.data = hif->hif_ops.hi_read_word(RG_BG_A16);
+        reg_bg16_data.b.RG_WF_SLEEP_ENB = 0;
+         hif->hif_ops.hi_write_word(RG_BG_A16, reg_bg16_data.data);
+
+        // switch rf dig ldo off
+        reg_bg16_data.data = hif->hif_ops.hi_read_word(RG_BG_A16);
+        reg_bg16_data.b.RG_WF_DVDD_LDO_EN = 0;
+        hif->hif_ops.hi_write_word(RG_BG_A16, reg_bg16_data.data);
+
+        // delay for aoldo work ok.
+        msleep(2);
+        // close bg ldo
+        reg_bg12_data.data = hif->hif_ops.hi_read_word(RG_BG_A12);
+        reg_bg12_data.b.RG_WF_BG_EN = 0;
+        hif->hif_ops.hi_write_word(RG_BG_A12, reg_bg12_data.data);
+
+        hif->hif_ops.hi_write_word(RG_INTF_CPU_CLK, 0x4f070001);
+
+        reg_aon29_data.data = hif->hif_ops.hi_read_word(RG_AON_A29);
+        reg_aon29_data.b.rg_ana_bpll_cfg |= BIT(1) | BIT(0);
+        hif->hif_ops.hi_write_word(RG_AON_A29, reg_aon29_data.data);
 
         hif->hif_ops.hi_write_word(RG_PMU_A12, 0x8ea2e);
         hif->hif_ops.hi_write_word(RG_PMU_A14, 0x1);
         hif->hif_ops.hi_write_word(RG_PMU_A16, 0x0);
-        hif->hif_ops.hi_write_word(RG_PMU_A17, 0x700);
-        hif->hif_ops.hi_write_word(RG_PMU_A20, 0x0);
-        hif->hif_ops.hi_write_word(RG_PMU_A18, 0x1700);
-        hif->hif_ops.hi_write_word(RG_PMU_A22, 0x704);
+
+        hif->hif_ops.hi_write_word(RG_PMU_A22, 0x707);
+        hif->hif_ops.hi_write_word(RG_PMU_A18, 0x8700);
+        hif->hif_ops.hi_write_word(RG_PMU_A20, 0x3ff01ff);
+        //hif->hif_ops.hi_write_word(RG_PMU_A24, 0x3f20000);
+        hif->hif_ops.hi_write_word(RG_PMU_A17, 0x703);
+        //hif->hif_ops.hi_write_word(RG_PMU_A17, 0x707);
+
+        reg_aon30_data.data = hif->hif_ops.hi_read_word(RG_AON_A30);
+        /* change rf to idle mode */
+        reg_aon30_data.b.rg_always_on_cfg4 |= BIT(12);
+        hif->hif_ops.hi_write_word(RG_AON_A30, reg_aon30_data.data);
+
 
         value_pmu_A12 = hif->hif_ops.hi_read_word(RG_PMU_A12);
         value_pmu_A15 = hif->hif_ops.hi_read_word(RG_PMU_A15);
@@ -1406,8 +1472,11 @@ static void config_pmu_reg(bool is_power_on)
         value_pmu_A18 = hif->hif_ops.hi_read_word(RG_PMU_A18);
         value_pmu_A20 = hif->hif_ops.hi_read_word(RG_PMU_A20);
         value_pmu_A22 = hif->hif_ops.hi_read_word(RG_PMU_A22);
-        printk("%s power off: before write A12=0x%x, A15=0x%x, A17=0x%x, A18=0x%x, A20=0x%x, A22=0x%x\n",
-            __func__, value_pmu_A12,value_pmu_A15,value_pmu_A17,value_pmu_A18,value_pmu_A20,value_pmu_A22);
+        value_pmu_A24 = hif->hif_ops.hi_read_word(RG_PMU_A24);
+        value_aon30 = hif->hif_ops.hi_read_word(RG_AON_A30);
+
+        printk("%s power off: after write A12=0x%x, A15=0x%x, A17=0x%x, A18=0x%x, A20=0x%x, A22=0x%x, A24=0x%x, AON30=0x%x\n",
+            __func__, value_pmu_A12,value_pmu_A15,value_pmu_A17,value_pmu_A18,value_pmu_A20,value_pmu_A22, value_pmu_A24, value_aon30);
 
 	 //force wifi pmu fsm to sleep mode
         host_req_status = (PMU_SLEEP_MODE << 1)| BIT(0);

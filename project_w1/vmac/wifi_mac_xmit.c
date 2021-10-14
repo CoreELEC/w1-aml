@@ -180,7 +180,7 @@ void wifi_mac_xmit_pkt_parse(struct sk_buff *skb, struct wifi_mac *wifimac)
 
     if (eh->ether_type == __constant_htons(ETHERTYPE_IP)) {
         if (iphdrp->protocol == IPPROTO_TCP) {
-           AML_PRINT(AML_DBG_MODULES_TX, "tcp src:%04x, dst:%04x, seq:%08x, tcp ack:%08x\n", th->source, th->dest, th->seq, th->ack_seq);
+           AML_PRINT(AML_DBG_MODULES_TX, "tcp src:%u, dst:%u, seq:%u, tcp ack:%u\n", __constant_htons(th->source), __constant_htons(th->dest), __constant_htonl(th->seq), __constant_htonl(th->ack_seq));
             rtsp = (char *)th + 32;
             if (rtsp && wifimac->is_miracast_connect) {
                 wifi_mac_get_rtsp_session(rtsp, sta->sta_wnet_vif->vm_p2p);
@@ -214,24 +214,6 @@ void wifi_mac_xmit_pkt_parse(struct sk_buff *skb, struct wifi_mac *wifimac)
             }
 
             wifimac->drv_priv->drv_config.cfg_ampdu_subframes = DEFAULT_TXAMPDU_SUB_MAX;
-
-            if (WIFINET_IS_CHAN_5GHZ(sta->sta_wnet_vif->vm_curchan) 
-                &&  tcp_tx_payload && sta->sta_wnet_vif->vm_tx_speed) {
-                if (sta->sta_wnet_vif->vm_tx_speed < 48) {
-                    wifimac->drv_priv->drv_config.cfg_ampdu_subframes = 9;
-                    if (sta->sta_wnet_vif->vm_tx_speed < 46) {
-                        wifimac->drv_priv->drv_config.cfg_ampdu_subframes = 7;
-                        if (sta->sta_wnet_vif->vm_tx_speed < 40) {
-                            wifimac->drv_priv->drv_config.cfg_ampdu_subframes = 5;
-                            if (sta->sta_wnet_vif->vm_tx_speed < 35) {
-                                wifimac->drv_priv->drv_config.cfg_ampdu_subframes = 2;
-                                if (sta->sta_wnet_vif->vm_tx_speed < 10)
-                                     wifimac->drv_priv->drv_config.cfg_ampdu_subframes = 1;
-                            }
-                        }
-                    }
-                }
-            }
 
             mac_pkt_info->tcp_seqnum = th->seq;
             mac_pkt_info->tcp_ack_seqnum = th->ack_seq;
