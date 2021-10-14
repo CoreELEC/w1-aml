@@ -1,5 +1,5 @@
 #config version info <char>
-version=20211008
+version=2
 
 #cali config <short>
 cali_config=0x0
