@@ -2793,19 +2793,23 @@ wifi_mac_sub_sm(struct wlan_net_vif *wnet_vif, enum wifi_mac_state nstate, int a
 
                 case WIFINET_S_AUTH:
                 case WIFINET_S_ASSOC:
-                    switch (arg) {
-                        case WIFINET_FC0_SUBTYPE_AUTH:
-                            mgmt_arg = WIFINET_AUTH_SHARED_CHALLENGE;
-                            WIFINET_DPRINTF(AML_DEBUG_STATE, "%d\n", mgmt_arg);
-                            wifi_mac_send_mgmt(sta, WIFINET_FC0_SUBTYPE_AUTH, (void *)&mgmt_arg);
-                            break;
+                    if ((prestate == WIFINET_S_ASSOC)
+                        && (sta->sta_authmode == WIFINET_AUTH_SAE)
+                        && (arg == STATUS_INVALID_PMKID)) {
+                        wifi_mac_trigger_sae(sta);
 
-                        case WIFINET_FC0_SUBTYPE_DEAUTH:
-                            mgmt_arg = WIFINET_AUTH_SHARED_REQUEST;
-                            WIFINET_DPRINTF(AML_DEBUG_STATE, "%d\n", mgmt_arg);
-                            wifi_mac_send_mgmt(sta, WIFINET_FC0_SUBTYPE_AUTH, (void *)&mgmt_arg);
-                            break;
+                    } else if (arg == WIFINET_FC0_SUBTYPE_AUTH) {
+                        mgmt_arg = WIFINET_AUTH_SHARED_CHALLENGE;
+                        WIFINET_DPRINTF(AML_DEBUG_STATE, "%d\n", mgmt_arg);
+                        wifi_mac_send_mgmt(sta, WIFINET_FC0_SUBTYPE_AUTH, (void *)&mgmt_arg);
+
+                    } else if (arg == WIFINET_FC0_SUBTYPE_DEAUTH) {
+                        mgmt_arg = WIFINET_AUTH_SHARED_REQUEST;
+                        WIFINET_DPRINTF(AML_DEBUG_STATE, "%d\n", mgmt_arg);
+                        wifi_mac_send_mgmt(sta, WIFINET_FC0_SUBTYPE_AUTH, (void *)&mgmt_arg);
+
                     }
+
                     break;
 
                 case WIFINET_S_CONNECTED:

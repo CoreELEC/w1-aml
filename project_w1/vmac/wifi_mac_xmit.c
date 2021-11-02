@@ -2654,11 +2654,11 @@ int aml_rsn_sync_pmkid(struct wifi_station *sta, int pmkid_index)
     if (pmkid_index != -1) {
         if (rsn->rsn_pmkid_count == 0) {
             DPRINTF(AML_DEBUG_WARNING, "no rsn pmkid, need to add\n");
-            frm[2 + rsn_ie_len - 6] = 1;
-            memcpy(gm_cipher_suite, frm + 2 + rsn_ie_len - 4, 4);
-            memcpy(frm + 2 + rsn_ie_len - 4, wnet_vif->pmk_list->pmkid_cache[pmkid_index].pmkid, 16);
-            memcpy(frm + 2 + rsn_ie_len - 4 + 16, gm_cipher_suite, 4);
-            frm[1] += 16;
+            frm[IE_HDR_LEN + rsn_ie_len - 6] = 1;
+            memcpy(gm_cipher_suite, frm + IE_HDR_LEN + rsn_ie_len - OUI_LEN, OUI_LEN);
+            memcpy(frm + IE_HDR_LEN + rsn_ie_len - OUI_LEN, wnet_vif->pmk_list->pmkid_cache[pmkid_index].pmkid, WPA_PMKID_LEN);
+            memcpy(frm + IE_HDR_LEN + rsn_ie_len - OUI_LEN + WPA_PMKID_LEN, gm_cipher_suite, OUI_LEN);
+            frm[IE_LEN_OFFSET] += WPA_PMKID_LEN;
 
         } else {
             if (memcmp(rsn->rsn_pmkid, wnet_vif->pmk_list->pmkid_cache[pmkid_index].pmkid, WPA_PMKID_LEN)) {
@@ -2681,14 +2681,13 @@ int aml_rsn_sync_pmkid(struct wifi_station *sta, int pmkid_index)
         }
 
         DPRINTF(AML_DEBUG_WARNING, "delete rsn pmkid\n");
-
         pmkid_count_index = rsn->rsn_pmkid_offset - 2;
         wnet_vif->vm_opt_ie_len -= WPA_PMKID_LEN;
-        frm[1] = frm[1] - WPA_PMKID_LEN;
+        frm[IE_LEN_OFFSET] -= WPA_PMKID_LEN;
         frm[pmkid_count_index] = 0;
         frm[pmkid_count_index + 1] = 0;
 
-        memcpy((frm+ pmkid_count_index + 2), (frm + rsn->rsn_pmkid_offset + 16), 4);
+        memcpy((frm+ pmkid_count_index + 2), (frm + rsn->rsn_pmkid_offset + WPA_PMKID_LEN), OUI_LEN);
     }
 
     return 0;

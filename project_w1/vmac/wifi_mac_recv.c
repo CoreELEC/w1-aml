@@ -1821,49 +1821,51 @@ int wifi_mac_parse_own_rsn(struct wifi_station *sta, unsigned char *frm)
 {
     struct wlan_net_vif *wnet_vif = sta->sta_wnet_vif;
     struct wifi_mac_Rsnparms *rsn = &sta->sta_rsn;
-    unsigned char len = frm[1];
+    const unsigned char len = frm[IE_LEN_OFFSET];
     unsigned int w;
     unsigned char n;
-    unsigned char pmkid_offset = frm[1];
+    int index = 0;
 
     if (len < 10) {
         WIFINET_DPRINTF(AML_DEBUG_WARNING, "RSN too short, len %u", len);
         return WIFINET_REASON_IE_INVALID;
     }
 
-    frm += 2;
-    w = READ_16L(frm);
+    index += IE_HDR_LEN;
+
+    w = READ_16L(frm + index);
     if (w != RSN_VERSION) {
         WIFINET_DPRINTF(AML_DEBUG_WARNING, "RSN bad version %u", w);
         return WIFINET_REASON_IE_INVALID;
     }
-    frm += 2, len -= 2;
+    index += 2;
 
-    w = rsn_cipher(frm, &rsn->rsn_mcastkeylen);
+    w = rsn_cipher(frm + index, &rsn->rsn_mcastkeylen);
     if ((w == 32) || (((wnet_vif->vm_caps & cipher2cap(w)) == 0) && !wifi_mac_security_available(w))) {
         DPRINTF(AML_DEBUG_ERROR, "%s %d wnet_vif->vm_caps=0x%x\n", __func__, __LINE__, wnet_vif->vm_caps);
         return WIFINET_REASON_IE_INVALID;
     }
     rsn->rsn_mcastcipher = w;
-    frm += 4, len -= 4;
+    index += OUI_LEN;
 
-    n = READ_16L(frm);
-    frm += 2, len -= 2;
-    if (len < n * 4 + 2) {
-        WIFINET_DPRINTF(AML_DEBUG_WARNING, "RSN ucast cipher data too short; len %u, n %u", len, n);
+    n = READ_16L(frm + index);
+    index += 2;
+
+    if ((len + IE_HDR_LEN - index) < n * OUI_LEN + 2) {
+        WIFINET_DPRINTF(AML_DEBUG_WARNING, "RSN ucast cipher data too short; len %u, n %u", (len + IE_HDR_LEN - index), n);
         return WIFINET_REASON_IE_INVALID;
     }
 
     w = 0;
     for (; n > 0; n--) {
-        w = rsn_cipher(frm, &rsn->rsn_ucastkeylen);
+        w = rsn_cipher(frm + index, &rsn->rsn_ucastkeylen);
 
         if ((w == 32) || (((wnet_vif->vm_caps & cipher2cap(w)) == 0) && !wifi_mac_security_available(w))) {
             DPRINTF(AML_DEBUG_ERROR, "%s %d wnet_vif->vm_caps=0x%x\n", __func__, __LINE__, wnet_vif->vm_caps);
             return WIFINET_REASON_IE_INVALID;
         }
         rsn->rsn_ucastcipherset |= (1 << w);
-        frm += 4, len -= 4;
+        index += OUI_LEN;
     }
 
     if (rsn->rsn_ucastcipherset & (1 << WIFINET_CIPHER_AES_CCM))
@@ -1871,48 +1873,47 @@ int wifi_mac_parse_own_rsn(struct wifi_station *sta, unsigned char *frm)
     else
         rsn->rsn_ucastcipher = WIFINET_CIPHER_TKIP;
 
-    n = READ_16L(frm);
-    frm += 2, len -= 2;
-    if (len < n * 4) {
-        WIFINET_DPRINTF(AML_DEBUG_WARNING, "RSN key mgmt alg data too short; len %u, n %u", len, n);
+    n = READ_16L(frm + index);
+    index += 2;
+    if ((len + IE_HDR_LEN - index) < n * OUI_LEN) {
+        WIFINET_DPRINTF(AML_DEBUG_WARNING, "RSN key mgmt alg data too short; len %u, n %u", (len + IE_HDR_LEN - index), n);
         return WIFINET_REASON_IE_INVALID;
     }
 
     w = 0;
     for (; n > 0; n--) {
-        w = rsn_keymgmt(frm);
+        w = rsn_keymgmt(frm + index);
 
         if (w == 0) {
             DPRINTF(AML_DEBUG_ERROR, "%s %d not support key mgmt;wnet_vif->vm_caps=0x%x\n", __func__, __LINE__, wnet_vif->vm_caps);
             return WIFINET_REASON_IE_INVALID;
         }
         rsn->rsn_keymgmtset |= (1 << w);
-        frm += 4, len -= 4;
+        index += OUI_LEN;
     }
 
-    if (len >= 2) {
-        rsn->rsn_caps = READ_16L(frm);
-        rsn->rsn_caps_offset = pmkid_offset - len + 2;
-        frm += 2;
-        len -= 2;
+    if ((len + IE_HDR_LEN - index) >= 2) {
+        rsn->rsn_caps = READ_16L(frm + index);
+        rsn->rsn_caps_offset = index;
+        index += 2;
+
     }
 
     rsn->rsn_pmkid_count = 0;
-    if (len >= 2) {
-        rsn->rsn_pmkid_count = READ_16L(frm);
-        frm += 2;
-        len -= 2;
+    if ((len + IE_HDR_LEN - index) >= 2) {
+        rsn->rsn_pmkid_count = READ_16L(frm + index);
+        index += 2;
     }
 
     if (rsn->rsn_pmkid_count != 0) {
-        if (len >= rsn->rsn_pmkid_count * 16) {
+        if ((len + IE_HDR_LEN - index) >= rsn->rsn_pmkid_count * WPA_PMKID_LEN) {
+            rsn->rsn_pmkid_offset = index;
             for (n = 0; n < rsn->rsn_pmkid_count; n++) {
                 if (n == 0) {
-                    memcpy(rsn->rsn_pmkid, frm, 16);
+                    memcpy(rsn->rsn_pmkid, frm + index, WPA_PMKID_LEN);
                 }
 
-                frm += 16;
-                len -= 16;
+                index += WPA_PMKID_LEN;
             }
 
         } else {
@@ -1926,10 +1927,9 @@ int wifi_mac_parse_own_rsn(struct wifi_station *sta, unsigned char *frm)
         rsn->rsn_pmkid_offset = 0;
     }
 
-    if (len >= 4) {
-        rsn->rsn_gmcipher = rsn_keymgmt(frm);
-        frm += 4;
-        len -= 4;
+    if ((len + IE_HDR_LEN - index) >= OUI_LEN) {
+        rsn->rsn_gmcipher = rsn_keymgmt(frm + index);
+        index += OUI_LEN;
     }
 
     WIFINET_DPRINTF(AML_DEBUG_WARNING, "RSN pmkid_count:%d, pmkid_offset:%d", rsn->rsn_pmkid_count, rsn->rsn_pmkid_offset);
@@ -3624,7 +3624,7 @@ void wifi_mac_recv_probe_req(struct wlan_net_vif *wnet_vif,
             FREE(sta->sta_wfd_ie,"sta->sta_wfd_ie");
             sta->sta_wfd_ie = NULL;
         }
-#endif //CONFIG_WFD 
+#endif //CONFIG_WFD
 
         wifi_mac_send_mgmt(sta, WIFINET_FC0_SUBTYPE_PROBE_RESP, (void *)wh->i_addr2);
 
@@ -3651,8 +3651,13 @@ void wifi_mac_status_code_handle(struct wifi_station *sta, unsigned char subtype
         return;
     }
 
-    if (STATUS_INVALID_PMKID == scan->status_code) {
+    if ((STATUS_INVALID_PMKID == scan->status_code)
+        && (sta->sta_rsn.rsn_keymgmtset & (1 << RSN_ASE_8021X_SAE))
+        && (sta->sta_authmode == WIFINET_AUTH_OPEN)) {
         aml_del_pmksa_by_index(wnet_vif, sta->sta_bssid);
+        sta->sta_authmode = WIFINET_AUTH_SAE;
+        wifi_mac_top_sm(wnet_vif, WIFINET_S_AUTH, STATUS_INVALID_PMKID);
+        return;
     }
 
     if (WIFINET_FC0_SUBTYPE_AUTH == subtype) {
@@ -4128,7 +4133,7 @@ void wifi_mac_recv_assoc_req(struct wlan_net_vif *wnet_vif,
             FREE(sta->sta_wfd_ie,"sta->sta_wfd_ie");
             sta->sta_wfd_ie = NULL;
         }
-#endif //CONFIG_WFD 
+#endif //CONFIG_WFD
 #endif//#ifdef CONFIG_P2P
 
         if (wifi_mac_is_ht_enable(sta)) {
@@ -4214,8 +4219,9 @@ void wifi_mac_recv_assoc_rsp(struct wlan_net_vif *wnet_vif,
         return;
     }
 
-    DPRINTF(AML_DEBUG_WARNING, "%s assoc status code:%d\n", __func__, scan.status_code);
     wifi_mac_pkt_parse_element(wnet_vif, sta, skb, &scan, &invalid, &drop);
+    AML_OUTPUT("%s assoc status code:%d\n", __func__, scan.status_code);
+
     if (scan.status_code != 0) {
         wnet_vif->vif_sts.sts_rx_auth_fail++;
         wifi_mac_status_code_handle(sta, WIFINET_FC0_SUBTYPE_ASSOC_RESP, &scan);
