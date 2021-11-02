@@ -1200,6 +1200,12 @@ struct wifi_mac_erp_ie
 #define WIFINET_AUTH_ALG_SHARED 0x0001
 #define WIFINET_AUTH_ALG_SAE 0x0003
 
+#define IE_HDR_LEN    2
+#define IE_LEN_OFFSET 1
+#define OUI_LEN       4
+#define WPA_PMKID_LEN 16
+
+
 enum
 {
     WIFINET_AUTH_OPEN_REQUEST       = 1,

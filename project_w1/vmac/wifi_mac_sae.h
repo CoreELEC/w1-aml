@@ -19,8 +19,7 @@
 
 #define MAXPMKID 16/* max # PMKID cache entries NDIS */
 #define WL_NUM_PMKIDS_MAX MAXPMKID
-#define WPA_PMKID_LEN 16
-#define WLAN_AUTH_SAE 3
+
 
 typedef struct _aml_pmkid_cache {
     unsigned char in_use;
