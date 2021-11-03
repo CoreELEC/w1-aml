@@ -3,13 +3,11 @@
 
 #include "wifi_drv_main.h"
 
-int drv_rx_input(struct drv_private *drv_priv, void * nsta, int is_ampdu, struct sk_buff * skbbuf,
-    struct wifi_mac_rx_status* rs, enum drv_rx_type *status);
+int drv_rx_input(struct drv_private *drv_priv, void *nsta, struct sk_buff * skbbuf, struct wifi_mac_rx_status* rs);
 int drv_rx_init( struct drv_private *drv_priv, int nbufs);
 void drv_rx_nsta_init(struct drv_private *drv_priv, struct aml_driver_nsta *drv_sta);
 void drv_rx_nsta_free(struct drv_private *drv_priv, struct aml_driver_nsta *drv_sta);
 void drv_rx_nsta_clean(struct drv_private *drv_priv, struct aml_driver_nsta *drv_sta);
-int drv_rx_indicate(struct drv_private *drv_priv,  struct sk_buff * skbbuf, struct wifi_mac_rx_status* rs);
 void drv_set_addba_rsp(struct drv_private *drv_priv ,void * nsta, unsigned char tid_index, unsigned short statuscode);
 
 void drv_clr_addba_rsp_status(struct drv_private *drv_priv, void * nsta);

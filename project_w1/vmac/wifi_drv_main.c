@@ -1579,7 +1579,6 @@ drv_intr_rx_ok(void * dpriv,struct sk_buff *skb, unsigned char Rssi,unsigned cha
     struct sk_buff *skbbuf = (struct sk_buff *)skb;
     struct wifi_frame *wh;
     struct wifi_mac_rx_status rxstatus;
-    int type;
     int rate_index =0;
 
     wifimac = drv_priv->wmac;
@@ -1599,7 +1598,7 @@ drv_intr_rx_ok(void * dpriv,struct sk_buff *skb, unsigned char Rssi,unsigned cha
     if (!list_empty(&wifimac->wm_wnet_vifs))
     {
         drv_priv->drv_stats.rx_indicate_cnt++;
-        type = drv_rx_indicate(drv_priv, skbbuf, &rxstatus);
+        drv_priv->net_ops->wifi_mac_rx_complete(wifimac, skbbuf, &rxstatus);
     }
     else
     {
@@ -1617,7 +1616,6 @@ static int pmf_encrypt_pkt_handle(void *dpriv, struct sk_buff *skb, unsigned cha
     struct sk_buff *skbbuf = ( struct sk_buff *)skb;
     struct wifi_frame *wh;
     struct wifi_mac_rx_status rxstatus;
-    int type;
     int rate_index = 0;
     unsigned char pkt_type;
     unsigned char is_protect;
@@ -1653,7 +1651,7 @@ static int pmf_encrypt_pkt_handle(void *dpriv, struct sk_buff *skb, unsigned cha
 
     if (!list_empty(&wifimac->wm_wnet_vifs)) {
         drv_priv->drv_stats.rx_indicate_cnt++;
-        type = drv_rx_indicate(drv_priv, skbbuf, &rxstatus);
+        drv_priv->net_ops->wifi_mac_rx_complete(wifimac, skbbuf, &rxstatus);
 
     } else {
         drv_priv->drv_stats.rx_free_skb_cnt++;

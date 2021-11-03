@@ -14,41 +14,11 @@
 #include "wifi_mac_com.h"
 #include "wifi_drv_xmit.h"
 
-static int drv_rx_ampdu(struct drv_private *drv_priv, struct aml_driver_nsta *drv_sta,  struct sk_buff * skbbuf, struct wifi_mac_rx_status* rs);
 static void drv_rx_flush_tid(struct drv_private *drv_priv, struct drv_rx_scoreboard *RxTidState, int drop);
 
 int drv_rx_init( struct drv_private *drv_priv, int nbufs)
 {
     return 0;
-}
-
-/*
- * Process an individual frame
- */
-int drv_rx_input( struct drv_private *drv_priv, void * nsta, int is_ampdu,
-              struct sk_buff * skbbuf, struct wifi_mac_rx_status* rs,
-              enum drv_rx_type *status)
-{
-    struct aml_driver_nsta *drv_sta = DRIVER_NODE(nsta);
-
-    if (is_ampdu && drv_priv->drv_config.cfg_rxaggr)
-    {
-        *status = DRV_RX_CONSUMED;
-        return drv_rx_ampdu(drv_priv, drv_sta, skbbuf, rs);
-    }
-    else
-    {
-        *status = DRV_RX_NON_CONSUMED;
-        return -1;
-    }
-}
-
-int drv_rx_indicate(struct drv_private *drv_priv,  struct sk_buff * skbbuf, struct wifi_mac_rx_status* rs)
-{
-    int type;
-
-    type = drv_priv->net_ops->wifi_mac_rx_complete(drv_priv->wmac, skbbuf, rs);
-    return type;
 }
 
 void
@@ -267,10 +237,8 @@ drv_rx_bar(struct drv_private *drv_priv, struct aml_driver_nsta *drv_sta,  struc
 }
 
 
-static int
-drv_rx_ampdu( struct drv_private *drv_priv, 
-                    struct aml_driver_nsta *drv_sta,  
-                    struct sk_buff *skbbuf, struct wifi_mac_rx_status* rs )
+int drv_rx_input( struct drv_private *drv_priv, void *nsta,
+    struct sk_buff *skbbuf, struct wifi_mac_rx_status* rs)
 {
     struct wifi_frame *wh;
     struct wifi_qos_frame *whqos;
@@ -281,6 +249,7 @@ drv_rx_ampdu( struct drv_private *drv_priv,
     int b_mcast, tid, index, desc_id, rxdiff, is4addr;
     unsigned short rxseq;
     unsigned long lockflags;
+    struct aml_driver_nsta *drv_sta = (struct aml_driver_nsta *)nsta;
 
     wh = (struct wifi_frame *)os_skb_data(skbbuf);
     is4addr = (wh->i_fc[1] & WIFINET_FC1_DIR_MASK) == WIFINET_FC1_DIR_DSTODS;

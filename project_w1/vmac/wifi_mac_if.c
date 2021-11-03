@@ -1084,7 +1084,6 @@ int wifi_mac_rx_complete(void *ieee,struct sk_buff *skbbuf, struct wifi_mac_rx_s
     unsigned char cur_snr;
 
     int frame_type, frame_subtype;
-    enum drv_rx_type status;
     static unsigned char recv_beacon_count = 0;
 
     if (os_skb_get_pktlen(skbbuf) < WIFINET_MIN_LEN)
@@ -1104,7 +1103,7 @@ int wifi_mac_rx_complete(void *ieee,struct sk_buff *skbbuf, struct wifi_mac_rx_s
     wh = (struct wifi_frame *)os_skb_data(skbbuf);
     frame_type = wh->i_fc[0] & WIFINET_FC0_TYPE_MASK;
     frame_subtype = wh->i_fc[0] & WIFINET_FC0_SUBTYPE_MASK;
-    rx_cb  = (struct wifi_mac_rx_cb *)os_skb_cb(skbbuf);
+    rx_cb = (struct wifi_mac_rx_cb *)os_skb_cb(skbbuf);
     rx_cb->keyid = rs->rs_keyid;
     rx_cb->wnet_vif_id = rs->rs_wnet_vif_id;
 
@@ -1124,17 +1123,15 @@ int wifi_mac_rx_complete(void *ieee,struct sk_buff *skbbuf, struct wifi_mac_rx_s
         return wifi_mac_input_all(wifimac, skbbuf, rs);
     }
 
+    wnet_vif = sta->sta_wnet_vif;
     if (WIFINET_IS_DATA(wh))
     {
         if (rs->rs_datarate > 0)
         {
-            wnet_vif= sta->sta_wnet_vif;
             wnet_vif->vm_mainsta->sta_last_rxrate = rs->rs_datarate;
             sta->sta_last_rxrate = rs->rs_datarate;
         }
     }
-
-    wnet_vif= sta->sta_wnet_vif;
 
     sta->sta_avg_rssi =  (sta->sta_avg_rssi + rs->rs_rssi*3)/4;
     if (WIFINET_IS_BEACON(wh))
@@ -1179,13 +1176,7 @@ int wifi_mac_rx_complete(void *ieee,struct sk_buff *skbbuf, struct wifi_mac_rx_s
     }
 
     /*process mpdu in ampdu  or pwr mgt frames*/
-    type = wifimac->drv_priv->drv_ops.rx_proc_frame(wifimac->drv_priv, sta->drv_sta,
-        (WIFINET_NODE_USEAMPDU(sta) && (rs->rs_flags & RS_AMPDU_PKT)), skbbuf, rs, &status);
-
-    if (status != DRV_RX_CONSUMED)
-    {
-        type = wifi_mac_input(sta, skbbuf, rs);
-    }
+    type = wifimac->drv_priv->drv_ops.rx_proc_frame(wifimac->drv_priv, sta->drv_sta, skbbuf, rs);
 
     return type;
 }
@@ -2796,8 +2787,9 @@ wifi_mac_sub_sm(struct wlan_net_vif *wnet_vif, enum wifi_mac_state nstate, int a
                     if ((prestate == WIFINET_S_ASSOC)
                         && (sta->sta_authmode == WIFINET_AUTH_SAE)
                         && (arg == STATUS_INVALID_PMKID)) {
+#if (KERNEL_VERSION(4, 17, 0) <= LINUX_VERSION_CODE)
                         wifi_mac_trigger_sae(sta);
-
+#endif
                     } else if (arg == WIFINET_FC0_SUBTYPE_AUTH) {
                         mgmt_arg = WIFINET_AUTH_SHARED_CHALLENGE;
                         WIFINET_DPRINTF(AML_DEBUG_STATE, "%d\n", mgmt_arg);

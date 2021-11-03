@@ -23,12 +23,6 @@
 #include "wifi_mac_action.h"
 #include <linux/list.h>
 
-enum drv_rx_type
-{
-    DRV_RX_NON_CONSUMED = 0,
-    DRV_RX_CONSUMED
-};
-
 #define DRV_RXDESC_NUM 256
 #define DRV_TXDESC_RATE_NUM 4
 #define DRIVER_NODE(_n) ((struct aml_driver_nsta *)(_n))
@@ -376,9 +370,7 @@ struct driver_ops
     int         (*txlist_isfull)( struct drv_private *,int queue_id,struct sk_buff * skbbuf, void *);
     /* rx callbacks */
     int         (*rx_init)(struct drv_private *, int nbufs);
-    int         (*rx_proc_frame)(struct drv_private *, void *, int is_ampdu,
-                                 struct sk_buff * skbbuf, struct wifi_mac_rx_status* rs,
-                                 enum drv_rx_type *status);
+    int         (*rx_proc_frame)(struct drv_private *, void *, struct sk_buff * skbbuf, struct wifi_mac_rx_status* rs);
 
     /* aggregation callbacks */
     int          (*check_aggr)(struct drv_private *, void *, unsigned char tid_index);
