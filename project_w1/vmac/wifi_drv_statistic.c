@@ -368,7 +368,7 @@ void sts_prt_info_map(void)
     sts_sys_prt_info[sts_drv_tx_ampdu_idx] = "drv_tx_ampdu";
     sts_sys_prt_info[sts_drv_tx_ampdu_on_frm_idx] = "drv_tx_ampdu_on_frm";
     sts_sys_prt_info[sts_drv_tx_end_fail_idx] = "drv_tx_end_fail";
-    sts_sys_prt_info[sts_drv_rx_ampdu_idx] = "drv_rx_ampdu";
+    sts_sys_prt_info[sts_drv_rx_ampdu_idx] = "drv_rx_input";
     sts_sys_prt_info[sts_drv_rx_bar_idx] = "drv_rx_bar";
     sts_sys_prt_info[sts_drv_rx_no_qos_idx] = "drv_rx_no_qos";
     sts_sys_prt_info[sts_drv_rx_dup_idx] = "drv_rx_dup";
