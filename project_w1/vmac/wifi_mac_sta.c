@@ -124,9 +124,12 @@ wifi_mac_start_bss_ex(unsigned long arg)
 #endif
     if (wnet_vif->vm_curchan != WIFINET_CHAN_ERR) {
         wifi_mac_ChangeChannel(wifimac, wnet_vif->vm_curchan, 3, wnet_vif->wnet_vif_id);
+
+        is_connect_need_set_gain(wnet_vif);
         if (wnet_vif->vm_opmode == WIFINET_M_STA) {
             if (wnet_vif->vm_mainsta->sta_avg_bcn_rssi > MAC_MIN_GAIN) {
                 wifi_mac_set_channel_rssi(wifimac, MAC_MIN_GAIN);
+
             } else {
                 wifi_mac_set_channel_rssi(wifimac, (unsigned char)(wnet_vif->vm_mainsta->sta_avg_bcn_rssi));
             }
@@ -572,6 +575,7 @@ void wifi_mac_sta_leave(struct wifi_station *sta, int reassoc)
     wifimac = wnet_vif->vm_wmac;
     wnet_vif->vm_fixed_rate.mode = WIFINET_FIXED_RATE_NONE;
     wnet_vif->vm_change_rate_enable = 1;
+    wnet_vif->vm_scanchan_rssi = MAC_MAX_GAIN;
 
     printk("wifi_mac_sta_leave:%d, sta:%p, main_sta:%p\n", wnet_vif->wnet_vif_id, sta, wnet_vif->vm_mainsta);
     if (wnet_vif->vm_opmode == WIFINET_M_STA)
@@ -608,7 +612,8 @@ void wifi_mac_sta_leave(struct wifi_station *sta, int reassoc)
         wifimac->drv_priv->drv_ops.drv_set_is_mother_channel(wifimac->drv_priv, wnet_vif->wnet_vif_id, 1);
         wifi_mac_rst_bss(wnet_vif);
         wifi_mac_rst_main_sta(wnet_vif);
-        wifimac->is_need_set_gain = 1;
+        wifimac->is_scan_noisy = 0;
+        wifimac->is_connect_set_gain = 1;
         wifimac->drv_priv->drv_ops.set_channel_rssi(wifimac->drv_priv, 174);
     }
 

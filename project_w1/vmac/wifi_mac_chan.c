@@ -1081,6 +1081,33 @@ int wifi_mac_chan_attach (struct wifi_mac *wifimac)
     return 0;
 }
 
+int wifi_mac_chan_overlapping_map_init(struct wifi_mac *wifimac)
+{
+    unsigned char i;
+
+    //2.4G channel count:14
+    for (i = 0; i < 14; ++i) {
+        wifimac->chan_overlapping_map[i].chan_index = i + 1;
+    }
+
+    //5G channel  34 - 64, count:16
+    for (; i < 30; ++i) {
+        wifimac->chan_overlapping_map[i].chan_index = 2 * (i - 14) + 34;
+    }
+
+    //5G channel  100 - 144 count:23
+    for (; i < 53; ++i) {
+        wifimac->chan_overlapping_map[i].chan_index = 2 * (i - 30) + 100;
+    }
+
+    //5G channel  149 - 165 count:9
+    for (; i < 62; ++i) {
+        wifimac->chan_overlapping_map[i].chan_index = 2 * (i - 53) + 149;
+    }
+
+    return 0;
+}
+
 void wifi_mac_chan_setup(void * ieee, unsigned int wMode, int countrycode_ex)
 {
     struct wifi_mac *wifimac = NET80211_HANDLE(ieee);
@@ -1230,7 +1257,8 @@ void wifi_mac_restore_wnet_vif_channel(struct wlan_net_vif *wnet_vif)
         wifi_mac_ChangeChannel(wifimac, selected_wnet_vif->vm_curchan, 1, selected_wnet_vif->wnet_vif_id);
     }
 
-    if (IS_APSTA_CONCURRENT(aml_wifi_get_con_mode())) {
+    wifi_mac_set_channel_rssi(wifimac, (unsigned char)(selected_wnet_vif->vm_mainsta->sta_avg_bcn_rssi));
+    if ((wifimac->wm_nrunning == 2) && concurrent_check_is_vmac_same_pri_channel(wifimac)) {
         selected_wnet_vif = drv_priv->drv_wnet_vif_table[NET80211_P2P_VMAC];
         wifimac->drv_priv->drv_ops.drv_set_is_mother_channel(wifimac->drv_priv, selected_wnet_vif->wnet_vif_id, 1);
 

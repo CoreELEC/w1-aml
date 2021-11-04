@@ -88,6 +88,8 @@ enum
     AML_DBG_MODULES_RATE_CTR = BIT(1),    /* minstrel rate */
     AML_DBG_MODULES_TX = BIT(2),    /* tx */
     AML_DBG_MODULES_HAL_TX = BIT(3),    /* hal_tx */
+    AML_DBG_MODULES_TX_ERROR = BIT(4),
+    AML_DBG_MODULES_SCAN = BIT(5),
     AML_DEBUG_MODDULES_ALL = 0xffffffffffffffff,
 };
 
@@ -100,6 +102,10 @@ enum
                         printk("[mi_rate] <%s> %d "format"",__FUNCTION__, __LINE__, ##__VA_ARGS__); \
                     else if(_m == AML_DBG_MODULES_TX) \
                         printk("[TX] <%s> %d "format"",__FUNCTION__, __LINE__, ##__VA_ARGS__); \
+                    else if(_m == AML_DBG_MODULES_TX_ERROR) \
+                        printk("[TX_ERROR] <%s> %d "format"",__FUNCTION__, __LINE__, ##__VA_ARGS__); \
+                    else if(_m == AML_DBG_MODULES_SCAN) \
+                        printk("[SCAN] <%s> %d "format"",__FUNCTION__, __LINE__, ##__VA_ARGS__); \
                 }    \
         } while (0)
 

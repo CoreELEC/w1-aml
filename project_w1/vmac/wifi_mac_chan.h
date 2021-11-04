@@ -6,7 +6,8 @@
 
 void wifi_mac_update_country_chan_list(struct wifi_mac *wifimac);
 void wifi_mac_chan_setup(void * ieee, unsigned int wMode, int countrycode_ex);
-int wifi_mac_chan_attach (struct wifi_mac *wifimac);
+int wifi_mac_chan_attach(struct wifi_mac *wifimac);
+int wifi_mac_chan_overlapping_map_init(struct wifi_mac *wifimac);
 unsigned char wifi_mac_chan_num_availd (struct wifi_mac *wifimac, unsigned char channum);
 int wifi_mac_recv_bss_intol_channelCheck(struct wifi_mac *wifimac, struct wifi_mac_ie_intolerant_report *intol_ie);
 struct wifi_channel * wifi_mac_scan_sta_get_ap_channel(struct wlan_net_vif *wnet_vif, struct wifi_mac_scan_param *sp);

@@ -328,6 +328,11 @@ enum
     CONCURRENT_NOTIFY_AP_SUCCESS = BIT(2),
 };
 
+struct wifi_mac_chan_overlapping {
+    unsigned char chan_index;
+    unsigned short overlapping;
+};
+
 struct wifi_mac
 {
     unsigned char wm_mac_exit;
@@ -361,6 +366,8 @@ struct wifi_mac
     spinlock_t  channel_lock;
     unsigned long channel_lock_flag;
 
+    struct wifi_mac_chan_overlapping chan_overlapping_map[WIFINET_MAX_SCAN_CHAN];
+    unsigned long chan_overlapping_last;
     unsigned long wm_scanplayercnt;
     struct wifi_mac_scan_state *wm_scan;
     unsigned long wm_lastscan;
@@ -421,8 +428,10 @@ struct wifi_mac
     struct _wifi_mac_country_iso wm_country;
     struct wifi_mac_country_ie* wm_11dinfo;
 
-    unsigned char gain_set_threshold;
-    unsigned char is_need_set_gain;
+    unsigned char scan_gain_thresh_unconnect;
+    unsigned char scan_gain_thresh_connect;
+    unsigned char is_scan_noisy;
+    unsigned char is_connect_set_gain;
 
     unsigned char wm_doth_tbtt;
     unsigned char wm_doth_channel;

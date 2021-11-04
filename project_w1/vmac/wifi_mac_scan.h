@@ -46,7 +46,7 @@ enum
     SCANSTATE_F_TIMEOUT = BIT(4),
     SCANSTATE_F_RESTORE = BIT(5),
     SCANSTATE_F_NOTIFY_AP = BIT(6),
-    SCANSTATE_F_NOTIFY_AP_SUCCESS = BIT(7),
+    SCANSTATE_F_TX_DONE = BIT(7),
     SCANSTATE_F_WAIT_PKT_CLEAR = BIT(8),
     SCANSTATE_F_DISCONNECT_REQ_CANCEL = BIT(9),
     SCANSTATE_F_WAIT_CHANNEL_SWITCH = BIT(10),
@@ -229,7 +229,7 @@ struct wifi_scan_info
 #define STA_MATCH_ERR_BSS                   (1<<1)
 #define STA_MATCH_ERR_PRIVACY               (1<<2)
 #define STA_MATCH_ERR_RATE                  (1<<3)
-#define STA_MATCH_ERR_HTRATE                    (1<<4)
+#define STA_MATCH_ERR_HTRATE                (1<<4)
 #define STA_MATCH_ERR_SSID                  (1<<5)
 #define STA_MATCH_ERR_BSSID                 (1<<6)
 #define STA_MATCH_ERR_STA_FAILS_MAX         (1<<7)
@@ -274,6 +274,7 @@ void wifi_mac_scan_notify_leave_or_back(struct wlan_net_vif *wnet_vif, unsigned 
 void wifi_mac_process_tx_error(struct wlan_net_vif *wnet_vif);
 void wifi_mac_update_roaming_candidate_chan(struct wlan_net_vif *wnet_vif,const struct wifi_mac_scan_param *sp, int rssi);
 int wifi_mac_scan_chk_11g_bss(struct wifi_mac_scan_state *ss, struct wlan_net_vif *wnet_vif);
+void is_connect_need_set_gain(struct wlan_net_vif *wnet_vif);
 
 
 #endif /* _WIFI_NET_SCAN_H_ */

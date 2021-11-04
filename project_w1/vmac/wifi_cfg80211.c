@@ -2881,9 +2881,9 @@ static int vm_cfg80211_connect(struct wiphy *wiphy, struct net_device *dev,
     DPRINTF(AML_DEBUG_CFG80211, "%s %d connect_timeout=%d ms\n", __func__, __LINE__, CFG80211_CONNECT_TIMER_OUT);
 
     if (wnet_vif->vm_state == WIFINET_S_CONNECTED) {
-        wifi_mac_top_sm(wnet_vif, WIFINET_S_INIT, 0);
+        wifi_mac_top_sm(wnet_vif, WIFINET_S_ASSOC, 0);
 
-    } else if (wnet_vif->vm_state == WIFINET_S_INIT) {
+    } else {
         wifi_mac_top_sm(wnet_vif, WIFINET_S_SCAN, 0);
     }
 
@@ -2892,11 +2892,6 @@ static int vm_cfg80211_connect(struct wiphy *wiphy, struct net_device *dev,
     pwdev_priv->connect_request = sme;
     os_timer_ex_start(&pwdev_priv->connect_timeout);
     OS_SPIN_UNLOCK_IRQ(&pwdev_priv->connect_req_lock,pwdev_priv->connect_req_lock_flags);
-
-    if (IS_UP(wnet_vif->vm_ndev)) {
-        DPRINTF(AML_DEBUG_CFG80211, "%s %d\n", __func__, __LINE__);
-        wifi_mac_initial(wnet_vif->vm_ndev, RESCAN);
-    }
 
 exit:
     DPRINTF(AML_DEBUG_CFG80211, "%s %d\n", __func__, __LINE__);
