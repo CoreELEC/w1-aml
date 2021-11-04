@@ -242,6 +242,7 @@ struct country_na_freq_set
 #define WIFINET_CHAN_BYTES  32
 #define WIFINET_CHAN_INVALUE    0
 #define WIFINET_CHAN_ERR  NULL
+#define WIFINET_MAX_SCAN_CHAN 64
 
 #define WIFINET_CHAN_2GHZ 0x4000  /* 2.4 GHz  channel. */
 #define  WIFINET_CHAN_5GHZ 0x8000  /* 5 GHz  channel */

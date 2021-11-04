@@ -217,22 +217,27 @@ wifi_mac_connect_end(struct wifi_mac *wifimac)
     wifimac->drv_priv->drv_ops.connect_end(wifimac->drv_priv);
 }
 
+void wifi_mac_scan_set_gain(struct wifi_mac *wifimac, unsigned char rssi)
+{
+    DPRINTF(AML_DEBUG_WARNING, "%s channel rssi:%d\n", __func__, rssi);
+    wifimac->drv_priv->drv_ops.set_channel_rssi(wifimac->drv_priv, rssi);
+}
+
 void wifi_mac_set_channel_rssi(struct wifi_mac *wifimac, unsigned char rssi)
 {
-    if (wifimac->is_need_set_gain) {
+    if (wifimac->is_connect_set_gain) {
         DPRINTF(AML_DEBUG_WARNING, "%s channel rssi:%d\n", __func__, rssi);
         wifimac->drv_priv->drv_ops.set_channel_rssi(wifimac->drv_priv, rssi);
     }
 }
 
-int wifi_mac_if_in_noisy_enviroment(struct wifi_mac *wifimac)
+int wifi_mac_is_in_noisy_enviroment(struct wifi_mac *wifimac)
 {
     int ret = 0;
-    if ((wifimac->wm_nrunning == 0 && wifimac->wm_scan->scan_ssid_count >= UNCONNECT_MIN_GIAN_THRESHOLD)
-        || (wifimac->wm_nrunning != 0 && wifimac->wm_scan->scan_ssid_count >= CONNECTED_MIN_GIAN_THRESHOLD)) {
+
+    if ((wifimac->wm_nrunning == 0 && wifimac->wm_scan->scan_ssid_count >= wifimac->scan_gain_thresh_unconnect)
+        || (wifimac->wm_nrunning != 0 && wifimac->wm_scan->scan_ssid_count >= wifimac->scan_gain_thresh_connect)) {
         ret = 1;
-    } else {
-        ret = 0;
     }
 
     return ret;
@@ -247,56 +252,30 @@ void wifi_mac_get_channel_rssi_before_scan(struct wifi_mac *wifimac, int *rssi)
     int channel_set_rssi = 0;
 
     DPRINTF(AML_DEBUG_WARNING, "%s last rssi:%d\n", __func__, *rssi);
+    channel_set_rssi = MAC_MIN_GAIN;
+
     switch (*rssi) {
         case MAC_MAX_GAIN:
-            if (wifimac->is_need_set_gain) {
-                //enviroment may be noisy now, set to min gain
-                channel_set_rssi = MAC_MIN_GAIN;
-            } else {
+            if (!wifimac->is_scan_noisy) {
                 //clear environment, always use max gain
-                if(aml_wifi_get_platform_verid() == 2) {
-                    /*this is for gva_mrt version, fix gain on -65dbm*/
-                    channel_set_rssi = MAC_MIN_GAIN;
-                } else {
-                    channel_set_rssi = MAC_MAX_GAIN;
-                }
+                channel_set_rssi = MAC_MAX_GAIN;
             }
             break;
 
         case MAC_MID_GAIN:
-            if (wifi_mac_if_in_noisy_enviroment(wifimac)) {
-                 // enviroment may be noisy now, set to min gain
-                channel_set_rssi = MAC_MIN_GAIN;
-            } else if (!wifimac->is_need_set_gain) {
-                //environment may be clear now, try to set max gain
-                channel_set_rssi = MAC_MAX_GAIN;
-            } else {
-               if(aml_wifi_get_platform_verid() == 2) {
-                  /*this is for gva_mrt version, fix gain on -65dbm*/
-                    channel_set_rssi = MAC_MIN_GAIN;
-                } else {
-                    channel_set_rssi = MAC_MID_GAIN;
-                }
+            if (!wifimac->is_scan_noisy) {
+                channel_set_rssi = MAC_MID_GAIN;
             }
             break;
 
         case MAC_MIN_GAIN:
-            if (wifi_mac_if_in_noisy_enviroment(wifimac)) {
-                //noisy enviroment, always use min gian
-                channel_set_rssi = MAC_MIN_GAIN;
-            } else {
+            if (!wifimac->is_scan_noisy) {
                 // enviroment may not be noisy now, try to use mid gian
-               if(aml_wifi_get_platform_verid() == 2) {
-                  /*this is for gva_mrt version, fix gain on -65dbm*/
-                    channel_set_rssi = MAC_MIN_GAIN;
-                } else {
-                    channel_set_rssi = MAC_MID_GAIN;
-                }
+                channel_set_rssi = MAC_MID_GAIN;
             }
             break;
+
         default:
-            // don't know what kind of environment it is, use min gian
-            channel_set_rssi = MAC_MIN_GAIN;
             break;
     }
 
@@ -1487,6 +1466,7 @@ int wifi_mac_cap_attach(struct wifi_mac *wifimac, struct drv_private* drv_priv)
 
     /*set channel num and set current use channel by country code.*/
     wifi_mac_chan_attach(wifimac);
+    wifi_mac_chan_overlapping_map_init(wifimac);
 
     if (wifimac->wm_caps & WIFINET_C_WME)
         wifimac->wm_flags |= WIFINET_F_WME;
@@ -1510,8 +1490,10 @@ int wifi_mac_cap_attach(struct wifi_mac *wifimac, struct drv_private* drv_priv)
     INIT_LIST_HEAD(&wifimac->wm_free_entryq);
     WIFINET_NODE_FREE_LOCK_INIT(wifimac);
 
-    wifimac->gain_set_threshold = MAX_GIAN_THRESHOLD;
-    wifimac->is_need_set_gain = 1;
+    wifimac->scan_gain_thresh_unconnect = UNCONNECT_MIN_GIAN_THRESHOLD;
+    wifimac->scan_gain_thresh_connect = CONNECT_MIN_GIAN_THRESHOLD;
+    wifimac->is_scan_noisy = 0;
+    wifimac->is_connect_set_gain = 1;
 
     wifimac->wm_txpowlimit = WIFINET_TXPOWER_MAX;
     wifimac->wm_rx_streams = WIFINET_RXSTREAM;
@@ -2261,10 +2243,11 @@ int wifi_mac_initial(struct net_device *dev, int forcescan)
     }
 
     hal_priv->powersave_init_flag = 0;
-    wifimac->is_need_set_gain = 1;
     if (wifimac->drv_priv->drv_config.cfg_txamsdu) {
         os_timer_ex_start_period(&wifimac->drv_priv->drv_txtimer, NET80211_AMSDU_TIMEOUT);
     }
+    wifimac->is_scan_noisy = 0;
+    wifimac->is_connect_set_gain = 1;
 
     /*dev/interface is not up. */
     if ((dev->flags & IFF_RUNNING) == 0) {
@@ -2315,6 +2298,7 @@ int wifi_mac_initial(struct net_device *dev, int forcescan)
                 wifi_mac_top_sm(wnet_vif, WIFINET_S_SCAN, 0);
             }
         }
+
     }
     return 0;
 }
@@ -2901,9 +2885,9 @@ wifi_mac_sub_sm(struct wlan_net_vif *wnet_vif, enum wifi_mac_state nstate, int a
                 wifi_mac_check_special_ap(wnet_vif);
 
                 printk("****************************************************\n");
-                printk("sta connect ok!!! AP CHANNEL:%d, BW:%d, SSID:%s, BSSID:%02x:%02x:%02x:%02x:%02x:%02x\n",
-                    wnet_vif->vm_curchan->chan_pri_num, sta->sta_chbw, wnet_vif->vm_des_ssid[0].ssid,
-                    wnet_vif->vm_des_bssid[0], wnet_vif->vm_des_bssid[1], wnet_vif->vm_des_bssid[2],
+                printk("sta connect ok!!! AP CHANNEL:%d, CENTER_CHAN:%d, BW:%d, SSID:%s, BSSID:%02x:%02x:%02x:%02x:%02x:%02x\n",
+                    wnet_vif->vm_curchan->chan_pri_num, wifi_mac_Mhz2ieee(wnet_vif->vm_curchan->chan_cfreq1, 0), sta->sta_chbw,
+                    wnet_vif->vm_des_ssid[0].ssid, wnet_vif->vm_des_bssid[0], wnet_vif->vm_des_bssid[1], wnet_vif->vm_des_bssid[2],
                     wnet_vif->vm_des_bssid[3], wnet_vif->vm_des_bssid[4], wnet_vif->vm_des_bssid[5]);
                 printk("****************************************************\n");
                 g_auto_gain_base = 0;

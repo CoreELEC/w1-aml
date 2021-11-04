@@ -1821,7 +1821,7 @@ int hal_close(void *drv_priv)
     return 1;
 }
 
-int hal_probe()
+int hal_probe(void)
 {
     struct hal_private *hal_priv = hal_get_priv();
 
