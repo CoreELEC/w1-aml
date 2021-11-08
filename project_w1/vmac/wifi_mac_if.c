@@ -225,9 +225,13 @@ void wifi_mac_scan_set_gain(struct wifi_mac *wifimac, unsigned char rssi)
 
 void wifi_mac_set_channel_rssi(struct wifi_mac *wifimac, unsigned char rssi)
 {
+    unsigned char rssi_temp = rssi;
+
+    if (rssi_temp > 191)
+         rssi_temp = 191;
     if (wifimac->is_connect_set_gain) {
-        DPRINTF(AML_DEBUG_WARNING, "%s channel rssi:%d\n", __func__, rssi);
-        wifimac->drv_priv->drv_ops.set_channel_rssi(wifimac->drv_priv, rssi);
+        DPRINTF(AML_DEBUG_WARNING, "%s channel rssi_temp:%d\n", __func__, rssi_temp);
+        wifimac->drv_priv->drv_ops.set_channel_rssi(wifimac->drv_priv, rssi_temp);
     }
 }
 
