@@ -1633,9 +1633,6 @@ void wifi_mac_end_scan( struct wifi_mac_scan_state *ss)
     }
 
     printk("%s---> scan finish, vid:%d, clean vm_flags 0x%x\n", __func__, wnet_vif->wnet_vif_id, wifimac->wm_flags);
-    if ((wnet_vif->vm_opmode == WIFINET_M_STA) && (wnet_vif->vm_state == WIFINET_S_CONNECTED)) {
-        wifi_mac_scan_set_gain(wifimac, (unsigned char)(wnet_vif->vm_mainsta->sta_avg_bcn_rssi));
-    }
     os_timer_ex_start_period(&wnet_vif->vm_pwrsave.ips_timer_presleep, wnet_vif->vm_pwrsave.ips_inactivitytime);
 }
 
