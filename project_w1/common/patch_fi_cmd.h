@@ -78,7 +78,7 @@ typedef struct tx_error_event
 typedef struct Cali_Param
 {
     unsigned char Cmd;
-    unsigned long version;
+    unsigned int version;
     unsigned short cali_config;
     unsigned char freq_offset;
     unsigned char htemp_freq_offset;
