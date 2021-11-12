@@ -976,8 +976,12 @@ int wifi_mac_recv_bss_intol_channelCheck(struct wifi_mac *wifimac, struct wifi_m
 struct wifi_channel * wifi_mac_scan_sta_get_ap_channel(struct wlan_net_vif *wnet_vif, struct wifi_mac_scan_param *sp)
 {
     unsigned char *htinfoie = sp->htinfo;
+    unsigned char *htcapie = sp->htcap;
     unsigned char chan = sp->chan;
     struct wifi_mac_ie_htinfo *xhtinfo = (struct wifi_mac_ie_htinfo*)htinfoie;
+    struct wifi_mac_ie_htcap *xhtcap =(struct wifi_mac_ie_htcap *)htcapie;
+    struct wifi_mac_ie_htcap_cmn *htcap = NULL;
+    int htcapval = 0;
     struct wifi_mac_ie_htinfo_cmn *htinfo = NULL;
     struct wifi_mac *wifimac = wnet_vif->vm_wmac;
     struct wifi_mac_ie_vht_opt *vht_opt_ie =  (struct wifi_mac_ie_vht_opt *)sp->vht_opt;
@@ -989,8 +993,13 @@ struct wifi_channel * wifi_mac_scan_sta_get_ap_channel(struct wlan_net_vif *wnet
         htinfo = &xhtinfo->hi_ie;
     }
 
-    DPRINTF(AML_DEBUG_BWC, "%s(%d) %s, chan %d htinfo %p,chwidth %x \n", __func__, __LINE__,
-        ssidie_sprintf(sp->ssid), sp->chan, htinfo, htinfo?htinfo->hi_txchwidth : 0);
+    if (xhtcap != NULL) {
+        htcap = &xhtcap->hc_ie;
+        htcapval = le16toh(htcap->hc_cap);
+    }
+
+    DPRINTF(AML_DEBUG_BWC, "%s(%d) %s, chan %d htinfo %p,chwidth %x, htcapval 0x%x \n", __func__, __LINE__,
+        ssidie_sprintf(sp->ssid), sp->chan, htinfo, htinfo?htinfo->hi_txchwidth : 0, htcapval);
 
     if ((htinfo != NULL) && (htinfo->hi_txchwidth == WIFINET_HTINFO_TXWIDTH_2040))
     {
@@ -1023,6 +1032,14 @@ struct wifi_channel * wifi_mac_scan_sta_get_ap_channel(struct wlan_net_vif *wnet
         bw = WIFINET_BWC_WIDTH20;
         center_chan = chan;
     }
+
+    /*check coexistence for 20MHz and 40MHz */
+    if ((bw == WIFINET_BWC_WIDTH40) && (xhtcap != NULL) && !(htcapval & WIFINET_HTCAP_SUPPORTCBW40)) {
+        bw = WIFINET_BWC_WIDTH20;
+        center_chan = chan;
+        DPRINTF(AML_DEBUG_BWC, "htcap and htinfo information conflict\n");
+    }
+
     if((vht_opt_ie != NULL) &&
     (vht_opt_ie->vht_op_chwidth >= WIFINET_VHTOP_CHWIDTH_80))
     {
