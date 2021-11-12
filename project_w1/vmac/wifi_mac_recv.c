@@ -2438,6 +2438,13 @@ wifi_mac_parse_htinfo(struct wifi_station *sta, unsigned char *ie)
             extoffset = 0;
             break;
     }
+
+    /*check coexistence for 20MHz and 40MHz */
+    if ((sta->sta_chbw == WIFINET_BWC_WIDTH20) && !(sta->sta_htcap & WIFINET_HTCAP_SUPPORTCBW40)) {
+        DPRINTF(AML_DEBUG_BWC, "htcap and htinfo information conflict\n");
+        return ;
+    }
+
     sta->sta_chbw = wnet_vif->vm_bandwidth > htinfo->hi_txchwidth ?
         htinfo->hi_txchwidth : wnet_vif->vm_bandwidth ;
 
