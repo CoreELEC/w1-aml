@@ -18,6 +18,19 @@ static DEFINE_MUTEX(wifi_bt_sdio_mutex);
     mutex_unlock(&wifi_bt_sdio_mutex);\
 } while (0)
 
+/* protect cmd53 and host sleep request */
+static DEFINE_MUTEX(wifi_sdio_power_mutex);
+
+void aml_wifi_sdio_power_lock(void)
+{
+        mutex_lock(&wifi_sdio_power_mutex);
+}
+
+void aml_wifi_sdio_power_unlock(void)
+{
+        mutex_unlock(&wifi_sdio_power_mutex);
+}
+
 unsigned char (*host_wake_w1_req)(void);
 int (*host_suspend_req)(struct device *device);
 int (*host_resume_req)(struct device *device);
@@ -165,6 +178,7 @@ static int _aml_w1_sdio_request_byte(unsigned char func_num,
     return (err_ret == 0) ? SDIOH_API_RC_SUCCESS : SDIOH_API_RC_FAIL;
 }
 
+unsigned char aml_w1_sdio_bottom_read8(unsigned char  func_num, int addr);
 static int _aml_w1_sdio_request_buffer(unsigned char func_num,
     unsigned int fix_incr, unsigned char write, unsigned int addr, void *buf, unsigned int nbytes)
 {
@@ -219,10 +233,12 @@ int aml_w1_sdio_bottom_read(unsigned char func_num, int addr, void *buf, size_t 
 
     ASSERT(func_num != SDIO_FUNC0);
 
+    aml_wifi_sdio_power_lock();
     if (host_wake_w1_req != NULL)
     {
         if (host_wake_w1_req() == 0)
         {
+            aml_wifi_sdio_power_unlock();
             ERROR_DEBUG_OUT("aml_w1_sdio_bottom_read, host wake w1 fail\n");
             return -1;
         }
@@ -251,6 +267,7 @@ int aml_w1_sdio_bottom_read(unsigned char func_num, int addr, void *buf, size_t 
     {
         ERROR_DEBUG_OUT("kmalloc buf fail\n");
         AML_W1_BT_WIFI_MUTEX_OFF();
+        aml_wifi_sdio_power_unlock();
         return SDIOH_API_RC_FAIL;
     }
 
@@ -263,6 +280,8 @@ int aml_w1_sdio_bottom_read(unsigned char func_num, int addr, void *buf, size_t 
     }
 
     AML_W1_BT_WIFI_MUTEX_OFF();
+    aml_wifi_sdio_power_unlock();
+
     return result;
 }
 
@@ -275,10 +294,12 @@ int aml_w1_sdio_bottom_write(unsigned char func_num, int addr, void *buf, size_t
   
     ASSERT(func_num != SDIO_FUNC0);
 
+    aml_wifi_sdio_power_lock();
     if (host_wake_w1_req != NULL)
     {
         if (host_wake_w1_req() == 0)
         {
+            aml_wifi_sdio_power_unlock();
             ERROR_DEBUG_OUT("aml_w1_sdio_bottom_write, host wake w1 fail\n");
             return -1;
         }
@@ -290,6 +311,7 @@ int aml_w1_sdio_bottom_write(unsigned char func_num, int addr, void *buf, size_t
     {
         ERROR_DEBUG_OUT("kmalloc buf fail\n");
         AML_W1_BT_WIFI_MUTEX_OFF();
+        aml_wifi_sdio_power_unlock();
         return SDIOH_API_RC_FAIL;
     }
     memcpy(kmalloc_buf, buf, len);
@@ -298,6 +320,7 @@ int aml_w1_sdio_bottom_write(unsigned char func_num, int addr, void *buf, size_t
 
     kfree(kmalloc_buf);
     AML_W1_BT_WIFI_MUTEX_OFF();
+    aml_wifi_sdio_power_unlock();
     return result;
 }
 
@@ -828,6 +851,8 @@ EXPORT_SYMBOL(w1_sdio_after_porbe);
 EXPORT_SYMBOL(host_wake_w1_req);
 EXPORT_SYMBOL(host_suspend_req);
 EXPORT_SYMBOL(host_resume_req);
+EXPORT_SYMBOL(aml_wifi_sdio_power_lock);
+EXPORT_SYMBOL(aml_wifi_sdio_power_unlock);
 
 /*set_wifi_bt_sdio_driver_bit() is used to determine whether to unregister sdio power driver.
   *Only when w1_sdio_wifi_bt_alive is 0, then call aml_w1_sdio_exit().

@@ -662,27 +662,22 @@ unsigned char hi_set_cmd(unsigned char *pdata,unsigned int len)
         OS_UDELAY(20);
     }
 
+    aml_wifi_sdio_power_lock();
+    POWER_BEGIN_LOCK();
     if (((hal_priv->powersave_init_flag == 0) && (pscmd.Cmd == Power_Save_Cmd) && (pscmd.psmode == PS_DOZE))
         || ((hal_priv->powersave_init_flag == 0) && (suspend_cmd.Cmd == WoW_Enable_Cmd) && (suspend_cmd.enable == 1)))
     {
         unsigned int tmpreg = 0;
 
-#ifdef PROJECT_T9026
-        tmpreg = hif->hif_ops.hif_aon_read_reg(WIFI_RG_AON_CFG4);
-        // set host sleep req
-        tmpreg |= BIT(1);
-        aml_aon_write_reg(WIFI_RG_AON_CFG4, tmpreg);
-#elif defined (PROJECT_W1)
         tmpreg = hif->hif_ops.hi_bottom_read8(SDIO_FUNC1, RG_SDIO_PMU_HOST_REQ);
         // set host sleep req
         tmpreg |= HOST_SLEEP_REQ;
         hif->hif_ops.hi_bottom_write8(SDIO_FUNC1, RG_SDIO_PMU_HOST_REQ, tmpreg);
-#endif
     }
 
-    POWER_BEGIN_LOCK();
     hal_priv->hal_drv_ps_status &= ~HAL_DRV_IN_ACTIVE;
     POWER_END_LOCK();
+    aml_wifi_sdio_power_unlock();
 
     return true;
 }
