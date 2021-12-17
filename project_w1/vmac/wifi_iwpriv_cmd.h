@@ -79,10 +79,10 @@ enum aml_iwpriv_subcmd
     AML_IWP_SET_BT_MAC = 71,
     AML_IWP_GET_BT_MAC = 72,
     AML_IWP_SET_TXPW_PLAN = 73,
+    AML_IWP_SET_MAC_MODE = 74,
 };
 
-extern unsigned char set_conn_band;
-extern unsigned char aml_iwpriv_get_conn_band(void);
+extern unsigned char aml_iwpriv_get_band(void);
 int aml_set_debug_modules(char *debug_str);
 
 #endif

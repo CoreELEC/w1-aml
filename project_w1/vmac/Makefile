@@ -58,7 +58,6 @@ EXT_INCS := $(CUR_DIR)/../common
 INCS     := -I$(CUR_DIR) -I$(EXT_INCS)
 KERNEL_SRC ?= $(KERNELDIR)
 #n=for normal mode,y=product mode
-CONFIG_PT_SUPPORT=y
 #n=not support WIFI_RF when boot up. y=support WIFI_RF when boot up
 CONFIG_WIFI_RF_SUPPORT=y
 #n=not support access bt rf reg, y=support access bt rf reg
@@ -122,6 +121,7 @@ EXTRA_CFLAGS += -DCONFIG_SDIO_IF
 EXTRA_CFLAGS += -DFPGA
 #EXTRA_CFLAGS += -DCONFIG_GPIO_WAKEUP
 
+#EXTRA_CFLAGS += -DNOT_AMLOGIC_PLATFORM
 ifeq ($(CONFIG_PT_SUPPORT),y)
 EXTRA_CFLAGS += -DDRV_PT_SUPPORT
 else

@@ -147,7 +147,23 @@ enum cip_param_id
     CHIP_PARAM_HRTIMER_INTERVAL,
 };
 
+enum wifi_mac_mode
+{
+    CFG_11B = 1,
+    CFG_11G = 2,
+    CFG_11N = 3,
+    CFG_11AC = 4,
+    DEFAULT_AUTO = 5,
+};
+
+enum wifi_band
+{
+    CFG_BAND_B = 2,
+    CFG_BAND_A = 5,
+    DEFAULT_BAND_ALL = 6,
+};
+
 int drv_get_config(void * dev, enum cip_param_id id);
 int drv_set_config(void * dev, enum cip_param_id id, int data);
-
+int drv_cfg_load_from_file(void);
 #endif // _AUTO_CONFIG_H

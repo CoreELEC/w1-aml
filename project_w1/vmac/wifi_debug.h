@@ -62,10 +62,9 @@ enum
                             AML_DEBUG_CFG80211)
 
 
-#ifdef DRV_PT_SUPPORT
 #define DBG_HAL_THR_ENTER()          //printk("---xman debug---:%s ++ \n",__FUNCTION__);
 #define DBG_HAL_THR_EXIT()           //printk("---xman debug---:%s -- \n",__FUNCTION__);
-#endif
+
 
 extern int aml_debug;
 extern unsigned long long g_dbg_info_enable;
@@ -118,11 +117,8 @@ enum
         } while (0)
 
 
-#ifdef DRV_PT_SUPPORT
 #include "wifi_pt_init.h"
 extern struct _B2B_Platform_Conf gB2BPlatformConf;
-
-#endif
 
 
 #define DEBUG_LOCK

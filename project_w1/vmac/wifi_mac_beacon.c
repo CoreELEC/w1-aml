@@ -810,13 +810,16 @@ void wifi_mac_process_beacon_miss_ex(SYS_TYPE arg)
     * beacuse 'vm_swbmiss' timeout is 2500ms.
     */
     if (wnet_vif->vm_bmiss_count++ < WIFINET_BMISS_COUNT_MAX) {
+        /* we should wakeup when beacon miss happened */
+        if (wifi_mac_pwrsave_is_wnet_vif_sleeping(wnet_vif) == 0) {
+            wifi_mac_pwrsave_wakeup(wnet_vif, WKUP_FROM_BCN_MISS);
+        }
         /*if not in roaming mode, triger roaming */
         if ((wifimac->wm_roaming == WIFINET_ROAMING_BASIC) && (wnet_vif->vm_chan_roaming_scan_flag != 1)
              && (wnet_vif->vm_bmiss_count >= 2)) {
             printk("Miss beacon trigger roaming\n");
             wifi_mac_roaming_trigger(wnet_vif);
          }
-        //should exit power save here
         return;
     }
 

@@ -79,9 +79,7 @@ struct hw_interface;
 #include "osdep.h"
 #include "wifi_rate_ctrl.h"
 #include "wifi_drv_reg_ops.h"
-#ifdef DRV_PT_SUPPORT
 #include "wifi_pt_init.h"
-#endif
 
 #elif defined (HAL_SIM_VER)
 #include "wifi_phy.h"
@@ -372,17 +370,16 @@ struct  hal_work_task
 #define ICCM_CHECK
 
 #elif defined(PROJECT_W1)
+#define ICCM_ROM_LEN    (96 * 1024)
+#define ICCM_RAM_LEN    (64 * 1024)
+#define DCCM_LEN        (48 * 1024)
+#define SRAM_LEN        (8 * 1024)
+#define ICCM_ALL_LEN    (ICCM_ROM_LEN + ICCM_RAM_LEN)
 
 // for check
-#define ICCM_BUFFER_RD_LEN (160*1024)
-#define ICCM_CHECK_LEN (96*1024)
-#define DCCM_CHECK_LEN (48*1024)
-
-#define ICCM_ALL_LEN (160*1024)
-#define ICCM_ROM_LEN (96*1024)
-#define ICCM_RAM_LEN (64*1024)
-#define DCCM_LEN (48*1024)
-#define SRAM_LEN (8*1024)
+#define ICCM_BUFFER_RD_LEN  (ICCM_RAM_LEN)
+#define ICCM_CHECK_LEN      (ICCM_RAM_LEN)
+#define DCCM_CHECK_LEN      (DCCM_LEN)
 
 #ifdef HAL_FPGA_VER
 #define ICCM_CHECK
@@ -462,10 +459,8 @@ struct  hal_work_task
 #define MAX_SEM_CNT 2
 #endif
 
-#ifdef DRV_PT_SUPPORT
 #define DATA_PACKET_LENGTH_MIN 1000
 #define THROUGHPUT_GET_INTERVAL 2000 //ms
-#endif
 
 //for tx mpdus, state machine: GET -> MAKE -> SET
 //each mpdu occupy one unit
@@ -507,6 +502,8 @@ struct  hal_work_task
     unsigned int Tx_Send_num;
     unsigned int Tx_Done_num;
     unsigned int Tx_Free_num;    //num of tx frames have been freed after tx completed
+    unsigned int tx_ok_num;
+    unsigned int tx_fail_num;
     unsigned int Rx_Rcv_num;
     unsigned int PushDownEvent_Err_num;
     unsigned int PushDownCmd_Err_num;
@@ -709,9 +706,7 @@ struct  hw_interface
     unsigned short         Seqnum;
     unsigned short         HTC;
     unsigned short         FrameControl;
-    #ifdef DRV_PT_SUPPORT
     unsigned short     	PrivDmaAddr;
-    #endif
     unsigned char          EncryptType;
 } ;
 
@@ -785,7 +780,6 @@ struct hal_layer_ops
     unsigned int (* phy_set_rf_chan)(struct hal_channel *hchan, unsigned char flag, unsigned char vid);
     unsigned int (* phy_set_mac_bssid)(unsigned char wnet_vif_id,unsigned char * Bssid);
     unsigned int (* phy_set_mac_addr)(unsigned char wnet_vif_id,unsigned char * MacAddr);
-    unsigned int (* phy_vmac_connect)(unsigned char wnet_vif_id);/*vmac connect to ap*/
     unsigned int (* phy_vmac_disconnect)(unsigned char wnet_vif_id);
     unsigned int (* phy_init_hmac)(unsigned char wnet_vif_id);
     unsigned int (* phy_disable_net_traffic)(void);
@@ -987,12 +981,11 @@ struct hal_layer_ops
     unsigned char bhalMKeySet[4]; //for all vmac_id, now for mkey reset
     unsigned char bhalUKeySet[4]; //for all vmac_id, now for ukey reset
     unsigned char bWpaMicMeasureEnable;
-    
+
     unsigned int int_status_copy; //0x70  is read-clean REG,save for debug
     unsigned char HalTxFrameDoneCounter;  //old counter of frames have been tx completed
     unsigned int HalRxFrameDoneCounter;  //old counter of frames have been rxed from firmware
     unsigned short HalTxPageDoneCounter;   //old counter of pages have been tx completed
-    unsigned int st_frame_done_counter;
 
     unsigned char use_irq;
     int tx_queueid_downloadok; //the id of queue which has been downloaded ok, init as 0

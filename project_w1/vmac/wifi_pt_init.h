@@ -66,7 +66,7 @@
 #endif
 
 #define RATE_LEN 21
-
+#define RESERVED_LEN 256
 
 #ifndef BSS_BW_40M
 #define BSS_BW_40M gB2BTestCasePacket.channel_bw

@@ -95,12 +95,11 @@ void drv_pwrsave_awake( struct drv_private *drv_priv, int wnet_vif_id)
 
 void drv_pwrsave_fullsleep( struct drv_private *drv_priv, int wnet_vif_id)
 {
-#ifdef DRV_PT_SUPPORT
     if (aml_wifi_is_enable_rf_test()) {
         drv_pwrsave_set_state(drv_priv, DRV_PWRSAVE_AWAKE, wnet_vif_id); //xman modified for hal thr test.
         return;
     }
-#endif
+
     if (drv_priv->drv_scanning)
         return;
 

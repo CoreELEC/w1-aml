@@ -420,7 +420,7 @@ int wifi_mac_connect(struct wlan_net_vif *wnet_vif, struct wifi_scan_info *se)
     printk("%s start connect to ssid:%s, pri_channel:%d, center_chan:%d, bw:%d, BSSID:%02x:%02x:%02x:%02x:%02x:%02x, mode:%d\n",
         __func__, se->SI_ssid+2, se->SI_chan->chan_pri_num, se->SI_chan->chan_cfreq1, se->SI_chan->chan_bw, sta->sta_bssid[0],
         sta->sta_bssid[1], sta->sta_bssid[2], sta->sta_bssid[3], sta->sta_bssid[4], sta->sta_bssid[5], sta->sta_bssmode);
-
+    wnet_vif->vm_phase_flags |= PHASE_CONNECTING;
     return wifi_mac_start_bss(sta);
 }
 
@@ -575,7 +575,7 @@ void wifi_mac_sta_leave(struct wifi_station *sta, int reassoc)
     wifimac = wnet_vif->vm_wmac;
     wnet_vif->vm_fixed_rate.mode = WIFINET_FIXED_RATE_NONE;
     wnet_vif->vm_change_rate_enable = 1;
-    wnet_vif->vm_scanchan_rssi = MAC_MAX_GAIN;
+    wnet_vif->vm_scanchan_rssi = MAC_MIN_GAIN;
 
     printk("wifi_mac_sta_leave:%d, sta:%p, main_sta:%p\n", wnet_vif->wnet_vif_id, sta, wnet_vif->vm_mainsta);
     if (wnet_vif->vm_opmode == WIFINET_M_STA)
@@ -605,17 +605,21 @@ void wifi_mac_sta_leave(struct wifi_station *sta, int reassoc)
         wifi_mac_reset_vmac(wnet_vif);
         wifi_mac_rate_disassoc(sta);
         wifi_mac_buffer_txq_flush(&wnet_vif->vm_tx_buffer_queue);
+        wifi_mac_buffer_txq_flush(&wifimac->drv_priv->retransmit_queue);
         wifimac->drv_priv->drv_ops.drv_free_normal_buffer_queue(wifimac->drv_priv, wnet_vif->wnet_vif_id);
         wifimac->drv_priv->drv_ops.drv_flush_txdata(wifimac->drv_priv, wnet_vif->wnet_vif_id);
-        wifi_mac_notify_nsta_disconnect(sta, reassoc);
+        if (wifimac->fw_recovery_stat != (WIFINET_RECOVERY_START|WIFINET_RECOVERY_UNDER_CONNECT)) {
+            wifi_mac_notify_nsta_disconnect(sta, reassoc);
+        }
         wifimac->drv_priv->drv_ops.drv_set_pkt_drop(wifimac->drv_priv, wnet_vif->wnet_vif_id, 0);
         wifimac->drv_priv->drv_ops.drv_set_is_mother_channel(wifimac->drv_priv, wnet_vif->wnet_vif_id, 1);
         wifi_mac_rst_bss(wnet_vif);
         wifi_mac_rst_main_sta(wnet_vif);
-        wifimac->is_scan_noisy = 0;
+        wifimac->scan_noisy_status = WIFINET_S_SCAN_ENV_NOISE;
         wifimac->is_connect_set_gain = 1;
         wifimac->drv_priv->drv_ops.set_channel_rssi(wifimac->drv_priv, 174);
     }
+    wnet_vif->vm_phase_flags &= ~PHASE_DISCONNECTING;
 
     /*
     * p2p mode disconnect, need reset vm_mac_mode
@@ -1993,6 +1997,9 @@ void wifi_mac_rst_main_sta(struct wlan_net_vif *wnet_vif)
 
         sta->sta_chbw = 0;
         sta->connect_status = CONNECT_IDLE;
+        sta->ip_acquired = 0;
+        memset(sta->sta_ap_ip, 0, IPV4_LEN);
+        memset(sta->sta_ap_ipv6, 0, IPV6_LEN);
         sta->sta_update_rate_flag = 0;
         sta->sta_bssmode = wnet_vif->vm_mac_mode;
 
@@ -2126,7 +2133,7 @@ void wifi_mac_notify_nsta_disconnect(struct wifi_station *sta, int reassoc)
             netif_carrier_off(dev);
         }
 
-        memset(wreq.ap_addr.sa_data, 0, ETHER_ADDR_LEN);
+        memset(wreq.ap_addr.sa_data, 0, MAC_ADDR_LEN);
         wreq.ap_addr.sa_family = ARPHRD_ETHER;
         wireless_send_event(dev, SIOCGIWAP, &wreq, NULL);
         vm_cfg80211_indicate_disconnect(wnet_vif);

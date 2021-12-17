@@ -12,6 +12,10 @@
  *
  ****************************************************************************************
  */
+#include <linux/netdevice.h>
+#include <linux/inetdevice.h>
+#include <net/addrconf.h>
+
 #include "wifi_drv_power.h"
 #include "wifi_drv_uapsd.h"
 #include "wifi_drv_xmit.h"
@@ -30,21 +34,27 @@
 #include "wifi_mac_tx_reg.h"
 #include "wifi_mac_xmit.h"
 
+
 const unsigned char drv_bcast_mac[WIFINET_ADDR_LEN] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 
 static unsigned int drv_phy_reg_sta_id( struct drv_private *drv_priv,
     unsigned char wnet_vif_id,unsigned short StaAid, unsigned char *pMac, unsigned char encrypt);
 
 static struct drv_private drv_priv;
+
 extern void hal_dpd_calibration(void);
+extern struct notifier_block aml_inetaddr_cb;
+extern struct notifier_block aml_inet6addr_cb;
+extern int hal_tx_flush(unsigned char vid);
+
+
 
 struct drv_private* drv_get_drv_priv(void)
 {
     return &drv_priv;
 }
 
- static int
- drv_rate_setup(struct drv_private *drv_priv, enum wifi_mac_macmode mode)
+int drv_rate_setup(struct drv_private *drv_priv, enum wifi_mac_macmode mode)
 {
 
     struct drv_rate_table *rt = drv_hal_get_rate_tbl(mode);
@@ -57,7 +67,7 @@ struct drv_private* drv_get_drv_priv(void)
 
     //do rate index and vendor_rate_code mapping.
     drv_hal_setupratetable(rt);
-
+    DRV_MINSTREL_LOCK_INIT(drv_priv);
     drv_priv->drv_currratetable = rt;
     drv_priv->drv_protect_rateindex =  0;
 
@@ -125,8 +135,7 @@ drv_assoc_proc( struct drv_private *drv_priv,
     drv_sta->sta_isuapsd =  b_uapsd ;
 }
 
-static int
-drv_channel_init(struct drv_private *drv_priv, unsigned int cc)
+int drv_channel_init(struct drv_private *drv_priv, unsigned int cc)
 {
     unsigned int wMode;
 
@@ -146,6 +155,13 @@ drv_update_slot( struct drv_private *drv_priv, int slottime)
     driv_ps_wakeup(drv_priv);
     drv_hal_setslottime( slottime);
     driv_ps_sleep(drv_priv);
+}
+
+void aml_w1_fw_recovery(void)
+{
+    hal_tx_flush(0);
+    aml_disable_wifi();
+    aml_enable_wifi();
 }
 
 static void drv_scan_start_ex( SYS_TYPE param1,SYS_TYPE param2,
@@ -169,6 +185,11 @@ static void drv_scan_start_ex( SYS_TYPE param1,SYS_TYPE param2,
 static void drv_scan_start( struct drv_private *drv_priv)
 {
     drv_hal_add_workitem((WorkHandler)drv_scan_start_ex, NULL, (SYS_TYPE)drv_priv, 0, 0, 0, 0);
+}
+
+static void drv_fw_recovery( struct drv_private *drv_priv)
+{
+    aml_w1_fw_recovery();
 }
 
 
@@ -288,7 +309,12 @@ static void drv_set_channel_rssi_ex( SYS_TYPE param1,SYS_TYPE param2,SYS_TYPE pa
 
 static void drv_set_channel_rssi( struct drv_private *drv_priv, unsigned char rssi)
 {
-    drv_hal_add_workitem((WorkHandler)drv_set_channel_rssi_ex, NULL, (SYS_TYPE)rssi, 0, 0, 0, 0);
+    static unsigned char pre_rssi = 0;
+
+    if (pre_rssi != rssi) {
+        pre_rssi = rssi;
+        drv_hal_add_workitem((WorkHandler)drv_set_channel_rssi_ex, NULL, (SYS_TYPE)rssi, 0, 0, 0, 0);
+    }
 }
 
 static void drv_set_tx_power_accord_rssi_ex( SYS_TYPE param1,SYS_TYPE param2,SYS_TYPE param3, SYS_TYPE param4,SYS_TYPE param5)
@@ -562,57 +588,6 @@ drv_wnet_vif_disconnect(struct drv_private *drv_priv,
     return 0;
 }
 
-static int drv_wnet_vif_connect_ex(SYS_TYPE param1, SYS_TYPE param2,
-    SYS_TYPE param3, SYS_TYPE param4,SYS_TYPE param5)
-{
-    struct drv_private *drv_priv = (void *)param1;
-    int wnet_vif_id = (int)param2;
-    unsigned char *bssid = (unsigned char *)param3;
-    unsigned short aid = (unsigned short)param4;
-    struct wlan_net_vif *wnet_vif;
-    struct wifi_station *sta;
-
-    int error = 0;
-
-    wnet_vif = drv_priv->drv_wnet_vif_table[wnet_vif_id];
-    if ((wnet_vif == NULL) || (wnet_vif->vm_state != WIFINET_S_CONNECTED)) {
-        return -EINVAL;
-    }
-
-    sta = wnet_vif->vm_mainsta;
-    driv_ps_wakeup(drv_priv);
-    drv_hal_wnet_vifconnect(wnet_vif_id);
-
-    if ((wnet_vif->vm_hal_opmode == WIFI_M_STA) || (wnet_vif->vm_hal_opmode == WIFI_M_IBSS)) {
-        drv_set_bssid(drv_priv, wnet_vif_id, bssid);
-        drv_phy_reg_sta_id(drv_priv, wnet_vif_id, aid, drv_priv->drv_bssid, sta->sta_encrypt_flag);
-
-        printk("%s %d sta id registered, allow to send pkt\n", __func__,__LINE__);
-        sta->connect_status = CONNECT_FW_CONFIG_COMPLETED;
-        wifi_mac_buffer_txq_send_pre(wnet_vif);
-    }
-
-// bad:
-    driv_ps_sleep(drv_priv);
-    FREE(bssid,"bssid");
-    return error;
-}
-
-static int
-drv_wnet_vif_connect( struct drv_private *drv_priv,
-    int wnet_vif_id,const unsigned char bssid[WIFINET_ADDR_LEN],
-    unsigned char aid, unsigned int flags)
-{
-    unsigned char *bssidx = ZMALLOC(WIFINET_ADDR_LEN,"bssid", GFP_ATOMIC);
-
-    memcpy(bssidx,bssid,6);
-    drv_hal_add_workitem((WorkHandler)drv_wnet_vif_connect_ex,NULL,
-                         (SYS_TYPE)drv_priv,(SYS_TYPE)wnet_vif_id,
-                         (SYS_TYPE)bssidx,(SYS_TYPE)aid,
-                         (SYS_TYPE)flags);
-    return 0;
-}
-
 static int
 drv_open( struct drv_private *drv_priv)
 {
@@ -645,11 +620,34 @@ void drv_get_sts( struct drv_private *drv_priv,
     unsigned int op_code, unsigned int ctrl_code)
 {
     int i;
+    struct wifi_mac *wifimac = wifi_mac_get_mac_handle();
+    struct drv_txlist *txlist = NULL;
+    struct drv_tx_scoreboard *tid;
+    struct wifi_station *sta = NULL;
+    struct aml_driver_nsta *drv_sta = NULL;
+    struct wlan_net_vif *connect_wnet = wifi_mac_running_wnet_vif(wifimac);
+
+    if(connect_wnet != NULL){
+        sta = connect_wnet->vm_mainsta;
+        drv_sta = sta->drv_sta;
+        printk("\n--------drv statistic--------\n");
+        for(i=0; i< WME_NUM_AC;i++)
+        {
+            txlist = drv_txlist_initial(drv_priv,i);
+            printk("queen %d ac_queue_buffer_in_drv %d\n", i, txlist->txds_pending_cnt);
+
+        }
+        for(i=0; i< WME_NUM_TID;i++)
+        {
+            tid = &drv_sta->tx_agg_st.tid[i];
+            printk("tid %d tid_queue_buffer_in_drv %d, msdu_count %d\n", i,WIFINET_SAVEQ_QLEN(&tid->tid_tx_buffer_queue), wifimac->msdu_cnt[i]);
+
+        }
+        printk("tx_buffer_queue_in_drv %d\n",WIFINET_SAVEQ_QLEN(&connect_wnet->vm_tx_buffer_queue));
+    }
 
     if((ctrl_code & STS_MOD_DRV) == STS_MOD_DRV)
     {
-        printk("\n--------drv statistic--------\n");
-
         if ((ctrl_code & STS_TYP_TX) == STS_TYP_TX)
         {
             for(i = 0; i < HAL_NUM_TX_QUEUES; i++)
@@ -820,23 +818,26 @@ static unsigned int drv_phy_unreg_all_sta_id(struct drv_private *drv_priv, unsig
     return ret;
 }
 
-static int drv_add_wnet_vif(struct drv_private *drv_priv,
+int drv_add_wnet_vif(struct drv_private *drv_priv,
     int wnet_vif_id, void * if_data, enum hal_op_mode vm_opmode, unsigned char *myaddr, unsigned int ip)
 {
     struct wlan_net_vif *wnet_vif;
     int ret = 0;
 
-    if (wnet_vif_id >= DEFAULT_MAX_VMAC
-        || drv_priv->drv_wnet_vif_table[wnet_vif_id] != NULL)
-    {
-        ERROR_DEBUG_OUT("Invalid interface id = %u\n", wnet_vif_id);
+    if (wnet_vif_id >= DEFAULT_MAX_VMAC) {
         return -EINVAL;
     }
+
+    if ((drv_priv->drv_wnet_vif_table[wnet_vif_id] != NULL)
+        && (drv_priv->drv_wnet_vif_table[wnet_vif_id]->vm_wmac->fw_recovery_stat == WIFINET_RECOVERY_END)) {
+        ERROR_DEBUG_OUT("Invalid interface id = %u, recovery %d \n", wnet_vif_id, drv_priv->drv_wnet_vif_table[wnet_vif_id]->vm_wmac->fw_recovery_stat);
+        return -EINVAL;
+    }
+
     driv_ps_wakeup(drv_priv);
     printk("%s(%d) macaddr "MAC_FMT"\n",__func__, __LINE__, MAC_ARG(myaddr));
 
-    if (vm_opmode == WIFI_M_HOSTAP)
-    {
+    if (vm_opmode == WIFI_M_HOSTAP) {
         /* copy nostabeacons - for WDS client */
         /* note: not right, beacon buffer is allocated on RUN trans */
         drv_set_bssid(drv_priv, wnet_vif_id, myaddr);
@@ -845,8 +846,7 @@ static int drv_add_wnet_vif(struct drv_private *drv_priv,
     wnet_vif = (struct wlan_net_vif *)if_data;
     /* Set the VMAC opmode */
     wnet_vif->vm_hal_opmode = vm_opmode;
-    AML_OUTPUT("<%s> hal_opmode=%d \n",
-            VMAC_DEV_NAME(wnet_vif), wnet_vif->vm_hal_opmode);
+    AML_OUTPUT("<%s> hal_opmode=%d \n", VMAC_DEV_NAME(wnet_vif), wnet_vif->vm_hal_opmode);
 
     drv_priv->drv_wnet_vif_table[wnet_vif_id] = wnet_vif;
     drv_priv->drv_wnet_vif_num++;
@@ -1219,7 +1219,6 @@ static void drv_cfg_cali_param(void)
     hal_priv->hal_ops.hal_cfg_cali_param();
 }
 
-
 static void drv_init_ops(struct drv_private *drv_priv)
 {
     drv_priv->drv_ops.drv_open = drv_open;                   /* drv_open */
@@ -1228,7 +1227,6 @@ static void drv_init_ops(struct drv_private *drv_priv)
     drv_priv->drv_ops.remove_interface = drv_delete_wnet_vif;             /* remove_interface */
     drv_priv->drv_ops.change_interface = drv_change_wnet_vif;             /* change_interface */
     drv_priv->drv_ops.down_interface = drv_wnet_vif_disconnect;               /* down_interface */
-    drv_priv->drv_ops.up_interface = drv_wnet_vif_connect;                 /* up_interface */
     drv_priv->drv_ops.alloc_nsta = drv_nsta_attach;            /* alloc_nsta */
     drv_priv->drv_ops.free_nsta = drv_nsta_detach;            /* free_nsta */
     drv_priv->drv_ops.cleanup_nsta = drv_nsta_cleanup;           /* cleanup_nsta */
@@ -1237,6 +1235,7 @@ static void drv_init_ops(struct drv_private *drv_priv)
     drv_priv->drv_ops.reset = drv_reset;                  /* reset */
     drv_priv->drv_ops.set_channel = drv_set_channel;            /* set_channel */
     drv_priv->drv_ops.scan_start = drv_scan_start;             /* scan_start */
+    drv_priv->drv_ops.fw_repair = drv_fw_recovery;             /* fw_repair */
     drv_priv->drv_ops.scan_end = drv_scan_end;               /* scan_end */
     drv_priv->drv_ops.connect_start = drv_connect_start;             /*connect_start */
     drv_priv->drv_ops.connect_end = drv_connect_end;               /* connect_end */
@@ -1252,6 +1251,7 @@ static void drv_init_ops(struct drv_private *drv_priv)
     drv_priv->drv_ops.rx_init = drv_rx_init;                /* rx_init */
     drv_priv->drv_ops.rx_proc_frame = drv_rx_input;               /* rx_proc_frame */
     drv_priv->drv_ops.check_aggr = drv_aggr_check;             /* check_aggr */
+    drv_priv->drv_ops.check_aggr_allow_to_send = drv_aggr_allow_to_send;      /* drv_aggr_allow_to_send */
     drv_priv->drv_ops.set_ampdu_params = drv_set_ampduparams;        /* set_ampdu_params */
     drv_priv->drv_ops.addba_request_setup = drv_addba_req_setup;     /* addba_request_setup */
     drv_priv->drv_ops.addba_response_setup = drv_rx_addbarsp;    /* addba_response_setup */
@@ -1335,6 +1335,8 @@ static void drv_init_ops(struct drv_private *drv_priv)
     drv_priv->drv_ops.drv_cfg_cali_param = drv_cfg_cali_param;
     drv_priv->drv_ops.drv_cfg_txpwr_cffc_param = drv_cfg_txpwr_cffc_param;
     drv_priv->drv_ops.drv_print_fwlog = drv_print_fwlog;
+    drv_priv->drv_ops.drv_set_bssid = drv_set_bssid;
+    drv_priv->drv_ops.drv_set_tx_livetime = drv_hal_txlivetime;
 }
 
 void aml_set_mac_control_register(void)
@@ -1443,6 +1445,8 @@ int aml_driv_attach( struct drv_private *drv_priv, struct wifi_mac* wmac)
     drv_priv->drv_config.cfg_no_aggr_thresh = DEFAULT_NO_AGGR_THRESH;
     drv_priv->drv_config.cfg_hrtimer_interval = DEFAULT_HRTIMER_INTERVAL;
     drv_priv->drv_config.cfg_mfp = DEFAULT_MFP_EN;//support mfp
+    drv_priv->drv_config.cfg_mac_mode = DEFAULT_AUTO;
+    drv_priv->drv_config.cfg_band = DEFAULT_BAND_ALL;
 
     for (i = 0; i < DEFAULT_MAX_VMAC; i++)
     {
@@ -1477,6 +1481,8 @@ int aml_driv_attach( struct drv_private *drv_priv, struct wifi_mac* wmac)
     drv_txlist_setup(drv_priv);
     driv_ps_sleep(drv_priv);
     aml_set_mac_control_register();
+
+    drv_cfg_load_from_file();
     return 0;
 
 bad:
@@ -1488,7 +1494,9 @@ void aml_driv_detach( struct drv_private * drv_priv)
     int i;
 
     drv_stop(drv_priv);
-    drv_priv->net_ops->wifi_mac_rate_ratmod_detach(drv_priv);
+    if (drv_priv->net_ops) {
+        drv_priv->net_ops->wifi_mac_rate_ratmod_detach(drv_priv);
+    }
 
     /* cleanup tx queues */
     for (i = 0; i < HAL_NUM_TX_QUEUES; i++)
@@ -2085,11 +2093,13 @@ static void drv_intr_fw_event(void *dpriv, void *event)
     struct drv_private *drv_priv = (struct drv_private *)dpriv;
     struct wlan_net_vif *wnet_vif = NULL;
     struct fw_event_no_data *fw_event = (struct fw_event_no_data *)event;
+    struct wifi_mac *wifimac = NULL;
 
     wnet_vif = drv_priv->drv_wnet_vif_table[fw_event->basic_info.vid];
     if (wnet_vif == NULL) {
         return;
     }
+    wifimac = wnet_vif->vm_wmac;
 
     //printk("%s, vid:%d, event:%d\n", __func__, fw_event->basic_info.vid, fw_event->basic_info.event);
 
@@ -2104,11 +2114,11 @@ static void drv_intr_fw_event(void *dpriv, void *event)
 
 #ifdef  CONFIG_CONCURRENT_MODE
         case VSDB_SWITCH_PREPARE_EVENT:
-            concurrent_vsdb_prepare_change_channel(wnet_vif->vm_wmac);
+            concurrent_vsdb_prepare_change_channel(wifimac);
             break;
 
         case VSDB_CHANNEL_SWITCH_EVENT:
-            concurrent_vsdb_change_channel(wnet_vif->vm_wmac);
+            concurrent_vsdb_change_channel(wifimac);
             break;
 #endif
 
@@ -2121,14 +2131,27 @@ static void drv_intr_fw_event(void *dpriv, void *event)
             break;
 
         case TX_ERROR_EVENT:
-            {
-                struct tx_error_event *error_event = (struct tx_error_event *)fw_event;
+        {
+            struct tx_error_event *error_event = (struct tx_error_event *)fw_event;
 
-                printk("%s:%d, frame type %x, error type %x \n", __func__, __LINE__,
-                    error_event->frame_type, error_event->error_type);
+            printk("%s:%d, frame type %x, error type %x \n", __func__, __LINE__,
+                error_event->frame_type, error_event->error_type);
+
+#if 0
+            WIFINET_FW_STAT_LOCK(wifimac);
+            if (wifimac->fw_recovery_stat != WIFINET_RECOVERY_END) {
+                WIFINET_FW_STAT_UNLOCK(wifimac);
+                break;
             }
+            wifimac->fw_recovery_stat = WIFINET_RECOVERY_START;
+            WIFINET_FW_STAT_UNLOCK(wifimac);
+
+            wifi_mac_connect_repair(wifimac);
+#else
             drv_priv->net_ops->wifi_mac_process_tx_error(wnet_vif);
+#endif
             break;
+        }
 
         case FWLOG_PRINT_EVENT:
             drv_priv->hal_priv->hal_ops.hal_set_fwlog_cmd(3); //3: print fwlog
@@ -2356,7 +2379,8 @@ drv_dev_probe(void)
 
     /*6 init station */
     drv_priv->net_ops->wifi_mac_sta_attach(wm_mac);
-
+    ret = register_inetaddr_notifier(&aml_inetaddr_cb);
+    ret = register_inet6addr_notifier(&aml_inet6addr_cb);
     //sholdn't be here
     drv_priv->drv_ops.drv_set_bmfm_info(drv_priv, 0, 0, 0, 0);
     drv_hal_enable_coexist(drv_priv->drv_config.cfg_wifi_bt_coexist_support );
@@ -2377,6 +2401,9 @@ int drv_dev_remove(void)
 
     hal_priv->hi_task_stop = 1;
     drv_priv->net_ops->wifi_mac_mac_exit(wm_mac);
+
+    unregister_inetaddr_notifier(&aml_inetaddr_cb);
+    unregister_inet6addr_notifier(&aml_inet6addr_cb);
     aml_driv_detach(drv_priv);
 
     AML_OUTPUT("<running>\n");

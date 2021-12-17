@@ -158,11 +158,8 @@ void wifi_mac_xmit_pkt_parse(struct sk_buff *skb, struct wifi_mac *wifimac)
     struct wifi_station *sta = cb->sta;
     struct wifi_mac_pkt_info *mac_pkt_info = &txinfo->ptxdesc->drv_pkt_info.pkt_info[0];
 
-    unsigned char i = 0, j = 0;
-    unsigned char *src_ip = NULL;
-    unsigned char src_ip_valid = 0;
+    unsigned char j = 0;
     char *rtsp = NULL;
-
     unsigned char *dhcp_p;
     unsigned short offset;
     unsigned short offset_max;
@@ -174,13 +171,18 @@ void wifi_mac_xmit_pkt_parse(struct sk_buff *skb, struct wifi_mac *wifimac)
 
     if ((eh->ether_type == __constant_htons(ETHERTYPE_PAE))
         ||(eh->ether_type == __constant_htons(ETHERTYPE_WPI))) {
-        mac_pkt_info->b_eap = 1;
-        printk("eapol frame send\n");
-    }
+        unsigned char *p_eap = (unsigned char *)(eh+1);
 
-    if (eh->ether_type == __constant_htons(ETHERTYPE_IP)) {
+        mac_pkt_info->b_eap = 1;
+        if (p_eap[1] == 3 && p_eap[4] == 2) {
+            AML_OUTPUT("send eapol frame,len:%d, key_info:%04x\n", (p_eap[2]<<8)|p_eap[3], (p_eap[5]<<8)|p_eap[6]);
+        }
+
+    } else if (eh->ether_type == __constant_htons(ETHERTYPE_IP)) {
         if (iphdrp->protocol == IPPROTO_TCP) {
-           AML_PRINT(AML_DBG_MODULES_TX, "tcp src:%u, dst:%u, seq:%u, tcp ack:%u\n", __constant_htons(th->source), __constant_htons(th->dest), __constant_htonl(th->seq), __constant_htonl(th->ack_seq));
+            AML_PRINT(AML_DBG_MODULES_TX, "tcp src:%d, dst:%d, seq:%u, tcp ack:%u\n",  __constant_htons(th->source),  __constant_htons(th->dest),
+                __constant_htonl(th->seq), __constant_htonl(th->ack_seq));
+
             rtsp = (char *)th + 32;
             if (rtsp && wifimac->is_miracast_connect) {
                 wifi_mac_get_rtsp_session(rtsp, sta->sta_wnet_vif->vm_p2p);
@@ -219,22 +221,29 @@ void wifi_mac_xmit_pkt_parse(struct sk_buff *skb, struct wifi_mac *wifimac)
             mac_pkt_info->tcp_ack_seqnum = th->ack_seq;
             mac_pkt_info->tcp_src_port = th->source;
             mac_pkt_info->tcp_dst_port = th->dest;
+
         } else if (iphdrp->protocol == IPPROTO_UDP) {
             if (((uh->source == 0x4400) && (uh->dest == 0x4300))
                 || ((uh->source == 0x4300) && (uh->dest == 0x4400))) {
+                if (sta->connect_status == CONNECT_DHCP_GET_ACK) {
+                    return;
+                }
+
                 dhcp_p = (unsigned char *)((unsigned char *)uh + 8);
                 offset = 240;
                 offset_max = os_skb_get_pktlen(skb);
 
                 while ((dhcp_p[offset] != 255) && (offset < offset_max)) {
                     if (dhcp_p[offset] == 53) {
-                        printk("dhcp send status : %d\n", dhcp_p[offset + 2]);
+                        AML_OUTPUT("dhcp send status : %d\n", dhcp_p[offset + 2]);
                         break;
                     }
 
                     offset += dhcp_p[offset + 1] + 2;
                 }
+
                 mac_pkt_info->b_dhcp = 1;
+
             } else {
                 for (j = 0; j < udp_cnt; j++) {
                     if ((uh->source == __constant_htons(aml_udp_info[j].src_port)) && (uh->dest == __constant_htons(aml_udp_info[j].dst_port)) && (aml_udp_info[j].out)) {
@@ -247,21 +256,6 @@ void wifi_mac_xmit_pkt_parse(struct sk_buff *skb, struct wifi_mac *wifimac)
         }
 
     } else if (eh->ether_type == __constant_htons(ETHERTYPE_ARP)) {
-        src_ip = (unsigned char *)iphdrp + 14;
-        for (i = 0; i < 4; ++i) {
-            if (src_ip[i] != 0) {
-                src_ip_valid = 1;
-                break;
-            }
-        }
-
-        if ((src_ip_valid == 1) && (sta->connect_status != CONNECT_DHCP_GET_ACK)) {
-            printk("parse pkt get ip, set dhcp complete\n");
-            sta->connect_status = CONNECT_DHCP_GET_ACK;
-            if (sta->sta_wnet_vif->vm_p2p->p2p_enable) {
-                set_p2p_negotiation_status(sta, NET80211_P2P_STATE_GO_COMPLETE);
-            }
-        }
         mac_pkt_info->b_arp = 1;
     }
 }
@@ -271,7 +265,20 @@ int wifi_mac_is_allow_send(struct wlan_net_vif *wnet_vif, struct wifi_station *s
     struct wifi_mac *wifimac = wnet_vif->vm_wmac;
     unsigned short qlen_real;
     unsigned short pending_cnt;
+    unsigned char tid_index = os_skb_get_tid(skb);
+    struct aml_driver_nsta *drv_sta = sta->drv_sta;
+    struct drv_tx_scoreboard *tid = DRV_GET_TIDTXINFO(drv_sta, tid_index);
 
+    if (tid->tid_tx_buff_sending) {
+        wnet_vif->vm_devstats.tx_dropped++;
+        wnet_vif->vif_sts.sts_tx_tid_drop_bf_in_msdu[os_skb_get_tid(skb)]++;
+        return NETDEV_TX_BUSY;
+    }
+
+    if (wnet_vif->vm_phase_flags & PHASE_TX_BUFF_QUEUE) {
+        wnet_vif->vm_devstats.tx_dropped++;
+        return NETDEV_TX_BUSY;
+    }
     /*check the txlist_x threshhold: been sent to hal and to be sent to hal*/
     /* check msdu pending num*/
     if (wifimac->drv_priv->drv_ops.txlist_isfull(wifimac->drv_priv, wifimac->wm_ac2q[os_skb_get_priority(skb)], (skb), sta->drv_sta)
@@ -370,27 +377,27 @@ int wifi_mac_hardstart(struct sk_buff *skb, struct net_device *dev)
     unsigned char hw_calculate_flag = 0;
     struct wifi_mac_tx_info *txinfo = (struct wifi_mac_tx_info *)os_skb_cb(skb);
     struct drv_txdesc *ptxdesc = NULL;
+    unsigned char error = 0;
 
-#ifdef DRV_PT_SUPPORT
      if (aml_wifi_is_enable_rf_test())
          goto bad;
-#endif
 
     if (skb != NULL) {
         eh = (struct ether_header *)os_skb_data(skb);
         os_skb_count_alloc(skb);
 
     } else {
+        error = 1;
         goto bad;
     }
 
     if (NET80211_IF_RUN_UP(wifimac) == 0) {
-        ERROR_DEBUG_OUT("<WARNNING::>,netdev is not run up!! \n");
+        error = 2;
         goto bad;
     }
 
-    if (wnet_vif->vm_state != WIFINET_S_CONNECTED) {
-        AML_PRINT(AML_DBG_MODULES_TX,"WARNNING: no connection vif_id %d\n",wnet_vif->wnet_vif_id);
+    if (wnet_vif->vm_state != WIFINET_S_CONNECTED || (wnet_vif->vm_phase_flags & PHASE_DISCONNECTING)) {
+        error = 3;
         goto bad;
     }
 
@@ -400,12 +407,12 @@ int wifi_mac_hardstart(struct sk_buff *skb, struct net_device *dev)
                 WIFINET_ADDR_COPY(eh->ether_shost,wnet_vif->vm_myaddr);
 
             } else {
-                ERROR_DEBUG_OUT("<WARNNING>\n");
+                error = 4;
                 goto bad;
             }
 
         } else {
-            ERROR_DEBUG_OUT("WARNNING::skb not for this Dev,arrive here, why?? <running> \n");
+            error = 5;
             goto bad;
         }
     }
@@ -413,33 +420,34 @@ int wifi_mac_hardstart(struct sk_buff *skb, struct net_device *dev)
     // find a sta by mac address
     sta = wifi_mac_find_tx_sta(wnet_vif, eh->ether_dhost);
     if (sta == NULL) {
-        ERROR_DEBUG_OUT("<WARNING> not find sta, mac:%02x:%02x:%02x:%02x:%02x:%02x\n",
-            eh->ether_dhost[0], eh->ether_dhost[1], eh->ether_dhost[2], eh->ether_dhost[3], eh->ether_dhost[4], eh->ether_dhost[5]);
+        error = 6;
         goto bad;
     }
 
     if ((wnet_vif->vm_opmode != WIFINET_M_IBSS) && (sta->sta_associd == 0) && (sta != wnet_vif->vm_mainsta)) {
-        ERROR_DEBUG_OUT("<WARNING> \n");
+        error = 7;
         goto bad;
     }
 
     if (wifi_mac_classify(sta, skb)) {
-        WIFINET_DPRINTF_STA(AML_DEBUG_XMIT, sta, "%s: discard, classification failure", __func__);
+        error = 8;
+        goto bad;
+    }
+
+    if (sta->sta_channel_switch_mode == 1) {
+        error = 9;
         goto bad;
     }
 
     if (wifi_mac_is_allow_send(wnet_vif, sta, skb)) {
-        return NETDEV_TX_BUSY;
-    }
-
-    if (sta->sta_channel_switch_mode == 1) {
-        ERROR_DEBUG_OUT("<WARNING>, channel_switch_mode[1]:drop\n");
+        error = 10;
         goto bad;
     }
 
     ptxdesc = wifi_mac_alloc_txdesc(wifimac);
     if (ptxdesc == NULL) {
-        return NETDEV_TX_BUSY;
+        error = 11;
+        goto bad;
     }
 
     wnet_vif->vif_sts.sts_tx_total_msdu++;
@@ -492,14 +500,21 @@ int wifi_mac_hardstart(struct sk_buff *skb, struct net_device *dev)
 
     return wifi_mac_tx_send(skb);
 bad:
-    if (skb != NULL) {
-        wnet_vif->vif_sts.sts_tx_drop_msdu++;
-        wnet_vif->vm_devstats.tx_dropped++;
-        wnet_vif->vif_sts.sts_tx_tid_drop_msdu[os_skb_get_tid(skb)]++;
-        os_skb_free(skb);
-    }
 
-    return 0;
+
+    AML_PRINT(AML_DBG_MODULES_TX_ERROR, "vid:%d, error:%d\n", wnet_vif->wnet_vif_id, error);
+    if (error > 9) {
+        return NETDEV_TX_BUSY;
+
+    } else {
+        if (skb != NULL) {
+            wnet_vif->vif_sts.sts_tx_drop_msdu++;
+            wnet_vif->vm_devstats.tx_dropped++;
+            wnet_vif->vif_sts.sts_tx_tid_drop_msdu[os_skb_get_tid(skb)]++;
+            os_skb_free(skb);
+        }
+        return 0;
+    }
 }
 
 void wifi_mac_send_setup(struct wlan_net_vif *wnet_vif,
@@ -2072,7 +2087,7 @@ wifi_mac_add_vht_cap(unsigned char *frm, struct wifi_station *sta)
 
     SET_VHT_CAP_TXOP_PS(vht_cap_ie->vht_cap_info, VHT_CAP_TXOP_PS_NOT_SUPPORT);
     SET_VHT_CAP_HTC_VHT(vht_cap_ie->vht_cap_info, VHT_CAP_NOT_SUPPORT_HTCVHT);
-    SET_VHT_CAP_MAX_APMDU_LEN_EXP(vht_cap_ie->vht_cap_info,  MAX_VHT_AMPDU_32K); 
+    SET_VHT_CAP_MAX_APMDU_LEN_EXP(vht_cap_ie->vht_cap_info,  MAX_VHT_AMPDU_32K);
     SET_VHT_CAP_LK_ADP(vht_cap_ie->vht_cap_info, VHT_CAP_LK_ADP_NO_FB);
     SET_VHT_CAP_RX_ATN_CONSTN(vht_cap_ie->vht_cap_info, VHT_CAP_RX_ATN_CONSTN_NOT_CHANGE);
     SET_VHT_CAP_TX_ATN_CONSTN(vht_cap_ie->vht_cap_info, VHT_CAP_TX_ATN_CONSTN_NOT_CHANGE);
@@ -2255,8 +2270,8 @@ unsigned char *wifi_mac_add_vht_quiet_ch(unsigned char *frm, struct wifi_station
 
     } else/*in no sta mode, there is only mode =0 in queit ie */{
         ie_vht_quiet_chn->ap_quiet_md = DIS_AP_MODE_IN_QUIET_IE;
-        ie_vht_quiet_chn->elem_len = 1;	 // ie mode   
-        return frm + 1 + 1 + 1; // ie_id + ie_len + opmode in no AP mode 
+        ie_vht_quiet_chn->elem_len = 1;	 // ie mode
+        return frm + 1 + 1 + 1; // ie_id + ie_len + opmode in no AP mode
     }
 }
 
@@ -2435,7 +2450,7 @@ int wifi_mac_send_probe_rsp(struct wlan_net_vif  *wnet_vif,
         frm = wifi_mac_add_rates(frm, &wnet_vif->vm_mainsta->sta_rates);
         frm = wifi_mac_add_xrates(frm, &wnet_vif->vm_mainsta->sta_rates);
     }
- 
+
     /*5G mode ,non-support DSSS Parameter Set*/
     if( WIFINET_IS_CHAN_2GHZ(wifimac->wm_curchan) )
     {
@@ -2558,21 +2573,20 @@ int wifi_mac_send_auth(struct wlan_net_vif *wnet_vif,struct wifi_station *sta,vo
     WIFINET_DPRINTF( AML_DEBUG_CONNECT, "status=%d seq=%d", status, *(int *)arg);
 
     is_shared_key = has_challenge || *(int *)arg >= WIFINET_AUTH_SHARED_RESPONSE ||
-        (*(int *)arg == WIFINET_AUTH_SHARED_REQUEST && ((wnet_vif->vm_mainsta->sta_authmode == WIFINET_AUTH_SHARED) ||
-        ((wnet_vif->vm_mainsta->sta_authmode == WIFINET_AUTH_AUTO) && (wnet_vif->vm_cur_authmode == WIFINET_AUTH_SHARED))));
+        (*(int *)arg == WIFINET_AUTH_SHARED_REQUEST && wnet_vif->vm_mainsta->sta_authmode == WIFINET_AUTH_SHARED);
 
     skb = wifi_mac_get_mgmt_frm(wnet_vif->vm_wmac, 3 * sizeof(unsigned short) + sizeof(struct wifi_mac_ie_timeout)
         + ((has_challenge && status == WIFINET_STATUS_SUCCESS) ? sizeof(unsigned short) + WIFINET_CHALLENGE_LEN : 0));
 
     if (skb == NULL)
     {
-        WIFINET_DPRINTF_STA( AML_DEBUG_CONNECT, sta, "%s: Auth: Unable to allocate mgmt frame", __func__);
+        ERROR_DEBUG_OUT("Auth: Unable to allocate mgmt frame\n");
         return ENOMEM;
     }
     frm = os_skb_put(skb, 3 * sizeof(unsigned short)
         + ((has_challenge && status == WIFINET_STATUS_SUCCESS) ? sizeof(unsigned short) + WIFINET_CHALLENGE_LEN : 0));
 
-    ((unsigned short *)frm)[0] =(is_shared_key) ? htole16(WIFINET_AUTH_ALG_SHARED) : htole16(WIFINET_AUTH_ALG_OPEN);
+    ((unsigned short *)frm)[0] =(is_shared_key) ? htole16(WIFINET_AUTH_SHARED) : htole16(WIFINET_AUTH_OPEN);
     ((unsigned short *)frm)[1] = htole16(*(int *)arg);
     ((unsigned short *)frm)[2] = htole16(status);
 
@@ -2637,7 +2651,7 @@ int wifi_mac_send_deauth(struct wlan_net_vif  *wnet_vif, struct wifi_station *st
     return 0;
 }
 
-int aml_rsn_sync_pmkid(struct wifi_station *sta, int pmkid_index) 
+int aml_rsn_sync_pmkid(struct wifi_station *sta, int pmkid_index)
 {
     struct wlan_net_vif *wnet_vif = sta->sta_wnet_vif;
     struct wifi_mac_Rsnparms *rsn = &sta->sta_rsn;
@@ -2958,7 +2972,6 @@ int wifi_mac_send_assoc_rsp(struct wlan_net_vif *wnet_vif, struct wifi_station *
     }
 #endif//#ifdef CONFIG_WFD
 
-    sta->connect_status = CONNECT_WAIT_FW_CONFIG;
     os_skb_trim(skb, frm - os_skb_data(skb));
     wifi_mac_mgmt_output(sta, skb, type);
     return 0;
@@ -3121,6 +3134,7 @@ int wifi_mac_send_actionframe(struct wlan_net_vif *wnet_vif, struct wifi_station
     struct wifi_mac_action_delts_req_frame *delts_req = NULL;
     struct wifi_mac_wmm_tspec_element wmm_tspec;
     struct wifi_mac_action_sa_query *sa_query = NULL;
+    struct drv_rx_scoreboard *RxTidState;
     unsigned short batimeout;
     unsigned char category, action, tid_index;
     unsigned short statuscode;
@@ -3172,35 +3186,47 @@ int wifi_mac_send_actionframe(struct wlan_net_vif *wnet_vif, struct wifi_station
                     break;
 
                 case WIFINET_ACTION_BA_ADDBA_RESPONSE:
-                    frm = os_skb_put(skb, sizeof(struct wifi_mac_action_ba_addbaresponse));
+                    if (tid_index < WME_NUM_TID) {
+                        frm = os_skb_put(skb, sizeof(struct wifi_mac_action_ba_addbaresponse));
 
-                    addbaresponse = (struct wifi_mac_action_ba_addbaresponse *)frm;
-                    addbaresponse->rs_header.ia_category = AML_CATEGORY_BACK;
-                    addbaresponse->rs_header.ia_action = action;
-                    wifi_mac_addba_rsp_setup(sta, tid_index, &addbaresponse->rs_dialogtoken, &statuscode, &baparamset, &batimeout);
-                    *(unsigned short *)&addbaresponse->rs_baparamset = htole16(*(unsigned short *)&baparamset);
-                    //dump_memory_internel(&baparamset,sizeof(struct wifi_mac_ba_parameterset));
-                    addbaresponse->rs_batimeout = htole16(batimeout);
-                    addbaresponse->rs_statuscode = htole16(statuscode);
+                        addbaresponse = (struct wifi_mac_action_ba_addbaresponse *)frm;
+                        addbaresponse->rs_header.ia_category = AML_CATEGORY_BACK;
+                        addbaresponse->rs_header.ia_action = action;
+                        RxTidState  = &((struct aml_driver_nsta *)sta->drv_sta)->rx_scb[tid_index];
 
-                    if (wifi_mac->wm_bt_en) {
-                        if (wifi_mac->wm_esco_en) {
-                            addbaresponse->rs_baparamset.buffersize = DEFAULT_TXAMPDU_SUB_MAX_COEX_ESCO;
+                        addbaresponse->rs_dialogtoken = RxTidState->dialogtoken;
+                        statuscode = RxTidState->statuscode;
+                        baparamset = RxTidState->baparamset;
+                        batimeout = RxTidState->batimeout;
 
-                        } else {
-                           addbaresponse->rs_baparamset.buffersize = DEFAULT_TXAMPDU_SUB_MAX_COEX;
+                        wifi_mac_addba_rsp_setup(sta, tid_index);
+                        *(unsigned short *)&addbaresponse->rs_baparamset = htole16(*(unsigned short *)&baparamset);
+                        //dump_memory_internel(&baparamset,sizeof(struct wifi_mac_ba_parameterset));
+                        addbaresponse->rs_batimeout = htole16(batimeout);
+                        addbaresponse->rs_statuscode = htole16(statuscode);
+
+                        if (wifi_mac->wm_bt_en) {
+                            if (wifi_mac->wm_esco_en) {
+                                addbaresponse->rs_baparamset.buffersize = DEFAULT_TXAMPDU_SUB_MAX_COEX_ESCO;
+
+                            } else {
+                                addbaresponse->rs_baparamset.buffersize = DEFAULT_TXAMPDU_SUB_MAX_COEX;
+                            }
                         }
-                    }
 
-                    //AMSDU is supported on the opposite end
-                    if (actionargs->arg2) {
-                        addbaresponse->rs_baparamset.buffersize = 16;
-                        DPRINTF(AML_DEBUG_ADDBA, "%s: ADDBA response. opposite support AMSDU, reduce buffer size to %d\n",
-                            __func__, addbaresponse->rs_baparamset.buffersize);
-                    }
+                        //AMSDU is supported on the opposite end
+                        if (actionargs->arg2) {
+                            addbaresponse->rs_baparamset.buffersize = 16;
+                            DPRINTF(AML_DEBUG_ADDBA, "%s: ADDBA response. opposite support AMSDU, reduce buffer size to %d\n",
+                                __func__, addbaresponse->rs_baparamset.buffersize);
+                        }
 
-                    DPRINTF(AML_DEBUG_WARNING, "%s: ADDBA response action mgt frame. TID %d, buffer size %d, status %d \n",
-                        __func__, tid_index, baparamset.buffersize, statuscode);
+                        DPRINTF(AML_DEBUG_WARNING, "%s: ADDBA response action mgt frame. TID %d, buffer size %d, status %d \n",
+                            __func__, tid_index, baparamset.buffersize, statuscode);
+                    } else {
+                        result = EINVAL;
+                        ERROR_DEBUG_OUT("ADDBA response TID %d exceeds the max value %d\n", tid_index, WME_NUM_TID);
+                    }
                     break;
 
                 case WIFINET_ACTION_BA_DELBA:

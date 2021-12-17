@@ -132,12 +132,12 @@ wifi_mac_wmm_chanparams(struct wlan_net_vif *wnet_vif,
 
 #define wifi_mac_enumerate_wnet_vifs(_wnet_vif, _netcom)  \
         list_for_each_entry(_wnet_vif,&(_netcom)->wm_wnet_vifs,vm_next)
-        
+
 #define NET80211_HANDLE(_ieee)      ((struct wifi_mac *)(_ieee))
-#define ETHER_ADDR_LEN      6
+#define MAC_ADDR_LEN        6
 #define ETHER_TYPE_LEN      2
 #define ETHER_CRC_LEN       4
-#define ETHER_HDR_LEN       (ETHER_ADDR_LEN*2+ETHER_TYPE_LEN)
+#define ETHER_HDR_LEN       (MAC_ADDR_LEN*2+ETHER_TYPE_LEN)
 #define ETHER_MAX_LEN       1518
 
 #ifndef ETHERTYPE_PAE
@@ -185,14 +185,16 @@ wifi_mac_wmm_chanparams(struct wlan_net_vif *wnet_vif,
 #define MAC_MIN_GAIN -65
 
 // when scan ap count more than MIN_GIAN_THRESHOLD , use MAC_MIN_GAIN
+#define MAX_GIAN_THRESHOLD 10
 #define CONNECT_MIN_GIAN_THRESHOLD 25
 #define UNCONNECT_MIN_GIAN_THRESHOLD 80
-
+#define OVERLAPPING_24G_GIAN_THRESHOLD 5
+#define OVERLAPPING_5G_GIAN_THRESHOLD 10
 
 struct  ether_header
 {
-    u_char  ether_dhost[ETHER_ADDR_LEN];
-    u_char  ether_shost[ETHER_ADDR_LEN];
+    u_char  ether_dhost[MAC_ADDR_LEN];
+    u_char  ether_shost[MAC_ADDR_LEN];
     u_short ether_type;
 } __packed;
 
@@ -273,6 +275,8 @@ void wifi_mac_connect_end(struct wifi_mac *wifimac);
 void wifi_mac_scan_set_gain(struct wifi_mac *wifimac, unsigned char rssi);
 void wifi_mac_set_channel_rssi(struct wifi_mac *wifimac, unsigned char rssi);
 int wifi_mac_is_in_noisy_enviroment(struct wifi_mac *wifimac);
+int wifi_mac_is_in_clear_enviroment(struct wifi_mac *wifimac);
+
 
 void wifi_mac_get_channel_rssi_before_scan(struct wifi_mac *wifimac, int *rssi);
 
@@ -286,9 +290,8 @@ void wifi_mac_com_ps_set_state(struct wifi_mac *wifimac, enum wifinet_ps_state n
 void wifi_mac_set_ampduparams(struct wifi_station *sta);
 void wifi_mac_addba_req_setup(struct wifi_station *sta, unsigned char tid_index,
     struct wifi_mac_ba_parameterset *baparamset, unsigned short *batimeout, struct wifi_mac_ba_seqctrl *basequencectrl, unsigned short buffersize);
+void wifi_mac_addba_rsp_setup(struct wifi_station *sta, unsigned char tid_index);
 
-void wifi_mac_addba_rsp_setup(struct wifi_station *sta, unsigned char tid_index,
-    unsigned char *dialogtoken, unsigned short *statuscode, struct wifi_mac_ba_parameterset *baparamset, unsigned short *batimeout);
 int wifi_mac_addba_req(struct wifi_station *sta, unsigned char dialogtoken,
     struct wifi_mac_ba_parameterset *baparamset, unsigned short batimeout, struct wifi_mac_ba_seqctrl basequencectrl);
 
@@ -371,5 +374,9 @@ void wifi_mac_pt_rx_stop(void);
 struct wifi_mac* wifi_mac_get_mac_handle(void);
 void wifi_mac_restore_wnet_vif_channel_task(struct wlan_net_vif *wnet_vif);
 void wifi_mac_roaming_trigger(struct wlan_net_vif * wnet_vif);
+void wifi_mac_sm_switch (SYS_TYPE param1,SYS_TYPE param2,SYS_TYPE param3,SYS_TYPE param4,SYS_TYPE param5);
+int wifi_mac_trigger_fw_recovery(void * arg);
+void wifi_mac_fw_recovery(struct wlan_net_vif *wnet_vif);
+int wifi_mac_connect_repair(struct wifi_mac *wifimac);
 
 #endif

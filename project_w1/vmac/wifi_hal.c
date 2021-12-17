@@ -28,16 +28,17 @@ namespace FW_NAME
 unsigned int rxframenum =0;
 #endif
 #include "wifi_common.h"
+#include <linux/inetdevice.h>
 
 #define CHIP_ID_F "CHIP_ID=%04x%08x\n"
 #define CHIP_ID_EFUASE_L 0x8
 #define CHIP_ID_EFUASE_H 0x9
+unsigned char  host_wake_w1_fail_cnt = 0;
 
 extern struct aml_hal_call_backs * get_hal_call_back_table(void);
 extern unsigned char *g_rx_fifo;
 static int hal_dev_unreg(void);
 static int hal_dev_reg(void * drv_priv);
-extern unsigned char wifi_in_insmod;
 struct hal_private g_hal_priv;
 struct hal_private *  hal_get_priv(void)
 {
@@ -519,6 +520,7 @@ unsigned char hal_wake_fw_req(void)
         else
         {
             POWER_END_LOCK();
+            host_wake_w1_fail_cnt++;
             printk("fw ps st 0x%x, fw_sleep 0x%x, host_sleep_req 0x%x\n", fw_ps_st, fw_sleep, host_sleep_req);
             return 0;
         }
@@ -637,7 +639,6 @@ void hal_ops_attach(void)
     hal_priv->hal_ops.phy_set_rf_chan = phy_set_rf_chan;
     hal_priv->hal_ops.phy_set_mac_bssid = phy_set_mac_bssid;
     hal_priv->hal_ops.phy_set_mac_addr = phy_set_mac_addr;
-    hal_priv->hal_ops.phy_vmac_connect = phy_vmac_connect;
     hal_priv->hal_ops.phy_vmac_disconnect = phy_vmac_disconnect;
     /* beacon operations */
     hal_priv->hal_ops.phy_enable_bcn = phy_enable_bcn;
@@ -1182,11 +1183,9 @@ void hal_txframe_pre(void)
 
 void hal_tx_complete(struct sk_buff * skb_buf)
 {
-#ifdef DRV_PT_SUPPORT
     if (aml_wifi_is_enable_rf_test() && (skb_buf != NULL)) {
         os_skb_free(skb_buf);
     }
-#endif
 }
 
 void  hal_tx_frame(void)
@@ -1781,7 +1780,7 @@ void hal_get_sts(unsigned int op_code, unsigned int ctrl_code)
             printk("dis_beacon[0]=%d\ndis_beacon[1]=%d\n", hal_priv->sts_dis_bcn[0], hal_priv->sts_dis_bcn[1]);
 
             printk("hal:tx_free_page %d \n", hal_priv->txPageFreeNum);
-            printk("hal:tx_frm_done %d \n",  hal_priv->st_frame_done_counter);
+            printk("hal:tx_ok_num:%d, tx_fail_num:%d\n", hif->HiStatus.tx_ok_num, hif->HiStatus.tx_fail_num);
             printk("hal:send_frm:%d, done_frm:%d, free_frm:%d\n",  hif->HiStatus.Tx_Send_num, hif->HiStatus.Tx_Done_num, hif->HiStatus.Tx_Free_num);
             printk("hal:gpio irq cnt %d \n",  hal_priv->gpio_irq_cnt);
             printk("tx_cmp: tx_done_frm %d, tx_mng_frm %d, tx_page %d\n",
@@ -1818,6 +1817,63 @@ int hal_close(void *drv_priv)
     return 1;
 }
 
+extern int drv_add_wnet_vif(struct drv_private *drv_priv, int wnet_vif_id, void * if_data, enum hal_op_mode vm_opmode, unsigned char *myaddr, unsigned int ip);
+extern int wifi_mac_set_tx_power_coefficient(struct drv_private *drv_priv, struct wifi_channel *chan, int tx_power_plan);
+extern int drv_rate_setup(struct drv_private *drv_priv, enum wifi_mac_macmode mode);
+extern int drv_channel_init(struct drv_private *drv_priv, unsigned int cc);
+extern void aml_set_mac_control_register(void);
+
+int cmp_vid(struct drv_private *drv_priv)
+{
+    struct wlan_net_vif *wnet_vif = NULL;
+    unsigned char myaddr[WIFINET_ADDR_LEN] = { mac_addr0, mac_addr1, mac_addr2, mac_addr3, mac_addr4, mac_addr5 };
+    unsigned int ipv4 = 0;
+
+
+    /*add wlan0 interface*/
+    wnet_vif = drv_priv->drv_wnet_vif_table[NET80211_MAIN_VMAC];
+    myaddr[2] += NET80211_MAIN_VMAC<<4;
+    drv_add_wnet_vif(drv_priv, NET80211_MAIN_VMAC, wnet_vif, wifi_mac_opmode_2_halmode(WIFINET_M_STA),  myaddr, ipv4);
+
+    /*add p2p0 interface*/
+    wnet_vif = drv_priv->drv_wnet_vif_table[NET80211_P2P_VMAC];
+    myaddr[2] += NET80211_P2P_VMAC<<4;
+    if (wnet_vif->vm_opmode == WIFINET_M_P2P_DEV) {
+        drv_add_wnet_vif(drv_priv, NET80211_P2P_VMAC, wnet_vif, wifi_mac_opmode_2_halmode(WIFINET_M_STA),  myaddr, ipv4);
+    } else if (wnet_vif->vm_opmode == WIFINET_M_HOSTAP) {
+        drv_add_wnet_vif(drv_priv, NET80211_P2P_VMAC, wnet_vif, wifi_mac_opmode_2_halmode(WIFINET_M_HOSTAP),  myaddr, ipv4);
+    } else {
+        //drv_add_wnet_vif(drv_priv, NET80211_MAIN_VMAC, wnet_vif, wifi_mac_opmode_2_halmode(WIFINET_M_STA),  myaddr, ipv4);
+        ERROR_DEBUG_OUT("error opmode %d\n", wnet_vif->vm_opmode);
+    }
+
+    return 0;
+}
+
+
+int hal_fw_repair(void)
+{
+    struct hal_private *hal_priv = hal_get_priv();
+    struct drv_private *drv_priv = drv_get_drv_priv();
+
+    hal_tx_flush(0);
+    hal_download_wifi_fw_img();
+    hal_host_init(hal_priv);
+
+    drv_set_config((void *)drv_priv, CHIP_PARAM_RETRY_LIMIT, 100 << 8 | 100);
+    wifi_mac_set_tx_power_coefficient(drv_priv, NULL, drv_priv->drv_config.cfg_txpoweplan);
+    drv_priv->net_ops->wifi_mac_rate_ratmod_attach(drv_priv);
+
+    drv_rate_setup(drv_priv, WIFINET_MODE_11GNAC);
+    aml_set_mac_control_register();
+    cmp_vid(drv_priv);
+    drv_priv->drv_ops.drv_set_bmfm_info(drv_priv, 0, 0, 0, 0);
+    drv_hal_enable_coexist(drv_priv->drv_config.cfg_wifi_bt_coexist_support);
+
+    return 0;
+}
+
+
 int hal_probe(void)
 {
     struct hal_private *hal_priv = hal_get_priv();
@@ -1839,9 +1895,7 @@ int hal_probe(void)
     {
         goto __exit_err;
     }
-#ifdef SDIO_BUILD_IN
-    wifi_in_insmod = 0;
-#endif
+
     if(hal_host_init(hal_priv) != true)
     {
         goto __exit_err;
@@ -2099,6 +2153,37 @@ static int hal_dev_unreg(void)
     return 0;
 }
 
+int hal_recovery_init_priv(void)
+{
+    struct hal_private * hal_priv = hal_get_priv();
+    memset(hal_priv->fw_event, 0, sizeof(struct fw_event_to_driver));
+    hal_priv->hal_fw_event_counter = 0;
+
+    /* init work task for upper layer, by calling work thread.*/
+    hal_priv->tx_page_offset = 0;
+    hal_priv->rx_host_offset = 0;
+    /* set -1, just as a flag. */
+    hal_priv->bhalPowerSave  = 0;
+    hal_priv->powersave_init_flag = 1;
+
+    POWER_BEGIN_LOCK();
+    hal_priv->hal_fw_ps_status = HAL_FW_IN_ACTIVE;
+    POWER_END_LOCK();
+
+    atomic_set(&hal_priv->sdio_suspend_cnt, 0);
+    atomic_set(&hal_priv->drv_suspend_cnt, 0);
+    hal_priv->hal_suspend_mode = HIF_SUSPEND_STATE_NONE;
+
+    hal_priv->gpio_irq_cnt = 0;
+    hal_priv->hst_if_init_ok = 1;
+
+    hal_priv->tx_frames_map[0] = 0;
+    hal_priv->tx_frames_map[1] = 0;
+
+    return 0;
+}
+
+
 int hal_init_priv(void)
 {
     struct hal_private * hal_priv = hal_get_priv();
@@ -2140,7 +2225,6 @@ int hal_init_priv(void)
     atomic_set(&hal_priv->drv_suspend_cnt, 0);
     hal_priv->hal_suspend_mode = HIF_SUSPEND_STATE_NONE;
 
-    hal_priv->st_frame_done_counter = 0;
     hal_priv->gpio_irq_cnt = 0;
     hal_init_task();
 #elif defined (HAL_SIM_VER)

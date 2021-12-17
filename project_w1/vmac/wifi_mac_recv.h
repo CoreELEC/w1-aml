@@ -4,10 +4,6 @@
 #include "wifi_mac_var.h"
 #include "wifi_mac_action.h"
 
-#define UNSUPPORTED_AUTH_ALGORITHM 13
-#define STATUS_INVALID_PMKID 53
-#define SUCCESS 0
-
 #define HAS_SEQ(type)   ((type & 0x4) == 0)
 
 #define WIFINET_VERIFY_ELEMENT(__elem, __maxlen) do {         \

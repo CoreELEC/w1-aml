@@ -25,77 +25,24 @@ struct sk_buff g_skbuffer[MAX_SKB_NUM];
 #include "fi_sdio.h"
 #include "wifi_rate_ctrl.h"
 #include "wifi_pkt_desc.h"
-
-static struct ieee80211_channel aml_2ghz_channels[] = {
-	CHAN2G(1, 2412, 0),
-	CHAN2G(2, 2417, 0),
-	CHAN2G(3, 2422, 0),
-	CHAN2G(4, 2427, 0),
-	CHAN2G(5, 2432, 0),
-	CHAN2G(6, 2437, 0),
-	CHAN2G(7, 2442, 0),
-	CHAN2G(8, 2447, 0),
-	CHAN2G(9, 2452, 0),
-	CHAN2G(10, 2457, 0),
-	CHAN2G(11, 2462, 0),
-	CHAN2G(12, 2467, 0),
-	CHAN2G(13, 2472, 0),
-	CHAN2G(14, 2484, 0),
-};
-
-static struct ieee80211_rate aml_legacy_rates[] = {
-	RATETAB_ENT(10, 0x1, 0),
-	RATETAB_ENT(20, 0x2, 0),
-	RATETAB_ENT(55, 0x4, 0),
-	RATETAB_ENT(110, 0x8, 0),
-	RATETAB_ENT(60, 0x10, 0),
-	RATETAB_ENT(90, 0x20, 0),
-	RATETAB_ENT(120, 0x40, 0),
-	RATETAB_ENT(180, 0x80, 0),
-	RATETAB_ENT(240, 0x100, 0),
-	RATETAB_ENT(360, 0x200, 0),
-	RATETAB_ENT(480, 0x400, 0),
-	RATETAB_ENT(540, 0x800, 0),
-};
-
-static struct ieee80211_channel aml_5ghz_channels[] = {
-	CHAN5G(34, 0), CHAN5G(36, 0),
-	CHAN5G(38, 0), CHAN5G(40, 0),
-	CHAN5G(42, 0), CHAN5G(44, 0),
-	CHAN5G(46, 0), CHAN5G(48, 0),
-	CHAN5G(52, 0), CHAN5G(56, 0),
-	CHAN5G(60, 0), CHAN5G(64, 0),
-	CHAN5G(100, 0), CHAN5G(104, 0),
-	CHAN5G(108, 0), CHAN5G(112, 0),
-	CHAN5G(116, 0), CHAN5G(120, 0),
-	CHAN5G(124, 0), CHAN5G(128, 0),
-	CHAN5G(132, 0), CHAN5G(136, 0),
-	CHAN5G(140, 0), CHAN5G(149, 0),
-	CHAN5G(153, 0), CHAN5G(157, 0),
-	CHAN5G(161, 0), CHAN5G(165, 0),
-	CHAN5G(184, 0), CHAN5G(188, 0),
-	CHAN5G(192, 0), CHAN5G(196, 0),
-	CHAN5G(200, 0), CHAN5G(204, 0),
-	CHAN5G(208, 0), CHAN5G(212, 0),
-	CHAN5G(216, 0),
-};
+#include "wifi_cfg80211.h"
 
 static struct ieee80211_supported_band aml_band_24ghz = {
-	.n_channels = ARRAY_SIZE(aml_2ghz_channels),
+	.n_channels = AML_2G_CHANNELS_NUM,
 	.channels = aml_2ghz_channels,
 	.band = IEEE80211_BAND_2GHZ,
-	.n_bitrates = aml_legacy_rates_size,
-	.bitrates = aml_legacy_rates,
+	.n_bitrates = AML_G_RATES_NUM,
+	.bitrates = aml_g_rates,
 	.ht_cap.cap = 0,/*Need to be initialized later*/
 	.ht_cap.ht_supported = true,
 };
 
 static struct ieee80211_supported_band aml_band_5ghz = {
-	.n_channels = ARRAY_SIZE(aml_5ghz_channels),
+	.n_channels = AML_5G_CHANNELS_NUM,
 	.channels = aml_5ghz_channels,
 	.band = IEEE80211_BAND_5GHZ,
-	.n_bitrates = aml_legacy_rates_size - 4 ,/*Eliminate 11b rate*/
-	.bitrates = aml_legacy_rates + 4,/*Eliminate 11b rate*/
+	.n_bitrates = AML_A_RATES_NUM,/*Eliminate 11b rate*/
+	.bitrates = aml_a_rates,/*Eliminate 11b rate*/
 	.ht_cap.cap = 0,  /*Need to be initialized later*/
 	.ht_cap.ht_supported = true,
 };
@@ -189,7 +136,7 @@ static struct ieee80211_sta_vht_cap aml_create_vht_cap(struct aml_rate_adaptatio
         vht_cap.vht_supported = 1;
 
     } else {
-         vht_cap.vht_supported = 0;
+        vht_cap.vht_supported = 0;
     }
     vht_cap.cap = aml_minstrel_dev->vht_cap_info;
 
@@ -383,38 +330,52 @@ unsigned char get_fitable_bw(struct wifi_station *sta) {
 }
 
 unsigned char get_fitable_mcs_rate(struct wifi_station *sta, unsigned char bw) {
+    int avg_rssi = 0;
     unsigned char max_rate_rssi = 0;
     unsigned char max_rate_snr = 0;
     unsigned char max_rate = 0;
     char rssi_offset = 6;
     char snr_offset = 0;
 
-    if (sta->sta_avg_bcn_rssi >= rssi_threshold[bw][0] + rssi_offset) {
+    if (sta->sta_wnet_vif->vm_opmode == WIFINET_M_HOSTAP)
+        avg_rssi = translate_to_dbm(sta->sta_avg_rssi);
+    else
+        avg_rssi = sta->sta_avg_bcn_rssi;
+
+    if((aml_wifi_get_platform_verid() == 1) || (aml_wifi_get_platform_verid() == 2)) {
+        /*this is for gva only*/
+        rssi_offset = 10;
+    }
+
+    if (avg_rssi >= rssi_threshold[bw][0] + rssi_offset) {
         max_rate_rssi = 9;
 
-    } else if (sta->sta_avg_bcn_rssi >= rssi_threshold[bw][1] + rssi_offset) {
+    } else if (avg_rssi >= rssi_threshold[bw][1] + rssi_offset) {
         max_rate_rssi = 8;
 
-    } else if (sta->sta_avg_bcn_rssi >= rssi_threshold[bw][2] + rssi_offset) {
+    } else if (avg_rssi >= rssi_threshold[bw][2] + rssi_offset) {
         max_rate_rssi = 7;
 
-    } else if (sta->sta_avg_bcn_rssi >= rssi_threshold[bw][3] + rssi_offset) {
+    } else if (avg_rssi >= rssi_threshold[bw][3] + rssi_offset) {
         max_rate_rssi = 6;
 
-    } else if (sta->sta_avg_bcn_rssi >= rssi_threshold[bw][4] + rssi_offset) {
+    } else if (avg_rssi >= rssi_threshold[bw][4] + rssi_offset) {
         max_rate_rssi = 5;
 
-    } else if (sta->sta_avg_bcn_rssi >= rssi_threshold[bw][5] + rssi_offset) {
+    } else if (avg_rssi >= rssi_threshold[bw][5] + rssi_offset) {
         max_rate_rssi = 4;
 
-    } else if (sta->sta_avg_bcn_rssi >= rssi_threshold[bw][6] + rssi_offset) {
+    } else if (avg_rssi >= rssi_threshold[bw][6] + rssi_offset) {
         max_rate_rssi = 3;
 
-    } else if (sta->sta_avg_bcn_rssi >= rssi_threshold[bw][7] + rssi_offset) {
+    } else if (avg_rssi >= rssi_threshold[bw][7] + rssi_offset) {
         max_rate_rssi = 2;
 
-    } else if (sta->sta_avg_bcn_rssi >= rssi_threshold[bw][8] + rssi_offset) {
+    } else if (avg_rssi >= rssi_threshold[bw][8] + rssi_offset) {
         max_rate_rssi = 1;
+
+    } else {
+        max_rate_rssi = 0;
     }
 
     //max rate according snr
@@ -444,6 +405,9 @@ unsigned char get_fitable_mcs_rate(struct wifi_station *sta, unsigned char bw) {
 
     } else if (sta->sta_avg_snr >= snr_threshold[bw][8] + snr_offset) {
         max_rate_snr = 1;
+
+    } else {
+        max_rate_snr = 0;
     }
 
     max_rate = max_rate_rssi;
@@ -725,7 +689,7 @@ unsigned int protocol_rate_to_vendor_rate(unsigned int protocol_rate)
             break;
 
     }
-    
+
      return ret;
 }
 
@@ -735,7 +699,7 @@ unsigned char minstrel_find_rate(
 #ifndef AUTO_RATE_SIM
 ,
    void *p_sta
-#endif 
+#endif
 )
 {
     struct ieee80211_tx_info tx_info;
@@ -748,10 +712,9 @@ unsigned char minstrel_find_rate(
     struct ieee80211_sta *p_ieee_sta;
     struct minstrel_ht_sta_priv *p_minstrel_ht_sta_priv = NULL;
     struct minstrel_sta_info *p_minstrel_sta_info = NULL;
-    int rate_mode = 0;   /*0: legacy rate, 1:ht rate, 2:vht rate*/
 
 #ifdef AUTO_RATE_SIM
-    rate_mode = g_rate_mode;
+    mcs_rate = g_rate_mode;
     p_ieee_sta = &g_sta;
     p_minstrel_ht_sta_priv = g_minstrel_ht_sta_priv;
     p_minstrel_sta_info = g_minstrel_sta_info;
@@ -765,12 +728,8 @@ unsigned char minstrel_find_rate(
         return 0;
     }
 
-    if (sta->sta_flags & WIFINET_NODE_VHT) {
-        rate_mode = 2;
-    } else  if (sta->sta_flags & WIFINET_NODE_HT) {
-        rate_mode = 1;
-    } else {
-        rate_mode = 0;
+    if ((sta->sta_flags & WIFINET_NODE_HT) || (sta->sta_flags & WIFINET_NODE_VHT)) {
+        mcs_rate = 1;
     }
 
     if (sta->sta_wnet_vif->vm_fixed_rate.mode == WIFINET_FIXED_RATE_MCS) {
@@ -784,10 +743,6 @@ unsigned char minstrel_find_rate(
         g_minstel_pri->fixed_rate_idx = ((u32) -1);
     }
 #endif
-
-    if (rate_mode >= 1) {
-        mcs_rate = 1;
-    }
 
     memset(&tx_info, 0,sizeof(struct ieee80211_tx_info));
     for (i = 0; i < IEEE80211_TX_MAX_RATES; i++) {
@@ -808,14 +763,14 @@ unsigned char minstrel_find_rate(
         sta->sta_vendor_bw = ratectrl[0].bw;
         sta->sta_vendor_rate_code = ratectrl[0].vendor_rate_code;
 
-        ratectrl[0].trynum = 10;
-        ratectrl[1].trynum = 30;
-        ratectrl[2].trynum = 60;
+        ratectrl[0].trynum = 2;
+        ratectrl[1].trynum = 2;
+        ratectrl[2].trynum = 3;
 
         return 1;
     }
 
-    if (mcs_rate == 1) {
+    if (mcs_rate > 0) {
         p_rate_control_ops =  get_rate_control_ops_ht();
         priv_sta = p_minstrel_ht_sta_priv;
 
@@ -825,7 +780,7 @@ unsigned char minstrel_find_rate(
     }
 
     if (priv_sta == NULL) {
-        DPRINTF(AML_DEBUG_WARNING, "%s: mcs_rate=%d, sta:%p\n", __func__,  mcs_rate, sta);
+        AML_OUTPUT("sta->sta_flags=%08x, sta:%p\n", sta->sta_flags, sta);
     }
 
     p_rate_control_ops->get_rate(g_minstel_pri, p_ieee_sta, priv_sta, info);
@@ -858,16 +813,12 @@ unsigned char minstrel_find_rate(
     }
 
     if (info->flags & IEEE80211_TX_CTL_RATE_CTRL_PROBE) {
-        ratectrl[0].flags  |= HAL_RATECTRL_USE_SAMPLE_RATE;
-        ratectrl[0].trynum = 2;
-        ratectrl[1].trynum = 2;
-        ratectrl[2].trynum = 96;
-
-    } else {
-        ratectrl[0].trynum = 2;
-        ratectrl[1].trynum = 2;
-        ratectrl[2].trynum = 96;
+        ratectrl[0].flags |= HAL_RATECTRL_USE_SAMPLE_RATE;
     }
+
+    ratectrl[0].trynum = 2;
+    ratectrl[1].trynum = 2;
+    ratectrl[2].trynum = 96;
 
     sta->sta_vendor_bw = ratectrl[0].bw;
     sta->sta_vendor_rate_code = ratectrl[0].vendor_rate_code;
@@ -875,50 +826,41 @@ unsigned char minstrel_find_rate(
     return 1;
 }
 
-void minstrel_tx_complete( 
+void minstrel_tx_complete(
     struct aml_ratecontrol *rc
 #ifndef AUTO_RATE_SIM
-,
-   void *p_sta
-#endif 
+, void *p_sta
+#endif
 )
 {
     void *priv_sta = NULL;
-    struct wifi_station *sta = ( struct wifi_station * )p_sta;
-    struct minstrel_rate_control_ops* p_rate_control_ops = NULL;
+    struct wifi_station *sta = (struct wifi_station *)p_sta;
+    struct minstrel_rate_control_ops *p_rate_control_ops = NULL;
     struct minstrel_ht_sta_priv *p_minstrel_ht_sta_priv = NULL;
     struct minstrel_sta_info *p_minstrel_sta_info = NULL;
     struct ieee80211_tx_info info;
     struct ieee80211_tx_rate *ar = info.status.rates;
     int i = 0;
-    int rate_mode = 0;
     int mcs_rate = 0;
 
 #ifdef AUTO_RATE_SIM
+    mcs_rate = g_rate_mode;
     p_minstrel_ht_sta_priv = g_minstrel_ht_sta_priv;
     p_minstrel_sta_info  =   g_minstrel_sta_info;
-    rate_mode =  g_rate_mode;
 #else
     p_minstrel_ht_sta_priv = sta->sta_minstrel_ht_priv;
-    p_minstrel_sta_info = sta->sta_minstrel_info; 
+    p_minstrel_sta_info = sta->sta_minstrel_info;
 
     if (!sta->minstrel_init_flag) {
         ERROR_DEBUG_OUT("minstrel not init, sta:%p\n", sta);
         return;
     }
 
-    if (sta->sta_flags & WIFINET_NODE_VHT) {
-        rate_mode = 2;
-    } else  if (sta->sta_flags & WIFINET_NODE_HT) {
-        rate_mode = 1;
-    } else {
-        rate_mode = 0;
-    }
-#endif 
-
-    if (rate_mode >= 1) {
+    if ((sta->sta_flags & WIFINET_NODE_HT) || (sta->sta_flags & WIFINET_NODE_VHT)) {
         mcs_rate = 1;
     }
+#endif
+
 
     memset(&info, 0, sizeof(struct ieee80211_tx_info));
     if (rc[0].flags & HAL_RATECTRL_TX_SEND_SUCCES) {
@@ -929,7 +871,7 @@ void minstrel_tx_complete(
     for (i = 0; i < IEEE80211_TX_MAX_RATES; i++) {
         ar[i].idx = -1;
         ar[i].count = 0;
-        ar[i].flags = 0; 
+        ar[i].flags = 0;
 
         if (rc[i].trynum != 0) {//not use if trynum is 0
             ar[i].count = rc[i].trynum;
@@ -940,7 +882,7 @@ void minstrel_tx_complete(
         }
     }
 
-    if (mcs_rate == 1) {
+    if (mcs_rate > 0) {
         p_rate_control_ops =  get_rate_control_ops_ht();
         if (p_minstrel_ht_sta_priv == NULL) {
             return;

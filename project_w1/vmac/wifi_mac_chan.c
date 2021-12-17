@@ -197,10 +197,14 @@ struct country_na_freq_set country_na_freq_plan_list [] =
         }
     },
     //0x01 :US
-    {3, {
+    {7, {
             {81, {CHAN_2_FREQ_2G(12), CHAN_2_FREQ_2G(13), 0}},
             {83, {CHAN_2_FREQ_2G(8 + 2), CHAN_2_FREQ_2G(9 + 2), 0}},
-            {84, {CHAN_2_FREQ_2G(12 - 2), CHAN_2_FREQ_2G(13 - 2), 0}}
+            {84, {CHAN_2_FREQ_2G(12 - 2), CHAN_2_FREQ_2G(13 - 2), 0}},
+            {121, {CHAN_2_FREQ_5G(144), 0}},
+            {122, {CHAN_2_FREQ_5G(140 + 2), 0}},
+            {123, {CHAN_2_FREQ_5G(144 - 2), 0}},
+            {128, {CHAN_2_FREQ_5G(138), 0}}
         }
     },
     //0x02 :E.R/JP/FR
@@ -258,7 +262,43 @@ struct country_na_freq_set country_na_freq_plan_list [] =
             {123, {CHAN_2_FREQ_5G(144 - 2), 0}},
             {128, {CHAN_2_FREQ_5G(138), 0}}
         }
-    }
+    },
+    //0x09 :RU
+    {4, {
+            {121, {CHAN_2_FREQ_5G(100), CHAN_2_FREQ_5G(104), CHAN_2_FREQ_5G(108), CHAN_2_FREQ_5G(112), CHAN_2_FREQ_5G(116), CHAN_2_FREQ_5G(120),CHAN_2_FREQ_5G(124), CHAN_2_FREQ_5G(128)}},
+            {122, {CHAN_2_FREQ_5G(100+2), CHAN_2_FREQ_5G(108+2), CHAN_2_FREQ_5G(116+2), CHAN_2_FREQ_5G(124+2),0}},
+            {123, {CHAN_2_FREQ_5G(104-2), CHAN_2_FREQ_5G(112-2), CHAN_2_FREQ_5G(120-2), CHAN_2_FREQ_5G(128-2),0}},
+            {128, {CHAN_2_FREQ_5G(106), CHAN_2_FREQ_5G(122), 0}}
+        }
+    },
+    //0x0a :ID
+    {1, {
+            {128, {CHAN_2_FREQ_5G(42),CHAN_2_FREQ_5G(58),CHAN_2_FREQ_5G(106), CHAN_2_FREQ_5G(122), CHAN_2_FREQ_5G(138)}}
+        }
+    },
+    //0x0b :TW
+    {10, {
+            {81, {CHAN_2_FREQ_2G(12), CHAN_2_FREQ_2G(13), 0}},
+            {83, {CHAN_2_FREQ_2G(8 + 2), CHAN_2_FREQ_2G(9 + 2), 0}},
+            {84, {CHAN_2_FREQ_2G(12 - 2), CHAN_2_FREQ_2G(13 - 2), 0}},
+            {118, {CHAN_2_FREQ_5G(52),0}},
+            {119, {CHAN_2_FREQ_5G(52+2),0}},
+            {120, {CHAN_2_FREQ_5G(56-2),0}},
+            {121, {CHAN_2_FREQ_5G(120), CHAN_2_FREQ_5G(124), CHAN_2_FREQ_5G(128), CHAN_2_FREQ_5G(144), 0}},
+            {122, {CHAN_2_FREQ_5G(116+2), CHAN_2_FREQ_5G(124+2),CHAN_2_FREQ_5G(140 + 2),0}},
+            {123, {CHAN_2_FREQ_5G(120-2), CHAN_2_FREQ_5G(128-2),CHAN_2_FREQ_5G(144-2),0}},
+            {128, {CHAN_2_FREQ_5G(122), CHAN_2_FREQ_5G(138), 0}}
+        }
+    },
+    //0x0c :KZ
+    {4, {
+            {121, {CHAN_2_FREQ_5G(100), CHAN_2_FREQ_5G(104), CHAN_2_FREQ_5G(108), CHAN_2_FREQ_5G(112), CHAN_2_FREQ_5G(116), CHAN_2_FREQ_5G(120), CHAN_2_FREQ_5G(124), CHAN_2_FREQ_5G(128)}},
+            {122, {CHAN_2_FREQ_5G(100+2), CHAN_2_FREQ_5G(108+2), CHAN_2_FREQ_5G(116+2), CHAN_2_FREQ_5G(124+2), 0}},
+            {123, {CHAN_2_FREQ_5G(104-2), CHAN_2_FREQ_5G(112-2), CHAN_2_FREQ_5G(120-2), CHAN_2_FREQ_5G(128-2), 0}},
+            {128, {CHAN_2_FREQ_5G(106), CHAN_2_FREQ_5G(122), CHAN_2_FREQ_5G(155), 0}}
+        }
+    },
+
 };
 
 struct tx_power_plan tx_power_plan_list[] = {
@@ -277,19 +317,27 @@ struct tx_power_plan tx_power_plan_list[] = {
 };
 
 struct country_chan_plan country_chan_plan_list[] = {
-    /* 0x00 */ {17, {115,118,124,121,125,116,119,122,126,117,120,123,127,81,83,84,128,0,0,0}, 0xff, DFS_5G_B2|DFS_5G_B3|DFS_5G_B4|PASSIVE_2G_12_14, TX_POWER_DEFAULT}, //Worldwide
-    /* 0x01 */ {10, {115,118,125,116,119,126,81,83,84,128,0,0,0,0,0,0,0,0,0,0}, 0x00, DFS_5G_B2, TX_POWER_SRRC}, //China
-    /* 0x02 */ {19, {115,118,124,121,125,81,116,119,122,126,126,117,120,123,127,127,83,84,128,0}, 0x01, DFS_5G_B2|DFS_5G_B3, TX_POWER_FCC}, //United States of America
-    /* 0x03 */ {14, {115,118,121,81,116,119,122,117,120,123,83,84,125,128,0,0,0,0,0,0}, 0x02, DFS_5G_B2|DFS_5G_B3, TX_POWER_CE}, //Europe
-    /* 0x04 */ {13, {115,118,121,116,119,122,117,120,123,81,83,84,128,0,0,0,0,0,0,0}, 0x02, DFS_5G_B2|DFS_5G_B3, TX_POWER_DEFAULT}, //France
-    /* 0x05 */ {17, {115,109,118,121,116,119,122,117,120,123,104,83,84,121,128,82,81,0,0,0}, 0x02, DFS_5G_B2|DFS_5G_B3, TX_POWER_ARIB}, //Japan
-    /* 0x06 */ {11, {115,118,116,119,117,120,128,81,83,84,128,0,0,0,0,0,0,0,0,0}, 0x03, DFS_5G_B2, TX_POWER_DEFAULT}, //Israel
-    /* 0x07 */ {13, {115,118,125,116,119,126,117,120,127,81,83,84,128,0,0,0,0,0,0,0}, 0x04, DFS_5G_B2, TX_POWER_DEFAULT}, //Mexico
-    /* 0x08 */ {16, {115,118,121,125,116,119,122,126,117,120,123,127,81,83,84,128,0,0,0,0}, 0x05, DFS_5G_B2|DFS_5G_B3, TX_POWER_DEFAULT}, //Canada
-    /* 0x09 */ {17, {115,118,124,121,125,116,119,122,126,117,120,123,127,81,83,84,128,0,0,0}, 0x06, DFS_5G_B2|DFS_5G_B3, TX_POWER_DEFAULT}, //India
-    /* 0x0A */ {16, {115,118,121,125,116,119,122,126,117,120,123,127,81,83,84,128,0,0,0,0}, 0x07, DFS_5G_B2|DFS_5G_B3, TX_POWER_DEFAULT}, //Australia
-    /* 0x0B */ {16, {115,118,121,125,116,119,122,126,117,120,123,127,81,83,84,128,0,0,0,0}, 0xff, DFS_5G_B2|DFS_5G_B3, TX_POWER_DEFAULT}, //NewZealand
-    /* 0x0C */ {16, {115,118,121,125,116,119,122,126,117,120,123,127,81,83,84,128,0,0,0,0}, 0x08, DFS_5G_B2|DFS_5G_B3, TX_POWER_ANATEL} //Brazi
+    /* 0x00 */ {17, {81,82,83,84,115,116,117,118,119,120,121,122,123,125,126,127,128}, 0xff, DFS_5G_B2|DFS_5G_B3|DFS_5G_B4|PASSIVE_2G_12_14, TX_POWER_DEFAULT}, //Worldwide
+    /* 0x01 */ {13, {81,83,84,115,116,117,118,119,120,125,126,127,128,0,0,0,0},       0x00, DFS_5G_B2,           TX_POWER_SRRC}, //China
+    /* 0x02 */ {16, {81,83,84,115,116,117,118,119,120,121,122,123,125,126,127,128,0}, 0x01, DFS_5G_B2|DFS_5G_B3, TX_POWER_FCC}, //United States of America
+    /* 0x03 */ {14, {81,83,84,115,116,117,118,119,120,121,122,123,125,128,0,0,0},     0x02, DFS_5G_B2|DFS_5G_B3, TX_POWER_CE}, //Europe
+    /* 0x04 */ {13, {81,83,84,115,116,117,118,119,120,121,122,123,128,0,0,0,0},       0x02, DFS_5G_B2|DFS_5G_B3, TX_POWER_CE}, //France
+    /* 0x05 */ {14, {81,82,83,84,115,116,117,118,119,120,121,122,123,128,0,0,0},      0x02, DFS_5G_B2|DFS_5G_B3, TX_POWER_ARIB}, //Japan
+    /* 0x06 */ {10, {81,83,84,115,116,117,118,119,120,128,0,0,0,0,0,0,0},             0x03, DFS_5G_B2,           TX_POWER_CE}, //Israel
+    /* 0x07 */ {13, {81,83,84,115,116,117,118,119,120,125,126,127,128,0,0,0,0},       0x04, DFS_5G_B2,           TX_POWER_FCC}, //Mexico
+    /* 0x08 */ {16, {81,83,84,115,116,117,118,119,120,121,122,123,125,126,127,128,0}, 0x05, DFS_5G_B2|DFS_5G_B3, TX_POWER_DEFAULT}, //Canada
+    /* 0x09 */ {16, {81,83,84,115,116,117,118,119,120,121,122,123,125,126,127,128,0}, 0x06, DFS_5G_B2|DFS_5G_B3, TX_POWER_DEFAULT}, //India
+    /* 0x0A */ {16, {81,83,84,115,116,117,118,119,120,121,122,123,125,126,127,128,0}, 0x07, DFS_5G_B2|DFS_5G_B3, TX_POWER_CE}, //Australia
+    /* 0x0B */ {16, {81,83,84,115,116,117,118,119,120,121,122,123,125,126,127,128,0}, 0xff, DFS_5G_B2|DFS_5G_B3, TX_POWER_CE}, //NewZealand
+    /* 0x0C */ {16, {81,83,84,115,116,117,118,119,120,121,122,123,125,126,127,128,0}, 0x08, DFS_5G_B2|DFS_5G_B3, TX_POWER_ANATEL}, //Brazi
+    /* 0x0D */ {16, {81,83,84,115,116,117,118,119,120,121,122,123,125,126,127,128,0}, 0x09, DFS_5G_B2|DFS_5G_B3, TX_POWER_CE}, //RU
+    /* 0x0E */ {7,  {81,83,84,125,126,127,128,0,0,0,0,0,0,0,0,0,0},                   0x0a, 0,                   TX_POWER_CE}, //Indonesia
+    /* 0x0f */ {16, {81,83,84,115,116,117,118,119,120,121,122,123,125,126,127,128,0}, 0xff, DFS_5G_B1|DFS_5G_B2|DFS_5G_B3, TX_POWER_CE}, //South Korea
+    /* 0x10 */ {4,  {81,83,84,125,0,0,0,0,0,0,0,0,0,0,0,0,0},                         0xff, 0,                   TX_POWER_FCC}, //Peru
+    /* 0x11 */ {13, {81,83,84,118,119,120,121,122,123,125,126,127,128,0,0,0,0},       0x0b, DFS_5G_B2|DFS_5G_B3, TX_POWER_FCC}, //Taiwan
+    /* 0x12 */ {16, {81,83,84,115,116,117,118,119,120,121,122,123,125,126,127,128,0}, 0xff, DFS_5G_B1|DFS_5G_B2, TX_POWER_CE}, //Thailand
+    /* 0x13 */ {13, {81,83,84,115,116,117,118,119,120,121,122,123,128,0,0,0,0},       0x0c, DFS_5G_B2|DFS_5G_B3, TX_POWER_CE}, //Kazakhstan
+
 };
 
 struct country_chan_mapping  country_chan_mapping_list[] = {
@@ -309,7 +357,7 @@ struct country_chan_mapping  country_chan_mapping_list[] = {
     {"AT", 0x04}, /* Austria */
     {"AU", 0x0A}, /* Australia */
     {"AW", 0x02}, /* Aruba */
-    {"AZ", 0x04}, /* Azerbaijan */
+    {"AZ", 0x06}, /* Azerbaijan */
     {"BA", 0x00}, /* Bosnia & Herzegovina */
     {"BB", 0x02}, /* Barbados */
     {"BD", 0x04}, /* Bangladesh */
@@ -337,10 +385,10 @@ struct country_chan_mapping  country_chan_mapping_list[] = {
     {"CH", 0x04}, /* Switzerland */
     {"CI", 0x00}, /* Cote d'Ivoire */
     {"CK", 0x04}, /* Cook Islands */
-    {"CL", 0x00}, /* Chile */
+    {"CL", 0x01}, /* Chile */
     {"CM", 0x04}, /* Cameroon */
     {"CN", 0x01}, /* China */
-    {"CO", 0x02}, /* Colombia */
+    {"CO", 0x07}, /* Colombia */
     {"CR", 0x02}, /* Costa Rica */
     {"CV", 0x04}, /* Cape Verde */
     {"CX", 0x0A}, /* Christmas Island (Australia) */
@@ -367,7 +415,7 @@ struct country_chan_mapping  country_chan_mapping_list[] = {
     {"FO", 0x04}, /* Faroe Islands (Denmark) */
     {"FR", 0x04}, /* France */
     {"GA", 0x04}, /* Gabon */
-    {"GB", 0x04}, /* Great Britain (United Kingdom; England) */
+    {"GB", 0x0b}, /* Great Britain (United Kingdom; England) */
     {"GD", 0x02}, /* Grenada */
     {"GE", 0x04}, /* Georgia */
     {"GF", 0x04}, /* French Guiana */
@@ -385,15 +433,15 @@ struct country_chan_mapping  country_chan_mapping_list[] = {
     {"GU", 0x02}, /* Guam (USA) */
     {"GW", 0x04}, /* Guinea-Bissau */
     {"GY", 0x00}, /* Guyana */
-    {"HK", 0x00}, /* Hong Kong */
+    {"HK", 0x0C}, /* Hong Kong */
     {"HM", 0x0A}, /* Heard and McDonald Islands (Australia) */
     {"HN", 0x00}, /* Honduras */
     {"HR", 0x04}, /* Croatia */
     {"HT", 0x02}, /* Haiti */
     {"HU", 0x04}, /* Hungary */
-    {"ID", 0x00}, /* Indonesia */
+    {"ID", 0x0e}, /* Indonesia */
     {"IE", 0x04}, /* Ireland */
-    {"IL", 0x00}, /* Israel */
+    {"IL", 0x06}, /* Israel */
     {"IM", 0x04}, /* Isle of Man (UK) */
     {"IN", 0x09}, /* India */
     {"IO", 0x04}, /* British Indian Ocean Territory (UK) */
@@ -411,10 +459,10 @@ struct country_chan_mapping  country_chan_mapping_list[] = {
     {"KI", 0x04}, /* Kiribati */
     {"KM", 0x04}, /* Comoros */
     {"KN", 0x02}, /* Saint Kitts and Nevis */
-    {"KR", 0x00}, /* South Korea */
+    {"KR", 0x0f}, /* South Korea */
     {"KW", 0x00}, /* Kuwait */
     {"KY", 0x02}, /* Cayman Islands (UK) */
-    {"KZ", 0x04}, /* Kazakhstan */
+    {"KZ", 0x13}, /* Kazakhstan */
     {"LA", 0x04}, /* Laos */
     {"LB", 0x04}, /* Lebanon */
     {"LC", 0x02}, /* Saint Lucia */
@@ -447,7 +495,7 @@ struct country_chan_mapping  country_chan_mapping_list[] = {
     {"MV", 0x00}, /* Maldives */
     {"MW", 0x04}, /* Malawi */
     {"MX", 0x07}, /* Mexico */
-    {"MY", 0x00}, /* Malaysia */
+    {"MY", 0x01}, /* Malaysia */
     {"MZ", 0x04}, /* Mozambique */
     {"NA", 0x04}, /* Namibia */
     {"NC", 0x04}, /* New Caledonia */
@@ -463,7 +511,7 @@ struct country_chan_mapping  country_chan_mapping_list[] = {
     {"NZ", 0x0B}, /* New Zealand */
     {"OM", 0x04}, /* Oman */
     {"PA", 0x02}, /* Panama */
-    {"PE", 0x02}, /* Peru */
+    {"PE", 0x10}, /* Peru */
     {"PF", 0x04}, /* French Polynesia (France) */
     {"PG", 0x00}, /* Papua New Guinea */
     {"PH", 0x00}, /* Philippines */
@@ -478,13 +526,13 @@ struct country_chan_mapping  country_chan_mapping_list[] = {
     {"RE", 0x04}, /* Reunion (France) */
     {"RO", 0x04}, /* Romania */
     {"RS", 0x04}, /* Serbia, Kosovo */
-    {"RU", 0x00}, /* Russia(fac/gost), Kaliningrad */
+    {"RU", 0x0d}, /* Russia(fac/gost), Kaliningrad */
     {"RW", 0x04}, /* Rwanda */
     {"SA", 0x00}, /* Saudi Arabia */
     {"SB", 0x04}, /* Solomon Islands */
     {"SC", 0x02}, /* Seychelles */
     {"SE", 0x04}, /* Sweden */
-    {"SG", 0x00}, /* Singapore */
+    {"SG", 0x0c}, /* Singapore */
     {"SH", 0x04}, /* Saint Helena (UK) */
     {"SI", 0x04}, /* Slovenia */
     {"SJ", 0x04}, /* Svalbard (Norway) */
@@ -502,7 +550,7 @@ struct country_chan_mapping  country_chan_mapping_list[] = {
     {"TD", 0x04}, /* Chad */
     {"TF", 0x04}, /* French Southern and Antarctic Lands (FR Southern Territories) */
     {"TG", 0x04}, /* Togo */
-    {"TH", 0x00}, /* Thailand */
+    {"TH", 0x12}, /* Thailand */
     {"TJ", 0x04}, /* Tajikistan */
     {"TK", 0x0A}, /* Tokelau */
     {"TM", 0x04}, /* Turkmenistan */
@@ -511,13 +559,13 @@ struct country_chan_mapping  country_chan_mapping_list[] = {
     {"TR", 0x04}, /* Turkey, Northern Cyprus */
     {"TT", 0x02}, /* Trinidad & Tobago */
     {"TV", 0x00}, /* Tuvalu */
-    {"TW", 0x02}, /* Taiwan */
+    {"TW", 0x11}, /* Taiwan */
     {"TZ", 0x04}, /* Tanzania */
     {"UA", 0x00}, /* Ukraine */
     {"UG", 0x04}, /* Uganda */
     {"US", 0x02}, /* United States of America (USA) */
     {"UY", 0x00}, /* Uruguay */
-    {"UZ", 0x00}, /* Uzbekistan */
+    {"UZ", 0x06}, /* Uzbekistan */
     {"VA", 0x04}, /* Holy See (Vatican City) */
     {"VC", 0x02}, /* Saint Vincent and the Grenadines */
     {"VE", 0x00}, /* Venezuela */
@@ -714,7 +762,8 @@ void wifi_mac_mark_dfs_channel_ex(int country_code, struct wifi_mac *wifimac, in
     if (chan_num == 0) {
         for (i = 0; i < wifimac->wm_nchans; i++) {
             chan_pri_num = wifimac->wm_channels[i].chan_pri_num;
-            if (((IS_5G_BAND2(chan_pri_num)) && (dfs_chan_flag & DFS_5G_B2))
+            if (((IS_5G_BAND1(chan_pri_num)) && (dfs_chan_flag & DFS_5G_B1))
+                || ((IS_5G_BAND2(chan_pri_num)) && (dfs_chan_flag & DFS_5G_B2))
                 || ((IS_5G_BAND3(chan_pri_num)) && (dfs_chan_flag & DFS_5G_B3))
                 || ((IS_5G_BAND4(chan_pri_num)) && (dfs_chan_flag & DFS_5G_B4))
                 || ((chan_pri_num >= 12 && chan_pri_num <= 14) && (dfs_chan_flag & PASSIVE_2G_12_14))) {
@@ -1037,7 +1086,7 @@ struct wifi_channel * wifi_mac_scan_sta_get_ap_channel(struct wlan_net_vif *wnet
     if ((bw == WIFINET_BWC_WIDTH40) && (xhtcap != NULL) && !(htcapval & WIFINET_HTCAP_SUPPORTCBW40)) {
         bw = WIFINET_BWC_WIDTH20;
         center_chan = chan;
-        DPRINTF(AML_DEBUG_BWC, "htcap and htinfo information conflict\n");
+        AML_OUTPUT("htcap and htinfo information conflict\n");
     }
 
     if((vht_opt_ie != NULL) &&
@@ -1075,7 +1124,7 @@ struct wifi_channel * wifi_mac_scan_sta_get_ap_channel(struct wlan_net_vif *wnet
     return apchan;
 }
 
-int wifi_mac_chan_attach (struct wifi_mac *wifimac)
+int wifi_mac_chan_attach(struct wifi_mac *wifimac)
 {
     struct wifi_channel *c;
     int i;

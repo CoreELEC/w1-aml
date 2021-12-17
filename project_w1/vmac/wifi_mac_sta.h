@@ -170,7 +170,9 @@ struct wifi_station
     unsigned short sta_listen_intval;
     unsigned char sta_fetch_pkt_method;
     unsigned short sta_capinfo;
-    unsigned char sta_ap_ip[4];
+    unsigned char ip_acquired;
+    unsigned char sta_ap_ip[IPV4_LEN];
+    unsigned char sta_ap_ipv6[IPV6_LEN];
     unsigned char sta_arp_flag;
 
     enum wifi_mac_bwc_width sta_chbw;
@@ -441,6 +443,11 @@ int wifi_mac_sta_arp_agent_ex (SYS_TYPE param1, SYS_TYPE param2,SYS_TYPE param3,
 #define WIFINET_PSLOCK_INIT(_ic, _name) spin_lock_init(&(_ic)->wm_pslock)
 #define WIFINET_PSLOCK(_ic) OS_SPIN_LOCK_IRQ(&(_ic)->wm_pslock, (_ic)->wm_pslock_flags);
 #define WIFINET_PSUNLOCK(_ic) OS_SPIN_UNLOCK_IRQ(&(_ic)->wm_pslock,  (_ic)->wm_pslock_flags);
+
+#define WIFINET_FW_STAT_LOCK_INIT(_ic, _name) spin_lock_init(&(_ic)->fw_stat_lock)
+#define WIFINET_FW_STAT_LOCK_DESTORY(_ic, _name)
+#define WIFINET_FW_STAT_LOCK(_ic) { OS_SPIN_LOCK(&(_ic)->fw_stat_lock); } while(0)
+#define WIFINET_FW_STAT_UNLOCK(_ic) { OS_SPIN_UNLOCK(&(_ic)->fw_stat_lock); } while(0)
 
 #if defined(CONFIG_SMP)
 #define WIFINET_LOCK_ASSERT(_ic) KASSERT(spin_is_locked(&(_ic)->wm_comlock),("wifi_mac not locked!"))

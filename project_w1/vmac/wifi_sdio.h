@@ -43,7 +43,6 @@ enum SDIO_RW_FLAG
     SDIO_F_DIRECT= BIT(3),
 };
 
-#ifdef DRV_PT_SUPPORT
 struct hal_thr_thread_test
 {
     int threadtest_loop;
@@ -60,7 +59,6 @@ struct hal_thr_thread_test
 };
 
 void Init_B2B_Resource(void);
-#endif
 
 struct amlw_hwif_sdio {
     struct sdio_func * sdio_func_if[SDIO_FUNCNUM_MAX];
@@ -123,6 +121,9 @@ void set_reg_fragment(unsigned int addr, unsigned int bit_end,
 int aml_sdio_init(void);
 void  aml_sdio_exit(void);
 int sdio_call_task( void );
+void aml_enable_wifi(void);
+void aml_disable_wifi(void);
+
 
 void aml_aon_write_reg(unsigned int addr,unsigned int data);
 unsigned int aml_aon_read_reg(unsigned int addr);

@@ -25,7 +25,7 @@ int aml_cfg80211_set_pmksa(struct wiphy *wiphy, struct net_device *dev, struct c
     unsigned char zero_mac[6] = { 0x00 };
     unsigned char find_entry = 0;
 
-    if ((pmksa->bssid != NULL) && memcmp((unsigned char *)pmksa->bssid, zero_mac, ETHER_ADDR_LEN)) {
+    if ((pmksa->bssid != NULL) && memcmp((unsigned char *)pmksa->bssid, zero_mac, MAC_ADDR_LEN)) {
         DPRINTF(AML_DEBUG_CFG80211, "%s BSSID:%02x:%02x:%02x:%02x:%02x:%02x\n", __func__, pmksa->bssid[0],
             pmksa->bssid[1], pmksa->bssid[2], pmksa->bssid[3], pmksa->bssid[4], pmksa->bssid[5]);
 
@@ -35,7 +35,7 @@ int aml_cfg80211_set_pmksa(struct wiphy *wiphy, struct net_device *dev, struct c
     }
 
     for (i = 0; i < WL_NUM_PMKIDS_MAX; i++) {
-        if (!memcmp(pmksa->bssid, &wnet_vif->pmk_list->pmkid_cache[i].bssid, ETHER_ADDR_LEN)) {
+        if (!memcmp(pmksa->bssid, &wnet_vif->pmk_list->pmkid_cache[i].bssid, MAC_ADDR_LEN)) {
             DPRINTF(AML_DEBUG_CFG80211, "find the bssid in pmkid_cache index:%d, and renew the pmkid\n", i);
 
             memcpy(wnet_vif->pmk_list->pmkid_cache[i].pmkid, pmksa->pmkid, WLAN_PMKID_LEN);
@@ -72,7 +72,7 @@ int aml_pmkid_cache_index(struct wlan_net_vif *wnet_vif, const unsigned char *bs
         goto not_found;
     }
 
-    if (!memcmp(bssid, zero_mac, ETHER_ADDR_LEN)) {
+    if (!memcmp(bssid, zero_mac, MAC_ADDR_LEN)) {
         goto not_found;
     }
 
@@ -80,7 +80,7 @@ int aml_pmkid_cache_index(struct wlan_net_vif *wnet_vif, const unsigned char *bs
         bssid[1], bssid[2], bssid[3], bssid[4], bssid[5]);
 
     for (i = 0; i < WL_NUM_PMKIDS_MAX; i++) {
-        if (!memcmp(bssid, &wnet_vif->pmk_list->pmkid_cache[i].bssid, ETHER_ADDR_LEN)) {
+        if (!memcmp(bssid, &wnet_vif->pmk_list->pmkid_cache[i].bssid, MAC_ADDR_LEN)) {
             pmkid = wnet_vif->pmk_list->pmkid_cache[i].pmkid;
             DPRINTF(AML_DEBUG_CFG80211, "%s pmkid:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x\n",
                 __func__, pmkid[0], pmkid[1], pmkid[2], pmkid[3], pmkid[4], pmkid[5], pmkid[6], pmkid[7], pmkid[8], pmkid[9], pmkid[10],
@@ -113,7 +113,7 @@ int aml_cfg80211_del_pmksa(struct wiphy *wiphy, struct net_device *dev, struct c
         return 0;
     }
 
-    if ((pmksa->bssid != NULL) && memcmp((unsigned char *)pmksa->bssid, zero_mac, ETHER_ADDR_LEN)) {
+    if ((pmksa->bssid != NULL) && memcmp((unsigned char *)pmksa->bssid, zero_mac, MAC_ADDR_LEN)) {
         DPRINTF(AML_DEBUG_CFG80211, "%s BSSID:%02x:%02x:%02x:%02x:%02x:%02x\n", __func__, pmksa->bssid[0],
             pmksa->bssid[1], pmksa->bssid[2], pmksa->bssid[3], pmksa->bssid[4], pmksa->bssid[5]);
 
@@ -123,7 +123,7 @@ int aml_cfg80211_del_pmksa(struct wiphy *wiphy, struct net_device *dev, struct c
     }
 
     for (i = 0; i < WL_NUM_PMKIDS_MAX; i++) {
-        if (!memcmp(pmksa->bssid, &wnet_vif->pmk_list->pmkid_cache[i].bssid, ETHER_ADDR_LEN)) {
+        if (!memcmp(pmksa->bssid, &wnet_vif->pmk_list->pmkid_cache[i].bssid, MAC_ADDR_LEN)) {
             DPRINTF(AML_DEBUG_CFG80211, "%s i:%d, BSSID:%02x:%02x:%02x:%02x:%02x:%02x\n", __func__, i, wnet_vif->pmk_list->pmkid_cache[i].bssid[0],
                 wnet_vif->pmk_list->pmkid_cache[i].bssid[1], wnet_vif->pmk_list->pmkid_cache[i].bssid[2], wnet_vif->pmk_list->pmkid_cache[i].bssid[3],
                 wnet_vif->pmk_list->pmkid_cache[i].bssid[4], wnet_vif->pmk_list->pmkid_cache[i].bssid[5]);

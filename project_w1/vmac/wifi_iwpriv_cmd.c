@@ -8,7 +8,6 @@
 #include "wifi_csi.h"
 
 
-unsigned char set_conn_band = 0;
 extern void print_driver_version(void);
 extern char **aml_cmd_char_prase(char sep, const char *str, int *size);
 extern struct udp_info aml_udp_info[];
@@ -206,20 +205,18 @@ int aml_set_ldpc(struct wlan_net_vif *wnet_vif, unsigned int set)
     struct wifi_mac *wifimac = wnet_vif->vm_wmac;
     struct wifi_station *sta = wnet_vif->vm_mainsta;
 
-#ifdef DRV_PT_SUPPORT
-        if (aml_wifi_is_enable_rf_test()) {
-            if (1 == set) {
-                gB2BTestCasePacket.ldpc_enable = 1;
-                printk("Enable tx LDPC\n");
-            } else if (0 == set){
-                gB2BTestCasePacket.ldpc_enable = 0;
-                printk("Disable tx LDPC\n");
-            } else {
-                ERROR_DEBUG_OUT("Invalid parameter\n");
-            }
-            return 0;
+    if (aml_wifi_is_enable_rf_test()) {
+        if (1 == set) {
+            gB2BTestCasePacket.ldpc_enable = 1;
+            printk("Enable tx LDPC\n");
+        } else if (0 == set){
+            gB2BTestCasePacket.ldpc_enable = 0;
+            printk("Disable tx LDPC\n");
+        } else {
+            ERROR_DEBUG_OUT("Invalid parameter\n");
         }
-#endif
+        return 0;
+    }
 
     if (1 == set) {
         sta->sta_vhtcap |= WIFINET_VHTCAP_RX_LDPC;
@@ -480,10 +477,11 @@ void aml_iwpriv_set_uapsd(struct wlan_net_vif *wnet_vif, unsigned int set)
     wnet_vif->vm_flags |= WIFINET_F_WMEUPDATE;
 }
 
-unsigned char aml_iwpriv_set_conn_band(unsigned int set)
+unsigned char aml_iwpriv_set_band(unsigned int set)
 {
-    set_conn_band = set;
-    printk("%s(%d) band %d\n ", __func__, __LINE__, set_conn_band);
+    struct drv_private *drv_priv = drv_get_drv_priv();
+    drv_priv->drv_config.cfg_band = set;
+    printk("%s(%d) band %d\n ", __func__, __LINE__, set);
     return 0;
 }
 
@@ -513,12 +511,18 @@ unsigned char aml_iwpriv_set_tx_power_change_hang(unsigned int set)
     return 0;
 }
 
-
-unsigned char aml_iwpriv_get_conn_band(void)
+unsigned char aml_iwpriv_get_band(void)
 {
-    return set_conn_band;
+    struct drv_private *drv_priv = drv_get_drv_priv();
+    return drv_priv->drv_config.cfg_band;
 }
 
+unsigned char aml_iwpriv_set_mac_mode(unsigned int set)
+{
+    struct drv_private *drv_priv = drv_get_drv_priv();
+    drv_priv->drv_config.cfg_mac_mode = set;
+    return 0;
+}
 
 static int aml_iwpriv_send_para1(struct net_device *dev,
     struct iw_request_info *info, union iwreq_data *wrqu, char *extra)
@@ -782,7 +786,7 @@ static int aml_iwpriv_send_para1(struct net_device *dev,
             break;
 
         case AML_IWP_SET_FIX_BAND:
-            aml_iwpriv_set_conn_band(set);
+            aml_iwpriv_set_band(set);
             break;
 
         case AML_IWP_SET_GAIN:
@@ -795,6 +799,10 @@ static int aml_iwpriv_send_para1(struct net_device *dev,
 
         case AML_IWP_SET_TXPW_PLAN:
             wifimac_set_tx_pwr_plan(set);
+            break;
+
+        case AML_IWP_SET_MAC_MODE:
+            aml_iwpriv_set_mac_mode(set);
             break;
     }
 
@@ -1339,6 +1347,18 @@ int aml_set_debug_modules(char *debug_str)
             return 0;
         }
         g_dbg_modules |= AML_DBG_MODULES_HAL_TX;
+    } else if(strstr(debug_str,"txe") != NULL) {
+        if(aml_iwpriv_set_debug_switch(debug_str) == AML_DBG_OFF) {
+            g_dbg_modules &= ~(BIT(4));
+            return 0;
+        }
+        g_dbg_modules |= AML_DBG_MODULES_TX_ERROR;
+    } else if(strstr(debug_str,"scn") != NULL) {
+        if(aml_iwpriv_set_debug_switch(debug_str) == AML_DBG_OFF) {
+            g_dbg_modules &= ~(BIT(5));
+            return 0;
+        }
+        g_dbg_modules |= AML_DBG_MODULES_SCAN;
     } else {
         ERROR_DEBUG_OUT("input error\n");
     }
@@ -1750,6 +1770,10 @@ static const struct iw_priv_args aml_iwpriv_private_args[] = {
 {
     AML_IWP_SET_TXPW_PLAN,
     IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "set_txpwr_plan"},
+{
+    AML_IWP_SET_MAC_MODE,
+    IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "set_mac_mode"},
+
 
 /*iwpriv get command*/
 {

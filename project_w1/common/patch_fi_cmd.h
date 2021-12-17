@@ -15,6 +15,13 @@
 
 #define TSSI_5G_CAL_NUM 4
 
+enum ver_id_enum
+{
+    VERSION_DEFAULT = 0,
+    VERSION_GVA = 1,
+    VERSION_GVA_MRT = 2,
+};
+
 enum patch_fw_event_type
 {
     CHANNEL_SWITCH_EVENT = (TBTT_EVENT + 1),
@@ -75,6 +82,24 @@ typedef struct tx_error_event
     unsigned int frame_type;
 } tx_error_event;
 
+typedef struct txtssi_ratio_limit_param
+{
+    unsigned char enable;
+    unsigned char wf2g_ratio_limit;
+    unsigned char wf5g_ratio_limit;
+    unsigned char reserved;
+} txtssi_ratio_limit_param;
+
+typedef struct digital_gain_limit_param
+{
+    unsigned char enable;
+    unsigned char min_2g;
+    unsigned char max_2g;
+    unsigned char min_5g;
+    unsigned char max_5g;
+    unsigned char resv[3];
+} digital_gain_limit_param;
+
 typedef struct Cali_Param
 {
     unsigned char Cmd;
@@ -88,7 +113,9 @@ typedef struct Cali_Param
     unsigned char tssi_5g_offset[TSSI_5G_CAL_NUM];
     unsigned char rf_num;
     unsigned char wftx_pwrtbl_en;
-    unsigned char resv[2];
+    unsigned char resv[1];
+    txtssi_ratio_limit_param txtssi_ratio_limit;
+    digital_gain_limit_param digital_gain_limit;
     unsigned short spur_freq;
     unsigned short platform_versionid;
 } Cali_Param;

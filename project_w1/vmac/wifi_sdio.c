@@ -24,10 +24,8 @@ namespace FW_NAME
 #include "chip_intf_reg.h"
 #include "chip_ana_reg.h"
 
-#ifdef DRV_PT_SUPPORT
 #include "wifi_pt_init.h"
 #include "wifi_pt_network.h"
-#endif
 
 #if defined (HAL_FPGA_VER)
 struct amlw_hwif_sdio g_amlw_hwif_sdio;
@@ -210,7 +208,7 @@ void aml_sdio_write_word(unsigned int addr, unsigned int data)
                                     (unsigned char*)(SYS_TYPE)(addr),
                                     sizeof(unsigned int));
     }
-    
+
     FREE(sdio_kmm, "sdio_write_word");
 }
 
@@ -1365,20 +1363,20 @@ static void config_pmu_reg(bool is_power_on)
         reg_bg12_data.data = hif->hif_ops.hi_read_word(RG_BG_A12);
         reg_bg12_data.b.RG_WF_BG_EN = 1;
         hif->hif_ops.hi_write_word(RG_BG_A12, reg_bg12_data.data);
-
+        
         // switch rf dig to rf ldo
         reg_bg16_data.data = hif->hif_ops.hi_read_word(RG_BG_A16);
         reg_bg16_data.b.RG_WF_DVDD_LDO_EN = 1;
         hif->hif_ops.hi_write_word(RG_BG_A16, reg_bg16_data.data);
-
+        
         //delay for rfldo work ok. xosc clock here.
         msleep(20);
-
+        
         // switch off rf dig from dvdd09_ao
         reg_bg16_data.data = hif->hif_ops.hi_read_word(RG_BG_A16);
         reg_bg16_data.b.RG_WF_SLEEP_ENB = 1;
         hif->hif_ops.hi_write_word(RG_BG_A16, reg_bg16_data.data);
-
+        
         //delay for rfldo work ok. xosc clock here.
         msleep(2);
 
@@ -1430,12 +1428,12 @@ static void config_pmu_reg(bool is_power_on)
         reg_bg16_data.data = hif->hif_ops.hi_read_word(RG_BG_A16);
         reg_bg16_data.b.RG_WF_SLEEP_ENB = 0;
          hif->hif_ops.hi_write_word(RG_BG_A16, reg_bg16_data.data);
-
+        
         // switch rf dig ldo off
         reg_bg16_data.data = hif->hif_ops.hi_read_word(RG_BG_A16);
         reg_bg16_data.b.RG_WF_DVDD_LDO_EN = 0;
         hif->hif_ops.hi_write_word(RG_BG_A16, reg_bg16_data.data);
-
+        
         // delay for aoldo work ok.
         msleep(2);
         // close bg ldo
@@ -1487,6 +1485,7 @@ static void config_pmu_reg(bool is_power_on)
 extern unsigned char set_wifi_bt_sdio_driver_bit(bool is_register, int shift);
 extern unsigned char w1_sdio_driver_insmoded;
 extern unsigned char w1_sdio_after_porbe;
+extern unsigned char wifi_sdio_access;
 extern int  aml_w1_sdio_init(void);
 extern void  aml_w1_sdio_exit(void);
 
@@ -1561,12 +1560,10 @@ int aml_sdio_init(void)
     aml_sdio_enable_irq(SDIO_FUNC4);
     printk("aml_sdio_probe-- ret %d\n", ret);
 
-#ifdef DRV_PT_SUPPORT
     if (aml_wifi_is_enable_rf_test()) {
         mib_init();
         driver_open();
     }
-#endif
 
     return ret;
 
@@ -1574,6 +1571,38 @@ create_thread_error:
     hal_kill_thread();
     return ret;
 }
+
+
+void aml_disable_wifi(void)
+{
+    config_pmu_reg(AML_W1_WIFI_POWER_OFF);
+    wifi_sdio_access = 0;
+    printk("aml_disable_wifi start sdio access %d\n", wifi_sdio_access);
+    msleep(300);
+}
+
+
+void aml_enable_wifi(void)
+{
+    struct hal_private * hal_priv = hal_get_priv();
+
+    printk("aml_enable_wifi start\n");
+    aml_customer_gpio_wlan_ctrl(WLAN_POWER_ON);
+
+    hal_recovery_init_priv();
+    wifi_sdio_access = 1;
+    printk("aml_enable_wifi start sdio access %d\n", wifi_sdio_access);
+    config_pmu_reg(AML_W1_WIFI_POWER_ON);
+    hal_fw_repair();
+
+    hal_priv->txcompletestatus->txdoneframecounter = 0;
+    hal_priv->HalTxFrameDoneCounter = 0;
+    hal_priv->txcompletestatus->txpagecounter = 0;
+    hal_priv->HalTxPageDoneCounter = 0;
+
+    printk("aml_enable_wifi end\n");
+}
+
 
 void aml_sdio_exit(void) {
     struct hal_private *hal_priv = hal_get_priv();
@@ -1590,10 +1619,9 @@ void aml_sdio_exit(void) {
     set_wifi_bt_sdio_driver_bit(AML_W1_WIFI_POWER_OFF, WIFI_POWER_CHANGE_SHIFT);
 
     set_usb_wifi_power(0);
-#ifdef DRV_PT_SUPPORT
     if (aml_wifi_is_enable_rf_test())
         b2b_tx_thread_remove();
-#endif
+
     vm_cfg80211_clear_parent_dev();
 }
 
@@ -1756,12 +1784,10 @@ int aml_sdio_probe(struct sdio_func *func, const struct sdio_device_id *id)
     printk("aml_sdio_probe-- ret %d\n", ret);
 
 
-#ifdef DRV_PT_SUPPORT
     if (aml_wifi_is_enable_rf_test()) {
         mib_init();
         driver_open();
     }
-#endif
 
     return ret;
 
@@ -1794,10 +1820,9 @@ static void  aml_sdio_remove(struct sdio_func *func)
     if (func->num == FUNCNUM_SDIO_LAST)
     {
         hal_kill_thread();
-#ifdef DRV_PT_SUPPORT
         if (aml_wifi_is_enable_rf_test())
             b2b_tx_thread_remove();
-#endif
+
         vm_cfg80211_clear_parent_dev();
     }
     sdio_claim_host(func);

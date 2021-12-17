@@ -31,6 +31,8 @@ enum tx_frame_flag
     TX_MGMT_ASSOC_REQ = 8,
     TX_MGMT_EAPOL = 9,
     TX_MGMT_DHCP = 10,
+    TX_MGMT_DEAUTH = 11,
+    TX_MGMT_DISASSOC = 12,
 };
 
 struct wifi_mac_pkt_info

@@ -20,7 +20,6 @@
 #define MAXPMKID 16/* max # PMKID cache entries NDIS */
 #define WL_NUM_PMKIDS_MAX MAXPMKID
 
-
 typedef struct _aml_pmkid_cache {
     unsigned char in_use;
     unsigned char bssid[6];
@@ -45,3 +44,4 @@ int aml_cfg80211_flush_pmksa(struct wiphy *wiphy, struct net_device *dev);
 void wifi_mac_trigger_sae(struct wifi_station *sta);
 
 #endif//_WIFI_MAC_SAE_H_
+

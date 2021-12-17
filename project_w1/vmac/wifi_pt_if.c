@@ -16,8 +16,6 @@
 #include "wifi_pt_if.h"
 #include "wifi_pt_init.h"
 
-#ifdef DRV_PT_SUPPORT
-
 static struct _Pool our_txpriv_pool;
 static void *our_txpriv_pool_buffer[HI_TXPRIVD_NUM_ALL_TID + 1];
 unsigned char our_txpriv_descriptors_buffer[DRIVER_TXPRIV_DESC_LEN];
@@ -360,6 +358,4 @@ int Driver_IsTxPrivEnough(int num)
         return 0;
     }
 }
-
-#endif//DRV_PT_SUPPORT
 

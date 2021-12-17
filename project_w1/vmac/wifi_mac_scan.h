@@ -53,6 +53,16 @@ enum
     SCANSTATE_F_CHANNEL_SWITCH_COMPLETE = BIT(11),
     SCANSTATE_F_SEND_PROBEREQ_AGAIN = BIT(12),
     SCANSTATE_F_GET_CONNECT_AP = BIT(13),
+    SCANSTATE_F_RX_LEAKAP_HAPPEN = BIT(14),
+    SCANSTATE_F_RX_CHKING_LEAKAP_PKT = BIT(15),
+};
+
+
+enum wifi_scan_noise
+{
+    WIFINET_S_SCAN_ENV_CLEAR  = 0,
+    WIFINET_S_SCAN_ENV_NOISE  = 1,
+    WIFINET_S_SCAN_ENV_MID  = 2,
 };
 
 
@@ -95,6 +105,8 @@ struct wifi_mac_scan_state
 
     struct os_timer_ext ss_scan_timer;
     struct os_timer_ext ss_probe_timer;
+    struct hrtimer scan_hr_timer;
+    ktime_t scan_kt;
 };
 
 
@@ -275,6 +287,7 @@ void wifi_mac_process_tx_error(struct wlan_net_vif *wnet_vif);
 void wifi_mac_update_roaming_candidate_chan(struct wlan_net_vif *wnet_vif,const struct wifi_mac_scan_param *sp, int rssi);
 int wifi_mac_scan_chk_11g_bss(struct wifi_mac_scan_state *ss, struct wlan_net_vif *wnet_vif);
 void is_connect_need_set_gain(struct wlan_net_vif *wnet_vif);
+void wifi_mac_scan_chking_leakap(void * station, struct wifi_frame *wh);
 
 
 #endif /* _WIFI_NET_SCAN_H_ */
