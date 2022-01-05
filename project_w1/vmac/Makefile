@@ -106,6 +106,10 @@ EXTRA_CFLAGS += -DUSE_GPIO_IRQ=1
 EXTRA_CFLAGS += -DUSE_SDIO_IRQ=0
 endif
 
+ifeq ($(CLANG_VERSION), r437112)
+EXTRA_CFLAGS += -Wno-unused-but-set-variable
+endif
+
 ifneq ($(KERNELRELEASE),)
 
 obj-m += aml_sdio.o
