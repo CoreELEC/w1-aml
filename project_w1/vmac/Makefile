@@ -71,7 +71,7 @@ TARGET = vlsicomm
 
 EXTRA_CFLAGS += -Wno-enum-conversion
 EXTRA_CFLAGS += ${INCS}  -DCONFIG_WAPI
-EXTRA_CFLAGS += -Wall -Wno-unused-function #show all warning
+EXTRA_CFLAGS += -Wall -Wno-unused-function -Wno-unused-but-set-variable #show all warning
 EXTRA_CFLAGS += -Werror -Wno-format #convert warning into error
 #EXTRA_CFLAGS += -W	#more strict, linux head file cannot pass, so give up
 #EXTRA_CFLAGS += -w	#ignore warning
