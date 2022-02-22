@@ -273,7 +273,7 @@ int aml_sdio_suspend(unsigned int suspend_enable)
     }
 
     /* just clear sdio clock value for emmc init when resume */
-    amlwifi_set_sdio_host_clk(0);
+    //amlwifi_set_sdio_host_clk(0);
 
     /* we shall suspend all card for sdio. */
     for (i = SDIO_FUNC1; i <= FUNCNUM_SDIO_LAST; i++)
@@ -641,7 +641,7 @@ void aml_bt_hi_write_word(unsigned int addr,unsigned int data)
      */
     reg_tmp = hif->hif_ops.hi_read_word(RG_SDIO_IF_MISC_CTRL);
 
-    if((reg_tmp & BIT(23)) != 1)
+    if((reg_tmp & BIT(23)) != BIT(23))
     {
         reg_tmp |= BIT(23);
         hif->hif_ops.hi_write_word(RG_SDIO_IF_MISC_CTRL , reg_tmp);
@@ -670,7 +670,7 @@ unsigned int aml_bt_hi_read_word(unsigned int addr)
 
     reg_tmp = hif->hif_ops.hi_read_word( RG_SDIO_IF_MISC_CTRL);
 
-    if((reg_tmp & BIT(23)) != 1)
+    if((reg_tmp & BIT(23)) != BIT(23))
     {
         reg_tmp |= BIT(23);
         hif->hif_ops.hi_write_word( RG_SDIO_IF_MISC_CTRL, reg_tmp);
@@ -1865,7 +1865,7 @@ int  aml_sdio_init(void)
 {
     int err = 0;
 
-    amlwifi_set_sdio_host_clk(sdioclk);
+    //amlwifi_set_sdio_host_clk(sdioclk);
 
     set_usb_wifi_power(0);
     msleep(500);
