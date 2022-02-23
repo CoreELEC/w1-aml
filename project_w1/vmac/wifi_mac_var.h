@@ -134,7 +134,7 @@ struct vm_wlan_net_vif_params
 #define DEFAULT_P2P_ACTION_RETRY_TIMES 5
 #define DEFAULT_MGMT_RETRY_INTERVAL 100
 #define DEFAULT_P2P_ACTION_RETRY_INTERVAL 50
-#define FIRST_AUTH_RETRY_INTERVAL_DUE_TO_CHANNEL_SWITCH 500
+#define DEFAULT_AUTH_RETRY_INTERVAL 512
 
 #define WIFINET_PS_MAX_QUEUE  100
 
@@ -440,6 +440,7 @@ struct wifi_mac
     unsigned char wm_rx_streams;
 
     struct list_head wm_amsdu_txq;
+    struct list_head free_amsdu_list;
     struct os_timer_ext wm_amsdu_flush_timer;
     spinlock_t wm_amsdu_txq_lock;
     /*buffered msdu num of per tid*/
@@ -467,7 +468,7 @@ struct wifi_mac
     unsigned char wm_esco_en;
     unsigned char wm_bt_en;
 
-    enum wifi_mac_recovery_state fw_recovery_stat;
+    enum wifi_mac_recovery_state recovery_stat;
     struct os_timer_ext wm_monitor_fw;
     spinlock_t fw_stat_lock;
 
@@ -632,6 +633,7 @@ struct wlan_net_vif
     struct wifi_mac_wmm_tspec_element tspecs[WME_AC_NUM][TS_DIR_IDX_COUNT];
     struct wifi_mac_app_ie_t app_ie[WIFINET_APPIE_NUM_OF_FRAME];
     struct wifi_mac_app_ie_t assocrsp_ie;
+    struct wifi_mac_app_ie_t assocreq_ie;
     struct wifi_mac_pwrsave_t vm_pwrsave;
     unsigned char vm_ht40_intolerant;
 

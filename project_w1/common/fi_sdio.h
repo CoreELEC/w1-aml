@@ -17,9 +17,11 @@
 #ifndef _FI_SDIO_H
 #define _FI_SDIO_H
 
-#define PRODUCT_AMLOGIC  0x8888
+#define PRODUCT_AMLOGIC 0x8888
 #define VENDOR_AMLOGIC  0x8888
-#define  HOST_VERSION  1234
+#define  HOST_VERSION   1234
+#define FW_VERSION_W1   0x1
+#define FW_VERSION_W1U  0x2
 
  /* memory mapping for wifi space */
 #define MAC_ICCM_AHB_BASE    0x00000000
@@ -249,7 +251,8 @@ enum
 };
 
 //friwmare version
-#define FW_UNUSED_IRQ_VERSION  0x0000
+#define FW_UNUSED_IRQ_VERSION   0x0000
+#define FW_IRQ_VERSION          FW_VERSION_W1
 
 /* Ack policy */
 /*Explicit BA*/
@@ -796,11 +799,12 @@ typedef struct Fw_TxPriv
 /*use in HW_TxVector option address, for key */
 typedef struct HW_TxOption
 {
-        unsigned char Reserve[2];
-        unsigned char pkt_position;
-        unsigned char KeyIdex;
-        //tkip/ccmp use 8B, wpi use 16B
-        unsigned char PN[16];
+    unsigned char is_bc;
+    unsigned char key_type;
+    unsigned char pkt_position;
+    unsigned char KeyIdex;
+    //tkip/ccmp use 8B, wpi use 16B
+    unsigned char PN[16];
 } HW_TxOption;
 
 #define HI_TXDESC_DATAOFFSET  ((size_t) &(((struct hi_tx_desc *)0)->txdata))

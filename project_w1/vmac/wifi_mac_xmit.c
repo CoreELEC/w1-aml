@@ -2617,12 +2617,7 @@ int wifi_mac_send_auth(struct wlan_net_vif *wnet_vif,struct wifi_station *sta,vo
     if (wnet_vif->vm_opmode == WIFINET_M_STA)
     {
         DPRINTF(AML_DEBUG_TIMER,"TIMERdbg <running> %s %d \n",__func__,__LINE__);
-        if (wnet_vif->mgmt_pkt_retry_count == 0) {
-            os_timer_ex_start_period(&wnet_vif->vm_mgtsend, FIRST_AUTH_RETRY_INTERVAL_DUE_TO_CHANNEL_SWITCH);
-
-        } else {
-            os_timer_ex_start_period(&wnet_vif->vm_mgtsend, DEFAULT_MGMT_RETRY_INTERVAL);
-        }
+        os_timer_ex_start_period(&wnet_vif->vm_mgtsend, DEFAULT_AUTH_RETRY_INTERVAL);
     }
     return 0;
 }
@@ -2656,11 +2651,22 @@ int aml_rsn_sync_pmkid(struct wifi_station *sta, int pmkid_index)
     struct wlan_net_vif *wnet_vif = sta->sta_wnet_vif;
     struct wifi_mac_Rsnparms *rsn = &sta->sta_rsn;
     unsigned char *frm = wnet_vif->vm_opt_ie;
-    unsigned char pmkid_count_index;
-    unsigned char gm_cipher_suite[4];
-    unsigned char rsn_ie_len = frm[1];
+    unsigned char *rsnie = NULL;
+    unsigned char rsn_ie_len = 0, pmkid_pos = 0;
+    int idx = 0, rsnie_offset = 0, pmkid_count;
 
-    if (wnet_vif->vm_opt_ie_len <= 0) {
+    while (idx < wnet_vif->vm_opt_ie_len) {
+        if (frm[idx] == WIFINET_ELEMID_RSN) {
+            rsnie = frm + idx;
+            rsn_ie_len = frm[idx+IE_LEN_OFFSET];
+            pmkid_pos = rsn->rsn_caps_offset + 2 + 2; // 2: rsn_caps_len; 2: pmkid_cnt
+            rsnie_offset = rsnie - frm;
+            break;
+        }
+        idx += (frm[idx+IE_LEN_OFFSET] + IE_HDR_LEN);
+    }
+
+    if (wnet_vif->vm_opt_ie_len <= 0 || rsnie == NULL) {
         DPRINTF(AML_DEBUG_WARNING, "RSN ie invalid\n");
         return WIFINET_REASON_IE_INVALID;
     }
@@ -2668,11 +2674,15 @@ int aml_rsn_sync_pmkid(struct wifi_station *sta, int pmkid_index)
     if (pmkid_index != -1) {
         if (rsn->rsn_pmkid_count == 0) {
             DPRINTF(AML_DEBUG_WARNING, "no rsn pmkid, need to add\n");
-            frm[IE_HDR_LEN + rsn_ie_len - 6] = 1;
-            memcpy(gm_cipher_suite, frm + IE_HDR_LEN + rsn_ie_len - OUI_LEN, OUI_LEN);
-            memcpy(frm + IE_HDR_LEN + rsn_ie_len - OUI_LEN, wnet_vif->pmk_list->pmkid_cache[pmkid_index].pmkid, WPA_PMKID_LEN);
-            memcpy(frm + IE_HDR_LEN + rsn_ie_len - OUI_LEN + WPA_PMKID_LEN, gm_cipher_suite, OUI_LEN);
-            frm[IE_LEN_OFFSET] += WPA_PMKID_LEN;
+            memcpy(rsnie+pmkid_pos+WPA_PMKID_LEN,rsnie+pmkid_pos,wnet_vif->vm_opt_ie_len-rsnie_offset-pmkid_pos);
+            rsnie[rsn->rsn_caps_offset + 2] = 1;
+            rsnie[rsn->rsn_caps_offset + 3] = 0;
+            rsn->rsn_pmkid_offset = pmkid_pos;
+            memcpy(rsnie + pmkid_pos, wnet_vif->pmk_list->pmkid_cache[pmkid_index].pmkid, WPA_PMKID_LEN);
+            memcpy(rsn->rsn_pmkid, wnet_vif->pmk_list->pmkid_cache[pmkid_index].pmkid, WPA_PMKID_LEN);
+            rsnie[IE_LEN_OFFSET] += WPA_PMKID_LEN;
+            wnet_vif->vm_opt_ie_len += WPA_PMKID_LEN;
+            rsn->rsn_pmkid_count++;
 
         } else {
             if (memcmp(rsn->rsn_pmkid, wnet_vif->pmk_list->pmkid_cache[pmkid_index].pmkid, WPA_PMKID_LEN)) {
@@ -2681,8 +2691,8 @@ int aml_rsn_sync_pmkid(struct wifi_station *sta, int pmkid_index)
                     rsn->rsn_pmkid[7], rsn->rsn_pmkid[8], rsn->rsn_pmkid[9], rsn->rsn_pmkid[10], rsn->rsn_pmkid[11], rsn->rsn_pmkid[12], rsn->rsn_pmkid[13],
                     rsn->rsn_pmkid[14], rsn->rsn_pmkid[15]);
 
-                memcpy(wnet_vif->vm_opt_ie + rsn->rsn_pmkid_offset, wnet_vif->pmk_list->pmkid_cache[pmkid_index].pmkid, WPA_PMKID_LEN);
-
+                memcpy(rsnie+rsn->rsn_pmkid_offset, wnet_vif->pmk_list->pmkid_cache[pmkid_index].pmkid, WPA_PMKID_LEN);
+                memcpy(rsn->rsn_pmkid, wnet_vif->pmk_list->pmkid_cache[pmkid_index].pmkid, WPA_PMKID_LEN);
             } else {
                 DPRINTF(AML_DEBUG_WARNING, "pmkid the same\n");
             }
@@ -2693,15 +2703,24 @@ int aml_rsn_sync_pmkid(struct wifi_station *sta, int pmkid_index)
             DPRINTF(AML_DEBUG_WARNING, "no rsn pmkid, just return, not delete\n");
             return 0;
         }
+        pmkid_count = rsnie[rsn->rsn_caps_offset + 2] | (rsnie[rsn->rsn_caps_offset + 3] << 8);
+        DPRINTF(AML_DEBUG_WARNING, "delete rsn pmkid:%d\n", pmkid_count);
 
-        DPRINTF(AML_DEBUG_WARNING, "delete rsn pmkid\n");
-        pmkid_count_index = rsn->rsn_pmkid_offset - 2;
-        wnet_vif->vm_opt_ie_len -= WPA_PMKID_LEN;
-        frm[IE_LEN_OFFSET] -= WPA_PMKID_LEN;
-        frm[pmkid_count_index] = 0;
-        frm[pmkid_count_index + 1] = 0;
+        rsnie[IE_LEN_OFFSET] -= pmkid_count * WPA_PMKID_LEN;
+        rsnie[rsn->rsn_caps_offset + 2] = 0;
+        rsnie[rsn->rsn_caps_offset + 3] = 0;
+        memcpy(rsnie + pmkid_pos, rsnie + pmkid_pos + (WPA_PMKID_LEN * pmkid_count),
+            wnet_vif->vm_opt_ie_len - rsnie_offset - pmkid_pos - (WPA_PMKID_LEN * pmkid_count));
+        memset(rsn->rsn_pmkid, 0, WPA_PMKID_LEN);
+        rsn_ie_len -= (WPA_PMKID_LEN * pmkid_count);
+        wnet_vif->vm_opt_ie_len -= (WPA_PMKID_LEN * pmkid_count);
+        rsn->rsn_pmkid_count -= pmkid_count;
+        if (rsn->rsn_pmkid_count == 0) {
+            rsn->rsn_pmkid_offset = 0;
 
-        memcpy((frm+ pmkid_count_index + 2), (frm + rsn->rsn_pmkid_offset + WPA_PMKID_LEN), OUI_LEN);
+        } else {
+            ERROR_DEBUG_OUT("BUG!\n");
+        }
     }
 
     return 0;
@@ -2856,6 +2875,7 @@ int wifi_mac_send_assoc_req(struct wlan_net_vif *wnet_vif, struct wifi_station *
 #endif//#ifdef CONFIG_P2P
 
     os_skb_trim(skb, frm - os_skb_data(skb));
+    wifi_mac_save_app_ie(&wnet_vif->assocreq_ie, os_skb_data(skb) + 4/*sizeof(capinfo+listen int)*/,os_skb_get_pktlen(skb) - 4);
     wifi_mac_mgmt_output(sta, skb, type);
     DPRINTF(AML_DEBUG_TIMER, "TIMERdbg <running> %s %d \n",__func__,__LINE__);
     os_timer_ex_start_period(&wnet_vif->vm_mgtsend, DEFAULT_MGMT_RETRY_INTERVAL);

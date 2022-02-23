@@ -197,14 +197,10 @@ struct country_na_freq_set country_na_freq_plan_list [] =
         }
     },
     //0x01 :US
-    {7, {
+    {3, {
             {81, {CHAN_2_FREQ_2G(12), CHAN_2_FREQ_2G(13), 0}},
             {83, {CHAN_2_FREQ_2G(8 + 2), CHAN_2_FREQ_2G(9 + 2), 0}},
-            {84, {CHAN_2_FREQ_2G(12 - 2), CHAN_2_FREQ_2G(13 - 2), 0}},
-            {121, {CHAN_2_FREQ_5G(144), 0}},
-            {122, {CHAN_2_FREQ_5G(140 + 2), 0}},
-            {123, {CHAN_2_FREQ_5G(144 - 2), 0}},
-            {128, {CHAN_2_FREQ_5G(138), 0}}
+            {84, {CHAN_2_FREQ_2G(12 - 2), CHAN_2_FREQ_2G(13 - 2), 0}}
         }
     },
     //0x02 :E.R/JP/FR
@@ -273,7 +269,7 @@ struct country_na_freq_set country_na_freq_plan_list [] =
     },
     //0x0a :ID
     {1, {
-            {128, {CHAN_2_FREQ_5G(42),CHAN_2_FREQ_5G(58),CHAN_2_FREQ_5G(106), CHAN_2_FREQ_5G(122), CHAN_2_FREQ_5G(138)}}
+            {128, {CHAN_2_FREQ_5G(42),CHAN_2_FREQ_5G(58),CHAN_2_FREQ_5G(106), CHAN_2_FREQ_5G(122), CHAN_2_FREQ_5G(138), 0}}
         }
     },
     //0x0b :TW
@@ -290,7 +286,20 @@ struct country_na_freq_set country_na_freq_plan_list [] =
             {128, {CHAN_2_FREQ_5G(122), CHAN_2_FREQ_5G(138), 0}}
         }
     },
-    //0x0c :KZ
+    //0x0c :AE
+    {1, {
+            {121, {CHAN_2_FREQ_5G(144), 0}}
+        }
+    },
+    //0x0d :AR
+    {4, {
+            {121, {CHAN_2_FREQ_5G(120), CHAN_2_FREQ_5G(124), CHAN_2_FREQ_5G(128), 0}},
+            {122, {CHAN_2_FREQ_5G(116 + 2), CHAN_2_FREQ_5G(124 + 2), 0}},
+            {123, {CHAN_2_FREQ_5G(120 - 2), CHAN_2_FREQ_5G(128 - 2), 0}},
+            {128, {CHAN_2_FREQ_5G(122), 0}}
+        }
+    },
+    //0x0e :KZ
     {4, {
             {121, {CHAN_2_FREQ_5G(100), CHAN_2_FREQ_5G(104), CHAN_2_FREQ_5G(108), CHAN_2_FREQ_5G(112), CHAN_2_FREQ_5G(116), CHAN_2_FREQ_5G(120), CHAN_2_FREQ_5G(124), CHAN_2_FREQ_5G(128)}},
             {122, {CHAN_2_FREQ_5G(100+2), CHAN_2_FREQ_5G(108+2), CHAN_2_FREQ_5G(116+2), CHAN_2_FREQ_5G(124+2), 0}},
@@ -336,23 +345,35 @@ struct country_chan_plan country_chan_plan_list[] = {
     /* 0x10 */ {4,  {81,83,84,125,0,0,0,0,0,0,0,0,0,0,0,0,0},                         0xff, 0,                   TX_POWER_FCC}, //Peru
     /* 0x11 */ {13, {81,83,84,118,119,120,121,122,123,125,126,127,128,0,0,0,0},       0x0b, DFS_5G_B2|DFS_5G_B3, TX_POWER_FCC}, //Taiwan
     /* 0x12 */ {16, {81,83,84,115,116,117,118,119,120,121,122,123,125,126,127,128,0}, 0xff, DFS_5G_B1|DFS_5G_B2, TX_POWER_CE}, //Thailand
-    /* 0x13 */ {13, {81,83,84,115,116,117,118,119,120,121,122,123,128,0,0,0,0},       0x0c, DFS_5G_B2|DFS_5G_B3, TX_POWER_CE}, //Kazakhstan
+    /* 0x13 */ {6,  {81,83,84,115,118,121,0,0,0,0,0,0,0,0,0,0,0},                     0x0c, DFS_5G_B2|DFS_5G_B3, TX_POWER_CE}, //United Arab Emirates
+    /* 0x14 */ {15, {81,83,84,115,116,117,118,119,120,121,122,123,125,126,127,128,0}, 0x0d, DFS_5G_B2|DFS_5G_B3, TX_POWER_CE}, //Argentina
+    /* 0x15 */ {6,  {81,83,84,115,118,125,0,0,0,0,0,0,0,0,0,0,0},                     0xff, DFS_5G_B2,           TX_POWER_CE}, //Bahrain
+    /* 0x16 */ {3,  {81,83,84,0,0,0,0,0,0,0,0,0,0,0,0,0,0},                           0xff, 0,                   TX_POWER_CE}, //Costa Rica
+    /* 0x17 */ {5,  {81,83,84,115,118,0,0,0,0,0,0,0,0,0,0,0,0},                       0xff, DFS_5G_B2,           TX_POWER_CE}, //Armenia
+    /* 0x18 */ {4,  {81,83,84,115,0,0,0,0,0,0,0,0,0,0,0,0,0},                         0xff, 0,                   TX_POWER_CE}, //Jordan
+    /* 0x19 */ {7,  {81,83,84,124,126,127,128,0,0,0,0,0,0,0,0,0,0},                   0x0a, 0,                   TX_POWER_CE}, //North Korea
+    /* 0x1A */ {7,  {81,83,84,115,118,121,125,0,0,0,0,0,0,0,0,0,0},                   0x0c, DFS_5G_B2|DFS_5G_B3, TX_POWER_CE}, //Sri Lanka
+    /* 0x1B */ {16, {81,83,84,115,116,117,118,119,120,121,122,123,125,126,127,128,0}, 0x08, 0,                   TX_POWER_CE}, //Ukraine
+    /* 0x1C */ {16, {81,83,84,115,116,117,118,119,120,121,122,123,125,126,127,128,0}, 0xff, DFS_5G_B2|DFS_5G_B3|DFS_5G_B4, TX_POWER_CE}, //Great Britain
+    /* 0x1D */ {13, {81,83,84,115,116,117,118,119,120,121,122,123,128,0,0,0,0},       0x0e, DFS_5G_B2|DFS_5G_B3, TX_POWER_CE}, //Kazakhstan
+    /* 0x1E */ {17, {81,82,83,84,115,116,117,118,119,120,121,122,123,125,126,127,128},0xff, 0,                   TX_POWER_DEFAULT}, //Global
 
 };
 
 struct country_chan_mapping  country_chan_mapping_list[] = {
     {"WW", 0x00}, /* Worldwide */
+    {"GO", 0x1E}, /* Global */
     {"AD", 0x04}, /* Andorra */
-    {"AE", 0x00}, /* United Arab Emirates */
+    {"AE", 0x13}, /* United Arab Emirates */
     {"AF", 0x00}, /* Afghanistan */
     {"AG", 0x02}, /* Antigua & Barbuda */
     {"AI", 0x04}, /* Anguilla(UK) */
     {"AL", 0x04}, /* Albania */
-    {"AM", 0x04}, /* Armenia */
+    {"AM", 0x17}, /* Armenia */
     {"AN", 0x02}, /* Netherlands Antilles */
     {"AO", 0x00}, /* Angola */
     {"AQ", 0x04}, /* Antarctica */
-    {"AR", 0x00}, /* Argentina */
+    {"AR", 0x14}, /* Argentina */
     {"AS", 0x02}, /* American Samoa */
     {"AT", 0x04}, /* Austria */
     {"AU", 0x0A}, /* Australia */
@@ -363,20 +384,20 @@ struct country_chan_mapping  country_chan_mapping_list[] = {
     {"BD", 0x04}, /* Bangladesh */
     {"BE", 0x04}, /* Belgium */
     {"BF", 0x04}, /* Burkina Faso */
-    {"BG", 0x04}, /* Bulgaria */
-    {"BH", 0x01}, /* Bahrain */
+    {"BG", 0x06}, /* Bulgaria */
+    {"BH", 0x15}, /* Bahrain */
     {"BI", 0x04}, /* Burundi */
     {"BJ", 0x04}, /* Benin */
     {"BM", 0x02}, /* Bermuda (UK) */
-    {"BN", 0x00}, /* Brunei */
-    {"BO", 0x00}, /* Bolivia */
+    {"BN", 0x0E}, /* Brunei */
+    {"BO", 0x0E}, /* Bolivia */
     {"BR", 0x0C}, /* Brazil */
     {"BS", 0x02}, /* Bahamas */
     {"BT", 0x04}, /* Bhutan */
     {"BV", 0x04}, /* Bouvet Island (Norway) */
     {"BW", 0x00}, /* Botswana */
     {"BY", 0x04}, /* Belarus */
-    {"BZ", 0x02}, /* Belize */
+    {"BZ", 0x0E}, /* Belize */
     {"CA", 0x08}, /* Canada */
     {"CC", 0x04}, /* Cocos (Keeling) Islands (Australia) */
     {"CD", 0x04}, /* Congo, Republic of the */
@@ -389,7 +410,7 @@ struct country_chan_mapping  country_chan_mapping_list[] = {
     {"CM", 0x04}, /* Cameroon */
     {"CN", 0x01}, /* China */
     {"CO", 0x07}, /* Colombia */
-    {"CR", 0x02}, /* Costa Rica */
+    {"CR", 0x16}, /* Costa Rica */
     {"CV", 0x04}, /* Cape Verde */
     {"CX", 0x0A}, /* Christmas Island (Australia) */
     {"CY", 0x04}, /* Cyprus */
@@ -398,11 +419,11 @@ struct country_chan_mapping  country_chan_mapping_list[] = {
     {"DJ", 0x04}, /* Djibouti */
     {"DK", 0x04}, /* Denmark */
     {"DM", 0x02}, /* Dominica */
-    {"DO", 0x02}, /* Dominican Republic */
+    {"DO", 0x07}, /* Dominican Republic */
     {"DZ", 0x03}, /* Algeria */
-    {"EC", 0x02}, /* Ecuador */
+    {"EC", 0x0C}, /* Ecuador */
     {"EE", 0x04}, /* Estonia */
-    {"EG", 0x00}, /* Egypt */
+    {"EG", 0x17}, /* Egypt */
     {"EH", 0x00}, /* Western Sahara */
     {"ER", 0x04}, /* Eritrea */
     {"ES", 0x04}, /* Spain, Canary Islands, Ceuta, Melilla */
@@ -415,7 +436,7 @@ struct country_chan_mapping  country_chan_mapping_list[] = {
     {"FO", 0x04}, /* Faroe Islands (Denmark) */
     {"FR", 0x04}, /* France */
     {"GA", 0x04}, /* Gabon */
-    {"GB", 0x0b}, /* Great Britain (United Kingdom; England) */
+    {"GB", 0x1C}, /* Great Britain (United Kingdom; England) */
     {"GD", 0x02}, /* Grenada */
     {"GE", 0x04}, /* Georgia */
     {"GF", 0x04}, /* French Guiana */
@@ -429,13 +450,13 @@ struct country_chan_mapping  country_chan_mapping_list[] = {
     {"GQ", 0x04}, /* Equatorial Guinea */
     {"GR", 0x04}, /* Greece */
     {"GS", 0x04}, /* South Georgia and the Sandwich Islands (UK) */
-    {"GT", 0x00}, /* Guatemala */
+    {"GT", 0x07}, /* Guatemala */
     {"GU", 0x02}, /* Guam (USA) */
     {"GW", 0x04}, /* Guinea-Bissau */
     {"GY", 0x00}, /* Guyana */
     {"HK", 0x0C}, /* Hong Kong */
     {"HM", 0x0A}, /* Heard and McDonald Islands (Australia) */
-    {"HN", 0x00}, /* Honduras */
+    {"HN", 0x0C}, /* Honduras */
     {"HR", 0x04}, /* Croatia */
     {"HT", 0x02}, /* Haiti */
     {"HU", 0x04}, /* Hungary */
@@ -445,13 +466,13 @@ struct country_chan_mapping  country_chan_mapping_list[] = {
     {"IM", 0x04}, /* Isle of Man (UK) */
     {"IN", 0x09}, /* India */
     {"IO", 0x04}, /* British Indian Ocean Territory (UK) */
-    {"IQ", 0x04}, /* Iraq */
+    {"IQ", 0x01}, /* Iraq */
     {"IR", 0x06}, /* Iran */
     {"IS", 0x04}, /* Iceland */
     {"IT", 0x04}, /* Italy */
     {"JE", 0x04}, /* Jersey (UK) */
     {"JM", 0x00}, /* Jamaica */
-    {"JO", 0x00}, /* Jordan */
+    {"JO", 0x18}, /* Jordan */
     {"JP", 0x05}, /* Japan- Telec */
     {"KE", 0x00}, /* Kenya */
     {"KG", 0x04}, /* Kyrgyzstan */
@@ -459,33 +480,34 @@ struct country_chan_mapping  country_chan_mapping_list[] = {
     {"KI", 0x04}, /* Kiribati */
     {"KM", 0x04}, /* Comoros */
     {"KN", 0x02}, /* Saint Kitts and Nevis */
+    {"KP", 0x19}, /* North Korea */
     {"KR", 0x0f}, /* South Korea */
-    {"KW", 0x00}, /* Kuwait */
+    {"KW", 0x16}, /* Kuwait */
     {"KY", 0x02}, /* Cayman Islands (UK) */
-    {"KZ", 0x13}, /* Kazakhstan */
+    {"KZ", 0x1D}, /* Kazakhstan */
     {"LA", 0x04}, /* Laos */
-    {"LB", 0x04}, /* Lebanon */
+    {"LB", 0x10}, /* Lebanon */
     {"LC", 0x02}, /* Saint Lucia */
-    {"LI", 0x00}, /* Liechtenstein */
-    {"LK", 0x04}, /* Sri Lanka */
+    {"LI", 0x04}, /* Liechtenstein */
+    {"LK", 0x1A}, /* Sri Lanka */
     {"LR", 0x04}, /* Liberia */
     {"LS", 0x04}, /* Lesotho */
     {"LT", 0x04}, /* Lithuania */
     {"LU", 0x04}, /* Luxembourg */
     {"LV", 0x04}, /* Latvia */
     {"LY", 0x04}, /* Libya */
-    {"MA", 0x00}, /* Morocco */
-    {"MC", 0x04}, /* Monaco */
+    {"MA", 0x16}, /* Morocco */
+    {"MC", 0x06}, /* Monaco */
     {"MD", 0x04}, /* Moldova */
     {"ME", 0x04}, /* Montenegro */
     {"MF", 0x02}, /* Saint Martin */
     {"MG", 0x04}, /* Madagascar */
     {"MH", 0x02}, /* Marshall Islands (USA) */
-    {"MK", 0x04}, /* Republic of Macedonia (FYROM) */
+    {"MK", 0x13}, /* Republic of Macedonia (FYROM) */
     {"ML", 0x04}, /* Mali */
     {"MM", 0x04}, /* Burma (Myanmar) */
     {"MN", 0x04}, /* Mongolia */
-    {"MO", 0x00}, /* Macau */
+    {"MO", 0x01}, /* Macau */
     {"MP", 0x02}, /* Northern Mariana Islands (USA) */
     {"MQ", 0x04}, /* Martinique (France) */
     {"MR", 0x04}, /* Mauritania */
@@ -501,7 +523,7 @@ struct country_chan_mapping  country_chan_mapping_list[] = {
     {"NC", 0x04}, /* New Caledonia */
     {"NE", 0x04}, /* Niger */
     {"NF", 0x0A}, /* Norfolk Island (Australia) */
-    {"NG", 0x00}, /* Nigeria */
+    {"NG", 0x0C}, /* Nigeria */
     {"NI", 0x02}, /* Nicaragua */
     {"NL", 0x04}, /* Netherlands */
     {"NO", 0x04}, /* Norway */
@@ -509,30 +531,30 @@ struct country_chan_mapping  country_chan_mapping_list[] = {
     {"NR", 0x04}, /* Nauru */
     {"NU", 0x0B}, /* Niue */
     {"NZ", 0x0B}, /* New Zealand */
-    {"OM", 0x04}, /* Oman */
-    {"PA", 0x02}, /* Panama */
+    {"OM", 0x15}, /* Oman */
+    {"PA", 0x07}, /* Panama */
     {"PE", 0x10}, /* Peru */
     {"PF", 0x04}, /* French Polynesia (France) */
     {"PG", 0x00}, /* Papua New Guinea */
-    {"PH", 0x00}, /* Philippines */
-    {"PK", 0x00}, /* Pakistan */
+    {"PH", 0x0C}, /* Philippines */
+    {"PK", 0x19}, /* Pakistan */
     {"PL", 0x04}, /* Poland */
     {"PM", 0x04}, /* Saint Pierre and Miquelon (France) */
-    {"PR", 0x02}, /* Puerto Rico */
+    {"PR", 0x07}, /* Puerto Rico */
     {"PT", 0x04}, /* Portugal */
     {"PW", 0x02}, /* Palau */
     {"PY", 0x02}, /* Paraguay */
-    {"QA", 0x00}, /* Qatar */
+    {"QA", 0x0B}, /* Qatar */
     {"RE", 0x04}, /* Reunion (France) */
     {"RO", 0x04}, /* Romania */
     {"RS", 0x04}, /* Serbia, Kosovo */
-    {"RU", 0x0d}, /* Russia(fac/gost), Kaliningrad */
+    {"RU", 0x0D}, /* Russia(fac/gost), Kaliningrad */
     {"RW", 0x04}, /* Rwanda */
-    {"SA", 0x00}, /* Saudi Arabia */
+    {"SA", 0x01}, /* Saudi Arabia */
     {"SB", 0x04}, /* Solomon Islands */
     {"SC", 0x02}, /* Seychelles */
     {"SE", 0x04}, /* Sweden */
-    {"SG", 0x0c}, /* Singapore */
+    {"SG", 0x0C}, /* Singapore */
     {"SH", 0x04}, /* Saint Helena (UK) */
     {"SI", 0x04}, /* Slovenia */
     {"SJ", 0x04}, /* Svalbard (Norway) */
@@ -543,8 +565,9 @@ struct country_chan_mapping  country_chan_mapping_list[] = {
     {"SO", 0x04}, /* Somalia */
     {"SR", 0x00}, /* Suriname */
     {"ST", 0x02}, /* Sao Tome and Principe */
-    {"SV", 0x00}, /* El Salvador */
+    {"SV", 0x16}, /* El Salvador */
     {"SX", 0x02}, /* Sint Marteen */
+    {"SY", 0x16}, /* Syria */
     {"SZ", 0x04}, /* Swaziland */
     {"TC", 0x04}, /* Turks and Caicos Islands (UK) */
     {"TD", 0x04}, /* Chad */
@@ -554,32 +577,32 @@ struct country_chan_mapping  country_chan_mapping_list[] = {
     {"TJ", 0x04}, /* Tajikistan */
     {"TK", 0x0A}, /* Tokelau */
     {"TM", 0x04}, /* Turkmenistan */
-    {"TN", 0x00}, /* Tunisia */
+    {"TN", 0x17}, /* Tunisia */
     {"TO", 0x04}, /* Tonga */
     {"TR", 0x04}, /* Turkey, Northern Cyprus */
-    {"TT", 0x02}, /* Trinidad & Tobago */
+    {"TT", 0x0C}, /* Trinidad & Tobago */
     {"TV", 0x00}, /* Tuvalu */
     {"TW", 0x11}, /* Taiwan */
     {"TZ", 0x04}, /* Tanzania */
-    {"UA", 0x00}, /* Ukraine */
+    {"UA", 0x1B}, /* Ukraine */
     {"UG", 0x04}, /* Uganda */
     {"US", 0x02}, /* United States of America (USA) */
-    {"UY", 0x00}, /* Uruguay */
+    {"UY", 0x0A}, /* Uruguay */
     {"UZ", 0x06}, /* Uzbekistan */
     {"VA", 0x04}, /* Holy See (Vatican City) */
     {"VC", 0x02}, /* Saint Vincent and the Grenadines */
-    {"VE", 0x00}, /* Venezuela */
+    {"VE", 0x0E}, /* Venezuela */
     {"VG", 0x02}, /* British Virgin Islands (UK) */
     {"VI", 0x02}, /* United States Virgin Islands (USA) */
-    {"VN", 0x00}, /* Vietnam */
+    {"VN", 0x0C}, /* Vietnam */
     {"VU", 0x04}, /* Vanuatu */
     {"WF", 0x04}, /* Wallis and Futuna (France) */
     {"WS", 0x02}, /* Samoa */
-    {"YE", 0x04}, /* Yemen */
+    {"YE", 0x16}, /* Yemen */
     {"YT", 0x04}, /* Mayotte (France) */
-    {"ZA", 0x00}, /* South Africa */
+    {"ZA", 0x0C}, /* South Africa */
     {"ZM", 0x04}, /* Zambia */
-    {"ZW", 0x04}  /* Zimbabwe */
+    {"ZW", 0x16}  /* Zimbabwe */
 };
 
 

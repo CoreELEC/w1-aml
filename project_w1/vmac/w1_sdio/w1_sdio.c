@@ -1,6 +1,13 @@
 #include "w1_sdio.h"
 #include <linux/mutex.h>
 
+#include "chip_pmu_reg.h"
+#include "chip_intf_reg.h"
+#include "wifi_intf_addr.h"
+#include "wifi_drv_reg_ops.h"
+#include "rf_d_top_reg.h"
+#include "wifi_coex_addr.h"
+
 struct amlw1_hwif_sdio g_w1_hwif_sdio;
 struct amlw1_hif_ops g_w1_hif_ops;
 
@@ -9,6 +16,8 @@ unsigned char w1_sdio_driver_insmoded;
 unsigned char w1_sdio_after_porbe;
 unsigned char wifi_in_insmod;
 unsigned char  wifi_sdio_access = 1;
+unsigned int  shutdown_i = 0;
+#define  I2C_CLK_QTR   0x4
 
 static DEFINE_MUTEX(wifi_bt_sdio_mutex);
 
@@ -233,14 +242,30 @@ int aml_w1_sdio_bottom_read(unsigned char func_num, int addr, void *buf, size_t 
 {
     void *kmalloc_buf = NULL;
     int result;
-    int align_len = 0;    
+    int align_len = 0;
 
     ASSERT(func_num != SDIO_FUNC0);
 
     if (!wifi_sdio_access) {
-        ERROR_DEBUG_OUT("fw recovery downloading\n");
-        return -1;
+        if (func_num == SDIO_FUNC5) {
+            /*SDIO_FUNC5 ignor*/
+            ERROR_DEBUG_OUT("SDIO_FUNC5, func num %d, addr 0x%08x\n", func_num, addr);
+
+        } else if (func_num == SDIO_FUNC1) {
+            /*SDIO_FUNC1 ignor*/
+            ERROR_DEBUG_OUT("SDIO_FUNC1, func num %d, addr 0x%08x\n", func_num, addr);
+
+        }  else if ((func_num == SDIO_FUNC2) && (addr == 0x00005080)) {
+            /*SDIO_FUNC2 && 0x00005080 ignor*/
+            ERROR_DEBUG_OUT("SDIO_FUNC1, func num %d, addr 0x%08x\n", func_num, addr);
+
+        } else {
+            ERROR_DEBUG_OUT("fw recovery downloading, func num %d, addr 0x%08x\n", func_num, addr);
+            return -1;
+        }
     }
+
+
     aml_wifi_sdio_power_lock();
 
     if (host_wake_w1_req != NULL)
@@ -305,9 +330,24 @@ int aml_w1_sdio_bottom_write(unsigned char func_num, int addr, void *buf, size_t
     int result;
 
     if (!wifi_sdio_access) {
-        ERROR_DEBUG_OUT("fw recovery downloading\n");
-        return -1;
+        if (func_num == SDIO_FUNC5) {
+            /*SDIO_FUNC5 ignor*/
+            ERROR_DEBUG_OUT("SDIO_FUNC5, func num %d, addr 0x%08x\n", func_num, addr);
+
+        } else if (func_num == SDIO_FUNC1) {
+            /*SDIO_FUNC1 ignor*/
+            ERROR_DEBUG_OUT("SDIO_FUNC1, func num %d, addr 0x%08x\n", func_num, addr);
+
+        }  else if ((func_num == SDIO_FUNC2) && (addr == 0x00005080)) {
+            /*SDIO_FUNC2 && 0x00005080 ignor*/
+            ERROR_DEBUG_OUT("SDIO_FUNC2, func num %d, addr 0x%08x\n", func_num, addr);
+
+        } else {
+            ERROR_DEBUG_OUT("fw recovery downloading, func num %d, addr 0x%08x\n", func_num, addr);
+            return -1;
+        }
     }
+
     aml_wifi_sdio_power_lock();
     ASSERT(func_num != SDIO_FUNC0);
 
@@ -820,6 +860,340 @@ static int aml_sdio_pm_resume(struct device *device)
         return 0;
 }
 
+
+void write_byte_8ba(unsigned char Bus, unsigned char SlaveAddr,
+    unsigned char RegAddr, unsigned char Data)
+{
+    unsigned int tmp,cnt = 0;
+
+    // Set the I2C bus to 100khz
+    tmp = aml_w1_sdio_read_word(I2C_CONTROL_REG);
+    tmp = (tmp & (~(0x3FF << I2C_CLOCK_OFFSET))) | (I2C_CLK_QTR << I2C_CLOCK_OFFSET);
+    aml_w1_sdio_write_word(I2C_CONTROL_REG, tmp);
+
+    // Set the I2C Address
+    aml_w1_sdio_write_word(I2C_SLAVE_ADDR, SlaveAddr);
+    // Fill the token registers
+    tmp = aml_w1_sdio_read_word(I2C_TOKEN_LIST_REG0);
+    tmp = (I2C_END  << 16)             |
+            (I2C_DATA << 12)             |    // Write Data
+            (I2C_DATA << 8)              |    // Write RegAddr
+            (I2C_SLAVE_ADDR_WRITE << 4)  |
+            (I2C_START << 0);
+    aml_w1_sdio_write_word(I2C_TOKEN_LIST_REG0, tmp);
+
+    // Fill the write data registers
+    aml_w1_sdio_write_word(I2C_TOKEN_WDATA_REG0,(Data << 8) | (RegAddr << 0));
+    // Start and Wait
+    tmp = aml_w1_sdio_read_word(I2C_CONTROL_REG);
+    tmp &= (~(1 << 0));
+    aml_w1_sdio_write_word(I2C_CONTROL_REG, tmp);
+    tmp |= ( (1 << 0));
+    aml_w1_sdio_write_word(I2C_CONTROL_REG, tmp);
+
+    do {
+        tmp  = aml_w1_sdio_read_word(I2C_CONTROL_REG);
+
+        cnt++;
+        if (cnt == 1000) {
+            printk("-------[ERR]-----> i2c[W] err\n");
+            break;
+        }
+    } while (tmp & (1 << 2));
+
+}
+
+unsigned char read_byte_8ba(unsigned char Bus, unsigned char SlaveAddr, unsigned char RegAddr)
+{
+    //struct hw_interface* hif = hif_get_hw_interface();
+    unsigned int tmp,cnt = 0;
+
+    // Set the I2C bus to 100khz
+    tmp = aml_w1_sdio_read_word(I2C_CONTROL_REG);
+    tmp = (tmp & (~(0x3FF << I2C_CLOCK_OFFSET))) | (I2C_CLK_QTR << I2C_CLOCK_OFFSET);
+    aml_w1_sdio_write_word(I2C_CONTROL_REG, tmp);
+
+    // Set the I2C Address
+    aml_w1_sdio_write_word(I2C_SLAVE_ADDR, SlaveAddr);
+    // Fill the token registers
+    tmp = aml_w1_sdio_read_word(I2C_TOKEN_LIST_REG0);
+    tmp =   (I2C_END  << 24)             |
+            (I2C_DATA_LAST << 20)        |  // this is a data read
+            (I2C_SLAVE_ADDR_READ << 16)  |
+            (I2C_START << 12)            |
+            (I2C_DATA << 8)              |  // This is a data write
+            (I2C_SLAVE_ADDR_WRITE << 4)  |
+            (I2C_START << 0);
+    aml_w1_sdio_write_word(I2C_TOKEN_LIST_REG0, tmp);
+
+    // Fill the write data registers
+    aml_w1_sdio_write_word(I2C_TOKEN_WDATA_REG0,(RegAddr << 0));
+    // Start and Wait
+    tmp = aml_w1_sdio_read_word(I2C_CONTROL_REG);
+    tmp &= (~(1 << 0));
+    aml_w1_sdio_write_word(I2C_CONTROL_REG, tmp);
+    tmp |= ( (1 << 0));
+    aml_w1_sdio_write_word(I2C_CONTROL_REG, tmp);
+
+    do {
+        tmp  = aml_w1_sdio_read_word(I2C_CONTROL_REG);
+
+        cnt++;
+        if (cnt == 1000) {
+            printk("-------[ERR]-----> i2c[W] err\n");
+            break;
+        }
+    } while (tmp & (1 << 2));
+
+    tmp  = aml_w1_sdio_read_word(I2C_TOKEN_RDATA_REG0) & 0xff;
+    return (unsigned char)tmp;
+}
+
+
+//void write_rdaddr_32ba(U8 Bus, U8 SlaveAddr, U32 TkData0, U32 TkData1)
+void write_word_32ba(unsigned char Bus, unsigned char SlaveAddr,
+    unsigned int StartToken, unsigned int Data)
+{
+    //struct hw_interface* hif = hif_get_hw_interface();
+    unsigned int tmp,cnt = 0;
+
+    //printk("%s(%d) token 0x%x data 0x%x\n", __func__, __LINE__, StartToken,Data);
+
+    // Set the I2C bus to 100khz
+    tmp = aml_w1_sdio_read_word(I2C_CONTROL_REG);
+    tmp = (tmp & (~(0x3FF << I2C_CLOCK_OFFSET))) | (I2C_CLK_QTR << I2C_CLOCK_OFFSET);
+    aml_w1_sdio_write_word(I2C_CONTROL_REG, tmp);
+
+    // Set the I2C Address
+    aml_w1_sdio_write_word(I2C_SLAVE_ADDR, SlaveAddr);
+    // Fill the token registers
+    tmp = aml_w1_sdio_read_word(I2C_TOKEN_LIST_REG0);
+    tmp =   (I2C_END << 28)              |    //
+            (I2C_DATA << 24)             |    //
+            (I2C_DATA << 20)             |    //
+            (I2C_DATA << 16)             |    //
+            (I2C_DATA << 12)             |    //
+            (I2C_DATA << 8)              |    //  This shall be related to start token (token = 0x04 for receiving paddr,  token = 0x00 for receiving pwdata)
+            (I2C_SLAVE_ADDR_WRITE << 4)  |
+            (I2C_START << 0);
+    aml_w1_sdio_write_word(I2C_TOKEN_LIST_REG0, tmp);
+
+    //Fill the write data registers
+    aml_w1_sdio_write_word(I2C_TOKEN_WDATA_REG0,StartToken | (Data<<8));
+    aml_w1_sdio_write_word(I2C_TOKEN_WDATA_REG1,(Data >> 24));
+    //Start and Wait
+    tmp = aml_w1_sdio_read_word(I2C_CONTROL_REG);
+    tmp &= (~(1 << 0));
+    aml_w1_sdio_write_word(I2C_CONTROL_REG, tmp);
+    tmp |= ( (1 << 0));
+    aml_w1_sdio_write_word(I2C_CONTROL_REG, tmp);
+
+    tmp = 0;
+    do {
+        tmp  = aml_w1_sdio_read_word(I2C_CONTROL_REG);
+
+        cnt++;
+        if (cnt == 100000) {
+            ERROR_DEBUG_OUT("-------[ERR]-----> i2c[W] err\n");
+            break;
+        }
+    } while (tmp & (1 << 2));
+}
+
+unsigned int read_word_32ba(unsigned int SlaveAddr, unsigned int RegAddr)
+{
+    //struct hw_interface* hif = hif_get_hw_interface();
+    unsigned int tmp,cnt = 0;
+
+    // Set the I2C bus to 100khz
+    tmp = aml_w1_sdio_read_word(I2C_CONTROL_REG);
+    tmp = (tmp & (~(0x3FF << I2C_CLOCK_OFFSET))) | (I2C_CLK_QTR << I2C_CLOCK_OFFSET);
+    aml_w1_sdio_write_word(I2C_CONTROL_REG, tmp);
+
+    // Set the I2C Address
+    aml_w1_sdio_write_word(I2C_SLAVE_ADDR, SlaveAddr);
+    // Fill the token registers
+    tmp = aml_w1_sdio_read_word(I2C_TOKEN_LIST_REG0);
+    tmp =    (I2C_DATA  << 28)            |
+             (I2C_DATA  << 24)            |
+             (I2C_DATA  << 20)            |
+             (I2C_SLAVE_ADDR_READ  << 16) |  // the second burst is for READ
+             (I2C_START << 12)            |  // after addr pointer has been reset to 0x00, we start a new burst for reading data out
+             (I2C_DATA  << 8)             |  // This shall be related a 0x00 written into rf i2c in order to reset addr pointer to 0x00
+             (I2C_SLAVE_ADDR_WRITE << 4)  |  // the first burst is for WRITE token 0x00 to reset addr pointer
+             (I2C_START << 0);               // start the first burst
+    aml_w1_sdio_write_word(I2C_TOKEN_LIST_REG0, tmp);
+
+    tmp = aml_w1_sdio_read_word(I2C_TOKEN_LIST_REG1);
+    tmp = (I2C_END       << 4) | (I2C_DATA_LAST << 0);
+    aml_w1_sdio_write_word(I2C_TOKEN_LIST_REG1, tmp);
+
+    // Fill the write data registers
+    aml_w1_sdio_write_word(I2C_TOKEN_WDATA_REG0,RegAddr << 0);
+    aml_w1_sdio_write_word(I2C_TOKEN_WDATA_REG1,0);
+    // Start and Wait
+    tmp = aml_w1_sdio_read_word(I2C_CONTROL_REG);
+    tmp &= (~(1 << 0));
+    aml_w1_sdio_write_word(I2C_CONTROL_REG, tmp);
+    tmp |= ( (1 << 0));
+    aml_w1_sdio_write_word(I2C_CONTROL_REG, tmp);
+
+    tmp = 0;
+    do {
+        tmp  = aml_w1_sdio_read_word(I2C_CONTROL_REG);
+
+        cnt++;
+        if (cnt == 100000) {
+            ERROR_DEBUG_OUT("-------[ERR]-----> i2c[R] err\n");
+            break;
+        }
+    } while( tmp & (1 << 2));
+
+    tmp = aml_w1_sdio_read_word(I2C_TOKEN_RDATA_REG0);
+    return tmp;
+}
+
+unsigned int rf_i2c_read(unsigned int reg_addr)
+{
+    unsigned char bus = 0;
+    unsigned int slave_addr = 0x7a;
+    unsigned int read_data = 0;
+    unsigned int start_token;
+
+    start_token = 0x04;
+
+    /* 0x4-0x7 save address of read register in slave device*/
+    write_word_32ba(bus, slave_addr, start_token, reg_addr);
+
+    /* 0x0-0x3 save address of read data in slave device*/
+    read_data = read_word_32ba(slave_addr, 0x0);
+    return read_data;
+}
+
+void rf_i2c_write(unsigned int reg_addr, unsigned int data)
+{
+    unsigned char bus = 0;
+    unsigned int slave_addr = 0x7a;
+    unsigned int start_token;
+
+    /* 0x0-0x3 save address of write data in slave device*/
+    start_token = 0x00;  //for data to be written in
+    write_word_32ba(bus, slave_addr, 0x00, data);
+
+    //system_wait(1);
+
+    /* 0x4-0x7 save address of write register in slave device*/
+    start_token = 0x04;  //for address to be written to
+    write_word_32ba(bus, slave_addr, start_token, reg_addr);
+
+    write_byte_8ba(bus, slave_addr, 0x8, bus);
+}
+
+void config_pmu_reg_off(void)
+{
+    int value_pmu_A12 = 0;
+    int value_pmu_A15 = 0;
+    int value_pmu_A17 = 0;
+    int value_pmu_A18 = 0;
+    int value_pmu_A20 = 0;
+    int value_pmu_A22 = 0;
+    int value_pmu_A24 = 0;
+    int value_aon30   = 0;
+
+    RG_AON_A30_FIELD_T reg_aon30_data;
+    RG_AON_A29_FIELD_T reg_aon29_data;
+
+    unsigned char host_req_status= 0;
+    unsigned int reg_val = 0;
+
+    //reg_val = rf_read_register(RG_TOP_A2);
+    reg_val = rf_i2c_read(RG_TOP_A2);
+    reg_val = reg_val &(~0x1f);
+    /*RF enter sx mode*/
+    // reg_val = reg_val |(0x15 );
+
+    /*RF enter sleep mode*/
+    //reg_val = reg_val |(0x10 );
+
+    /*2.4G sx mode*/
+    reg_val |= 0x15;
+    rf_i2c_write(RG_TOP_A2, reg_val);
+
+    /*infor BT ,wifi not work*/
+    reg_val  = aml_w1_sdio_read_word(RG_PMU_A16);
+    reg_val &= (~BIT(31));
+    aml_w1_sdio_write_word(RG_PMU_A16, reg_val);
+
+    /*close all WIFI coexist thread*/
+    reg_val  = aml_w1_sdio_read_word(RG_COEX_WF_OWNER_CTRL);
+    reg_val &= (~BIT(28) );
+    aml_w1_sdio_write_word(RG_COEX_WF_OWNER_CTRL, reg_val);
+
+    {
+        value_pmu_A12 = aml_w1_sdio_read_word(RG_PMU_A12);
+        value_pmu_A15 = aml_w1_sdio_read_word(RG_PMU_A15);
+        value_pmu_A17 = aml_w1_sdio_read_word(RG_PMU_A17);
+        value_pmu_A18 = aml_w1_sdio_read_word(RG_PMU_A18);
+        value_pmu_A20 = aml_w1_sdio_read_word(RG_PMU_A20);
+        value_pmu_A22 = aml_w1_sdio_read_word(RG_PMU_A22);
+        value_pmu_A24 = aml_w1_sdio_read_word(RG_PMU_A24);
+        value_aon30   = aml_w1_sdio_read_word(RG_AON_A30);
+        printk("%s power off: before write A12=0x%x, A15=0x%x, A17=0x%x, A18=0x%x, A20=0x%x, A22=0x%x, A24=0x%x, AON30=0x%x\n",
+            __func__, value_pmu_A12,value_pmu_A15,value_pmu_A17,value_pmu_A18,value_pmu_A20,value_pmu_A22,value_pmu_A24, value_aon30);
+
+        aml_w1_sdio_write_word(RG_INTF_CPU_CLK, 0x4f070001);
+
+        reg_aon29_data.data = aml_w1_sdio_read_word(RG_AON_A29);
+        reg_aon29_data.b.rg_ana_bpll_cfg |= BIT(1) | BIT(0);
+        aml_w1_sdio_write_word(RG_AON_A29, reg_aon29_data.data);
+
+        aml_w1_sdio_write_word(RG_PMU_A12, 0x8ea2e);
+        aml_w1_sdio_write_word(RG_PMU_A14, 0x1);
+        aml_w1_sdio_write_word(RG_PMU_A16, 0x0);
+        aml_w1_sdio_write_word(RG_PMU_A22, 0x707);
+        aml_w1_sdio_write_word(RG_PMU_A18, 0x8700);
+        aml_w1_sdio_write_word(RG_PMU_A20, 0x3ff01ff);
+        aml_w1_sdio_write_word(RG_PMU_A17, 0x703);
+        //aml_w1_sdio_write_word(RG_PMU_A24, 0x3f20000);
+
+        reg_aon30_data.data = aml_w1_sdio_read_word(RG_AON_A30);
+        /* change rf to idle mode */
+        reg_aon30_data.b.rg_always_on_cfg4 |= BIT(12);
+        aml_w1_sdio_write_word(RG_AON_A30, reg_aon30_data.data);
+
+        value_pmu_A12 = aml_w1_sdio_read_word(RG_PMU_A12);
+        value_pmu_A15 = aml_w1_sdio_read_word(RG_PMU_A15);
+        value_pmu_A17 = aml_w1_sdio_read_word(RG_PMU_A17);
+        value_pmu_A18 = aml_w1_sdio_read_word(RG_PMU_A18);
+        value_pmu_A20 = aml_w1_sdio_read_word(RG_PMU_A20);
+        value_pmu_A22 = aml_w1_sdio_read_word(RG_PMU_A22);
+        value_pmu_A24 = aml_w1_sdio_read_word(RG_PMU_A24);
+        value_aon30   = aml_w1_sdio_read_word(RG_AON_A30);
+        printk("%s power off: after write A12=0x%x, A15=0x%x, A17=0x%x, A18=0x%x, A20=0x%x, A22=0x%x, A24=0x%x, AON30=0x%x\n",
+            __func__, value_pmu_A12,value_pmu_A15,value_pmu_A17,value_pmu_A18,value_pmu_A20,value_pmu_A22,value_pmu_A24, value_aon30);
+
+        //force wifi pmu fsm to sleep mode
+        host_req_status = (0x8 << 1)| BIT(0);
+        aml_w1_sdio_bottom_write8(SDIO_FUNC1, 0x221, host_req_status);
+    }
+}
+
+static void aml_sdio_shutdown(struct device *device)
+{
+    printk("===>>> enter %s <<<===\n", __func__);
+    shutdown_i += 1;
+    if (shutdown_i == 1) {
+        config_pmu_reg_off();
+    } else if (shutdown_i == 7) {
+        shutdown_i = 0;
+        printk("===>>> end <<<===\n");
+    } else {
+        ;
+    }
+    printk("=== shutdown_i:%d ===\n", shutdown_i);
+}
+
+
 static SIMPLE_DEV_PM_OPS(aml_sdio_pm_ops, aml_sdio_pm_suspend,
                      aml_sdio_pm_resume);
 
@@ -838,6 +1212,7 @@ static struct sdio_driver aml_w1_sdio_driver =
     .probe = aml_w1_sdio_probe,
     .remove = aml_w1_sdio_remove,
     .drv.pm = &aml_sdio_pm_ops,
+    .drv.shutdown = aml_sdio_shutdown,
 };
 
 #ifdef NOT_AMLOGIC_PLATFORM

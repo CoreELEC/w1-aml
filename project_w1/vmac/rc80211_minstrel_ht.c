@@ -1161,7 +1161,8 @@ minstrel_ht_update_caps(void *priv, struct ieee80211_supported_band *sband,
 
 		if (gflags & IEEE80211_TX_RC_80_MHZ_WIDTH) {
 			if (sta->bandwidth < IEEE80211_STA_RX_BW_80 ||
-				!(vht_cap->cap & IEEE80211_VHT_CAP_SHORT_GI_80)) {
+				((gflags & IEEE80211_TX_RC_SHORT_GI) &&
+				!(vht_cap->cap & IEEE80211_VHT_CAP_SHORT_GI_80))) {
 				continue;
 			}
 		}

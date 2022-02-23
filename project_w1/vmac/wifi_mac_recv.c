@@ -369,7 +369,7 @@ int wifi_mac_input(void *station, struct sk_buff *skb, struct wifi_mac_rx_status
                                 else if (!WIFINET_ADDR_EQ(temp_nsta->sta_macaddr, wnet_vif->vm_myaddr))
                                 {
                                     printk("<running> %s %d \n",__func__,__LINE__);
-                                    wifi_mac_sta_disconnect(temp_nsta);
+                                    wifi_mac_sta_disconnect_from_ap(temp_nsta);
                                     wifi_mac_add_wds_addr(&wnet_vif->vm_sta_tbl, sta, wh4->i_addr4);
                                 }
                             }
@@ -441,9 +441,7 @@ int wifi_mac_input(void *station, struct sk_buff *skb, struct wifi_mac_rx_status
                         sta_wds = wifi_mac_find_wds_sta(nt, wh4->i_addr4);
                         if ((sta_wds != NULL) && (sta_wds != sta))
                         {
-                            WIFINET_NODE_LOCK(nt);
-                            (void) wifi_mac_rm_wds_addr(nt,wh4->i_addr4);
-                            WIFINET_NODE_UNLOCK(nt);
+                            wifi_mac_rm_sta(nt, wh4->i_addr4);
                             wifi_mac_add_wds_addr(nt, sta, wh4->i_addr4);
                         }
                         if (sta_wds == NULL)
@@ -452,9 +450,8 @@ int wifi_mac_input(void *station, struct sk_buff *skb, struct wifi_mac_rx_status
                             if (temp_nsta)
                             {
                                 printk("<running> %s %d \n",__func__,__LINE__);
-                                wifi_mac_sta_disconnect(temp_nsta);
+                                wifi_mac_sta_disconnect_from_ap(temp_nsta);
                             }
-                            wifi_mac_add_wds_addr(nt, sta, wh4->i_addr4);
                         }
                     }
 
@@ -1903,7 +1900,6 @@ int wifi_mac_parse_own_rsn(struct wifi_station *sta, unsigned char *frm)
 
     } else {
         printk("not pmkid\n");
-        rsn->rsn_pmkid_count = 0;
         rsn->rsn_pmkid_offset = 0;
     }
 
@@ -1912,7 +1908,7 @@ int wifi_mac_parse_own_rsn(struct wifi_station *sta, unsigned char *frm)
         index += OUI_LEN;
     }
 
-    WIFINET_DPRINTF(AML_DEBUG_WARNING, "RSN pmkid_count:%d, pmkid_offset:%d", rsn->rsn_pmkid_count, rsn->rsn_pmkid_offset);
+    WIFINET_DPRINTF(AML_DEBUG_WARNING, "RSN_len:%d, pmkid_count:%d, pmkid_offset:%d", len, rsn->rsn_pmkid_count, rsn->rsn_pmkid_offset);
     return 0;
 }
 
@@ -3157,7 +3153,9 @@ void wifi_mac_recv_beacon(struct wlan_net_vif *wnet_vif,
         int hash = STA_HASH(wh->i_addr2);
 
         /* check if the channel is an candidate channel*/
-        wifi_mac_update_roaming_candidate_chan(wnet_vif, &scan, rssi);
+        if (scan.ssid) {
+            wifi_mac_update_roaming_candidate_chan(wnet_vif, &scan, rssi);
+        }
 
         WIFI_SCAN_SE_LIST_LOCK(st);
         list_for_each_entry_safe(se, si_next, &st->st_hash[hash], se_hash) {
@@ -3693,7 +3691,7 @@ static void wifi_mac_recv_auth(struct wlan_net_vif *wnet_vif,
 
     if ((sta->sta_associd) && (wnet_vif->vm_opmode == WIFINET_M_HOSTAP)) {
         printk("sta try connect, but associd:%d not zero\n", sta->sta_associd);
-        wifi_mac_sta_disconnect(sta);
+        wifi_mac_sta_disconnect_from_ap(sta);
         return;
     }
 
@@ -3804,7 +3802,7 @@ void wifi_mac_recv_assoc_req(struct wlan_net_vif *wnet_vif,
             //arg = 2;
             //wifi_mac_send_mgmt(sta, resp, (void *)&arg);
             if (sta != wnet_vif->vm_mainsta) {
-                //wifi_mac_sta_disconnect(sta);
+                //wifi_mac_sta_disconnect_from_ap(sta);
             }
            // return;
         }
@@ -3981,7 +3979,7 @@ void wifi_mac_recv_assoc_req(struct wlan_net_vif *wnet_vif,
                 arg = reason;
                 printk("<running> %s %d reason=%d\n",__func__,__LINE__, reason);
                 wifi_mac_send_mgmt(sta, WIFINET_FC0_SUBTYPE_DEAUTH, (void *)&arg);
-                wifi_mac_sta_disconnect(sta);
+                wifi_mac_sta_disconnect_from_ap(sta);
                 wnet_vif->vif_sts.sts_rx_assoc_wpa_mismatch++;
                 return;
             }
@@ -4004,7 +4002,7 @@ void wifi_mac_recv_assoc_req(struct wlan_net_vif *wnet_vif,
             WIFINET_DPRINTF_MACADDR( AML_DEBUG_ANY, wh->i_addr2,
                 "deny %s request, capability mismatch 0x%x", reassoc ? "reassoc" : "assoc", capinfo);
             wifi_mac_send_mgmt(sta, resp, (void *)&arg);
-            wifi_mac_sta_disconnect(sta);
+            wifi_mac_sta_disconnect_from_ap(sta);
             wnet_vif->vif_sts.sts_rx_assoc_cap_mismatch++;
             return;
         }
@@ -4025,7 +4023,7 @@ void wifi_mac_recv_assoc_req(struct wlan_net_vif *wnet_vif,
                 WIFINET_DPRINTF_MACADDR( AML_DEBUG_ANY,wh->i_addr2,
                     "deny %s request, short slot time capability mismatch 0x%x", reassoc ? "reassoc": "assoc", capinfo);
                 wifi_mac_send_mgmt(sta, resp, (void *)&arg);
-                wifi_mac_sta_disconnect(sta);
+                wifi_mac_sta_disconnect_from_ap(sta);
                 wnet_vif->vif_sts.sts_rx_assoc_cap_mismatch++;
                 return;
             }
@@ -4127,7 +4125,7 @@ void wifi_mac_recv_assoc_req(struct wlan_net_vif *wnet_vif,
                     WIFINET_DPRINTF_MACADDR(AML_DEBUG_ANY, wh->i_addr2,
                         "deny %s request, non-11n station (in N-only mode)", reassoc ? "reassoc" : "assoc");
                     wifi_mac_send_mgmt(sta, resp, (void *)&arg);
-                    wifi_mac_sta_disconnect(sta);
+                    wifi_mac_sta_disconnect_from_ap(sta);
                     wnet_vif->vif_sts.sts_rx_assoc_cap_mismatch++;
                     return;
                 }
@@ -4298,11 +4296,9 @@ void wifi_mac_recv_assoc_rsp(struct wlan_net_vif *wnet_vif,
     } else {
         return;
     }
-
+    wifi_mac_save_app_ie(&wnet_vif->assocrsp_ie, os_skb_data(skb) + sizeof(struct wifi_frame) + 6/*sizeof(capinfo+status+associd)*/,os_skb_get_pktlen(skb) - sizeof(struct wifi_frame)- 6);
     wifi_mac_notify_nsta_connect(sta, 1);
     wifi_mac_new_assoc(sta, 0);
-
-    wifi_mac_save_app_ie(&wnet_vif->assocrsp_ie, os_skb_data(skb) + 6/*sizeof(capinfo+status+associd)*/,os_skb_get_pktlen(skb) - 6);
     vm_cfg80211_notify_mgmt_rx(wnet_vif, channel, os_skb_data(skb), os_skb_get_pktlen(skb));
     if ((sta->sta_flags & WIFINET_NODE_VHT) && (drv_priv->drv_config.cfg_dynamic_bw == 1)) {
         #ifdef DYNAMIC_BW
@@ -4355,7 +4351,7 @@ void wifi_mac_recv_deauth(struct wlan_net_vif *wnet_vif,
 
             case WIFINET_M_HOSTAP:
                 if (sta != wnet_vif->vm_mainsta)
-                    wifi_mac_sta_disconnect(sta);
+                    wifi_mac_sta_disconnect_from_ap(sta);
                 break;
 
             default:
@@ -4419,7 +4415,7 @@ void wifi_mac_recv_disassoc(struct wlan_net_vif *wnet_vif,
 
             case WIFINET_M_HOSTAP:
                 if (sta != wnet_vif->vm_mainsta) {
-                    wifi_mac_sta_disconnect(sta);
+                    wifi_mac_sta_disconnect_from_ap(sta);
                 }
                 break;
 
@@ -4802,9 +4798,7 @@ void wifi_mac_recv_mgmt(struct wifi_station *sta, struct sk_buff *skb,
             if ((subtype ==  WIFINET_FC0_SUBTYPE_AUTH)
                 || (subtype ==  WIFINET_FC0_SUBTYPE_ASSOC_REQ)
                 || (subtype ==  WIFINET_FC0_SUBTYPE_REASSOC_REQ)) {
-                WIFINET_NODE_LOCK(nt);
-                (void) wifi_mac_rm_wds_addr(nt,wh->i_addr2);
-                WIFINET_NODE_UNLOCK(nt);
+                wifi_mac_rm_sta(nt,wh->i_addr2);
                 sta = wifi_mac_bup_bss(wnet_vif,wh->i_addr2);
                 if (sta == NULL) {
                     return;

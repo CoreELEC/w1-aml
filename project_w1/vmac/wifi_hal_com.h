@@ -523,8 +523,6 @@ struct  hal_work_task
     struct hi_tx_desc *pTxDPape;
     struct sk_buff *ampduskb;
     unsigned char txqueueid;
-    unsigned char staid;
-    unsigned short SN;
 } ;
 
  struct fw_rx_desc
@@ -630,7 +628,6 @@ struct  hw_interface
     unsigned long callback;
     unsigned char valid;
     unsigned char txqueueid;
-    unsigned short SN;
 } ;
 
 #define MAX_PN_LEN      16
@@ -641,10 +638,6 @@ struct  hw_interface
 #define MAX_TX_QUEUE    1   //tx PN of all tids are merged into one ac, we can keep the increase
 #define TX_UNICAST_REPCNT_ID 0
 
-#define DP_AC_BK          3  /* Background                          */
-#define DP_AC_BE          2  /* Best effort                         */
-#define DP_AC_VI          1  /* Video                                   */
-#define DP_AC_VO          0  /* Voice                                   */
 
     unsigned char txPN[MAX_TX_QUEUE/*macx ac queue num*/][MAX_PN_LEN]; //see HW_TxOption PN
     unsigned char rxPN[MAX_RX_QUEUE/*macx ac queue num*/][MAX_PN_LEN]; //see HW_RxDescripter_bit PN
@@ -959,6 +952,8 @@ struct hal_layer_ops
     struct Tx_FrameDesc tx_frames[WIFI_MAX_TXFRAME];
     unsigned long tx_frames_map[BITS_TO_LONGS(WIFI_MAX_TXFRAME)];
     unsigned int txPageFreeNum;  //the num of free tx pages
+    unsigned int fwRecoveryCnt;
+    unsigned long fwRecoveryStamp;
     struct unicastReplayCnt  uRepCnt[WIFI_MAX_VID][WIFI_MAX_STA];
     struct multicastReplayCnt mRepCnt[WIFI_MAX_VID];
 

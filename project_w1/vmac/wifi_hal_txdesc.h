@@ -18,5 +18,8 @@ unsigned char hal_mac_frame_type( unsigned int frame_control, unsigned int type 
 unsigned int max_send_packet_len(unsigned char rate,unsigned char bw, unsigned char short_gi, unsigned char streams);
 
 char hw_rate2tv_format(unsigned char rate);
+void assign_tx_desc_pn(unsigned char is_bc, unsigned char vid,
+    unsigned char sta_id, struct hi_tx_desc *tx_page, unsigned char encrypt_type);
+
 extern struct wifi_cfg_mib  wifi_conf_mib;
 #endif//_AML_TXDESC_H_

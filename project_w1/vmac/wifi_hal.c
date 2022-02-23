@@ -1087,7 +1087,6 @@ static int hal_alloc_tx_id(struct hal_private * hal_priv,struct fw_txdesc_fifo *
     }
 
     set_bit(id, hal_priv->tx_frames_map);
-    hal_priv->tx_frames[id].SN = pTxDescFiFo->SN;
     hal_priv->tx_frames[id].txqueueid= pTxDescFiFo->txqueueid;
     hal_priv->tx_frames[id].callback= pTxDescFiFo->callback;
     hal_priv->tx_frames[id].skb = NULL;
@@ -1140,6 +1139,10 @@ void hal_txframe_pre(void)
             //if the queue has mpdus to tx, do once
             if (CO_SharedFifoEmpty(pTxShareFifo, CO_TX_BUFFER_MAKE))
             {
+                if ((txqueueid == HAL_WME_NOQOS)
+                    && (hif->HiStatus.Tx_Done_num - hif->HiStatus.Tx_Free_num > 32)) {
+                    return;
+                }
                 EltPtr = CO_SharedFifoPick(pTxShareFifo, CO_TX_BUFFER_MAKE);
                 pTxDescFiFo = (struct fw_txdesc_fifo *)EltPtr;
 
@@ -1149,7 +1152,6 @@ void hal_txframe_pre(void)
                     return ;
                 }
                 pTxDescFiFo->pTxDPape->TxPriv.hostcallbackid= (unsigned char)id;
-                pTxDescFiFo->pTxDPape->TxPriv.SN= pTxDescFiFo->SN;
 
                 STATUS = CO_SharedFifoGet(pTxShareFifo, CO_TX_BUFFER_MAKE, 1, &EltPtr);
                 STATUS = CO_SharedFifoPut(pTxShareFifo, CO_TX_BUFFER_MAKE, 1);
@@ -1172,7 +1174,6 @@ void hal_txframe_pre(void)
                 return ;
             }
             pTxDescFiFo->pTxDPape->TxPriv.hostcallbackid = id;
-            pTxDescFiFo->pTxDPape->TxPriv.SN= pTxDescFiFo->SN;
             STATUS = CO_SharedFifoGet(pTxShareFifo, CO_TX_BUFFER_MAKE, 1, &EltPtr);
             ASSERT(STATUS == CO_STATUS_OK);
             STATUS = CO_SharedFifoPut(pTxShareFifo, CO_TX_BUFFER_MAKE, 1);
@@ -1301,7 +1302,7 @@ void  hal_tx_frame(void)
                 AML_PRINT(AML_DBG_MODULES_TX, "TxPriv.aggr_page_num:%d <= txPageFreeNum:%d, TxPriv.AggrNum:%d <= q_fifo_set_cnt:%d, "\
                     "AggrNum:%d + mpdu_num:%d, aggr_page_num:%d, len:%d, sn:%d(0x%04x)\n",
                     pTxDPape->TxPriv.aggr_page_num, hal_priv->txPageFreeNum, pTxDPape->TxPriv.AggrNum, q_fifo_set_cnt,
-                    AggrNum, mpdu_num, aggr_page_num, pTxDPape->TxPriv.AggrLen, pTxDescFiFo->SN, pTxDescFiFo->SN);
+                    AggrNum, mpdu_num, aggr_page_num, pTxDPape->TxPriv.AggrLen, pTxDPape->TxPriv.SN, pTxDPape->TxPriv.SN);
 #endif
                 do
                 {
@@ -1315,7 +1316,8 @@ void  hal_tx_frame(void)
                     ASSERT(STATUS==CO_STATUS_OK);
 
 #if defined (HAL_FPGA_VER)
-
+                   assign_tx_desc_pn(pTxDPape->TxOption.is_bc, pTxDPape->TxPriv.vid,
+                        pTxDPape->TxPriv.StaId, pTxDPape, pTxDPape->TxOption.key_type);
                     ASSERT(scat_req->scat_count == mpdu_num);
                     scat_req->scat_list[mpdu_num].skbbuf = pTxDescFiFo->ampduskb; // need to free
                     scat_req->scat_list[mpdu_num].packet = pTxDPape;
@@ -1486,10 +1488,9 @@ struct sk_buff *hal_fill_agg_start(struct hi_agg_tx_desc *HI_AGG,struct hi_tx_pr
 
     /*for callback after tx completing */
     pTxDescFiFo->callback = HI_TxPriv->hostreserve;
-    pTxDescFiFo->SN = HI_TxPriv->Seqnum;
     pTxDescFiFo->txqueueid = txqueueid;
-    pTxDescFiFo->staid = HI_AGG->StaId;
     pTxDescFiFo->pTxDPape = pTxDPape;
+    pTxDPape->TxPriv.SN = HI_TxPriv->Seqnum;
 
     pTxDPape->TxPriv.PageNum = hal_calc_mpdu_page(HI_TxPriv->MPDULEN);
     pTxDPape->MPDUBufFlag = HW_FIRST_MPDUBUF_FLAG|HW_FIRST_AGG_FLAG|HW_LAST_MPDUBUF_FLAG;
@@ -1569,13 +1570,12 @@ struct sk_buff *hal_fill_priv(struct hi_tx_priv_hdr* HI_TxPriv,unsigned char que
   #endif
 
     pTxDescFiFo->callback = HI_TxPriv->hostreserve;
-    pTxDescFiFo->SN = HI_TxPriv->Seqnum;
     pTxDescFiFo->txqueueid = txqueueid;
-    pTxDescFiFo->staid = pFirstTxDPape->TxPriv.StaId;
     pTxDescFiFo->pTxDPape =pTxDPape;
 
     hal_tx_desc_build_sub(HI_TxPriv,pTxDPape, pFirstTxDPape);
     pTxDPape->TxOption.pkt_position = AML_PKT_IN_HAL;
+    pTxDPape->TxPriv.SN = HI_TxPriv->Seqnum;
 #if defined (HAL_FPGA_VER)
     if (g_dbg_modules & AML_DBG_MODULES_HAL_TX)
     {
@@ -1658,7 +1658,6 @@ int hal_get_agg_pend_cnt(void)
                     break;//how to handle this situation
                 }
                 pTxDescFiFo->pTxDPape->TxPriv.hostcallbackid= (unsigned char)id;
-                pTxDescFiFo->pTxDPape->TxPriv.SN= pTxDescFiFo->SN;
             }
 
             STATUS = CO_SharedFifoPut(pTxShareFifo, CO_TX_BUFFER_MAKE, 1);
@@ -1778,6 +1777,7 @@ void hal_get_sts(unsigned int op_code, unsigned int ctrl_code)
         {
             printk("en_beacon[0]=%d\nen_beacon[1]=%d\n", hal_priv->sts_en_bcn[0], hal_priv->sts_en_bcn[1]);
             printk("dis_beacon[0]=%d\ndis_beacon[1]=%d\n", hal_priv->sts_dis_bcn[0], hal_priv->sts_dis_bcn[1]);
+            printk("hal:fw recovery cnt %d last stamp %lu\n", hal_priv->fwRecoveryCnt, hal_priv->fwRecoveryStamp);
 
             printk("hal:tx_free_page %d \n", hal_priv->txPageFreeNum);
             printk("hal:tx_ok_num:%d, tx_fail_num:%d\n", hif->HiStatus.tx_ok_num, hif->HiStatus.tx_fail_num);

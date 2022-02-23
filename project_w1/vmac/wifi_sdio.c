@@ -1313,6 +1313,7 @@ static void aml_customer_gpio_wlan_ctrl(int onoff)
 }
 
 extern void set_usb_wifi_power(int is_on);
+extern unsigned char wifi_sdio_access;
 #ifdef SDIO_BUILD_IN
 static void config_pmu_reg(bool is_power_on)
 {
@@ -1363,24 +1364,29 @@ static void config_pmu_reg(bool is_power_on)
         reg_bg12_data.data = hif->hif_ops.hi_read_word(RG_BG_A12);
         reg_bg12_data.b.RG_WF_BG_EN = 1;
         hif->hif_ops.hi_write_word(RG_BG_A12, reg_bg12_data.data);
-        
+
         // switch rf dig to rf ldo
         reg_bg16_data.data = hif->hif_ops.hi_read_word(RG_BG_A16);
         reg_bg16_data.b.RG_WF_DVDD_LDO_EN = 1;
         hif->hif_ops.hi_write_word(RG_BG_A16, reg_bg16_data.data);
-        
+
         //delay for rfldo work ok. xosc clock here.
         msleep(20);
-        
+
         // switch off rf dig from dvdd09_ao
         reg_bg16_data.data = hif->hif_ops.hi_read_word(RG_BG_A16);
         reg_bg16_data.b.RG_WF_SLEEP_ENB = 1;
         hif->hif_ops.hi_write_word(RG_BG_A16, reg_bg16_data.data);
-        
+
         //delay for rfldo work ok. xosc clock here.
         msleep(2);
 
-        hif->hif_ops.hi_write_word(RG_PMU_A12, 0x2a2c);
+        /* recovery config */
+        if (wifi_sdio_access == 0)
+            hif->hif_ops.hi_write_word(RG_PMU_A12, 0x16a2c);
+        /* default */
+        else
+            hif->hif_ops.hi_write_word(RG_PMU_A12, 0x2a2c);
         hif->hif_ops.hi_write_word(RG_PMU_A14, 0x1);
         hif->hif_ops.hi_write_word(RG_PMU_A17, 0x700);
         hif->hif_ops.hi_write_word(RG_PMU_A20, 0x0);
@@ -1428,12 +1434,12 @@ static void config_pmu_reg(bool is_power_on)
         reg_bg16_data.data = hif->hif_ops.hi_read_word(RG_BG_A16);
         reg_bg16_data.b.RG_WF_SLEEP_ENB = 0;
          hif->hif_ops.hi_write_word(RG_BG_A16, reg_bg16_data.data);
-        
+
         // switch rf dig ldo off
         reg_bg16_data.data = hif->hif_ops.hi_read_word(RG_BG_A16);
         reg_bg16_data.b.RG_WF_DVDD_LDO_EN = 0;
         hif->hif_ops.hi_write_word(RG_BG_A16, reg_bg16_data.data);
-        
+
         // delay for aoldo work ok.
         msleep(2);
         // close bg ldo
@@ -1441,17 +1447,20 @@ static void config_pmu_reg(bool is_power_on)
         reg_bg12_data.b.RG_WF_BG_EN = 0;
         hif->hif_ops.hi_write_word(RG_BG_A12, reg_bg12_data.data);
 
-        hif->hif_ops.hi_write_word(RG_INTF_CPU_CLK, 0x4f070001);
-
         reg_aon29_data.data = hif->hif_ops.hi_read_word(RG_AON_A29);
         reg_aon29_data.b.rg_ana_bpll_cfg |= BIT(1) | BIT(0);
         hif->hif_ops.hi_write_word(RG_AON_A29, reg_aon29_data.data);
 
-        hif->hif_ops.hi_write_word(RG_PMU_A12, 0x8ea2e);
+        /* recovery config */
+        if (wifi_sdio_access == 0)
+            hif->hif_ops.hi_write_word(RG_PMU_A12, 0xbea2e);
+        /* default */
+        else
+            hif->hif_ops.hi_write_word(RG_PMU_A12, 0x8ea2e);
         hif->hif_ops.hi_write_word(RG_PMU_A14, 0x1);
         hif->hif_ops.hi_write_word(RG_PMU_A16, 0x0);
+        msleep(2);
 
-        hif->hif_ops.hi_write_word(RG_PMU_A22, 0x707);
         hif->hif_ops.hi_write_word(RG_PMU_A18, 0x8700);
         hif->hif_ops.hi_write_word(RG_PMU_A20, 0x3ff01ff);
         //hif->hif_ops.hi_write_word(RG_PMU_A24, 0x3f20000);
@@ -1462,7 +1471,6 @@ static void config_pmu_reg(bool is_power_on)
         /* change rf to idle mode */
         reg_aon30_data.b.rg_always_on_cfg4 |= BIT(12);
         hif->hif_ops.hi_write_word(RG_AON_A30, reg_aon30_data.data);
-
 
         value_pmu_A12 = hif->hif_ops.hi_read_word(RG_PMU_A12);
         value_pmu_A15 = hif->hif_ops.hi_read_word(RG_PMU_A15);
@@ -1476,7 +1484,10 @@ static void config_pmu_reg(bool is_power_on)
         printk("%s power off: after write A12=0x%x, A15=0x%x, A17=0x%x, A18=0x%x, A20=0x%x, A22=0x%x, A24=0x%x, AON30=0x%x\n",
             __func__, value_pmu_A12,value_pmu_A15,value_pmu_A17,value_pmu_A18,value_pmu_A20,value_pmu_A22, value_pmu_A24, value_aon30);
 
-	 //force wifi pmu fsm to sleep mode
+        hif->hif_ops.hi_write_word(RG_PMU_A22, 0x707);
+        hif->hif_ops.hi_write_word(RG_INTF_CPU_CLK, 0x4f070001);
+
+        //force wifi pmu fsm to sleep mode
         host_req_status = (PMU_SLEEP_MODE << 1)| BIT(0);
         hif->hif_ops.hi_bottom_write8(SDIO_FUNC1, RG_SDIO_PMU_HOST_REQ, host_req_status);
     }
@@ -1485,7 +1496,6 @@ static void config_pmu_reg(bool is_power_on)
 extern unsigned char set_wifi_bt_sdio_driver_bit(bool is_register, int shift);
 extern unsigned char w1_sdio_driver_insmoded;
 extern unsigned char w1_sdio_after_porbe;
-extern unsigned char wifi_sdio_access;
 extern int  aml_w1_sdio_init(void);
 extern void  aml_w1_sdio_exit(void);
 
@@ -1575,10 +1585,10 @@ create_thread_error:
 
 void aml_disable_wifi(void)
 {
-    config_pmu_reg(AML_W1_WIFI_POWER_OFF);
     wifi_sdio_access = 0;
     printk("aml_disable_wifi start sdio access %d\n", wifi_sdio_access);
-    msleep(300);
+    config_pmu_reg(AML_W1_WIFI_POWER_OFF);
+    msleep(50);
 }
 
 
@@ -1590,9 +1600,9 @@ void aml_enable_wifi(void)
     aml_customer_gpio_wlan_ctrl(WLAN_POWER_ON);
 
     hal_recovery_init_priv();
+    config_pmu_reg(AML_W1_WIFI_POWER_ON);
     wifi_sdio_access = 1;
     printk("aml_enable_wifi start sdio access %d\n", wifi_sdio_access);
-    config_pmu_reg(AML_W1_WIFI_POWER_ON);
     hal_fw_repair();
 
     hal_priv->txcompletestatus->txdoneframecounter = 0;

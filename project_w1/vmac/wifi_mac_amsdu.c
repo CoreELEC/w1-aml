@@ -122,9 +122,12 @@ void wifi_mac_txamsdu_free_all(struct wifi_mac *wifimac, unsigned char vid)
     struct sk_buff *skbbuf = NULL;
     struct wifi_mac_msdu_node *msdu_node = NULL;
     struct list_head amsdu_not_free;
+    struct wifi_mac_msdu_node *need_free_node = NULL;
+    int tid = 0;
+    struct wifi_mac_tx_info *txinfo = NULL;
 
     INIT_LIST_HEAD(&amsdu_not_free);
-
+    WIFINET_AMSDU_TASKLET_LOCK(wifimac);
     WIFINET_AMSDU_LOCK(wifimac);
     while (!list_empty(&wifimac->wm_amsdu_txq))
     {
@@ -137,14 +140,33 @@ void wifi_mac_txamsdu_free_all(struct wifi_mac *wifimac, unsigned char vid)
             amsdutx->amsdu_tx_buf = NULL;
 
             if (skbbuf != NULL) {
-                wifi_mac_free_skb(skbbuf);
+                tid = os_skb_get_tid(skbbuf);
+                txinfo = (struct wifi_mac_tx_info *)os_skb_cb(skbbuf);
+                txinfo->b_amsdu = os_skb_is_amsdu(skbbuf);
+                need_free_node = wifi_mac_msdu_node_alloc(&(wifimac->msdu_node_list));
+                if (need_free_node == NULL) {
+                    ERROR_DEBUG_OUT("alloc msdu_node failed\n");
+                    break;
+                }
+                need_free_node->skbbuf = skbbuf;
+                list_add_tail(&(need_free_node->msdu_node), &(wifimac->free_amsdu_list));
+
+                if (txinfo->b_amsdu == 1)
+                {
+                    wifimac->msdu_cnt[tid] = (wifimac->msdu_cnt[tid] > txinfo->amsdunum) ?
+                            (wifimac->msdu_cnt[tid] - txinfo->amsdunum) : 0;
+
+                } else {
+                    wifimac->msdu_cnt[tid] = (wifimac->msdu_cnt[tid] > 0) ? (wifimac->msdu_cnt[tid] - 1) : 0;
+                }
             }
 
             while (!list_empty(&amsdutx->msdu_list)) {
                 msdu_node = list_first_entry(&amsdutx->msdu_list, struct wifi_mac_msdu_node, msdu_node);
+                tid = os_skb_get_tid(msdu_node->skbbuf);
                 list_del_init(&msdu_node->msdu_node);
-                wifi_mac_complete_wbuf(msdu_node->skbbuf, 0);
-                wifi_mac_msdu_node_free(msdu_node, &(wifimac->msdu_node_list));
+                list_add_tail(&(msdu_node->msdu_node), &(wifimac->free_amsdu_list));
+                wifimac->msdu_cnt[tid] = (wifimac->msdu_cnt[tid] > 0) ? (wifimac->msdu_cnt[tid] - 1) : 0;
             }
 
             while (amsdutx->amsdunum > 0) {
@@ -152,7 +174,15 @@ void wifi_mac_txamsdu_free_all(struct wifi_mac *wifimac, unsigned char vid)
                 skbbuf = amsdutx->msdu_tmp_buf[amsdutx->amsdunum];
                 amsdutx->msdu_tmp_buf[amsdutx->amsdunum] = NULL;
                 if (skbbuf != NULL) {
-                    wifi_mac_complete_wbuf(skbbuf, 0);
+                    tid = os_skb_get_tid(skbbuf);
+                    need_free_node = wifi_mac_msdu_node_alloc(&(wifimac->msdu_node_list));
+                    if (need_free_node == NULL) {
+                        ERROR_DEBUG_OUT("alloc msdu_node failed\n");
+                        break;
+                    }
+                    need_free_node->skbbuf = skbbuf;
+                    list_add_tail(&(need_free_node->msdu_node), &(wifimac->free_amsdu_list));
+                    wifimac->msdu_cnt[tid] = (wifimac->msdu_cnt[tid] > 0) ? (wifimac->msdu_cnt[tid] - 1) : 0;
                 }
             }
         } else {
@@ -164,6 +194,7 @@ void wifi_mac_txamsdu_free_all(struct wifi_mac *wifimac, unsigned char vid)
         list_splice_tail_init(&amsdu_not_free, &wifimac->wm_amsdu_txq);
     }
     WIFINET_AMSDU_UNLOCK(wifimac);
+    WIFINET_AMSDU_TASKLET_UNLOCK(wifimac);
 }
 
 /*shijie.chen add amsdu tasklet to aggregate amsdu and remove amsdu timer*/
@@ -175,6 +206,7 @@ static void wifi_mac_amsdu_tasklet(unsigned long arg)
     unsigned long now_time;
     struct drv_private *drv_priv = NULL;
 
+    struct wifi_mac_msdu_node *need_free_node = NULL;
     drv_priv = wifimac->drv_priv;
 
     WIFINET_AMSDU_LOCK(wifimac);
@@ -210,6 +242,13 @@ static void wifi_mac_amsdu_tasklet(unsigned long arg)
         {
             break;
         }
+    }
+
+    while (!list_empty(&wifimac->free_amsdu_list)) {
+        need_free_node = list_first_entry(&wifimac->free_amsdu_list, struct wifi_mac_msdu_node, msdu_node);
+        list_del_init(&need_free_node->msdu_node);
+        wifi_mac_complete_wbuf(need_free_node->skbbuf, 0);
+        wifi_mac_msdu_node_free(need_free_node, &(wifimac->msdu_node_list));
     }
     WIFINET_AMSDU_UNLOCK(wifimac);
 
@@ -547,6 +586,7 @@ struct sk_buff *wifi_mac_amsdu_send( struct sk_buff * skbbuf)
     msdu_node->skbbuf = skbbuf;
     amsdutx = &(sta->sta_amsdu->amsdutx[tid_index]);
     list_add_tail(&msdu_node->msdu_node, &amsdutx->msdu_list);
+    wifimac->msdu_cnt[tid_index] ++;
     wnet_vif->vif_sts.sts_tx_amsdu_in_msdu[tid_index]++;
 
     if (amsdutx->b_work == 0)
@@ -559,7 +599,7 @@ struct sk_buff *wifi_mac_amsdu_send( struct sk_buff * skbbuf)
     amsdutx->tid = tid_index;
     WIFINET_AMSDU_UNLOCK(wifimac);
 
-    if (++wifimac->msdu_cnt[tid_index] > 1)
+    if (wifimac->msdu_cnt[tid_index] > 1)
     {
         wifi_mac_amsdu_tasklet_ex((unsigned long)(SYS_TYPE)wifimac);
     } else {
@@ -573,6 +613,7 @@ int wifi_mac_amsdu_attach(struct wifi_mac *wifimac)
     int tid = 0;
 
     INIT_LIST_HEAD(&wifimac->wm_amsdu_txq);
+    INIT_LIST_HEAD(&wifimac->free_amsdu_list);
     tasklet_init(&amsdu_tasklet, wifi_mac_amsdu_tasklet_ex, (unsigned long)(SYS_TYPE)wifimac);
     os_timer_ex_initialize(&wifimac->drv_priv->drv_txtimer, 0, wifi_mac_txamsdu_task, &wifimac->drv_priv);
     WIFINET_AMSDU_LOCK_INIT(wifimac);

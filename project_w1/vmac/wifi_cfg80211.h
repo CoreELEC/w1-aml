@@ -245,7 +245,7 @@ union vendor_if
                  .max_power     = 30,               \
  }
 
-#define CFG80211_CONNECT_TIMER_OUT (8*1000)
+#define CFG80211_CONNECT_TIMER_OUT (20*1000)
 struct vm_wdev_priv
 {
     struct wireless_dev *vm_wdev;

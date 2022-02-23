@@ -753,6 +753,8 @@ unsigned char hal_download_wifi_fw_img(void)
 
     hif->hif_ops.hi_write_word(CMD_DOWN_FIFO_FDH_ADDR, 0);
     hif->hif_ops.hi_write_word(CMD_DOWN_FIFO_FDT_ADDR, 0);
+    hif->hif_ops.hi_write_word(RG_WIFI_IF_RXPAGE_BUF_RDPTR, 0);
+    hif->hif_ops.hi_write_word(RG_WIFI_IF_MAC_TXTABLE_RD_ID, 0);
 
     //cpu select riscv
     regdata = hif->hif_ops.hi_read_word(RG_WIFI_CPU_CTRL);
@@ -804,6 +806,7 @@ static char * country_code = "WW";
 unsigned short dhcp_offload = 0;
 static int sdblksize = BLKSIZE;
 unsigned char aml_insmod_flag = 0;
+char *hif_type = "SDIO";
 
 #ifdef DEBUG_MALLOC
     int kmalloc_count = 0;
@@ -908,6 +911,25 @@ char * aml_wifi_get_vif1_name(void)
 unsigned int aml_wifi_get_con_mode(void)
 {
     return con_mode;
+}
+
+char * aml_wifi_get_bus_type(void)
+{
+    return hif_type;
+}
+
+char * aml_wifi_get_fw_type(void)
+{
+    unsigned int regdata = hi_get_fw_version();
+    if (regdata == FW_VERSION_W1) {
+        return "w1";
+    }
+    else if (regdata == FW_VERSION_W1U) {
+        return "w1u";
+    }
+    else {
+        return "unknown";
+    }
 }
 
 /* return value default is 0 */

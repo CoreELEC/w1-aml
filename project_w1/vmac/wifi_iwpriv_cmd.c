@@ -1002,6 +1002,7 @@ static int aml_iwpriv_get(struct net_device *dev,
         case AML_IWP_PRINT_VERSION:
             print_driver_version();
             printk("driver version: %s\n", DRIVERVERSION);
+            AML_OUTPUT("=============bus type:%s fw_chip:%s=============\n",aml_wifi_get_bus_type(),aml_wifi_get_fw_type());
             break;
 
         case AML_IWP_GET_TX_STATUS:

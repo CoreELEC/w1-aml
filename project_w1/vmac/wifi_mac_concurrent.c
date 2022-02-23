@@ -81,6 +81,7 @@ static void concurrent_vsdb_do_channel_change_ex(SYS_TYPE param1,
 
     if (wifimac->wm_nrunning > 1) {
         if (wifimac->wm_vsdb_flags & CONCURRENT_CHANNEL_SWITCH) {
+            wifimac->wm_vsdb_flags &= ~CONCURRENT_CHANNEL_SWITCH;
             if (wifimac->wm_vsdb_slot == CONCURRENT_SLOT_STA) {
                 if (p2p_vmac->vm_curchan != WIFINET_CHAN_ERR) {
                     wifimac->wm_vsdb_slot = CONCURRENT_SLOT_P2P;
@@ -96,7 +97,6 @@ static void concurrent_vsdb_do_channel_change_ex(SYS_TYPE param1,
 
             DPRINTF(AML_DEBUG_CONNECT, "%s, slot:%d\n", __func__, wifimac->wm_vsdb_slot);
 
-            wifimac->wm_vsdb_flags &= ~CONCURRENT_CHANNEL_SWITCH;
             if (wifimac->wm_vsdb_slot != CONCURRENT_SLOT_NONE) {
                 selected_vmac = drv_priv->drv_wnet_vif_table[wifimac->wm_vsdb_slot];
                 wifi_mac_scan_notify_leave_or_back(selected_vmac, 0);
@@ -180,7 +180,8 @@ void concurrent_vsdb_prepare_change_channel(struct wifi_mac *wifimac)
 
     //printk("%s\n", __func__);
     if ((wifimac->wm_nrunning > 1)
-        && time_after(jiffies, wifimac->wm_vsdb_switch_time + (WIFINET_SCAN_DEFAULT_INTERVAL * HZ / 1000))) {
+        && (time_after(jiffies, wifimac->wm_vsdb_switch_time + (WIFINET_SCAN_DEFAULT_INTERVAL * HZ / 1000))
+        || (wifimac->wm_vsdb_switch_time == 0))) {
         if (!(wifimac->wm_vsdb_flags & CONCURRENT_CHANNEL_SWITCH)) {
             wifimac->wm_vsdb_flags |= CONCURRENT_CHANNEL_SWITCH;
             wifi_mac_add_work_task(wifimac, concurrent_vsdb_change_channel_ex,NULL,(SYS_TYPE)wifimac,0,0,0,0);

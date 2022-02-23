@@ -825,7 +825,7 @@ int drv_tx_start( struct drv_private *drv_priv, struct sk_buff *skbbuf)
     }
 
     wnet_vif = sta->sta_wnet_vif;
-    if (wnet_vif->vm_wmac->fw_recovery_stat < WIFINET_RECOVERY_VIF_UP) {
+    if (wnet_vif->vm_wmac->recovery_stat < WIFINET_RECOVERY_VIF_UP) {
         ERROR_DEBUG_OUT("fw recovery not finish\n");
         return -2;
     }
@@ -1237,9 +1237,10 @@ static void reset_connected_sta_keepalive_time(struct wifi_station *sta)
 }
 
 static void drv_tx_complete_mgmt_handle(struct drv_private *drv_priv,struct drv_txdesc *ptxdesc,
-    unsigned char txok, struct wifi_station *sta)
+    unsigned char status, struct wifi_station *sta)
 {
     struct wlan_net_vif *wnet_vif = NULL;
+    int txok = (status == TX_DESCRIPTOR_STATUS_SUCCESS);
     int mgmt_arg;
     static int deauth_fail_time = 0;
 
@@ -1249,7 +1250,7 @@ static void drv_tx_complete_mgmt_handle(struct drv_private *drv_priv,struct drv_
         || (ptxdesc->txdesc_frame_flag == TX_P2P_GO_NEGO_REQ_GO_NEGO_CONF)
         || (ptxdesc->txdesc_frame_flag == TX_P2P_PRESENCE_REQ)) {
 
-        printk("%s, txdesc_frame_flag=%d, txok=%d\n", __func__, ptxdesc->txdesc_frame_flag, txok);
+        printk("%s, txdesc_frame_flag=%d, status=%d\n", __func__, ptxdesc->txdesc_frame_flag, status);
         if (txok) {
             sta->sta_wnet_vif->vm_p2p->tx_status_flag = WIFINET_TX_STATUS_SUCC;
             sta->sta_wnet_vif->vm_p2p->send_tx_status_flag = 1;
@@ -1270,7 +1271,7 @@ static void drv_tx_complete_mgmt_handle(struct drv_private *drv_priv,struct drv_
 
 #ifdef CTS_VERIFIER_GAS
     if (ptxdesc->txdesc_frame_flag == TX_P2P_GAS) {
-        printk("%s, txdesc_frame_flag=%d, txok=%d\n", __func__, ptxdesc->txdesc_frame_flag, txok);
+        printk("%s, txdesc_frame_flag=%d, status=%d\n", __func__, ptxdesc->txdesc_frame_flag, status);
 
         if ((sta->sta_wnet_vif->vm_p2p->action_code == WIFINET_ACT_PUBLIC_GAS_REQ && sta->sta_wnet_vif->vm_p2p->p2p_flag & P2P_GAS_RSP) ||
             (sta->sta_wnet_vif->vm_p2p->action_code == WIFINET_ACT_PUBLIC_GAS_RSP && txok)) {
@@ -1290,8 +1291,8 @@ static void drv_tx_complete_mgmt_handle(struct drv_private *drv_priv,struct drv_
 #endif
     if ((ptxdesc->txdesc_frame_flag >= TX_MGMT_PROBE_REQ) && !txok) {
         drv_priv->drv_ops.cca_busy_check();
-        printk("%s, txdesc_frame_flag:%d, txok=%d, rate:%02x\n",
-            __func__, ptxdesc->txdesc_frame_flag, txok, ptxdesc->txdesc_rateinfo[0].vendor_rate_code);
+        printk("%s, txdesc_frame_flag:%d, status=%d, rate:%02x\n",
+            __func__, ptxdesc->txdesc_frame_flag, status, ptxdesc->txdesc_rateinfo[0].vendor_rate_code);
 
     } else if (ptxdesc->txdesc_frame_flag == TX_MGMT_ADDBA_RSP) {
         ;
@@ -1346,7 +1347,7 @@ static void drv_tx_complete_task(struct drv_private *drv_priv, struct drv_txlist
 
     ts.ts_ackrssi = AckRssi - 256;
 
-    drv_tx_complete_mgmt_handle(drv_priv,ptxdesc,txok,sta);
+    drv_tx_complete_mgmt_handle(drv_priv,ptxdesc,status,sta);
 
     if (txok) {
         if ((sta->sta_wnet_vif->vm_opmode == WIFINET_M_HOSTAP)
@@ -1641,7 +1642,6 @@ static void drv_txlist_free_all_by_vid(struct drv_private *drv_priv, struct drv_
         list_del_init(&ptxdesc->txdesc_queue);
         desc_sta = ptxdesc->txdesc_sta;
         if ((ptxdesc->txinfo->wnet_vif_id == vid) || (vid == 3)) {
-            txlist->txlist_qcnt--;
             ptxdesc->txdesc_sta = NULL;
 
             DRV_TXQ_UNLOCK(txlist);
@@ -1653,6 +1653,7 @@ static void drv_txlist_free_all_by_vid(struct drv_private *drv_priv, struct drv_
                 }
 
                 drv_tx_complete(drv_priv, ptxdesc, 0);
+                txlist->txlist_qcnt--;
             }
             DRV_TXQ_LOCK(txlist);
 
@@ -2178,7 +2179,6 @@ static void drv_tx_update_ba_win(struct drv_private *drv_priv, struct drv_tx_sco
     index  = DRV_BA_INDEX(tid->seq_start, seqnum);
     if (index > tid->baw_size)
     {
-        printk("%s, start:%d, seqnum:%d\n", __func__,tid->seq_start, seqnum);
         return;
     }
     desc_id = (tid->baw_head + index) & (DRV_TID_MAX_BUFS - 1);

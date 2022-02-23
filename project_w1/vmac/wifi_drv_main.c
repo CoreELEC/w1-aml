@@ -225,6 +225,8 @@ static void drv_print_fwlog_ex( SYS_TYPE param1,SYS_TYPE param2,SYS_TYPE param3,
 {
     unsigned char* logbuf_ptr = (unsigned char *)param1;
     int databyte = (int)param2;
+    unsigned char new_string[64] = {0};
+    int i = 0;
 
     if (print_type == 1) //auto
     {
@@ -238,14 +240,26 @@ static void drv_print_fwlog_ex( SYS_TYPE param1,SYS_TYPE param2,SYS_TYPE param3,
     }
 
     /* print process */
-    printk("logbuf_ptr 0x%x\n", logbuf_ptr);
-    printk("fw_log:\n");
+    AML_OUTPUT("logbuf_ptr 0x%x\n", logbuf_ptr);
+    AML_OUTPUT("fw_log:\n");
     while (databyte--)
     {
-        printk("%c", *logbuf_ptr);
+        if ((*logbuf_ptr == '\n') || (i == 63)) {
+            new_string[i] = *logbuf_ptr;
+            AML_OUTPUT("%s", new_string);
+            memset(new_string, 0, 64);
+            i = 0;
+        } else {
+            new_string[i] = *logbuf_ptr;
+            i++;
+        }
+
         logbuf_ptr++;
     }
-    printk("\nfwlog_print end\n");
+    /* exit the loop and need to print the remaining characters */
+    AML_OUTPUT("%s", new_string);
+
+    AML_OUTPUT("\nfwlog_print end\n");
 }
 
 static void drv_print_fwlog(unsigned char *logbuf_ptr, int databyte)
@@ -829,8 +843,8 @@ int drv_add_wnet_vif(struct drv_private *drv_priv,
     }
 
     if ((drv_priv->drv_wnet_vif_table[wnet_vif_id] != NULL)
-        && (drv_priv->drv_wnet_vif_table[wnet_vif_id]->vm_wmac->fw_recovery_stat == WIFINET_RECOVERY_END)) {
-        ERROR_DEBUG_OUT("Invalid interface id = %u, recovery %d \n", wnet_vif_id, drv_priv->drv_wnet_vif_table[wnet_vif_id]->vm_wmac->fw_recovery_stat);
+        && (drv_priv->drv_wnet_vif_table[wnet_vif_id]->vm_wmac->recovery_stat == WIFINET_RECOVERY_END)) {
+        ERROR_DEBUG_OUT("Invalid interface id = %u, recovery %d \n", wnet_vif_id, drv_priv->drv_wnet_vif_table[wnet_vif_id]->vm_wmac->recovery_stat);
         return -EINVAL;
     }
 
@@ -1776,6 +1790,7 @@ void p2p_noa_start_irq (struct wifi_mac_p2p *p2p, struct drv_private *drv_priv)
 
             if (wnet_vif->vm_opmode == WIFINET_M_HOSTAP)
             {
+                WIFINET_NODE_LOCK(nt);
                 list_for_each_entry_safe(sta, sta_next, &nt->nt_nsta, sta_list)
                 {
                     if (sta->sta_wnet_vif == wnet_vif)
@@ -1800,6 +1815,7 @@ void p2p_noa_start_irq (struct wifi_mac_p2p *p2p, struct drv_private *drv_priv)
                         }
                     }
                 }
+                WIFINET_NODE_UNLOCK(nt);
             }
             drv_priv->net_ops->wifi_mac_buffer_txq_send_pre(wnet_vif);
 
@@ -2139,11 +2155,11 @@ static void drv_intr_fw_event(void *dpriv, void *event)
 
 #if 0
             WIFINET_FW_STAT_LOCK(wifimac);
-            if (wifimac->fw_recovery_stat != WIFINET_RECOVERY_END) {
+            if (wifimac->recovery_stat != WIFINET_RECOVERY_END) {
                 WIFINET_FW_STAT_UNLOCK(wifimac);
                 break;
             }
-            wifimac->fw_recovery_stat = WIFINET_RECOVERY_START;
+            wifimac->recovery_stat = WIFINET_RECOVERY_START;
             WIFINET_FW_STAT_UNLOCK(wifimac);
 
             wifi_mac_connect_repair(wifimac);
@@ -2242,6 +2258,7 @@ static void drv_trigger_send_delba(SYS_TYPE param1,
        /*traverse all hash value*/
        for (i = 0; i < WIFINET_NODE_HASHSIZE; i++) {
             /*traverse all staion in  one hash value*/
+            WIFINET_NODE_LOCK(vm_sta_tbl);
             list_for_each_entry_safe(sta, sta_next, &vm_sta_tbl->nt_nsta, sta_list) {
                 drv_sta = DRIVER_NODE(sta->drv_sta);
 
@@ -2265,6 +2282,7 @@ static void drv_trigger_send_delba(SYS_TYPE param1,
                     }
                 }
             }
+            WIFINET_NODE_UNLOCK(vm_sta_tbl);
         }
     }
 }

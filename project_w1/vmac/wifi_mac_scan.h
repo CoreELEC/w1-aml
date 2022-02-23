@@ -247,6 +247,7 @@ struct wifi_scan_info
 #define STA_MATCH_ERR_STA_FAILS_MAX         (1<<7)
 #define STA_MATCH_ERR_STA_PURGE_SCANS       (1<<8)
 
+#define LEAKY_AP_DET_WIN                    20
 struct scaninfo_entry
 {
     struct wifi_scan_info scaninfo;
@@ -276,6 +277,7 @@ int wifi_mac_scan_parse(struct wlan_net_vif *, wifi_mac_ScanIterFunc, void *);
 int saveie(unsigned char *iep, const unsigned char *ie);
 void wifi_mac_set_scan_time(struct wlan_net_vif *wnet_vif);
 int vm_scan_user_set_chan(struct wlan_net_vif *wnet_vif,struct cfg80211_scan_request *request);
+int vm_is_p2p_connect_scan(struct wlan_net_vif *wnet_vif, struct cfg80211_scan_request *request);
 void scan_next_chan(struct wifi_mac *wifimac);
 void wifi_mac_end_scan( struct wifi_mac_scan_state *ss);
 void wifi_mac_check_switch_chan_result(struct wlan_net_vif * wnet_vif);

@@ -62,7 +62,8 @@ static void wifi_mac_pwrsave_presleep(struct work_struct *work)
          && (wnet_vif->vm_pwrsave.ips_state == WIFINET_PWRSAVE_AWAKE)
          && (wifi_mac_all_txq_all_qcnt(wifimac) == 0)
          && (!(wnet_vif->vm_flags & WIFINET_F_WPA) || ((wnet_vif->vm_flags & WIFINET_F_WPA)
-         && (wnet_vif->vm_mainsta->connect_status == CONNECT_DHCP_GET_ACK))))
+         && (wnet_vif->vm_mainsta->connect_status == CONNECT_DHCP_GET_ACK)))
+         && !((wifimac->recovery_stat > WIFINET_RECOVERY_START) && (wifimac->recovery_stat < WIFINET_RECOVERY_END)))
     {
         WIFINET_PWRSAVE_UNLOCK(wnet_vif);
         if ((wnet_vif->vm_opmode == WIFINET_M_STA) && (wnet_vif->vm_state == WIFINET_S_CONNECTED))
@@ -745,8 +746,23 @@ int wifi_mac_forward_txq_enqueue (struct sk_buff_head *fwdtxqueue, struct sk_buf
 int wifi_mac_buffer_txq_send(struct sk_buff_head *txqueue)
 {
     struct sk_buff *skb = NULL;
+    struct wifi_station *sta;
+    struct wifi_mac *wifimac;
     unsigned int qlen_real = WIFINET_SAVEQ_QLEN(txqueue);
-
+    if (qlen_real == 0) {
+        return qlen_real;
+    }
+#ifdef  CONFIG_CONCURRENT_MODE
+    skb = WIFINET_SAVEQ_GET_TAIL(txqueue);
+    if (skb) {
+        sta = os_skb_get_nsta(skb);
+        wifimac = sta->sta_wmac;
+        if (wifimac->wm_vsdb_flags & CONCURRENT_CHANNEL_SWITCH) {
+            DPRINTF(AML_DEBUG_CONNECT, "%s, break due to channel switch,vif:%d\n", __func__,sta->wnet_vif_id);
+            return qlen_real;
+        }
+    }
+#endif
     while (qlen_real) {
         WIFINET_SAVEQ_LOCK(txqueue);
         WIFINET_SAVEQ_DEQUEUE(txqueue, skb, qlen_real);
@@ -755,21 +771,10 @@ int wifi_mac_buffer_txq_send(struct sk_buff_head *txqueue)
         if (!skb) {
             break;
         }
-
-        {
-            struct wifi_station *sta = os_skb_get_nsta(skb);
-            struct wifi_mac *wifimac = sta->sta_wmac;
-
-    #ifdef  CONFIG_CONCURRENT_MODE
-            if (wifimac->wm_vsdb_flags & CONCURRENT_CHANNEL_SWITCH) {
-                DPRINTF(AML_DEBUG_CONNECT, "%s, break due to channel switch\n", __func__);
-                break;
-            }
-    #endif
-            wifimac->drv_priv->drv_ops.tx_start(wifimac->drv_priv, skb);
-        }
+        sta = os_skb_get_nsta(skb);
+        wifimac = sta->sta_wmac;
+        wifimac->drv_priv->drv_ops.tx_start(wifimac->drv_priv, skb);
     }
-
     return qlen_real;
 }
 
@@ -1310,7 +1315,7 @@ static int wifi_mac_pwrsave_psqueue_send (struct wifi_station *sta, int force)
         {
             if (force)
             {
-                wifi_mac_send_nulldata(sta, 0, 0, 0, 0);
+                wifi_mac_send_nulldata_for_ap(sta, 0, 0, 0, 0);
                 wnet_vif->vif_sts.sts_tx_ps_no_data++;
                 printk("tx null for pspoll\n");
             }

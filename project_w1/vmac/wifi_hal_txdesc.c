@@ -736,17 +736,60 @@ __INLINE unsigned int Hal_TxDescriptor_GetCtsTime(struct hi_agg_tx_desc* HiTxDes
 
 unsigned char hal_mac_frame_type( unsigned int frame_control, unsigned int type )
 {
-        return (( frame_control & ( FRAME_TYPE_MASK | FRAME_SUBTYPE_MASK ) ) == type);
+    return (( frame_control & ( FRAME_TYPE_MASK | FRAME_SUBTYPE_MASK ) ) == type);
 }
+
+void assign_tx_desc_pn(unsigned char is_bc, unsigned char vid,
+    unsigned char sta_id, struct hi_tx_desc *tx_page, unsigned char encrypt_type) {
+    struct hal_private *hal_priv = hal_get_priv();
+    unsigned long long *PN = NULL;
+
+    if (encrypt_type == WIFI_NO_WEP) {
+        return;
+    }
+
+    PN_LOCK();
+    if (is_bc) {
+        PN = (unsigned long long *)hal_priv->mRepCnt[vid].txPN;
+    } else {
+        PN = (unsigned long long *)hal_priv->uRepCnt[vid][sta_id].txPN[TX_UNICAST_REPCNT_ID];
+    }
+    //printk("zy:pn=0x%x\n",*PN);
+    switch (encrypt_type) {
+        case WIFI_TKIP:
+            memcpy(&tx_page->TxOption.PN[0],(unsigned char *)PN, 8);
+            *PN = (*PN) + 1;
+            break;
+
+        case WIFI_AES:
+            memcpy(&tx_page->TxOption.PN[0],(unsigned char *)PN,8);
+            *PN = (*PN) + 1;
+            break;
+
+        case WIFI_WPI:
+            memcpy(&tx_page->TxOption.PN[0], (unsigned char *)PN, MAX_PN_LEN);
+            if (is_bc) {
+                hal_wpi_pn_self_plus(PN);
+
+            } else {
+                hal_wpi_pn_self_plus_plus(PN);
+            }
+            break;
+
+        default:
+            break;
+    }
+    PN_UNLOCK();
+}
+
 
 void hal_tx_desc_build(struct hi_agg_tx_desc* HiTxDesc,
     struct hi_tx_priv_hdr* HI_TxPriv,struct hi_tx_desc *pTxDPape)
 {
-    struct hal_private * hal_priv = hal_get_priv();
-    unsigned long long  *PN = NULL;
     struct hw_tx_vector_bits * TxVector_Bit= (struct hw_tx_vector_bits * )&pTxDPape->TxVector;
     unsigned short bw  = ( HiTxDesc->FLAG & WIFI_CHANNEL_BW_MASK)>>WIFI_CHANNEL_BW_OFFSET;
     struct wifi_qos_frame *wh = NULL;
+    unsigned char is_bc;
 
     //printk("%s(%d) bw 0x%x\n", __func__, __LINE__, bw);
 
@@ -764,7 +807,7 @@ void hal_tx_desc_build(struct hi_agg_tx_desc* HiTxDesc,
         TxVector_Bit->tv_ack_policy =  ACK;
     }
 
-    wh =( struct wifi_qos_frame* ) pTxDPape->txdata;
+    wh = ( struct wifi_qos_frame *)pTxDPape->txdata;
     if ((IS_VHT_RATE( DESC_RATE)) && !(HiTxDesc->FLAG & WIFI_IS_AGGR)) {
         TxVector_Bit->tv_single_ampdu = ((pTxDPape->MPDUBufFlag & (HW_LAST_AGG_FLAG|HW_FIRST_AGG_FLAG))
                                                         == (HW_LAST_AGG_FLAG|HW_FIRST_AGG_FLAG)); //:1,
@@ -884,66 +927,25 @@ void hal_tx_desc_build(struct hi_agg_tx_desc* HiTxDesc,
     TxVector_Bit->tv_ht.htbit.tv_rts_flag = 0;
     TxVector_Bit->tv_ht.htbit.tv_cts_flag = 0;
 
-    if( HiTxDesc->FLAG&WIFI_IS_DYNAMIC_BW  ){
+    if (HiTxDesc->FLAG&WIFI_IS_DYNAMIC_BW) {
         TxVector_Bit->tv_dyn_bw_nonht = 1;
         TxVector_Bit->tv_ht.htbit.tv_check_cca_bw = 1;
-        TxVector_Bit->tv_ch_bw_nonht = bw&0x3;
+        TxVector_Bit->tv_ch_bw_nonht = bw & 0x3;
     }
 
-    PN_LOCK();
-#if defined (HAL_FPGA_VER)
-    if (HiTxDesc->EncryptType !=  WIFI_NO_WEP)
-    {
-        pTxDPape->TxOption.KeyIdex = HiTxDesc->KeyId;
-        if (HiTxDesc->FLAG & WIFI_IS_Group) {
-            PN  = (unsigned long long *)hal_priv->mRepCnt[HiTxDesc->vid].txPN;
-            ASSERT( HiTxDesc->FLAG & WIFI_IS_NOACK);
-
-        } else {
-            PN = (unsigned long long *)hal_priv->uRepCnt[HiTxDesc->vid][HiTxDesc->StaId].txPN[TX_UNICAST_REPCNT_ID];
-        }
-        switch (HiTxDesc->EncryptType)
-        {
-            case WIFI_WEP64:
-                break;
-
-            case WIFI_TKIP:
-                memcpy(&pTxDPape->TxOption.PN[0],(unsigned char *)PN,8);
-                *PN = (*PN) + 1;
-                break;
-
-            case WIFI_AES:
-                memcpy(&pTxDPape->TxOption.PN[0],(unsigned char *)PN,8);
-                *PN = (*PN) + 1;
-                break;
-
-            case WIFI_WEP128:
-                break;
-
-            case WIFI_WPI:
-                memcpy(&pTxDPape->TxOption.PN[0],(unsigned char *)PN,MAX_PN_LEN);
-                if ( HiTxDesc->FLAG & WIFI_IS_Group) {
-                    hal_wpi_pn_self_plus(PN);
-
-                } else {
-                    hal_wpi_pn_self_plus_plus(PN);
-                }
-                break;
-        }
-    }
-#endif
-    PN_UNLOCK();
-
-    pTxDPape->TxPriv.AggrLen  = HiTxDesc->AGGR_len;
-    pTxDPape->TxPriv.aggr_page_num =  HiTxDesc->aggr_page_num;
-
+    is_bc = ((HiTxDesc->FLAG & WIFI_IS_Group) ? 1 : 0);
+    pTxDPape->TxOption.is_bc = is_bc;
+    pTxDPape->TxOption.key_type = HiTxDesc->EncryptType;
+    pTxDPape->TxOption.KeyIdex = HiTxDesc->KeyId;
+    pTxDPape->TxPriv.AggrLen = HiTxDesc->AGGR_len;
+    pTxDPape->TxPriv.aggr_page_num = HiTxDesc->aggr_page_num;
     //if have immediate rsp ,exchange txtime=FrameTxTime +SIFS +ACKTxTime
     if (HiTxDesc->FLAG &WIFI_IS_BLOCKACK)
     {
         if (!(HiTxDesc->FLAG &WIFI_IS_NOACK)) // implicit  inmediate block ack, bar-ba
             pTxDPape->TxPriv.FrameExchDur = Hal_TxDescriptor_GetTxTimeBA(HiTxDesc);
         else  //normal block ack
-            pTxDPape->TxPriv.FrameExchDur =  Hal_TxDescriptor_GetTxTime(HiTxDesc);
+            pTxDPape->TxPriv.FrameExchDur = Hal_TxDescriptor_GetTxTime(HiTxDesc);
     }
     else
     {
@@ -977,13 +979,12 @@ void hal_tx_desc_build(struct hi_agg_tx_desc* HiTxDesc,
     pTxDPape->TxPriv.txsretrynum=0;
     pTxDPape->TxPriv.pTxInfo=0;
     pTxDPape->TxPriv.vid =HiTxDesc->vid;
-    if (HiTxDesc->FLAG2 & TX_DESCRIPTER_P2P_PS_NOA_TRIGRSP)
-    {
+    if (HiTxDesc->FLAG2 & TX_DESCRIPTER_P2P_PS_NOA_TRIGRSP) {
         pTxDPape->TxPriv.HiP2pNoaCountNow = HiTxDesc->HiP2pNoaCountNow;
     }
 
  //if frame is broadcast, initialize TxPriv.txstatus to TX_DESCRIPTOR_STATUS_SUCCESS
-    if((pTxDPape->TxPriv.Flag&WIFI_IS_Group) == WIFI_IS_Group){
+    if ((pTxDPape->TxPriv.Flag & WIFI_IS_Group) == WIFI_IS_Group) {
         pTxDPape->TxPriv.txstatus = TX_DESCRIPTOR_STATUS_SUCCESS;
     }
 }
@@ -991,9 +992,7 @@ void hal_tx_desc_build(struct hi_agg_tx_desc* HiTxDesc,
 void hal_tx_desc_build_sub(struct hi_tx_priv_hdr* HI_TxPriv,
     struct hi_tx_desc *pTxDPape, struct hi_tx_desc *pFirstTxDPape)
 {
-    struct hal_private * hal_priv = hal_get_priv();
-    unsigned long long  *PN = NULL;
-
+    unsigned char is_bc;
     ASSERT(HI_TxPriv);
     ASSERT(pTxDPape);
     ASSERT(pFirstTxDPape);
@@ -1007,53 +1006,18 @@ void hal_tx_desc_build_sub(struct hi_tx_priv_hdr* HI_TxPriv,
     pTxDPape->MPDUBufFlag = HW_FIRST_MPDUBUF_FLAG|HW_LAST_MPDUBUF_FLAG;
     pTxDPape->MPDUBufFlag |= HW_MPDU_LEN_SET(HI_TxPriv->MPDULEN);
     pTxDPape->MPDUBufFlag |= HW_BUFFER_LEN_SET(HI_TxPriv->Delimiter);
-    if ((HI_TxPriv->Flag & WIFI_MORE_AGG)==0)
-    {
+    if ((HI_TxPriv->Flag & WIFI_MORE_AGG) == 0) {
         pTxDPape->MPDUBufFlag |= HW_LAST_AGG_FLAG;
     }
-    if (pTxDPape->TxPriv.PageNum == 1)
-    {
+    if (pTxDPape->TxPriv.PageNum == 1) {
         pTxDPape->MPDUBufFlag |= HW_LAST_MPDUBUF_FLAG;
     }
 
+    is_bc = ((pFirstTxDPape->TxPriv.Flag & WIFI_IS_Group) ? 1 : 0);
+    pTxDPape->TxOption.is_bc = is_bc;
+    pTxDPape->TxOption.key_type = HI_TxPriv->EncryptType;
+    pTxDPape->TxOption.KeyIdex = pFirstTxDPape->TxOption.KeyIdex;
 
-    if (HI_TxPriv->EncryptType !=  WIFI_NO_WEP)
-    {
-        pTxDPape->TxOption.KeyIdex = pFirstTxDPape->TxOption.KeyIdex;
-        if (pFirstTxDPape->TxPriv.Flag & WIFI_IS_Group) {
-            PN  = (unsigned long long *)hal_priv->mRepCnt[pFirstTxDPape->TxPriv.vid].txPN;
-        } else {
-            PN = (unsigned long long *)hal_priv->uRepCnt[pFirstTxDPape->TxPriv.vid][pFirstTxDPape->TxPriv.StaId].txPN[TX_UNICAST_REPCNT_ID];
-        }
-        switch (HI_TxPriv->EncryptType)
-        {
-            case WIFI_WEP64:
-                break;
-
-            case WIFI_TKIP:
-                memcpy(&pTxDPape->TxOption.PN[0],(unsigned char *)PN,8);
-                *PN = (*PN) + 1;
-                break;
-
-            case WIFI_AES:
-                memcpy(&pTxDPape->TxOption.PN[0],(unsigned char *)PN,8);
-                *PN = (*PN) + 1;
-                break;
-
-            case WIFI_WEP128:
-                break;
-
-            case WIFI_WPI:
-                memcpy(&pTxDPape->TxOption.PN[0],(unsigned char *)PN,MAX_PN_LEN);
-                if (pFirstTxDPape->TxPriv.Flag & WIFI_IS_Group) {
-                    hal_wpi_pn_self_plus(PN);
-
-                } else {
-                    hal_wpi_pn_self_plus_plus(PN);
-                }
-                break;
-        }
-    }
 }
 
 
