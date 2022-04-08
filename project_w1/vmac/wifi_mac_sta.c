@@ -973,7 +973,7 @@ static struct wifi_station *wifi_mac_find_sta(struct wifi_station_tbl *nt,
     hash = WIFINET_NODE_HASH(macaddr);
     WIFINET_NODE_LOCK(nt);
     list_for_each_entry_safe(sta, sta_next, &nt->nt_nsta, sta_list) {
-        if ((WIFINET_ADDR_EQ(sta->sta_macaddr, macaddr)) && (sta->wnet_vif_id == wnet_vif_id))  {
+        if((WIFINET_ADDR_EQ(sta->sta_macaddr, macaddr))&&(sta->wnet_vif_id == wnet_vif_id))  {
             WIFINET_NODE_UNLOCK(nt);
             return sta;
         }
@@ -1669,7 +1669,7 @@ void wifi_mac_func_to_task_cb(SYS_TYPE param1, SYS_TYPE param2, SYS_TYPE param3,
 
 void wifi_mac_sta_disassoc(void *arg, struct wifi_station *sta)
 {
-    struct wlan_net_vif *wnet_vif = arg;
+    struct wlan_net_vif *wnet_vif = arg;	
     struct wifi_station_tbl *nt = &(wnet_vif->vm_sta_tbl);
     int mgmt_arg = WIFINET_REASON_ASSOC_LEAVE;
 

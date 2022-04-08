@@ -1463,7 +1463,7 @@ static int vm_cfg80211_connect_timeout_timer (void * arg)
     static unsigned int connect_timeout_taskid = 0, connect_timeout_once = 0;
 
     DPRINTF(AML_DEBUG_CFG80211, "%s vid:%d, state:%d\n", __func__, wnet_vif->wnet_vif_id, wnet_vif->vm_state);
-    if ((pwdev_priv->connect_request && (wnet_vif->vm_state >= WIFINET_S_CONNECTING) && (wnet_vif->vm_mainsta->connect_status != CONNECT_DHCP_GET_ACK))
+    if ((pwdev_priv->connect_request && (wnet_vif->vm_mainsta->connect_status != CONNECT_DHCP_GET_ACK))
         || (wifimac->recovery_stat != WIFINET_RECOVERY_END)) {
         if (connect_timeout_once == 0) {
             connect_timeout_taskid = wifi_mac_register_behindTask(wifimac, vm_cfg80211_connect_timeout_task);
@@ -2513,7 +2513,7 @@ static int vm_cfg80211_del_key(struct wiphy *wiphy, struct net_device *dev,
     unsigned char key_index, bool pairwise, const unsigned char *mac_addr)
 {
     struct wlan_net_vif *wnet_vif = wiphy_to_adapter(wiphy);
-    struct wifi_station *sta;
+    struct wifi_station *sta = NULL;
     int total_delay = 0;
     struct wifi_mac *wifimac = wnet_vif->vm_wmac;
     struct drv_private *drv_priv = wifimac->drv_priv;
@@ -2525,7 +2525,10 @@ static int vm_cfg80211_del_key(struct wiphy *wiphy, struct net_device *dev,
         sta = wifi_mac_get_sta(&wnet_vif->vm_sta_tbl, mac_addr,wnet_vif->wnet_vif_id);
 
     } else {
-        sta = wnet_vif->vm_mainsta;
+        if (wnet_vif->vm_opmode == WIFINET_M_STA
+            || wnet_vif->vm_opmode == WIFINET_M_P2P_CLIENT) {
+            sta = wnet_vif->vm_mainsta;
+        }
     }
 
     if (sta == NULL) {
@@ -2533,7 +2536,7 @@ static int vm_cfg80211_del_key(struct wiphy *wiphy, struct net_device *dev,
         goto exit;
     }
 
-    while (total_delay < 1000 && ((wifimac->wm_runningmask & BIT(wnet_vif->wnet_vif_id))
+    while (total_delay < 1000 && ((sta->connect_status != CONNECT_IDLE)
         || (!drv_priv->hal_priv->hal_ops.hal_tx_empty()))) {
         msleep(10);
         total_delay += 10;
@@ -2941,7 +2944,12 @@ vm_cfg80211_disconnect(struct wiphy *wiphy,
         wnet_vif->vm_phase_flags |= PHASE_DISCONNECTING;
 
     } else {
-      goto exit;
+        struct vm_wdev_priv *pwdev_priv = wdev_to_priv(wnet_vif->vm_wdev);
+        if (pwdev_priv->connect_request) {
+            wnet_vif->vm_phase_flags |= PHASE_DISCONNECT_DELAY;
+            AML_OUTPUT("current in connecting, disconnect later\n");
+        }
+        goto exit;
     }
 
     if (wnet_vif->vm_wmac->wm_flags & WIFINET_F_SCAN) {

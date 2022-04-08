@@ -3100,6 +3100,14 @@ void wifi_mac_recv_beacon(struct wlan_net_vif *wnet_vif,
     struct wifi_mac_scan_param scan = {0};
     int has_erp = 0;
     int has_ht  = 0;
+    int i = 0;
+
+    WIFI_CHANNEL_LOCK(wifimac);
+    for (i = 0; i < wifimac->wm_nchans; i++) {
+        if (wifimac->wm_channels[i].chan_pri_num == channel)
+            wifimac->wm_channels[i].chan_flags |= WIFINET_CHAN_AWARE;
+    }
+    WIFI_CHANNEL_UNLOCK(wifimac);
 
     if (!((wifimac->wm_flags & WIFINET_F_SCAN) ||
         ((wnet_vif->vm_opmode == WIFINET_M_HOSTAP) &&
@@ -4292,6 +4300,14 @@ void wifi_mac_recv_assoc_rsp(struct wlan_net_vif *wnet_vif,
         drv_priv->drv_ops.RegisterStationID(drv_priv, sta->wnet_vif_id, sta->sta_associd, sta->sta_bssid, sta->sta_encrypt_flag);
         wifi_mac_top_sm(wnet_vif, WIFINET_S_CONNECTED, WIFINET_FC0_SUBTYPE_ASSOC_RESP);
         wnet_vif->vm_phase_flags &= ~PHASE_CONNECTING;
+        if (wnet_vif->vm_phase_flags & PHASE_DISCONNECT_DELAY) {
+            int mgmt_arg = WIFINET_REASON_AUTH_LEAVE;
+
+            AML_OUTPUT("disconnecting for last disconnect cmd\n");
+            wnet_vif->vm_phase_flags &= ~PHASE_DISCONNECT_DELAY;
+            wifi_mac_send_mgmt(wnet_vif->vm_mainsta, WIFINET_FC0_SUBTYPE_DEAUTH, (void *)&mgmt_arg);
+            return;
+        }
 
     } else {
         return;

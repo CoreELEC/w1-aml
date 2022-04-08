@@ -952,8 +952,6 @@ struct hal_layer_ops
     struct Tx_FrameDesc tx_frames[WIFI_MAX_TXFRAME];
     unsigned long tx_frames_map[BITS_TO_LONGS(WIFI_MAX_TXFRAME)];
     unsigned int txPageFreeNum;  //the num of free tx pages
-    unsigned int fwRecoveryCnt;
-    unsigned long fwRecoveryStamp;
     struct unicastReplayCnt  uRepCnt[WIFI_MAX_VID][WIFI_MAX_STA];
     struct multicastReplayCnt mRepCnt[WIFI_MAX_VID];
 

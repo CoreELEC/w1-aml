@@ -144,7 +144,7 @@ void wifi_mac_txamsdu_free_all(struct wifi_mac *wifimac, unsigned char vid)
                 txinfo = (struct wifi_mac_tx_info *)os_skb_cb(skbbuf);
                 txinfo->b_amsdu = os_skb_is_amsdu(skbbuf);
                 need_free_node = wifi_mac_msdu_node_alloc(&(wifimac->msdu_node_list));
-                if (need_free_node == NULL) {
+                if(need_free_node == NULL) {
                     ERROR_DEBUG_OUT("alloc msdu_node failed\n");
                     break;
                 }
@@ -176,7 +176,7 @@ void wifi_mac_txamsdu_free_all(struct wifi_mac *wifimac, unsigned char vid)
                 if (skbbuf != NULL) {
                     tid = os_skb_get_tid(skbbuf);
                     need_free_node = wifi_mac_msdu_node_alloc(&(wifimac->msdu_node_list));
-                    if (need_free_node == NULL) {
+                    if(need_free_node == NULL) {
                         ERROR_DEBUG_OUT("alloc msdu_node failed\n");
                         break;
                     }
