@@ -1777,7 +1777,6 @@ void hal_get_sts(unsigned int op_code, unsigned int ctrl_code)
         {
             printk("en_beacon[0]=%d\nen_beacon[1]=%d\n", hal_priv->sts_en_bcn[0], hal_priv->sts_en_bcn[1]);
             printk("dis_beacon[0]=%d\ndis_beacon[1]=%d\n", hal_priv->sts_dis_bcn[0], hal_priv->sts_dis_bcn[1]);
-            printk("hal:fw recovery cnt %d last stamp %lu\n", hal_priv->fwRecoveryCnt, hal_priv->fwRecoveryStamp);
 
             printk("hal:tx_free_page %d \n", hal_priv->txPageFreeNum);
             printk("hal:tx_ok_num:%d, tx_fail_num:%d\n", hif->HiStatus.tx_ok_num, hif->HiStatus.tx_fail_num);

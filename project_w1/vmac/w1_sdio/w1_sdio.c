@@ -1147,7 +1147,7 @@ void config_pmu_reg_off(void)
         reg_aon29_data.b.rg_ana_bpll_cfg |= BIT(1) | BIT(0);
         aml_w1_sdio_write_word(RG_AON_A29, reg_aon29_data.data);
 
-        aml_w1_sdio_write_word(RG_PMU_A12, 0x8ea2e);
+        aml_w1_sdio_write_word(RG_PMU_A12, 0x9ea2e); //set dpll_val(bit16) for sdio resp_timeout
         aml_w1_sdio_write_word(RG_PMU_A14, 0x1);
         aml_w1_sdio_write_word(RG_PMU_A16, 0x0);
         aml_w1_sdio_write_word(RG_PMU_A22, 0x707);
@@ -1172,7 +1172,7 @@ void config_pmu_reg_off(void)
         printk("%s power off: after write A12=0x%x, A15=0x%x, A17=0x%x, A18=0x%x, A20=0x%x, A22=0x%x, A24=0x%x, AON30=0x%x\n",
             __func__, value_pmu_A12,value_pmu_A15,value_pmu_A17,value_pmu_A18,value_pmu_A20,value_pmu_A22,value_pmu_A24, value_aon30);
 
-        //force wifi pmu fsm to sleep mode
+	 //force wifi pmu fsm to sleep mode
         host_req_status = (0x8 << 1)| BIT(0);
         aml_w1_sdio_bottom_write8(SDIO_FUNC1, 0x221, host_req_status);
     }

@@ -4287,8 +4287,6 @@ void wifi_mac_fw_recovery(struct wlan_net_vif *wnet_vif)
     struct wifi_mac *wifimac = wnet_vif->vm_wmac;
     struct vm_wdev_priv *pwdev_priv = wdev_to_priv(wnet_vif->vm_wdev);
 
-    wifimac->drv_priv->hal_priv->fwRecoveryCnt++;
-    wifimac->drv_priv->hal_priv->fwRecoveryStamp = jiffies;
     wifimac->drv_priv->drv_ops.fw_repair(wifimac->drv_priv);
     wifimac->drv_priv->drv_ops.drv_interface_enable(ENABLE, wnet_vif->wnet_vif_id);
 

@@ -1,2 +1,1 @@
-#define DRIVERVERSION    "v1.4.0_20220224-r driver:1ad75b01a4fc8071b1316416887581531528b7c6 \n\
-		 patch#202713"
+#define DRIVERVERSION    "v1.4.1_20220408-r driver:69a449bfd7ebfa42eec6ab48c6da7ec652e9003c"

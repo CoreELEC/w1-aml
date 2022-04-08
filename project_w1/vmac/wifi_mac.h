@@ -241,8 +241,10 @@ struct country_na_freq_set
 #define WIFINET_MAX_SCAN_CHAN 64
 
 #define WIFINET_CHAN_2GHZ 0x4000  /* 2.4 GHz  channel. */
-#define  WIFINET_CHAN_5GHZ 0x8000  /* 5 GHz  channel */
-#define  WIFINET_CHAN_DFS 0x2000  /* DFS */
+#define WIFINET_CHAN_5GHZ 0x8000  /* 5 GHz  channel */
+#define WIFINET_CHAN_DFS  0x2000  /* DFS */
+#define WIFINET_CHAN_AWARE  0x1000  /* chan aware */
+
 #define  WIFINET_CHAN_MODE_MASK             0xff
 
 #define WIFINET_IS_CHAN_2GHZ(_c) \
@@ -301,6 +303,7 @@ enum wifi_mac_connect_state
 #define PHASE_CONNECTING 1
 #define PHASE_DISCONNECTING 2
 #define PHASE_TX_BUFF_QUEUE 4
+#define PHASE_DISCONNECT_DELAY 8
 
 enum wifi_mac_recovery_state
 {

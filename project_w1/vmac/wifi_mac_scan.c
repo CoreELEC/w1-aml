@@ -877,6 +877,7 @@ static int vm_scan_setup_chan(struct wifi_mac_scan_state *ss, struct wlan_net_vi
 {
     struct wifi_mac *wifimac = wnet_vif->vm_wmac;
     struct wifi_channel *c;
+    static unsigned char chan_aware_cnt = 0;
     int i = 0;
 
 #ifdef CONFIG_P2P
@@ -894,6 +895,11 @@ static int vm_scan_setup_chan(struct wifi_mac_scan_state *ss, struct wlan_net_vi
         WIFI_CHANNEL_LOCK(wifimac);
         for (i = 0; i < wifimac->wm_nchans; i++) {
             c = &wifimac->wm_channels[i];
+            if (chan_aware_cnt >= 10) {
+                c->chan_flags &= ~WIFINET_CHAN_AWARE;
+                chan_aware_cnt = 0;
+            }
+
             /* both 2.4G and 5G set WIFINET_BW_20 flag.*/
             if ((c->chan_bw == WIFINET_BWC_WIDTH20) && (wifimac->wm_curchan != c)) {
                 if ((aml_iwpriv_get_band() == CFG_BAND_B) && (!WIFINET_IS_CHAN_2GHZ(c))) {
@@ -947,6 +953,11 @@ static int vm_scan_setup_chan(struct wifi_mac_scan_state *ss, struct wlan_net_vi
         for (i = 0; i < wifimac->wm_nchans; i++)
         {
             c = &wifimac->wm_channels[i];
+            if (chan_aware_cnt >= 10) {
+                c->chan_flags &= ~WIFINET_CHAN_AWARE;
+                chan_aware_cnt = 0;
+            }
+
             /* both 2.4G and 5G set WIFINET_BW_20 flag.*/
             if (c->chan_bw == WIFINET_BWC_WIDTH20)
             {
@@ -987,6 +998,7 @@ static int vm_scan_setup_chan(struct wifi_mac_scan_state *ss, struct wlan_net_vi
         WIFI_CHANNEL_UNLOCK(wifimac);
     }
 
+    chan_aware_cnt++;
     wifi_mac_set_scan_time(wnet_vif);
     DPRINTF(AML_DEBUG_SCAN, "%s vid:%d ss->scan_next_chan_index=%d \
         ss->scan_last_chan_index=%d, ss->scan_chan_wait=0x%xms, HZ = %d LINUX_VERSION_CODE =%x\n",
@@ -1160,8 +1172,8 @@ void wifi_mac_scan_channel(struct wifi_mac *wifimac)
     if (last_mac_mode != wnet_vif->vm_mac_mode)
         wifi_mac_set_legacy_rates(&wnet_vif->vm_legacy_rates, wnet_vif);
 
-    if ((ss->scan_CfgFlags & WIFINET_SCANCFG_ACTIVE) && !(chan->chan_flags & WIFINET_CHAN_DFS))
-    {
+    if (((ss->scan_CfgFlags & WIFINET_SCANCFG_ACTIVE) && !(chan->chan_flags & WIFINET_CHAN_DFS))
+        ||((ss->scan_CfgFlags & WIFINET_SCANCFG_ACTIVE) && (chan->chan_flags & WIFINET_CHAN_AWARE))) {
         struct net_device *dev = wnet_vif->vm_ndev;
 
         DPRINTF(AML_DEBUG_SCAN, "%s vid:%d, next_chan_index = %d, chan=%d freq=%d, p2p_enable:%d\n", __func__,
@@ -1825,6 +1837,7 @@ int vm_scan_user_set_chan(struct wlan_net_vif *wnet_vif,
     struct wifi_mac_scan_state *ss = wifimac->wm_scan;
     struct wifi_channel *c;
     int i=0,j=0;
+    static unsigned char user_chan_aware_cnt = 0;
 
     ss->scan_last_chan_index = 0;
     DPRINTF(AML_DEBUG_SCAN, "%s %d wm_nchans=%d request_ch %d\n",
@@ -1834,6 +1847,11 @@ int vm_scan_user_set_chan(struct wlan_net_vif *wnet_vif,
     for (j = 0; j < request->n_channels; j++) {
         for (i = 0; i < wifimac->wm_nchans; i++) {
             c = &wifimac->wm_channels[i];
+
+            if (user_chan_aware_cnt >= 10) {
+                c->chan_flags &= ~WIFINET_CHAN_AWARE;
+                user_chan_aware_cnt = 0;
+            }
 
             if (c->chan_bw == WIFINET_BWC_WIDTH20) {
                 if (wnet_vif->vm_p2p_support && wnet_vif->vm_p2p->social_channel) {
@@ -1858,6 +1876,7 @@ int vm_scan_user_set_chan(struct wlan_net_vif *wnet_vif,
     }
     WIFI_CHANNEL_UNLOCK(wifimac);
 
+    user_chan_aware_cnt++;
     wifi_mac_set_scan_time(wnet_vif);
     DPRINTF(AML_DEBUG_SCAN, "%s vid:%d ss->scan_next_chan_index=%d \
         ss->scan_last_chan_index=%d, ss->scan_chan_wait=0x%xms, HZ = %d LINUX_VERSION_CODE =%x\n",

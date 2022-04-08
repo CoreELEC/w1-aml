@@ -1456,7 +1456,7 @@ static void config_pmu_reg(bool is_power_on)
             hif->hif_ops.hi_write_word(RG_PMU_A12, 0xbea2e);
         /* default */
         else
-            hif->hif_ops.hi_write_word(RG_PMU_A12, 0x8ea2e);
+            hif->hif_ops.hi_write_word(RG_PMU_A12, 0x9ea2e); //add set apll_val(bit16) for sdio resp_timeout
         hif->hif_ops.hi_write_word(RG_PMU_A14, 0x1);
         hif->hif_ops.hi_write_word(RG_PMU_A16, 0x0);
         msleep(2);
