@@ -4273,30 +4273,30 @@ vm_cfg80211_get_station(struct wiphy *wiphy, struct net_device *dev,
         return ret;
     }
 
-    sinfo->filled |= BIT(NL80211_STA_INFO_SIGNAL);
+    sinfo->filled |= STATION_INFO_SIGNAL;
     sinfo->signal =  sta->sta_avg_bcn_rssi;
     if (sinfo->signal > -10) {
         //DPRINTF(AML_DEBUG_ERROR, "%s signal exceeds scope:%d\n", __func__, sinfo->signal);
         sinfo->signal = -10;
     }
 
-    sinfo->filled |= BIT(NL80211_STA_INFO_TX_BYTES) | BIT(NL80211_STA_INFO_TX_FAILED) | BIT(NL80211_STA_INFO_TX_PACKETS);
+    sinfo->filled |= STATION_INFO_TX_BYTES | STATION_INFO_TX_FAILED | STATION_INFO_TX_PACKETS;
     sinfo->tx_bytes = wnet_vif->vm_devstats.tx_bytes;
     sinfo->tx_packets = wnet_vif->vm_devstats.tx_packets;
     sinfo->tx_failed = wnet_vif->vm_devstats.tx_dropped + wnet_vif->vm_devstats.tx_errors;
 
-    sinfo->filled |= BIT(NL80211_STA_INFO_TX_BITRATE);
+    sinfo->filled |= STATION_INFO_TX_BITRATE;
 
     rate_index = vm_cfg80211_get_rate_index(sta);
 
     sinfo->txrate.legacy = rt->info[rate_index].rateKbps / 100;
 
-    sinfo->filled |= BIT(NL80211_STA_INFO_BSS_PARAM);
+    sinfo->filled |= STATION_INFO_BSS_PARAM;
     sinfo->bss_param.flags = 0;
     sinfo->bss_param.dtim_period = wnet_vif->vm_dtim_period;
     sinfo->bss_param.beacon_interval = wnet_vif->vm_bcn_intval;
 
-    sinfo->filled |= BIT(NL80211_STA_INFO_INACTIVE_TIME);
+    sinfo->filled |= STATION_INFO_INACTIVE_TIME;
     sinfo->inactive_time = (unsigned int)((jiffies - sta->sta_inact_time) * 1000 / HZ);
 
     DPRINTF(AML_DEBUG_CONNECT, "%s signal:%d, tx_bytes:%lld, tx_packets:%d, tx_failed:%d, txrate.legacy:%d, inactive_time:%x\n",
@@ -6527,12 +6527,21 @@ void vm_wlan_net_vif_mode_change(struct wlan_net_vif *wnet_vif,struct vm_wlan_ne
 {
     printk("<running> %s %d \n",__func__,__LINE__);
     wnet_vif->wnet_vif_replaycounter++;
+    if (wnet_vif->vm_ndev->flags & IFF_RUNNING) {
 
     wifi_mac_stop(wnet_vif->vm_ndev);
     vm_wlan_net_vif_detach_ex(wnet_vif);
     vm_wlan_net_vif_attach_ex(wnet_vif,cp);
     wifi_mac_security_vattach(wnet_vif);
     wifi_mac_open(wnet_vif->vm_ndev);
+
+    } else {
+
+    vm_wlan_net_vif_detach_ex(wnet_vif);
+    vm_wlan_net_vif_attach_ex(wnet_vif,cp);
+    wifi_mac_security_vattach(wnet_vif);
+
+    }
 }
 
 int wifi_mac_rm_app_ie(struct wifi_mac_app_ie_t  * app_ie)
