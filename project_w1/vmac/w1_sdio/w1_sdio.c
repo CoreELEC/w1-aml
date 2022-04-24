@@ -15,6 +15,7 @@ unsigned char w1_sdio_wifi_bt_alive;
 unsigned char w1_sdio_driver_insmoded;
 unsigned char w1_sdio_after_porbe;
 unsigned char wifi_in_insmod;
+unsigned char wifi_in_rmmod;
 unsigned char  wifi_sdio_access = 1;
 unsigned int  shutdown_i = 0;
 #define  I2C_CLK_QTR   0x4
@@ -1319,6 +1320,7 @@ int  aml_w1_sdio_init(void)
     err = sdio_register_driver(&aml_w1_sdio_driver);
     w1_sdio_driver_insmoded = 1;
     wifi_in_insmod = 0;
+    wifi_in_rmmod = 0;
     PRINT("*****************aml sdio common driver is insmoded********************\n");
     if (err)
         PRINT("failed to register sdio driver: %d \n", err);
@@ -1339,6 +1341,7 @@ void  aml_w1_sdio_exit(void)
 
 EXPORT_SYMBOL(w1_sdio_driver_insmoded);
 EXPORT_SYMBOL(wifi_in_insmod);
+EXPORT_SYMBOL(wifi_in_rmmod);
 EXPORT_SYMBOL(w1_sdio_after_porbe);
 EXPORT_SYMBOL(host_wake_w1_req);
 EXPORT_SYMBOL(host_suspend_req);
