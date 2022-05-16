@@ -109,6 +109,9 @@ endif
 ifeq ($(CLANG_VERSION), r437112)
 EXTRA_CFLAGS += -Wno-unused-but-set-variable
 endif
+ifeq ($(CLANG_VERSION), r450784d)
+EXTRA_CFLAGS += -Wno-unused-but-set-variable
+endif
 
 ifneq ($(KERNELRELEASE),)
 
