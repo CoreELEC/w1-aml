@@ -27,6 +27,10 @@
 #include "wifi_mac_tx_reg.h"
 #include "wifi_drv_capture.h"
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
+MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
+#endif
+
 #ifdef CONFIG_AML_CFG80211
 
 /** vendor events */
