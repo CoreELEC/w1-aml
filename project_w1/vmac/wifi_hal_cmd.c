@@ -1176,6 +1176,18 @@ int phy_set_suspend(unsigned char vid, unsigned char enable,
         return -1;
     }
 
+    /* wait for set driver sleep flag */
+    while ((enable == 1) && (hal_priv->hal_drv_ps_status & HAL_DRV_IN_ACTIVE))
+    {
+        msleep(20);
+        cnt++;
+        if (cnt > 10)
+        {
+            //AML_OUTPUT("suspend hal_drv_ps_status=%d   time=%d\n",hal_priv->hal_drv_ps_status,cnt);
+            break;
+        }
+    }
+
     POWER_BEGIN_LOCK();
     if ((enable == 1) && (hal_priv->powersave_init_flag == 0))
     {

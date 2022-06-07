@@ -433,6 +433,7 @@ struct wifi_mac
     unsigned char scan_max_gain_thresh;
     enum wifi_scan_noise scan_noisy_status;
     unsigned char is_connect_set_gain;
+    unsigned char bt_lk;
 
     unsigned char wm_doth_tbtt;
     unsigned char wm_doth_channel;

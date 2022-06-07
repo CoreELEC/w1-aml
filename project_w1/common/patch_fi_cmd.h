@@ -28,6 +28,7 @@ enum patch_fw_event_type
     DPD_CALIBRATION_EVENT,
     TX_ERROR_EVENT,
     FWLOG_PRINT_EVENT,
+    COEX_EVENT,
 };
 
 /* channel switch flag */

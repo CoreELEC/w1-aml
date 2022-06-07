@@ -2169,9 +2169,26 @@ static void drv_intr_fw_event(void *dpriv, void *event)
             break;
         }
 
+        case COEX_EVENT:
+        {
+            struct coex_info_event *coex_event = (struct coex_info_event *)fw_event;
+            AML_OUTPUT("coex state = %d\n",coex_event->coexist_state);
+
+            if (coex_event->coexist_state == TRUE_RSSI) {
+                wifimac->bt_lk = 1;
+                wifi_mac_set_channel_rssi(wifimac, (unsigned char)(wnet_vif->vm_mainsta->sta_avg_bcn_rssi));
+
+            } else if (coex_event->coexist_state == OPTIMIZE_RSSI) {
+                wifimac->bt_lk = 0;
+                wifi_mac_set_channel_rssi(wifimac, (unsigned char)(wnet_vif->vm_mainsta->sta_avg_bcn_rssi));
+            }
+            break;
+        }
+
         case FWLOG_PRINT_EVENT:
             drv_priv->hal_priv->hal_ops.hal_set_fwlog_cmd(3); //3: print fwlog
             break;
+
 
         default:
             break;
@@ -2313,7 +2330,7 @@ static void drv_intr_bt_info_change(void * dpriv, unsigned char wnet_vif_id,unsi
     }
 
     if (bt_lk_change == 1) {/*BT link info change*/
-       drv_trigger_send_delba(0, 0, 0, 0, 0);
+        drv_trigger_send_delba(0, 0, 0, 0, 0);
 
     } else {
          reg_val = hif->hif_ops.hi_read_word(RG_BT_PMU_A16);

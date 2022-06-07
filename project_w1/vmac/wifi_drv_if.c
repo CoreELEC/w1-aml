@@ -400,22 +400,24 @@ int drv_hal_add_workitem(WorkHandler task, WorkHandler taskcallback, SYS_TYPE pa
     }
 
     pWorkTask = ( struct hal_work_task *)EltPtr;
-    pWorkTask->param1 = param1;
-    pWorkTask->param2 = param2;
-    pWorkTask->param3 = param3;
-    pWorkTask->param4 = param4;
-    pWorkTask->param5 = param5;
-    pWorkTask->taskcallback = taskcallback;
-    pWorkTask->task = task;
-    task_p = (void *)task;
+    if (pWorkTask) {
+        pWorkTask->param1 = param1;
+        pWorkTask->param2 = param2;
+        pWorkTask->param3 = param3;
+        pWorkTask->param4 = param4;
+        pWorkTask->param5 = param5;
+        pWorkTask->taskcallback = taskcallback;
+        pWorkTask->task = task;
+        task_p = (void *)task;
 
-    STATUS = CO_SharedFifoPut(pWorkFifo, CO_WORK_GET, 1);
-    if (STATUS != CO_STATUS_OK) {
-        ERROR_DEBUG_OUT("work fifo overflow\n");
-        CO_SharedFifo_Dump(pWorkFifo, CO_WORK_GET);
-        CO_SharedFifo_Dump(pWorkFifo, CO_WORK_FREE);
+        STATUS = CO_SharedFifoPut(pWorkFifo, CO_WORK_GET, 1);
+        if (STATUS != CO_STATUS_OK) {
+            ERROR_DEBUG_OUT("work fifo overflow\n");
+            CO_SharedFifo_Dump(pWorkFifo, CO_WORK_GET);
+            CO_SharedFifo_Dump(pWorkFifo, CO_WORK_FREE);
+        }
+        hal_priv->hal_ops.hal_call_task(hal_priv->WorkFifo_task_id,(SYS_TYPE)NULL);
     }
-    hal_priv->hal_ops.hal_call_task(hal_priv->WorkFifo_task_id,(SYS_TYPE)NULL);
     return 0;
 }
 

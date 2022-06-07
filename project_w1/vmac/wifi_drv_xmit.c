@@ -819,13 +819,19 @@ int drv_tx_start( struct drv_private *drv_priv, struct sk_buff *skbbuf)
     unsigned short header_room = os_skb_hdrspace(skbbuf);
     unsigned short tail_room = os_skb_get_tailroom(skbbuf);
 
-    if (!sta) {
-        ERROR_DEBUG_OUT("sta is NULL\n");
+    wnet_vif = sta->sta_wnet_vif;
+    if (!sta  || (wnet_vif->vm_opmode == WIFINET_M_HOSTAP && sta->is_disconnecting
+        && txinfo->b_datapkt)) {
+        ERROR_DEBUG_OUT("sta is NULL or softap disconnect\n");
+        return -1;
+    }
+    if (wnet_vif == NULL || wnet_vif->vm_wmac == NULL)
+    {
+        ERROR_DEBUG_OUT("-----%p is NULL should return \n",wnet_vif);
         return -1;
     }
 
-    wnet_vif = sta->sta_wnet_vif;
-    if (wnet_vif->vm_wmac->recovery_stat < WIFINET_RECOVERY_VIF_UP) {
+    if (wnet_vif->vm_opmode != WIFINET_M_HOSTAP && wnet_vif->vm_wmac->recovery_stat < WIFINET_RECOVERY_VIF_UP) {
         ERROR_DEBUG_OUT("fw recovery not finish\n");
         return -2;
     }
@@ -1853,7 +1859,6 @@ unsigned int drv_txlist_all_qcnt ( struct drv_private *drv_priv, int queue_id)
 
 int drv_txlist_isfull(struct drv_private *drv_priv, int queue_id, struct sk_buff *skbbuf, void *nsta)
 {
-    int txlist_qcnt = 0;
     int tid_idx = 0;
     struct aml_driver_nsta *drv_sta = DRIVER_NODE(nsta);
     int fifo_freecnt = 0;
@@ -1867,8 +1872,6 @@ int drv_txlist_isfull(struct drv_private *drv_priv, int queue_id, struct sk_buff
         return -1;
     }
 
-    txlist_qcnt = drv_priv->drv_txlist_table[queue_id].txlist_qcnt
-                    + drv_priv->drv_txlist_table[queue_id].txds_pending_cnt;// all frame in amlmain
     /*get fifo free num */
     fifo_freecnt = drv_priv->hal_priv->hal_ops.hal_get_priv_cnt(queue_id);
 
@@ -1877,7 +1880,8 @@ int drv_txlist_isfull(struct drv_private *drv_priv, int queue_id, struct sk_buff
     /*check if txlist is full by mpdu pending cnt is greater than
         (get_fifo free num + WIFI_MAX_TXFRAME/WIFI_MAX_TID))*/
     if(drv_priv->drv_txlist_table[queue_id].txds_pending_cnt
-        > (fifo_freecnt + WIFI_MAX_TXFRAME/WIFI_MAX_TID + 48))
+        > (fifo_freecnt + WIFI_MAX_TXFRAME/WIFI_MAX_TID + 48)
+        || (fifo_freecnt < 2))
     {
         return 1;
     }
