@@ -287,11 +287,10 @@ int wifi_mac_input(void *station, struct sk_buff *skb, struct wifi_mac_rx_status
         }
     }
 
-    if (((wifimac->wm_flags & WIFINET_F_SCAN) == 0) && wnet_vif->vm_p2p->p2p_enable
-        && ((wnet_vif->vm_opmode == WIFINET_M_STA) && (wnet_vif->vm_state == WIFINET_S_CONNECTED) && (!WIFINET_IS_PROBERSP(wh)))) {
+    if ((wnet_vif->vm_opmode == WIFINET_M_STA) && (wnet_vif->vm_state == WIFINET_S_CONNECTED)
+        && (!WIFINET_IS_PROBERSP(wh)) && (!WIFINET_IS_BEACON(wh))) {
         bssid = wh->i_addr2;
-        if (!WIFINET_ADDR_EQ(bssid, sta->sta_bssid))
-        {
+        if (!WIFINET_ADDR_EQ(bssid, sta->sta_bssid)) {
             WIFINET_DPRINTF(AML_DEBUG_RECV, "%s,%s,%x%x\n", "not to bss",ether_sprintf(bssid),wh->i_fc[0],wh->i_fc[1]);
             wnet_vif->vif_sts.sts_rx_wrong_bss++;
             goto out;
@@ -3697,8 +3696,12 @@ static void wifi_mac_recv_auth(struct wlan_net_vif *wnet_vif,
     WIFINET_DPRINTF_MACADDR( AML_DEBUG_WARNING, wh->i_addr2,
         "recv auth frame with algorithm %d seq %d", auth_type, seq);
 
-    if ((sta->sta_associd) && (wnet_vif->vm_opmode == WIFINET_M_HOSTAP)) {
-        printk("sta try connect, but associd:%d not zero\n", sta->sta_associd);
+    if ((sta->sta_associd || sta->is_disconnecting) && (wnet_vif->vm_opmode == WIFINET_M_HOSTAP)) {
+        AML_OUTPUT("sta try connect, but associd:%d not zero\n", sta->sta_associd);
+        if (sta->is_disconnecting == 1) {
+            return;
+        }
+        wifi_softap_allsta_stopping(wnet_vif,1);
         wifi_mac_sta_disconnect_from_ap(sta);
         return;
     }
@@ -4339,7 +4342,8 @@ void wifi_mac_recv_deauth(struct wlan_net_vif *wnet_vif,
     subtype = wh->i_fc[0] & WIFINET_FC0_SUBTYPE_MASK;
 
     {
-        if ((wnet_vif->vm_opmode == WIFINET_M_STA) && (wnet_vif->vm_phase_flags & PHASE_DISCONNECTING)) {
+        if (((wnet_vif->vm_opmode == WIFINET_M_STA) && (wnet_vif->vm_phase_flags & PHASE_DISCONNECTING))
+            || ((wnet_vif->vm_opmode == WIFINET_M_HOSTAP) && (sta->is_disconnecting == 1))) {
             AML_OUTPUT("ignor rx deauth because we send first\n");
             return;
         }
@@ -4366,8 +4370,10 @@ void wifi_mac_recv_deauth(struct wlan_net_vif *wnet_vif,
                 break;
 
             case WIFINET_M_HOSTAP:
-                if (sta != wnet_vif->vm_mainsta)
+                if (sta != wnet_vif->vm_mainsta) {
+                    wifi_softap_allsta_stopping(wnet_vif,1);
                     wifi_mac_sta_disconnect_from_ap(sta);
+                }
                 break;
 
             default:
@@ -4431,7 +4437,8 @@ void wifi_mac_recv_disassoc(struct wlan_net_vif *wnet_vif,
 
             case WIFINET_M_HOSTAP:
                 if (sta != wnet_vif->vm_mainsta) {
-                    wifi_mac_sta_disconnect_from_ap(sta);
+                     wifi_softap_allsta_stopping(wnet_vif,1);
+                     wifi_mac_sta_disconnect_from_ap(sta);
                 }
                 break;
 
@@ -4525,7 +4532,7 @@ void wifi_mac_recv_action(struct wlan_net_vif *wnet_vif, struct wifi_station *st
                         DPRINTF(AML_DEBUG_WARNING, "%s: ADDBA request . TID %d, buffer size %d  vm_state %d\n",
                             __func__, baparamset.tid, baparamset.buffersize, wnet_vif->vm_state);
 
-                        if (!WIFINET_NODE_USEAMPDU(sta)) {
+                        if ((!WIFINET_NODE_USEAMPDU(sta)) || (wnet_vif->vm_opmode == WIFINET_M_HOSTAP && softap_get_sta_num(wnet_vif) > 1)) {
                             wifi_mac_addba_set_rsp(sta, baparamset.tid, WIFINET_STATUS_REFUSED);
 
                         } else {

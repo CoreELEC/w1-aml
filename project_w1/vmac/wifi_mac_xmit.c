@@ -419,7 +419,7 @@ int wifi_mac_hardstart(struct sk_buff *skb, struct net_device *dev)
 
     // find a sta by mac address
     sta = wifi_mac_find_tx_sta(wnet_vif, eh->ether_dhost);
-    if (sta == NULL) {
+    if ((sta == NULL) || ((wnet_vif->vm_opmode == WIFINET_M_HOSTAP) && (sta->is_disconnecting == 1))) {
         error = 6;
         goto bad;
     }
@@ -3400,6 +3400,13 @@ int wifi_mac_send_mgmt(struct wifi_station *sta, int type, void *arg)
     unsigned char retry_count;
 
     KASSERT(sta != NULL, ("null nsta"));
+
+    if (sta->sta_wnet_vif->vm_curchan == NULL) {
+        ERROR_DEBUG_OUT("vm_curchan is NULL, just return\n");
+        ret = EINVAL;
+        return ret;
+    }
+
     switch (type) {
         case WIFINET_FC0_SUBTYPE_PROBE_RESP:
             ret = wifi_mac_send_probe_rsp(wnet_vif,sta,arg);

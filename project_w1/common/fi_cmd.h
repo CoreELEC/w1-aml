@@ -428,6 +428,17 @@ typedef struct Coexist_Cmd
 
 } Coexist_Cmd;
 
+typedef struct coex_info_event
+{
+    struct fw_event_basic_info basic_info;
+    unsigned int coexist_state;
+} coex_info_event;
+
+enum
+{
+    TRUE_RSSI = 1,
+    OPTIMIZE_RSSI,
+};
 
 struct New_Cmd
 {

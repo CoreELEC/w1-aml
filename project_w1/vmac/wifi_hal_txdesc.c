@@ -602,8 +602,13 @@ unsigned short hal_tx_desc_get_len(unsigned char rate ,unsigned short pktlen,
 
 unsigned short Hal_TxDescriptor_GetAckTimeout( unsigned char data_rate,unsigned char preambletype)
 {
-    return 20+PHY_TEST;
+    if (IS_HT_RATE(data_rate) || IS_VHT_RATE(data_rate)) {
+        return 80 + PHY_TEST;
+    } else {
+        return 20 + PHY_TEST;
+    }
 }
+
 
 /*+SIGNAL_EXTENSION_VALUE+TXTIME(pclp+data+signalextension)*/
 unsigned short Hal_TxDescriptor_GetAckTime(

@@ -772,7 +772,6 @@ unsigned char hal_download_wifi_fw_img(void)
     printk("fw download success!\n");
 #ifdef SDIO_BUILD_IN
     wifi_in_insmod = 0;
-    wifi_in_rmmod = 0;
 #endif
 
     return true;
@@ -967,7 +966,6 @@ static int aml_insmod(void)
 
 #ifdef SDIO_BUILD_IN
     wifi_in_insmod = 1;
-    wifi_in_rmmod = 1;
 #endif
 
     print_driver_version();
@@ -1007,7 +1005,6 @@ static int aml_insmod(void)
 insmod_failed:
 #ifdef SDIO_BUILD_IN
     wifi_in_insmod = 0;
-    wifi_in_rmmod = 0;
 #endif
 
     return ret;

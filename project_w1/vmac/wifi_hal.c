@@ -1281,6 +1281,15 @@ void  hal_tx_frame(void)
             AggrNum     = pTxDPape->TxPriv.AggrNum;
 
             q_fifo_set_cnt = CO_SharedFifoNbEltCont(pTxShareFifo,CO_TX_BUFFER_SET);
+
+            if (!pTxDPape->TxPriv.AggrNum || !pTxDPape->TxPriv.aggr_page_num || pTxDPape->TxPriv.TID > QUEUE_BEACON)
+            {
+                STATUS =CO_SharedFifoGet(pTxShareFifo,CO_TX_BUFFER_SET,1,&EltPtr);
+                STATUS =CO_SharedFifoPut(pTxShareFifo,CO_TX_BUFFER_SET,1);
+                PRINT("!!!error:set_cnt:%d, aggrnum:%d, aggr_page_num:%d, sn:%d, skb:%p, tid:%d, fc:0x%x\n", q_fifo_set_cnt, pTxDPape->TxPriv.AggrNum, pTxDPape->TxPriv.aggr_page_num,
+                       pTxDPape->TxPriv.SN, pTxDescFiFo->ampduskb, pTxDPape->TxPriv.TID, pTxDPape->TxVector.tv_FrameControl);
+                break;
+            }
 #if defined (HAL_FPGA_VER)
             if ((pTxDPape->TxPriv.aggr_page_num <= hal_priv->txPageFreeNum)
                     && (pTxDPape->TxPriv.AggrNum <= q_fifo_set_cnt)
@@ -1312,6 +1321,15 @@ void  hal_tx_frame(void)
 
                     STATUS =CO_SharedFifoGet(pTxShareFifo,CO_TX_BUFFER_SET,1,&EltPtr);
                     ASSERT(STATUS==CO_STATUS_OK);
+                    if (STATUS != CO_STATUS_OK)
+                    {
+                        PRINT("!!!error:TxPriv.aggr_page_num:%d, txPageFreeNum:%d, TxPriv.AggrNum:%d, set_cnt:%d, "\
+                        "AggrNum:%d, mpdu_num:%d, aggr_page_num:%d, aggrlen:%d, sn:%d, queueid:%d, sn:%d, skb:%p, tid:%d, fc:0x%x \n",
+                        pTxDPape->TxPriv.aggr_page_num, hal_priv->txPageFreeNum, pTxDPape->TxPriv.AggrNum, q_fifo_set_cnt,
+                        AggrNum, mpdu_num, aggr_page_num, pTxDPape->TxPriv.AggrLen, pTxDPape->TxPriv.SN, txqueueid,
+                        pTxDPape->TxPriv.SN, pTxDescFiFo->ampduskb, pTxDPape->TxPriv.TID, pTxDPape->TxVector.tv_FrameControl);
+                    }
+
                     STATUS =CO_SharedFifoPut(pTxShareFifo,CO_TX_BUFFER_SET,1);
                     ASSERT(STATUS==CO_STATUS_OK);
 

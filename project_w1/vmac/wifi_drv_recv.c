@@ -297,7 +297,7 @@ int drv_rx_input( struct drv_private *drv_priv, void *nsta,
 
     if (index > (WIFINET_SEQ_MAX - (RxTidState->baw_size << 2)))
     {
-        DRV_RXTID_UNLOCK_IRQ(RxTidState,lockflags);;
+        DRV_RXTID_UNLOCK_IRQ(RxTidState,lockflags);
         os_skb_free(skbbuf);
         return WIFINET_FC0_TYPE_DATA;
     }

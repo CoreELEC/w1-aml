@@ -251,13 +251,18 @@ void wifi_mac_set_channel_rssi(struct wifi_mac *wifimac, unsigned char rssi)
 {
     unsigned char rssi_set = rssi;
 
-    if (wifimac->is_connect_set_gain) {
+    if (wifimac->bt_lk) {
+        //for bt wifi coexit need set -50 gian
+        wifimac->drv_priv->drv_ops.set_channel_rssi(wifimac->drv_priv, 226);
+
+    } else if (wifimac->is_connect_set_gain) {
         if (rssi_set > 191) {
             rssi_set = 191;
         }
-
-        //AML_OUTPUT("connect rssi_set:%d, rssi:%d\n", rssi_set, rssi);
         wifimac->drv_priv->drv_ops.set_channel_rssi(wifimac->drv_priv, rssi_set);
+
+    } else {
+        wifimac->drv_priv->drv_ops.set_channel_rssi(wifimac->drv_priv, 174); //-82 gain
     }
 }
 
@@ -616,9 +621,11 @@ int wifi_mac_build_txinfo(struct wifi_mac *wifimac, struct sk_buff *skbbuf, stru
 void wifi_mac_tx_addba_check(struct wifi_station *sta, unsigned char tid_index)
 {
     struct wifi_mac *wifimac = sta->sta_wmac;
+    struct wlan_net_vif *wnet_vif = sta->sta_wnet_vif;
 
     if (WIFINET_NODE_USEAMPDU(sta)
-        && wifimac->drv_priv->drv_ops.check_aggr(wifimac->drv_priv, sta->drv_sta, tid_index))
+        && wifimac->drv_priv->drv_ops.check_aggr(wifimac->drv_priv, sta->drv_sta, tid_index)
+        && (wnet_vif->vm_opmode != WIFINET_M_HOSTAP || softap_get_sta_num(wnet_vif) < 2))
     {
         struct wifi_mac_action_mgt_args actionargs;
         DPRINTF(AML_DEBUG_WARNING,"<running> %s %d tid_index = %d \n", __func__,__LINE__,tid_index);
@@ -1723,7 +1730,7 @@ int wifi_mac_cap_attach(struct wifi_mac *wifimac, struct drv_private* drv_priv)
 #endif
 
     wifimac->recovery_stat = WIFINET_RECOVERY_END;
-    os_timer_ex_initialize(&wifimac->wm_monitor_fw, 2000,wifi_mac_trigger_recovery, wifimac);
+    os_timer_ex_initialize(&wifimac->wm_monitor_fw, 20000,wifi_mac_trigger_recovery, wifimac);
 
     AML_OUTPUT("<running>\n");
     return 0;
@@ -2742,7 +2749,9 @@ static int wifi_mac_act_tx_timeout(void* arg)
                     wifi_mac_sta_disconnect(sta);
                     wifi_mac_rm_sta_from_wds_by_addr(nt,sta->sta_macaddr);
                     list_del_init(&sta->sta_list);
+                    WIFINET_NODE_UNLOCK(nt);
                     wifi_mac_free_sta(sta);
+                    WIFINET_NODE_LOCK(nt);
                 }
             }
         }
@@ -3108,6 +3117,7 @@ wifi_mac_sub_sm(struct wlan_net_vif *wnet_vif, enum wifi_mac_state nstate, int a
                     sta->connect_status = CONNECT_DHCP_GET_ACK;
                     wifimac->recovery_stat = WIFINET_RECOVERY_END;
                 }
+                wifi_mac_set_channel_rssi(wifimac, (unsigned char)(wnet_vif->vm_mainsta->sta_avg_bcn_rssi));
 
                 printk("****************************************************\n");
                 printk("sta connect ok!!! AP CHANNEL:%d, CENTER_CHAN:%d, BW:%d, SSID:%s, BSSID:%02x:%02x:%02x:%02x:%02x:%02x\n",
@@ -4176,12 +4186,8 @@ int wifi_mac_connect_repair(struct wifi_mac *wifimac)
     wifi_mac_set_wifi_insmod_status();
 #endif
 
-    if (wifimac->wm_flags & WIFINET_F_SCAN) {
-        wifimac->wm_scan->scan_StateFlags |= SCANSTATE_F_CANCEL;
-    }
-
     list_for_each_entry(wnet_vif,&wifimac->wm_wnet_vifs, vm_next) {
-        if (wnet_vif->vm_opmode == WIFINET_M_STA) {
+        if (wnet_vif->vm_opmode == WIFINET_M_STA || wnet_vif->vm_opmode == WIFINET_M_HOSTAP) {
             break;
         }
     }
@@ -4190,6 +4196,17 @@ int wifi_mac_connect_repair(struct wifi_mac *wifimac)
     {
         case WIFINET_M_STA:
             AML_OUTPUT("sta mode\n");
+            WIFINET_FW_STAT_LOCK(wifimac);
+            if (wifimac->recovery_stat != WIFINET_RECOVERY_END) {
+                WIFINET_FW_STAT_UNLOCK(wifimac);
+                return 0;
+            }
+            wifimac->recovery_stat = WIFINET_RECOVERY_START;
+            WIFINET_FW_STAT_UNLOCK(wifimac);
+
+            if (wifimac->wm_flags & WIFINET_F_SCAN) {
+                wifimac->wm_scan->scan_StateFlags |= SCANSTATE_F_CANCEL;
+            }
             if (wnet_vif->vm_state == WIFINET_S_CONNECTED) {
                 wifimac->recovery_stat |= WIFINET_RECOVERY_UNDER_CONNECT;
             }
@@ -4197,7 +4214,6 @@ int wifi_mac_connect_repair(struct wifi_mac *wifimac)
             wifi_mac_top_sm(wnet_vif, WIFINET_S_SCAN, 0);
             wifi_mac_fw_recovery(wnet_vif);
             break;
-
         case WIFINET_M_HOSTAP:
             break;
 
@@ -4248,15 +4264,6 @@ void wifi_mac_connect_repair_task(SYS_TYPE param1,SYS_TYPE param2, SYS_TYPE para
                     free_page, hal_priv->txPageFreeNum, tx_ok_num, hif->HiStatus.tx_ok_num, tx_fail_num, hif->HiStatus.tx_fail_num);
 
             count = 0;
-
-            WIFINET_FW_STAT_LOCK(wifimac);
-            if (wifimac->recovery_stat != WIFINET_RECOVERY_END) {
-                WIFINET_FW_STAT_UNLOCK(wifimac);
-                return;
-            }
-            wifimac->recovery_stat = WIFINET_RECOVERY_START;
-            WIFINET_FW_STAT_UNLOCK(wifimac);
-
             wifi_mac_connect_repair(wifimac);
         }
 

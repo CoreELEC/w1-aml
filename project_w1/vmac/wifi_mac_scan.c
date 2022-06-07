@@ -1663,7 +1663,7 @@ void wifi_mac_end_scan( struct wifi_mac_scan_state *ss)
     }
 
     if ((wnet_vif->vm_opmode == WIFINET_M_STA) && (wnet_vif->vm_state == WIFINET_S_CONNECTED)) {
-        wifi_mac_scan_set_gain(wifimac, 174);
+        wifi_mac_set_channel_rssi(wifimac, (unsigned char)(wnet_vif->vm_mainsta->sta_avg_bcn_rssi));
     }
     wifi_mac_restore_wnet_vif_channel(wnet_vif);
     wifimac->wm_flags &= ~WIFINET_F_SCAN;
