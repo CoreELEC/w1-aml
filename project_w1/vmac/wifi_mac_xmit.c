@@ -1809,7 +1809,7 @@ wifi_mac_add_htcap(unsigned char *frm, struct wifi_station *sta)
     }
 
     if(wifimac->wm_flags & WIFINET_F_LDPC) {
-        /*if our support rx ldpc,  add support rx ldpc capability to ht capability infomation element */
+        /*if our support rx ldpc,  add support rx ldpc capability to ht capability information element */
         htcap |= WIFINET_HTCAP_LDPC;
     }
 
@@ -2094,7 +2094,7 @@ wifi_mac_add_vht_cap(unsigned char *frm, struct wifi_station *sta)
     SET_VHT_CAP_RSV(vht_cap_ie->vht_cap_info, 0);
     SET_VHT_CAP_MAX_MPDU(vht_cap_ie->vht_cap_info, VHT_CAP_MAX_MPDU_LEN_7991);
 
-    /*filled  max mpdu length capablity */
+    /*filled  max mpdu length capability */
     if (wifimac->wm_flags_ext2 & WIFINET_VHTCAP_MAX_MPDU_LEN_11454) {
         SET_VHT_CAP_MAX_MPDU(vht_cap_ie->vht_cap_info,   VHT_CAP_MAX_MPDU_LEN_11454);
 
@@ -2268,7 +2268,7 @@ unsigned char *wifi_mac_add_vht_quiet_ch(unsigned char *frm, struct wifi_station
         ie_vht_quiet_chn->quiet_offset = 0;
         return frm + vht_quiet_ch_len;
 
-    } else/*in no sta mode, there is only mode =0 in queit ie */{
+    } else/*in no sta mode, there is only mode =0 in quit ie */{
         ie_vht_quiet_chn->ap_quiet_md = DIS_AP_MODE_IN_QUIET_IE;
         ie_vht_quiet_chn->elem_len = 1;	 // ie mode
         return frm + 1 + 1 + 1; // ie_id + ie_len + opmode in no AP mode

@@ -298,7 +298,7 @@ struct drv_config
     unsigned short cfg_cachelsz;               /*dev dma cache len size*/
     unsigned short cfg_40Msupport;             /*40M mode support*/
     unsigned char cfg_bw_ctrl;                        /* Enable BW auto control  */
-    unsigned char cfg_shortpreamble;                       /* shor peamble*/
+    unsigned char cfg_shortpreamble;                       /* shor preamble*/
     unsigned short cfg_txamsdu;                /*tx amsdu*/
     unsigned short cfg_eap_lowest_rate;             /* Use lowest data rate for EAP packets. kbps */
     unsigned char cfg_uapsdsupported ;/* supports UAPSD */
@@ -480,7 +480,7 @@ struct driver_ops
         unsigned char len, unsigned char id, unsigned char *mask, unsigned char *pattern);
     int (*drv_set_suspend)(struct drv_private *drv_priv, unsigned char vid, unsigned char enable,
         unsigned char mode, unsigned int filters);
-    int (*drv_p2p_client_opps_cwend_may_spleep) (struct wlan_net_vif *wnet_vif);
+    int (*drv_p2p_client_opps_cwend_may_sleep) (struct wlan_net_vif *wnet_vif);
     int (*drv_txq_backup_send) (struct drv_private *drv_priv, struct drv_txlist *txlist);
 
     void (*dut_rx_start)(void);
@@ -601,7 +601,7 @@ struct drv_private
 };
 
 #ifdef CONFIG_P2P
-int drv_p2p_client_opps_cwend_may_spleep (struct wlan_net_vif *wnet_vif);
+int drv_p2p_client_opps_cwend_may_sleep (struct wlan_net_vif *wnet_vif);
 int drv_p2p_go_opps_cwend_may_sleep (struct wlan_net_vif *wnet_vif);
 void p2p_noa_start_irq (struct wifi_mac_p2p *p2p, struct drv_private *drv_priv);
 #endif

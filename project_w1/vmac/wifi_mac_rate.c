@@ -414,7 +414,7 @@ int wifi_mac_setup_ht_rates(struct wifi_station *sta, unsigned char *ie,int flag
     rrs.dot11_rate_num = j;
     irs = &wifimac->wm_sup_ht_rates;
 
-    /*sort rate for rate from accoc req frames */
+    /*sort rate for rate from assoc req frames */
     if (flags & WIFINET_F_DOSORT)
         wifi_mac_sort_rate(&rrs);
 
@@ -508,7 +508,7 @@ static void  wifi_mac_get_vht_intersect_rates( struct wifi_mac_vht_rate_s *irs,
     int i = 0;
     irs->num_streams = MIN(srs->num_streams, drs->num_streams);
 
-    /* Intialiaze the rates for all streams with unsupported val (0x3) */
+    /* initialize the rates for all streams with unsupported val (0x3) */
     memset(irs->rates,0x3, MAX_VHT_STREAMS);
 
     for ( ; i < irs->num_streams; i++ ) 

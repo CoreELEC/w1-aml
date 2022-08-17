@@ -863,9 +863,9 @@ void minstrel_tx_complete(
 
 
     memset(&info, 0, sizeof(struct ieee80211_tx_info));
-    if (rc[0].flags & HAL_RATECTRL_TX_SEND_SUCCES) {
+    if (rc[0].flags & HAL_RATECTRL_TX_SEND_SUCCESS) {
         info.flags |= IEEE80211_TX_STAT_ACK;
-        rc[0].flags &= ~HAL_RATECTRL_TX_SEND_SUCCES;
+        rc[0].flags &= ~HAL_RATECTRL_TX_SEND_SUCCESS;
     }
 
     for (i = 0; i < IEEE80211_TX_MAX_RATES; i++) {

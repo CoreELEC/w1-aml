@@ -128,7 +128,7 @@ unsigned char CO_SharedFifoEmpty(struct _CO_SHARED_FIFO *SharedFifoPtr, unsigned
 static __INLINE struct _CO_SF_BLOCK_IDX *CO_SharedFifoGetInBlockIdxPtr(struct _CO_SHARED_FIFO *const SharedFifoPtr,
     const unsigned char BlockID)
 {
-    /* Embbedded processor */
+    /* Embedded processor */
     return &(SharedFifoPtr->IdxTab[BlockID]);
 }
 

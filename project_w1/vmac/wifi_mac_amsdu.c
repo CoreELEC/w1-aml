@@ -568,7 +568,7 @@ struct sk_buff *wifi_mac_amsdu_send( struct sk_buff * skbbuf)
           wnet_vif->vm_opmode == WIFINET_M_HOSTAP||
           wnet_vif->vm_opmode == WIFINET_M_P2P_GO))
     {
-        ERROR_DEBUG_OUT("not statisfy amsdu\n");
+        ERROR_DEBUG_OUT("not satisfy amsdu\n");
         return skbbuf;
     }
 
@@ -650,7 +650,7 @@ int wifi_mac_alloc_amsdu_node(struct wifi_mac *wifimac, unsigned char vid, struc
     sta->sta_amsdu->amsdu_max_length = AMSDU_MAX_BUFFER_SIZE_BW80;
     sta->sta_amsdu->amsdu_max_sub = DEFAULT_TXAMSDU_SUB_MAX_BW80;
 
-    /*init amsdu max length capablity */
+    /*init amsdu max length capability */
     if (wifimac->wm_flags_ext2 & WIFINET_VHTCAP_MAX_MPDU_LEN_11454)
     {
         sta->sta_amsdu->amsdu_max_length = MIN(sta->sta_amsdu->amsdu_max_length, VHT_MPDU_SIZE_11451);

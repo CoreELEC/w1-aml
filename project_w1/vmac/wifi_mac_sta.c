@@ -739,7 +739,7 @@ alloc_sta_node(struct wifi_station_tbl *nt,struct wlan_net_vif *wnet_vif)
     return sta;
 }
 
-//if sta node is in the table, get it when addr and mac macth
+//if sta node is in the table, get it when addr and mac match
 //if the sta node is not in the table, allocate one and append the queue, and get it
 struct wifi_station *wifi_mac_get_new_sta_node(struct wifi_station_tbl *nt,
     struct wlan_net_vif *wnet_vif, const unsigned char *macaddr)
@@ -751,7 +751,7 @@ struct wifi_station *wifi_mac_get_new_sta_node(struct wifi_station_tbl *nt,
     sta = alloc_sta_node(nt,wnet_vif);
     if (sta == NULL) {
         wnet_vif->vif_sts.sts_rx_sta_all_fail++;
-        DPRINTF(AML_DEBUG_NODE, "WARNNING:%s %d \n", __func__, __LINE__);
+        DPRINTF(AML_DEBUG_NODE, "WARNING:%s %d \n", __func__, __LINE__);
         return NULL;
     }
     sta->sta_tmp_nsta = 0;
@@ -807,7 +807,7 @@ struct wifi_station *wifi_mac_get_sta_node(struct wifi_station_tbl *nt,
     sta = wifi_mac_get_new_sta_node(nt, wnet_vif, macaddr);
     if (sta == NULL) {
         wnet_vif->vif_sts.sts_rx_sta_all_fail++;
-        DPRINTF(AML_DEBUG_NODE, "WARNNING:%s %d \n",__func__,__LINE__);
+        DPRINTF(AML_DEBUG_NODE, "WARNING:%s %d \n",__func__,__LINE__);
         return NULL;
     }
 
@@ -824,7 +824,7 @@ int wifi_mac_add_wds_addr(struct wifi_station_tbl *nt,
         GFP_KERNEL, "wifi_mac_add_wds_addr.wds");
 
     if (wds == NULL) {
-        DPRINTF(AML_DEBUG_NODE, "WARNNING:%s %d \n",__func__,__LINE__);
+        DPRINTF(AML_DEBUG_NODE, "WARNING:%s %d \n",__func__,__LINE__);
         return 1;
     }
 
@@ -943,7 +943,7 @@ wifi_mac_tmp_nsta(struct wlan_net_vif *wnet_vif, const unsigned char *macaddr)
         WIFINET_SAVEQ_INIT(&(sta->sta_pstxqueue), "unknown");
 
     } else {
-        DPRINTF(AML_DEBUG_NODE, "WARNNING:%s %d \n",__func__,__LINE__);
+        DPRINTF(AML_DEBUG_NODE, "WARNING:%s %d \n",__func__,__LINE__);
         wnet_vif->vif_sts.sts_rx_sta_all_fail++;
     }
 

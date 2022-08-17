@@ -257,7 +257,7 @@ int drv_rx_input( struct drv_private *drv_priv, void *nsta,
         return drv_rx_bar(drv_priv, drv_sta, skbbuf);
     }
 
-    /*receive a mmpdu or broad/mulitcast packets*/
+    /*receive a mmpdu or broad/multicast packets*/
     if (type != WIFINET_FC0_TYPE_DATA ||
         subtype != WIFINET_FC0_SUBTYPE_QOS || (b_mcast))
     {

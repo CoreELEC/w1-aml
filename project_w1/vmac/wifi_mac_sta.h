@@ -452,7 +452,7 @@ int wifi_mac_sta_arp_agent_ex (SYS_TYPE param1, SYS_TYPE param2,SYS_TYPE param3,
 #define WIFINET_PSUNLOCK(_ic) OS_SPIN_UNLOCK_IRQ(&(_ic)->wm_pslock,  (_ic)->wm_pslock_flags);
 
 #define WIFINET_FW_STAT_LOCK_INIT(_ic, _name) spin_lock_init(&(_ic)->fw_stat_lock)
-#define WIFINET_FW_STAT_LOCK_DESTORY(_ic, _name)
+#define WIFINET_FW_STAT_LOCK_DESTROY(_ic, _name)
 #define WIFINET_FW_STAT_LOCK(_ic) { OS_SPIN_LOCK(&(_ic)->fw_stat_lock); }
 #define WIFINET_FW_STAT_UNLOCK(_ic) { OS_SPIN_UNLOCK(&(_ic)->fw_stat_lock); }
 

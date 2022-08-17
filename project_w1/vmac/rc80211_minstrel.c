@@ -34,7 +34,7 @@
  *   NO WARRANTY
  *   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  *   ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- *   LIMITED TO, THE IMPLIED WARRANTIES OF NONINFRINGEMENT, MERCHANTIBILITY
+ *   LIMITED TO, THE IMPLIED WARRANTIES OF NONINFRINGEMENT, MERCHANTABILITY
  *   AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
  *   THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE LIABLE FOR SPECIAL, EXEMPLARY,
  *   OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
@@ -176,7 +176,7 @@ void minstrel_calc_rate_stats(struct minstrel_rate_stats *mrs)
             /* update exponential weighted moving variance */
             mrs->prob_ewmv = minstrel_ewmv(mrs->prob_ewmv, cur_prob, mrs->prob_ewma, EWMA_LEVEL);
 
-            /*update exponential weighted moving avarage */
+            /*update exponential weighted moving average */
             mrs->prob_ewma = minstrel_ewma(mrs->prob_ewma, cur_prob, EWMA_LEVEL);
         }
 
@@ -281,7 +281,7 @@ static void minstrel_update_stats(struct minstrel_priv *mp, struct minstrel_sta_
 
         /* To determine the most robust rate (max_prob_rate) used at
         * 3rd mmr stage we distinct between two cases:
-        * (1) if any success probabilitiy >= 95%, out of those rates
+        * (1) if any success probability >= 95%, out of those rates
         * choose the maximum throughput rate as max_prob_rate
         * (2) if all success probabilities < 95%, the rate with
         * highest success probability is chosen as max_prob_rate */
@@ -807,7 +807,7 @@ int ieee80211_frame_duration(enum ieee80211_band band, size_t len,
 	 * len bytes (does not include FCS) at the given rate. Duration will
 	 * also include SIFS.
 	 *
-	 * rate is in 100 kbps, so divident is multiplied by 10 in the
+	 * rate is in 100 kbps, so dividend is multiplied by 10 in the
 	 * DIV_ROUND_UP() operations.
 	 *
 	 * shift may be 2 for 5 MHz channels or 1 for 10 MHz channels, and

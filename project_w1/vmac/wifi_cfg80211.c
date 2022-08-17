@@ -215,7 +215,7 @@ aml_spt_band_alloc (enum ieee80211_band band)
 {
     struct ieee80211_supported_band *spt_band = NULL;
     int n_channels, n_bitrates;
-    int totallen;
+    int totalled;
 
     if (band == IEEE80211_BAND_2GHZ)
     {
@@ -232,10 +232,10 @@ aml_spt_band_alloc (enum ieee80211_band band)
         goto exit;
     }
 
-    totallen = sizeof(struct ieee80211_supported_band)
+    totalled = sizeof(struct ieee80211_supported_band)
                 + sizeof(struct ieee80211_channel)*n_channels
                 + sizeof(struct ieee80211_rate)*n_bitrates;
-    spt_band = (struct ieee80211_supported_band *)ZMALLOC(totallen,"spt_band", GFP_ATOMIC);
+    spt_band = (struct ieee80211_supported_band *)ZMALLOC(totalled,"spt_band", GFP_ATOMIC);
     if (!spt_band)
         goto exit;
 
@@ -1201,14 +1201,14 @@ int vm_p2p_set_p2p_noa(struct net_device *dev, char* buf, int len)
             if ((count < 0) || (start < 0) || (duration < 0)
                 || (count > NET80211_P2P_SCHED_REPEAT))
             {
-                ERROR_DEBUG_OUT("ilegal setting for count=%d start=%d duration=%d\n",
+                ERROR_DEBUG_OUT("illegal setting for count=%d start=%d duration=%d\n",
                     count, start, duration);
                 break;
             }
 
             if ((count==NET80211_P2P_SCHED_RSVD) && (duration>0))
             {
-                ERROR_DEBUG_OUT("ilegal setting for count=%d duration=%d\n",
+                ERROR_DEBUG_OUT("illegal setting for count=%d duration=%d\n",
                     count, duration);
                 break;
             }
@@ -1267,7 +1267,7 @@ int vm_p2p_set_p2p_ps(struct net_device *dev, char* buf, int len)
                     wnet_vif->vm_p2p->ctw_opps_u.ctw_opps_s.ctw = ctw_opps_u.ctw_opps_s.ctw;
             }
             else
-                ERROR_DEBUG_OUT("ilegal setting for ctw=%d\n", ctw);
+                ERROR_DEBUG_OUT("illegal setting for ctw=%d\n", ctw);
         }
 
         if (opps != -1)
@@ -1306,7 +1306,7 @@ int vm_p2p_set_p2p_ps(struct net_device *dev, char* buf, int len)
             case -1:
                 break;
             default:
-               ERROR_DEBUG_OUT("ilegal setting for legacy_ps=%d\n", legacy_ps);
+               ERROR_DEBUG_OUT("illegal setting for legacy_ps=%d\n", legacy_ps);
                 break;
         }
     }
@@ -2346,7 +2346,7 @@ static  int vm_cfg80211_add_key(struct wiphy *wiphy, struct net_device *dev, uns
     int total_delay = 0;
     struct drv_private *drv_priv = wifimac->drv_priv;
 
-    DPRINTF(AML_DEBUG_CFG80211, "%s adding key for <%s> vm_state=%d, cipher=0x%x key_len=%d seq_len=%d kid=%d, pariwise:%d\n",
+    DPRINTF(AML_DEBUG_CFG80211, "%s adding key for <%s> vm_state=%d, cipher=0x%x key_len=%d seq_len=%d kid=%d, pairwise :%d\n",
         __func__, dev->name, wnet_vif->vm_state, lparams->cipher, lparams->key_len, lparams->seq_len, kid, pairwise);
 
     DPRINTF(AML_DEBUG_CFG80211, "key is %02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:\n",
@@ -2711,7 +2711,7 @@ static int vm_cfg80211_connect(struct wiphy *wiphy, struct net_device *dev,
     }
 
     if (pwdev_priv->connect_request) {
-        DPRINTF(AML_DEBUG_WARNING, "%s %d multiple connectreq, should not happen\n", __func__, __LINE__);
+        DPRINTF(AML_DEBUG_WARNING, "%s %d multiple connect req, should not happen\n", __func__, __LINE__);
     }
     DPRINTF(AML_DEBUG_CFG80211, "%s ssid=%s, len=%zd\n", __func__, ssid_sprintf(lsme->ssid, lsme->ssid_len), lsme->ssid_len);
 
@@ -4572,7 +4572,7 @@ int vm_cfg80211_notify_mgmt_rx(struct wlan_net_vif *wnet_vif, unsigned short cha
             && (p2p_pub_act->action == WIFINET_ACT_PUBLIC_P2P)) {
             switch (p2p_pub_act->subtype) {
                 case P2P_GO_NEGO_RESP:
-                case P2P_INVIT_RESP:
+                case P2P_INVITE_RESP:
                 case P2P_PROVISION_DISC_RESP:
                     if (p2p_pub_act->dialog_token == p2p->action_dialog_token) {
                         DPRINTF(AML_DEBUG_WARNING, "%s dialog_token:%d, send_tx_status_flag;%d\n", __func__, p2p_pub_act->dialog_token, p2p->send_tx_status_flag);
@@ -4761,8 +4761,8 @@ static int vm_cfg80211_mgmt_tx_p2p(struct wiphy *wiphy, struct wireless_dev *wde
             case P2P_PROVISION_DISC_RESP:
             case P2P_GO_NEGO_REQ:
             case P2P_GO_NEGO_RESP:
-            case P2P_INVIT_REQ:
-            case P2P_INVIT_RESP:
+            case P2P_INVITE_REQ:
+            case P2P_INVITE_RESP:
             case P2P_GO_NEGO_CONF:
             case P2P_DEVDISC_REQ:
             case P2P_DEVDISC_RESP:
@@ -5357,7 +5357,7 @@ static void vm_cfg80211_init_vht_capab(struct ieee80211_sta_vht_cap *vht_cap, en
     printk("%s(%d)\n",__func__,__LINE__);
 
     vht_cap->vht_supported = true;
-    #if 0 /*Original added from RTL view, interpreated into kernel language*/
+    #if 0 /*Original added from RTL view, interpreted into kernel language*/
     vht_cap->cap =
     (3 << 0) | // MaxMPDU Len: 0/1/2/3 is 3895/7991/11454/reserved octets
     (0 << 2) | // ChanWidth: 0 is only80, 1 is 160, 2 is 160+8080, 3 is reserved
@@ -5369,7 +5369,7 @@ static void vm_cfg80211_init_vht_capab(struct ieee80211_sta_vht_cap *vht_cap, en
     (0 << 11) | // SU beamformer:
     (1 << 12) | // SU Beamformee:
     (1 << 13) | // Beamformee STS Capability: Rx SPS -1
-    (0 << 16) | // Number of sounding Demensions
+    (0 << 16) | // Number of sounding dimensions
     (0 << 19) | // MU beamformer Capable
     (0 << 20) | // MU beamformee Capable
     (0 << 21) | // VHT TXOP PS
@@ -5713,7 +5713,7 @@ int vm_cfg80211_vnd_cmd_set_para(struct wiphy *wiphy, struct wireless_dev *wdev,
 
         case VM_NL80211_VENDER_SUBCMD_DRV_B2B_PKT_LENGTH:
             gB2BTestCasePacket.pkt_length = usr_data;
-            printk("Cfg80211: set pkt_len(mpdu_len) = %d uninvolve(fcs,delimter)\n",usr_data);
+            printk("Cfg80211: set pkt_len(mpdu_len) = %d uninvolved (fcs,delimiter)\n",usr_data);
             break;
 
         case VM_NL80211_VENDER_SUBCMD_DRV_SET_SHORT_GI:
@@ -5902,7 +5902,7 @@ err:
         vm_cfg80211_update_wiphy_params(wiphy);
         break;
     case VM_NL80211_VENDOR_SET_PREAMBLE_TYPE:
-        printk("Cfg80211: set preanble type\n");
+        printk("Cfg80211: set preamble type\n");
         phy_set_preamble_type(usr_data);
         break;
     case VM_NL80211_VENDOR_SET_BURST:
@@ -5945,7 +5945,7 @@ err:
 
             wnet_vif->vm_mainsta->sta_vhtcap |= WIFINET_VHTCAP_RX_LDPC;
             wifimac->wm_flags |=WIFINET_F_LDPC;
-            printk("Enalbe ldpc, if need change,the action must be excute before connect ap or create ap\n");
+            printk("Enable ldpc, if need change,the action must be excute before connect ap or create ap\n");
         }
         else
         {
@@ -6333,7 +6333,7 @@ int wifi_mac_alloc_wdev(struct wlan_net_vif *wnet_vif, struct device *dev)
     }
 
     /*alloc a cfg80211_register_dev and set ops for cfg80211 framework,
-    the 'sizeof(struct vm_wdev_priv)' is sized for our private data. And return wirelsess hw descriptor. */
+    the 'sizeof(struct vm_wdev_priv)' is sized for our private data. And return wireless hw descriptor. */
     wdev->wiphy = wiphy_new(&vm_cfg80211_ops, sizeof(struct vm_wdev_priv));
     if (!wdev->wiphy) {
         ERROR_DEBUG_OUT("ERROR ENOMEM\n");

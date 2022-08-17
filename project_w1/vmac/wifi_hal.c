@@ -301,7 +301,7 @@ void hal_soft_rx_cs(struct hal_private *hal_priv, struct sk_buff *skb)
 #ifdef BEACON_TX_TEST
         if ((frame_control & 0xfc) == MAC_FCTRL_BEACON)
         {
-            /*counter frames without beaocn frame*/
+            /*counter frames without beacon frame*/
             PRINT("Host receive beacon!\n");
         }
         else
@@ -459,7 +459,7 @@ unsigned char hal_wake_fw_req(void)
     if (atomic_read(&halpriv->drv_suspend_cnt) != 0)
     {
         POWER_END_LOCK();
-        printk("%s:%d, suspending, desn't wake, fw st %d\n", __func__, __LINE__,
+        printk("%s:%d, suspending, does not wake, fw st %d\n", __func__, __LINE__,
             halpriv->hal_fw_ps_status);
         return 0;
     }
@@ -2222,7 +2222,7 @@ int hal_init_priv(void)
 
     //fw event buffer allocation
     hal_alloc_fw_event_buf(hal_priv);
-    //phyical layer parameters setting functions
+    //physical layer parameters setting functions
     hal_ops_attach();
     /* register hal layer callback */
     hal_priv->hal_call_back = get_hal_call_back_table();
@@ -2285,7 +2285,7 @@ void hal_exit_priv(void)
         return;
     }
 
-    /*switch rf to SX mode or sleep mode,beacuae of interfence BT*/
+    /*switch rf to SX mode or sleep mode,because of interfence BT*/
     reg_val = rf_read_register(RG_TOP_A2);
     reg_val = reg_val &(~0x1f);
     /*RF enter sx mode*/
@@ -2441,7 +2441,7 @@ int hal_work_thread(void *param)
     struct sched_param sch_param;
     int  i = 0;
 
-    PRINT("%s(%d)  =====creat thread hal_worl_thread<=====\n",__func__,__LINE__);
+    PRINT("%s(%d)  =====creat thread hal_world_thread<=====\n",__func__,__LINE__);
 
     sch_param.sched_priority = 91;
     sched_setscheduler(current, SCHED_RR, &sch_param);
@@ -2549,7 +2549,7 @@ int hal_txok_thread(void *param)
                     txok_status_node = NULL;
                     continue;
                 }
-                /* to procesess drv_intr_tx_ok*/
+                /* to processes drv_intr_tx_ok*/
                 if (hal_priv->hal_call_back != NULL) {
                     hal_priv->hal_call_back->intr_tx_handle(hal_priv->drv_priv, txstatus, callback, queue_id);
                 }

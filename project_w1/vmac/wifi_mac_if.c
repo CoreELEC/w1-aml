@@ -266,7 +266,7 @@ void wifi_mac_set_channel_rssi(struct wifi_mac *wifimac, unsigned char rssi)
     }
 }
 
-int wifi_mac_is_in_noisy_enviroment(struct wifi_mac *wifimac)
+int wifi_mac_is_in_noisy_environment(struct wifi_mac *wifimac)
 {
     int ret = 0;
 
@@ -278,7 +278,7 @@ int wifi_mac_is_in_noisy_enviroment(struct wifi_mac *wifimac)
     return ret;
 }
 
-int wifi_mac_is_in_clear_enviroment(struct wifi_mac *wifimac)
+int wifi_mac_is_in_clear_environment(struct wifi_mac *wifimac)
 {
     int ret = 0;
 
@@ -1581,7 +1581,7 @@ int wifi_mac_cap_attach(struct wifi_mac *wifimac, struct drv_private* drv_priv)
     wifimac->wm_uapsd_qid = HAL_WME_UAPSD;
 
     /*get capabilities from 'drv_priv->drv_config'
-      initiallized in aml_driv_attach()*/
+      initialize in aml_driv_attach()*/
     if (ops->drv_get_config_param(drv_priv, CHIP_PARAM_UAPSD))
     {
         wifi_mac_ComSetCap(wifimac, WIFINET_C_UAPSD);
@@ -1713,7 +1713,7 @@ int wifi_mac_cap_attach(struct wifi_mac *wifimac, struct drv_private* drv_priv)
     /* initialize inact_timer for ap&sta, sta will keep alive
     to ap (send nulldata to ap), ap will monitor if sta leave bss.*/
 
-    /*initlialize scan param and scan_timer */
+    /*initialize scan param and scan_timer */
     wifi_mac_scan_attach(wifimac);
     wifimac->wm_esco_en    = 0;
     wifimac->wm_bt_en = 0;
@@ -2476,7 +2476,7 @@ int wifi_mac_initial(struct net_device *dev, int forcescan)
 
         /*set running & up flag for dev/interface. */
         dev->flags |= IFF_RUNNING | IFF_UP;
-#if (DEFAULT_INTIAL_POWERMODE == 1)
+#if (DEFAULT_INITIAL_POWERMODE == 1)
         wifi_mac_pwrsave_set_mode(wnet_vif, WIFINET_PWRSAVE_LOW);
 #endif
     }
@@ -3152,7 +3152,7 @@ wifi_mac_sub_sm(struct wlan_net_vif *wnet_vif, enum wifi_mac_state nstate, int a
                 wifimac->wm_vsdb_slot = CONCURRENT_SLOT_STA;
             }
             if (IS_APSTA_CONCURRENT(aml_wifi_get_con_mode()) && concurrent_check_vmac_is_AP(wifimac)) {
-                /*softap and sta concurrrent as scc, no need vsdb*/
+                /*softap and sta concurrent as scc, no need vsdb*/
                 wifimac->wm_vsdb_slot = CONCURRENT_SLOT_NONE;
             } else {
                 wifi_mac_add_work_task(wifimac, wifi_mac_set_vsdb, NULL, (SYS_TYPE)wifimac, 0, ENABLE, (SYS_TYPE)wnet_vif, 0);
@@ -3540,7 +3540,7 @@ vm_wlan_net_vif_register(struct wlan_net_vif *wnet_vif, char* name)
     if (name != NULL)
         strncpy(dev->name, name, sizeof(dev->name) - 1);
 
-    /*set net device operations, refer to 'wifi_mac_netdev_ops' for detials.
+    /*set net device operations, refer to 'wifi_mac_netdev_ops' for details.
         For example, if wlan0 up/down, tcp/ip_xmit_start ...*/
     dev->netdev_ops = &wifi_mac_netdev_ops;
     dev->hard_header_len = DEFAULT_HARD_HDR_LEN;
@@ -3692,7 +3692,7 @@ wifi_mac_build_country_ie(struct wlan_net_vif * wnet_vif)
 
     wifimac->wm_countryinfo.country_str[0] = country.iso[0];
     wifimac->wm_countryinfo.country_str[1] = country.iso[1];
-    wifimac->wm_countryinfo.country_str[2] = 0x20; //Environmnet: Any
+    wifimac->wm_countryinfo.country_str[2] = 0x20; //environment: Any
     wifimac->wm_countryinfo.country_len += 3;
 
     if (WIFINET_IS_CHAN_2GHZ(wnet_vif->vm_curchan)) {

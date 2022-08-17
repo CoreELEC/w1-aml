@@ -176,7 +176,7 @@ minstrel_ht_get_tp_avg(struct minstrel_ht_sta *mi, int group, int rate,
 {
     unsigned int nsecs = 0;
 
-    /* do not account throughput if sucess prob is below 10% */
+    /* do not account throughput if success prob is below 10% */
     if (prob_ewma < MINSTREL_FRAC(10, 100))
         return 0;
 
@@ -425,7 +425,7 @@ void minstrel_clear_unfitable_rate_stats(struct minstrel_ht_sta *mi, unsigned ch
  *  - max_prob_rate must use only one stream, as a tradeoff between delivery
  *    probability and throughput during strong fluctuations
  *  - as long as the max prob rate has a probability of more than 75%, pick
- *    higher throughput rates, even if the probablity is a bit lower
+ *    higher throughput rates, even if the probability is a bit lower
  */
 static void
 minstrel_ht_update_stats(struct minstrel_priv *mp, struct minstrel_ht_sta *mi)

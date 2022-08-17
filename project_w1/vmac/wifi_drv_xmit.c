@@ -137,7 +137,7 @@ struct drv_txlist *drv_txlist_initial(struct drv_private *drv_priv, int queue_id
     return &drv_priv->drv_txlist_table[queue_id];
 }
 
-void drv_txlist_destory(struct drv_private *drv_priv, struct drv_txlist *txlist)
+void drv_txlist_destroy(struct drv_private *drv_priv, struct drv_txlist *txlist)
 {
     DRV_TXQ_LOCK_DESTROY(txlist);
     drv_priv->drv_txqueue_map &= ~(1<<txlist->txlist_qnum);
@@ -410,7 +410,7 @@ static void drv_init_txpriv (struct hi_tx_priv_hdr * txpriv_content, struct drv_
     txpriv_content->Flag = WIFI_MORE_AGG|WIFI_FIRST_BUFFER;
 }
 
- //in the three-demo fifo and txlist_q which idexed by id from drv_list[0..7]
+ //in the three-demo fifo and txlist_q which indexed by id from drv_list[0..7]
 int drv_to_hal(struct drv_private *drv_priv, struct drv_txlist *txlist, struct list_head *head)
 {
     struct drv_txdesc *ptxdesc, *first;
@@ -508,7 +508,7 @@ int drv_to_hal(struct drv_private *drv_priv, struct drv_txlist *txlist, struct l
     up(&hal_priv->hi_irq_thread_sem);
 
     /*Saving txdesc which are sent to hal layer.  And will be freed when txcomplete,
-    so we need to protcet txlist_q.*/
+    so we need to protect txlist_q.*/
     if (!list_empty(head))
     {
         txlist->txlist_qcnt += list_first_entry(head, struct drv_txdesc, txdesc_queue)->txdesc_pktnum;
@@ -742,7 +742,7 @@ static int drv_tx_prepare(struct drv_private *drv_priv, struct sk_buff *skbbuf,s
                 }
             }
 
-            /* no need to do aggr in leagcy/drv_cfg
+            /* no need to do aggr in legacy/drv_cfg
              * not support/bar-ba session fail: need to add vht case , t.b.d/zqh
             */
             if (IS_MCS_RATE(ratectrl[0].vendor_rate_code) && txinfo->ht
@@ -876,7 +876,7 @@ int drv_tx_start( struct drv_private *drv_priv, struct sk_buff *skbbuf)
         }
     #endif
 
-        //if no need bakcup for powersave (M_PWR_SAV_BYPASS), bypass here. such as nulldata
+        //if no need backup for powersave (M_PWR_SAV_BYPASS), bypass here. such as nulldata
         //if not triggered uapsd frame to peer sta, also bypass here.
         if (!M_FLAG_GET(skbbuf, M_PWR_SAV_BYPASS) && !M_FLAG_GET(skbbuf, M_UAPSD))
         {
@@ -985,8 +985,8 @@ enum tx_frame_flag drv_set_tx_frame_flag(struct sk_buff *skbbuf)
             case P2P_GO_NEGO_RESP:
             case P2P_PROVISION_DISC_REQ:
             case P2P_PROVISION_DISC_RESP:
-            case P2P_INVIT_REQ:
-            case P2P_INVIT_RESP:
+            case P2P_INVITE_REQ:
+            case P2P_INVITE_RESP:
                 ret = TX_P2P_OTHER_GO_NEGO_FRAME;
                 break;
 
@@ -1053,7 +1053,7 @@ int drv_send(struct sk_buff *skbbuf, struct drv_private *drv_priv)
     ptxdesc->txinfo = txinfo;
     list_add_tail(&ptxdesc->txdesc_queue, &txdesc_list_head);
 
-    //build seperated tx desc: set tx_info/calc pages/set skbbuf/next ptr/last_ptr/subframe for agg/
+    //build separated tx desc: set tx_info/calc pages/set skbbuf/next ptr/last_ptr/subframe for agg/
     ptxdesc->txdesc_queue_next = NULL;
     ptxdesc->txdesc_frame_flag = drv_set_tx_frame_flag(skbbuf);
 
@@ -1090,7 +1090,7 @@ int drv_send(struct sk_buff *skbbuf, struct drv_private *drv_priv)
 
     } else {
         DRV_TXQ_UNLOCK(txlist);
-        /*no aggregted: data frames,  mgmt frames and multicast/broad frames*/
+        /*no aggregated: data frames,  mgmt frames and multicast/broad frames*/
         if (txinfo->b_mcast) {
 #ifdef  AML_MCAST_QUEUE
             //mcast backup also use txlist_backup_qcnt
@@ -1449,7 +1449,7 @@ static void drv_tx_complete_task(struct drv_private *drv_priv, struct drv_txlist
                     }
 
                     if (status == TX_DESCRIPTOR_STATUS_SUCCESS) {
-                        ptxdesc->txdesc_rateinfo[0].flags |= HAL_RATECTRL_TX_SEND_SUCCES;
+                        ptxdesc->txdesc_rateinfo[0].flags |= HAL_RATECTRL_TX_SEND_SUCCESS;
                     }
 
                 } else {

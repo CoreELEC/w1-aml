@@ -282,7 +282,7 @@ drv_hal_calc_txtime(const struct drv_rate_table *rates,
 
     kbps = rates->info[rateix].rateKbps;
     /*
-     * index can be invalid duting dynamic Turbo transitions.
+     * index can be invalid during dynamic Turbo transitions.
      */
     if (kbps == 0) return 0;
     switch (rates->info[rateix].phy)

@@ -6,7 +6,7 @@
  * Project: 11N 80211 driver  layer Software
  *
  * Description:
- *  driver layer configuration functuon
+ *  driver layer configuration function
  *
  *
  ****************************************************************************************

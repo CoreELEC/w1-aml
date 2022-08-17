@@ -34,7 +34,7 @@ struct wifi_station;
 #define HAL_RATECTRL_USE_FIXED_RATE 0x0001
 #define HAL_RATECTRL_CW40_FLAG 0x0002    /* CW 40 */
 #define HAL_RATECTRL_SGI_FLAG 0x0004    /* Short Guard Interval */
-#define HAL_RATECTRL_TX_SEND_SUCCES 0X800
+#define HAL_RATECTRL_TX_SEND_SUCCESS 0X800
 #define HAL_RATECTRL_USE_SAMPLE_RATE 0X1000
 
 #define HAL_BEACON_PERIOD 0x0000ffff  /* beacon interval period */
@@ -60,7 +60,7 @@ enum
 } ;
 
 /**
- *  Protection Moide
+ *  Protection Mode
  */
 enum prot_mode
 {
@@ -167,7 +167,7 @@ static inline int drv_hal_setmac(unsigned char wnet_vif_id, unsigned char *mac)
     return 1;
 }
 
-static inline int drv_hal_intrset( int ints)
+static inline int drv_hal_interset( int ints)
 {
     return 0;
 }

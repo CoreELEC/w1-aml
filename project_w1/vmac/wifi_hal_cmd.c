@@ -200,7 +200,7 @@ unsigned int phy_addba_ok(unsigned char wnet_vif_id,unsigned short StaAid,unsign
     struct hal_private *hal_priv = hal_get_priv();
     Add_BA_Struct AddBA = {0};
 
-    //PRINT("phy_addba_okwnet_vif_id %d StaAid %d,tid %d,sn 0x%x,baw,%d,aothrole %d,batype %d \n",
+    //PRINT("phy_addba_okwnet_vif_id %d StaAid %d,tid %d,sn 0x%x,baw,%d,authorless %d,batype %d \n",
       //  wnet_vif_id, StaAid, TID, SeqNumStart, BA_Size, AuthRole, BA_TYPE);
 
     DBG_ENTER();
@@ -1325,13 +1325,13 @@ void phy_set_bmfm_info(int wnet_vif_id, unsigned char *group_id,
 
 unsigned int hal_dpd_memory_download_cmd(void)
 {
-    struct DPD_Memory_Downlod dpd_download;
+    struct DPD_Memory_Download dpd_download;
 
-    memset(&dpd_download, 0, sizeof(struct DPD_Memory_Downlod));
+    memset(&dpd_download, 0, sizeof(struct DPD_Memory_Download));
     dpd_download.Cmd = DPD_MEMORY_CMD;
 
     HAL_BEGIN_LOCK();
-    hi_set_cmd((unsigned char *)&dpd_download, sizeof(struct DPD_Memory_Downlod));
+    hi_set_cmd((unsigned char *)&dpd_download, sizeof(struct DPD_Memory_Download));
     HAL_END_LOCK();
 
     return 0;
@@ -1432,7 +1432,7 @@ unsigned int phy_set_coexist_max_not_grant_cnt( unsigned int coexist_max_not_gra
 
 /*
 bit31-bit16 : minimal  priority
-bit15:bit0: max prioriyt
+bit15:bit0: max priority
 */
 unsigned int phy_set_coexist_scan_priority_range( unsigned int coexist_scan_priority_range)
 {
@@ -1455,7 +1455,7 @@ unsigned int phy_set_coexist_scan_priority_range( unsigned int coexist_scan_prio
 
 /*
 bit31-bit16 : minimal  priority
-bit15:bit0: max prioriyt
+bit15:bit0: max priority
 */
 unsigned int phy_set_coexist_be_bk_noqos_priority_range( unsigned int coexist_scan_priority_range)
 {
@@ -1767,31 +1767,31 @@ unsigned char get_s32_item(char *varbuf, int len, char *item, unsigned int *item
     return 1;
 }
 
-unsigned char parse_tx_power_coefficient(char *varbuf, int len, char str_pwr_coefficien[])
+unsigned char parse_tx_power_coefficient(char *varbuf, int len, char str_pwr_coefficient[])
 {
     unsigned short pwr_coefficient[57];
     memset(pwr_coefficient,0,sizeof(pwr_coefficient));
 
-    get_s16_item(varbuf, len, str_pwr_coefficien, &pwr_coefficient[0]);
+    get_s16_item(varbuf, len, str_pwr_coefficient, &pwr_coefficient[0]);
 
     if (pwr_coefficient[0]) {
-        if (memcmp(str_pwr_coefficien,"ce_pwr_coefficient",strlen(str_pwr_coefficien)) == 0) {
+        if (memcmp(str_pwr_coefficient,"ce_pwr_coefficient",strlen(str_pwr_coefficient)) == 0) {
             update_tx_power_coefficient_plan(TX_POWER_CE, pwr_coefficient);
         }
 
-        if (memcmp(str_pwr_coefficien,"fcc_pwr_coefficient",strlen(str_pwr_coefficien)) == 0) {
+        if (memcmp(str_pwr_coefficient,"fcc_pwr_coefficient",strlen(str_pwr_coefficient)) == 0) {
             update_tx_power_coefficient_plan(TX_POWER_FCC, pwr_coefficient);
         }
 
-        if (memcmp(str_pwr_coefficien,"arib_pwr_coefficient",strlen(str_pwr_coefficien)) == 0) {
+        if (memcmp(str_pwr_coefficient,"arib_pwr_coefficient",strlen(str_pwr_coefficient)) == 0) {
         update_tx_power_coefficient_plan(TX_POWER_ARIB, pwr_coefficient);
         }
 
-        if (memcmp(str_pwr_coefficien,"srrc_pwr_coefficient",strlen(str_pwr_coefficien)) == 0) {
+        if (memcmp(str_pwr_coefficient,"srrc_pwr_coefficient",strlen(str_pwr_coefficient)) == 0) {
         update_tx_power_coefficient_plan(TX_POWER_SRRC, pwr_coefficient);
         }
 
-        if (memcmp(str_pwr_coefficien,"anatel_pwr_coefficient",strlen(str_pwr_coefficien)) == 0) {
+        if (memcmp(str_pwr_coefficient,"anatel_pwr_coefficient",strlen(str_pwr_coefficient)) == 0) {
         update_tx_power_coefficient_plan(TX_POWER_ANATEL, pwr_coefficient);
         }
     }

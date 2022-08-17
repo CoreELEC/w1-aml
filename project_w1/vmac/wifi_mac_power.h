@@ -16,7 +16,7 @@
 
 #include "wifi_mac_rx_status.h"
 
-//powersave presleep timer peroid
+//powersave presleep timer
 #define WIFINET_PWRSAVE_TIMER_INTERVAL   200
 
 //INACTIVITYTIME for WIFINET_PWRSAVE_LOW
@@ -57,11 +57,11 @@ enum wifi_mac_psmode
 
 enum wifinet_ps_state
 {
-    //sta is recogized awake by ap
+    //sta is recognized awake by ap
     WIFINET_PWRSAVE_AWAKE,
-    //sta is recogized sleep by ap, and fw of sta is sleep too.
+    //sta is recognized sleep by ap, and fw of sta is sleep too.
     WIFINET_PWRSAVE_FULL_SLEEP,
-    //sta is recogized sleep by ap, but fw of sta is not sleep.
+    //sta is recognized sleep by ap, but fw of sta is not sleep.
     //such as sta wakeup by beacon timer.
     WIFINET_PWRSAVE_NETWORK_SLEEP,
     WIFINET_PWRSAVE_STATE_MAX,

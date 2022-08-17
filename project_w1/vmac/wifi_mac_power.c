@@ -48,7 +48,7 @@ static void wifi_mac_pwrsave_presleep(struct work_struct *work)
         os_timer_ex_start(&wnet_vif->vm_pwrsave.ips_timer_presleep);
         return;
     }
-    //if conditions are stasified, will enter presleep. conditions must include:
+    //if conditions are stratified, will enter presleep. conditions must include:
     //a, ips_inactivitytime enough
     //b, not in WIFINET_PSQUEUE_PS4QUIET (mean fake powersave)
     //c, not in scan
@@ -151,7 +151,7 @@ void wifi_mac_pwrsave_restore_sleep(struct wlan_net_vif *wnet_vif)
         if ((wnet_vif->vm_pwrsave.ips_sleep_wait_reason == SLEEP_AFTER_PS_TRIGGER_TIMEOUT)
             && (wnet_vif->vm_p2p->p2p_flag & P2P_OPPPS_CWEND_FLAG_HI))
         {
-            wifimac->drv_priv->drv_ops.drv_p2p_client_opps_cwend_may_spleep(wnet_vif);
+            wifimac->drv_priv->drv_ops.drv_p2p_client_opps_cwend_may_sleep(wnet_vif);
         }
         else
 #endif
@@ -297,7 +297,7 @@ int wifi_mac_pwrsave_fullsleep(struct wlan_net_vif *wnet_vif,
     enum wifinet_ps_sleep_reason reason)
 {
     int status;
-    DPRINTF(AML_DEBUG_PWR_SAVE, "<%s>%s %d resaon=%s\n",
+    DPRINTF(AML_DEBUG_PWR_SAVE, "<%s>%s %d reason=%s\n",
         VMAC_DEV_NAME(wnet_vif), __func__,__LINE__, ips_sleep_reason[reason]);
     status = wifi_mac_pwrsave_set_state(wnet_vif, WIFINET_PWRSAVE_FULL_SLEEP);
     return status;
@@ -308,7 +308,7 @@ int wifi_mac_pwrsave_wakeup(struct wlan_net_vif *wnet_vif,
     enum wifinet_ps_wk_reason reason)
 {
     int status;
-    DPRINTF(AML_DEBUG_PWR_SAVE, "<%s>%s %d resaon=%s\n",
+    DPRINTF(AML_DEBUG_PWR_SAVE, "<%s>%s %d reason=%s\n",
         VMAC_DEV_NAME(wnet_vif), __func__,__LINE__, ips_wakeup_reason[reason]);
     status = wifi_mac_pwrsave_set_state(wnet_vif, WIFINET_PWRSAVE_AWAKE);
     return status;
@@ -317,7 +317,7 @@ int wifi_mac_pwrsave_wakeup(struct wlan_net_vif *wnet_vif,
 int wifi_mac_pwrsave_wkup_and_NtfyAp (struct wlan_net_vif *wnet_vif,
         enum wifinet_ps_wk_reason reason)
 {
-    DPRINTF(AML_DEBUG_PWR_SAVE, "<%s>%s %d resaon=%s\n",
+    DPRINTF(AML_DEBUG_PWR_SAVE, "<%s>%s %d reason=%s\n",
         VMAC_DEV_NAME(wnet_vif), __func__,__LINE__, ips_wakeup_reason[reason]);
     wifi_mac_pwrsave_wakeup(wnet_vif, reason);
 
@@ -1102,7 +1102,7 @@ void wifi_mac_pwrsave_check_ps_end(void * ieee,
 #ifdef CONFIG_P2P
         if (wnet_vif->vm_p2p->p2p_flag & P2P_OPPPS_CWEND_FLAG_HI)
         { 
-             wifimac->drv_priv->drv_ops.drv_p2p_client_opps_cwend_may_spleep(wnet_vif);
+             wifimac->drv_priv->drv_ops.drv_p2p_client_opps_cwend_may_sleep(wnet_vif);
         }
         if (ps_over_flag != PS_OVER_FLAG_ALL)
         {

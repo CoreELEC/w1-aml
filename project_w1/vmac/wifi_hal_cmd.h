@@ -11,7 +11,7 @@ unsigned int phy_init_hmac(unsigned char wnet_vif_id);
 unsigned int phy_disable_net_traffic(void);
 unsigned int phy_set_param_cmd(unsigned char cmd,unsigned char vid,unsigned int data);
 unsigned int phy_get_param_cmd_ul(unsigned char cmd,unsigned char vid);
-unsigned int phy_enable_bcn(unsigned char vid,unsigned short BecaonInterval, unsigned short DtimPeriod, unsigned char BssType);
+unsigned int phy_enable_bcn(unsigned char vid,unsigned short BeaconInterval, unsigned short DtimPeriod, unsigned char BssType);
 unsigned int phy_set_bcn_buf(unsigned char wnet_vif_id,unsigned char *pBeacon, unsigned short len,unsigned short Rate,unsigned short Flag);
 unsigned int phy_switch_chan(unsigned short channel, unsigned char bw, unsigned char restore);
 void phy_rf_channel_restore(unsigned short channel, int bw);

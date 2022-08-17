@@ -109,7 +109,7 @@ static int writeFile(struct file *fp, char *buf, int len)
 }
 
 /*
-* Test if the specifi @param path is a file and readable
+* Test if the specific @param path is a file and readable
 * If readable, @param sz is got
 * @param path the path of the file to test
 * @return Linux specific error code
@@ -190,7 +190,7 @@ static int retriveFromFile(const char *path, u8 *buf, u32 sz)
 }
 
 /*
-* Open the file with @param path and wirte @param sz byte of data starting from @param buf into the file
+* Open the file with @param path and write @param sz byte of data starting from @param buf into the file
 * @param path the path of the file to open and write
 * @param buf the starting address of the data to write into file
 * @param sz how many bytes to write at most
@@ -228,7 +228,7 @@ static int storeToFile(const char *path, u8 *buf, u32 sz)
 }
 
 /*
-* Test if the specifi @param path is a file and readable
+* Test if the specific @param path is a file and readable
 * @param path the path of the file to test
 * @return true or false
 */
@@ -242,7 +242,7 @@ int aml_is_file_readable(const char *path)
 }
 
 /*
-* Test if the specifi @param path is a file and readable.
+* Test if the specific @param path is a file and readable.
 * If readable, @param sz is got
 * @param path the path of the file to test
 * @return _TRUE or _FALSE
@@ -257,7 +257,7 @@ int aml_is_file_readable_with_size(const char *path, u32 *sz)
 }
 
 /*
-* Test if the specifi @param path is a readable file with valid size.
+* Test if the specific @param path is a readable file with valid size.
 * If readable, @param sz is got
 * @param path the path of the file to test
 * @return _TRUE or _FALSE
@@ -291,7 +291,7 @@ int aml_retrieve_from_file(const char *path, u8 *buf, u32 sz)
 }
 
 /*
-* Open the file with @param path and wirte @param sz byte of data starting from @param buf into the file
+* Open the file with @param path and write @param sz byte of data starting from @param buf into the file
 * @param path the path of the file to open and write
 * @param buf the starting address of the data to write into file
 * @param sz how many bytes to write at most

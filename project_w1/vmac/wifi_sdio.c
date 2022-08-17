@@ -50,7 +50,7 @@ static inline struct amlw_hwif_sdio *aml_sdio_priv(void)
 
 #define HIF_SDIO_UNIT_MULTIBLKSZ
 
-#ifdef    DRIVER_FOR_BT  // access bt domain need more slower clk for crosse the AHB bridge
+#ifdef    DRIVER_FOR_BT  // access bt domain need more slower clk for cross the AHB bridge
 int sdioclk = 3000000;
 #else
 #ifdef RF_T9026

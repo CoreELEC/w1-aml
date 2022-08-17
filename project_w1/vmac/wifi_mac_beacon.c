@@ -807,7 +807,7 @@ void wifi_mac_process_beacon_miss_ex(SYS_TYPE arg)
 
     /*
     * Actually, we will lost at least 25 beacons here,
-    * beacuse 'vm_swbmiss' timeout is 2500ms.
+    * because 'vm_swbmiss' timeout is 2500ms.
     */
     if (wnet_vif->vm_bmiss_count++ < WIFINET_BMISS_COUNT_MAX) {
         /* we should wakeup when beacon miss happened */

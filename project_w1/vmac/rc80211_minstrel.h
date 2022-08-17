@@ -65,7 +65,7 @@ struct minstrel_rate_stats {
 	/* total attempts/success counters */
 	u32 att_hist, succ_hist;
 
-	/* statistis of packet delivery probability
+	/* statistics of packet delivery probability
 	 *  prob_ewma - exponential weighted moving average of prob
 	 *  prob_ewmsd - exp. weighted moving standard deviation of prob */
 	u16 prob_ewma;

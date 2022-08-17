@@ -570,7 +570,7 @@ int wifi_mac_input(void *station, struct sk_buff *skb, struct wifi_mac_rx_status
 #endif//CONFIG_P2P
                )
             {
-                WIFINET_DPRINTF(AML_DEBUG_RECV,"recive mgmt frame dir = %d drop !\n ",dir);
+                WIFINET_DPRINTF(AML_DEBUG_RECV,"receive mgmt frame dir = %d drop !\n ",dir);
                 wnet_vif->vif_sts.sts_rx_wrong_dir++;
                 goto err;
             }
@@ -949,7 +949,7 @@ wifi_mac_deliver_data(struct wifi_station *sta, struct sk_buff *skb)
     struct net_device *dev = wnet_vif->vm_ndev;
     struct ether_header *eh;
 
-    /* TODO this code will cause WARN, it is used to rounter function, but cause dump, need t.b.d*/
+    /* TODO this code will cause WARN, it is used to router function, but cause dump, need t.b.d*/
     if (skb != NULL)
     {
         eh = (struct ether_header *) os_skb_data(skb);
@@ -1371,7 +1371,7 @@ wifi_mac_auth_shared(struct wifi_station *sta, struct wifi_frame *wh,
                     }
                     get_random_bytes(sta->sta_challenge, WIFINET_CHALLENGE_LEN);
                     WIFINET_DPRINTF_STA(AML_DEBUG_DEBUG | AML_DEBUG_CONNECT, sta,
-                        "shared key %sauth request", allocbs ? "" : "re");
+                        "shared key %s auth request", allocbs ? "" : "re");
                     break;
 
                 case WIFINET_AUTH_SHARED_RESPONSE:
@@ -2074,7 +2074,7 @@ wifi_mac_parse_wmeie(unsigned char *frm, const struct wifi_frame *wh,
         //WIFINET_DPRINTF(AML_DEBUG_ELEMID | AML_DEBUG_WME, "WME IE too short, len %u", len);
         return -1;
     }
-    /*get uapsd filed from wmm ie and set flag for loacl */
+    /*get uapsd filed from wmm ie and set flag for local */
     sta->sta_uapsd = frm[WME_CAPINFO_IE_OFFSET];
     if (WME_STA_UAPSD_ENABLED(sta->sta_uapsd))
     {
@@ -2176,7 +2176,7 @@ wifi_mac_parse_dothparams(struct wlan_net_vif *wnet_vif, unsigned char *frm,
     }
     wnet_vif->vm_mainsta->sta_channel_switch_mode = frm[2];
     chan = frm[3];
-    if (wifi_mac_chan_num_availd(wifimac, chan)==false)
+    if (wifi_mac_chan_num_avail(wifimac, chan)==false)
     {
         WIFINET_DPRINTF(AML_DEBUG_ELEMID | AML_DEBUG_DOTH,
                         "channel switch invalid channel %u", chan);
@@ -2367,15 +2367,15 @@ void wifi_mac_parse_htcap(struct wifi_station *sta, unsigned char *ie)
         sta->sta_flags &= ~WIFINET_F_LDPC;
     }
      /*negotiate  amsdu capability*/
-    if (htcapval & WIFINET_HTCAP_C_MAXAMSDUSIZE ) /*Indicates support for receiiving 7935 octets capablity */
+    if (htcapval & WIFINET_HTCAP_C_MAXAMSDUSIZE ) /*Indicates support for receiving 7935 octets capability */
     {
         sta->sta_amsdu->amsdu_max_length = MIN(sta->sta_amsdu->amsdu_max_length, AMSDU_SIZE_7935);
     }
-    else /*Indicates support for receiiving 3839 octets capablity */
+    else /*Indicates support for receiving 3839 octets capability */
     {
         sta->sta_amsdu->amsdu_max_length = MIN(sta->sta_amsdu->amsdu_max_length, AMSDU_SIZE_3839);
     }
-    /*get amdpu infomation */
+    /*get amdpu information */
     sta->sta_maxampdu = ((1u << (WIFINET_HTCAP_MAXRXAMPDU_FACTOR + htcap->hc_maxampdu)) - 1);
     sta->sta_mpdudensity = wifi_mac_parse_mpdudensity(htcap->hc_mpdudensity);
     wifi_mac_set_ampduparams(sta);
@@ -4259,7 +4259,7 @@ void wifi_mac_recv_assoc_rsp(struct wlan_net_vif *wnet_vif,
 
     if (scan.vht_cap) {
         wifi_mac_parse_vht_cap(sta, scan.vht_cap);
-        /*fiter the same rate as local and save. */
+        /*filter the same rate as local and save. */
         wifi_mac_setup_vht_rates(sta, scan.vht_cap,
             WIFINET_F_DOFRATE | WIFINET_F_DOXSECT | WIFINET_F_DOBRS);
 
@@ -4344,7 +4344,7 @@ void wifi_mac_recv_deauth(struct wlan_net_vif *wnet_vif,
     {
         if (((wnet_vif->vm_opmode == WIFINET_M_STA) && (wnet_vif->vm_phase_flags & PHASE_DISCONNECTING))
             || ((wnet_vif->vm_opmode == WIFINET_M_HOSTAP) && (sta->is_disconnecting == 1))) {
-            AML_OUTPUT("ignor rx deauth because we send first\n");
+            AML_OUTPUT("ignore rx deauth because we send first\n");
             return;
         }
         if (wnet_vif->vm_state == WIFINET_S_SCAN) {
@@ -4416,7 +4416,7 @@ void wifi_mac_recv_disassoc(struct wlan_net_vif *wnet_vif,
 
         WIFINET_DPRINTF_STA(AML_DEBUG_WARNING, sta, "recv disassociate (reason %d)", reason);
 
-        printk("%s %d sorure bssid: %02x:%02x:%02x:%02x:%02x:%02x\n", __func__, __LINE__,
+        printk("%s %d source bssid: %02x:%02x:%02x:%02x:%02x:%02x\n", __func__, __LINE__,
             wh->i_addr2[0], wh->i_addr2[1],wh->i_addr2[2],
             wh->i_addr2[3], wh->i_addr2[4], wh->i_addr2[5]);
 

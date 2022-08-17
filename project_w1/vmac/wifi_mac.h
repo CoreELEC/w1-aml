@@ -1311,7 +1311,7 @@ struct wifi_mac_ie_ext_cap
 #define WIFINET_VHTCAP_MU_BFMEE           0x00100000  /* Bit20 mu beamformee */
 
 #define WIFINET_VHTCAP_BF_MAX_ANT          0x0000E000 /* B13-B15 Compressed steering number of
-                                                         * beacomformer Antennas supported */
+                                                         * beacon former Antennas supported */
 
 #define WIFINET_VHTCAP_SOUND_DIMENSIONS    0x00070000 /* B16-B18 Sounding Dimensions */
 
@@ -1509,7 +1509,7 @@ enum wifi_mac_ie_timeout_type {
 #define VHT_CAP_SUPPORT_MU_BFMER            (1)
 
 
-/*mu beaformee capable*/
+/*mu beam former capable*/
 #define SET_VHT_CAP_MU_BFMEE(dst, val) do {(dst) &= ~(0x1 <<20) ; (dst) |= (val) << 20;}while(0)
 #define VHT_CAP_NOT_SUPPORT_MU_BFMEE    (0)
 #define VHT_CAP_SUPPORT_MU_BFMEE            (1)

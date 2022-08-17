@@ -173,7 +173,7 @@ wifi_mac_wmm_chanparams(struct wlan_net_vif *wnet_vif,
 #define LLC_FRMR    0x87
 #define LLC_DM      0x0f
 #define LLC_XID     0xaf
-#define LLC_SABME   0x6f
+#define LLC_SAME    0x6f
 
 
 
@@ -274,8 +274,8 @@ void wifi_mac_connect_start(struct wifi_mac *wifimac);
 void wifi_mac_connect_end(struct wifi_mac *wifimac);
 void wifi_mac_scan_set_gain(struct wifi_mac *wifimac, unsigned char rssi);
 void wifi_mac_set_channel_rssi(struct wifi_mac *wifimac, unsigned char rssi);
-int wifi_mac_is_in_noisy_enviroment(struct wifi_mac *wifimac);
-int wifi_mac_is_in_clear_enviroment(struct wifi_mac *wifimac);
+int wifi_mac_is_in_noisy_environment(struct wifi_mac *wifimac);
+int wifi_mac_is_in_clear_environment(struct wifi_mac *wifimac);
 
 
 void wifi_mac_get_channel_rssi_before_scan(struct wifi_mac *wifimac, int *rssi);

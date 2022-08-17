@@ -13,7 +13,7 @@ static char * sts_man[] ={"-----------format:-----------\n",
     "iw dev wlan0 vendor send 0xc3 0xc4 op_code,addr high 8bits,addr low 8bits,function code,data_0,data_1,data_2 data_3\n",
     "-----------op_code:-----------\n",
 "0x96 + systems:set the default system cfg: sw statistic 0x1, sw probe 0x0\n",
-"0x97 + addr high 8bits,addr low 8bits,data_0,data_1,data_2 data_3 to updte the cfg;\n",
+"0x97 + addr high 8bits,addr low 8bits,data_0,data_1,data_2 data_3 to update the cfg;\n",
 "0x98 + function code to clear/start/read/stop by the function code;\n",
 "-----------function code: -----------\n",
 "clear 0x0, start 0x1, read 0x2, stop 0x3\n",
@@ -48,11 +48,10 @@ static unsigned short sts_reg_chk_pool[] = {
 
 /*
 ---description---
-it is used to do all kinds of statistis inforomation  initialization
-for log showing, the infromation content is mapped by the array index which defined
+it is used to do all kinds of statistics information initialization
+for log showing, the information content is mapped by the array index which defined
 by the hardware
 @(void)
----created by qinghua.zeng in amlogic shanghai, 2018-11-07---
 */
 
 static char* sts_mac_irq_prt_tag[5]={NULL,NULL,"mac irq  ","mac irq  ",NULL};
@@ -212,7 +211,7 @@ void sts_prt_info_map(void)
     sts_sys_idx_val[sts_drv_tx_pkts_idx] = (HOST_SW_VADDR) << 16 | sts_drv_tx_pkts_idx;
     sts_sys_idx_val[sts_drv_tx_drops_idx] = (HOST_SW_VADDR) << 16 | sts_drv_tx_drops_idx;
     sts_sys_idx_val[sts_drv_tx_normal_idx] = (HOST_SW_VADDR) << 16 | sts_drv_tx_normal_idx;
-    sts_sys_idx_val[sts_drv_tx_end_nornal_idx] = (HOST_SW_VADDR) << 16 | sts_drv_tx_end_nornal_idx;
+    sts_sys_idx_val[sts_drv_tx_end_normal_idx] = (HOST_SW_VADDR) << 16 | sts_drv_tx_end_normal_idx;
     sts_sys_idx_val[sts_drv_tx_end_ampdu_idx] = (HOST_SW_VADDR) << 16 | sts_drv_tx_end_ampdu_idx;
     sts_sys_idx_val[sts_drv_tx_ampdu_idx] = (HOST_SW_VADDR) << 16 | sts_drv_tx_ampdu_idx;
     sts_sys_idx_val[sts_drv_tx_ampdu_on_frm_idx] = (HOST_SW_VADDR) << 16 | sts_drv_tx_ampdu_on_frm_idx;
@@ -364,7 +363,7 @@ void sts_prt_info_map(void)
     sts_sys_prt_info[sts_drv_tx_pkts_idx] = "drv_tx_pkts";
     sts_sys_prt_info[sts_drv_tx_drops_idx] = "drv_tx_drops";
     sts_sys_prt_info[sts_drv_tx_normal_idx] = "drv_tx_normal";
-    sts_sys_prt_info[sts_drv_tx_end_nornal_idx] = "drv_tx_end_nornal";
+    sts_sys_prt_info[sts_drv_tx_end_normal_idx] = "drv_tx_end_normal";
     sts_sys_prt_info[sts_drv_tx_ampdu_idx] = "drv_tx_ampdu";
     sts_sys_prt_info[sts_drv_tx_ampdu_on_frm_idx] = "drv_tx_ampdu_on_frm";
     sts_sys_prt_info[sts_drv_tx_end_fail_idx] = "drv_tx_end_fail";
@@ -412,7 +411,6 @@ void sts_prt_info_map(void)
 ---description---
 it is used to get the tag information for log showing, indexed by the address
 @addr, the statistic address
----created by qinghua.zeng in amlogic shanghai, 2018-11-07---
 */
  char** get_tag_info(unsigned short addr, unsigned int tag_info)
 {
@@ -504,7 +502,6 @@ void sts_sw_probe(unsigned int sts_idx, unsigned int unit)
 ---description---
 it is used to set the default configuration for the statistic register.
 @(void)
----created by qinghua.zeng in amlogic shanghai, 2018-11-07---
 */
 void sts_default_cfg(struct sts_cfg_data* cfg_data, unsigned char sts_sys_type)
 {
@@ -563,7 +560,6 @@ it is used to update the default configuration for the statistic register.
 @len: update information length
 1)check the registers statistic pool
 2)look up the registers to update, update the exist one  or append the new one
----created by qinghua.zeng in amlogic shanghai, 2018-11-07---
 */
 void sts_update_cfg(struct sts_cfg_data* cfg_data, const char* data,unsigned int len)
 {
@@ -657,7 +653,6 @@ void sts_update_cfg(struct sts_cfg_data* cfg_data, const char* data,unsigned int
 ---description---
 it is used to clear statistic register by address
 @addr: the statistic register address
----created by qinghua.zeng in amlogic shanghai, 2018-11-07---
 */
 void sts_clr_cnt(unsigned short addr)
 {
@@ -761,7 +756,6 @@ it is used to start a statistic by the index code
 @char obj_1, index 1
 @char obj_2, index 2
 @char obj_3  index 3
----created by qinghua.zeng in amlogic shanghai, 2018-11-07---
 */
 void sts_start_cnt(unsigned short addr,
                              char obj_0,char obj_1,char obj_2,char obj_3)
@@ -990,7 +984,6 @@ it is used to finish a statistic by the index code
 @char obj_1, index 1
 @char obj_2, index 2
 @char obj_3  index 3
----created by qinghua.zeng in amlogic shanghai, 2018-11-07---
 */
 void sts_read_cnt(unsigned short addr,
                          unsigned char obj_0,unsigned char obj_1,unsigned char obj_2, unsigned char obj_3,
@@ -1112,7 +1105,6 @@ void sts_read_cnt(unsigned short addr,
 ---description---
 it is used to stop statistic register by address
 @addr: the statistic register address
----created by qinghua.zeng in amlogic shanghai, 2018-11-07---
 */
 void sts_stop_cnt(unsigned short addr)
 {
@@ -1202,7 +1194,6 @@ void sts_show_cfg(  struct sts_cfg_data* cfg_data)
 ---description---
 it is used to operate the statistic register by the address
 @func_code: the statistic register operation code=>clear:0/start:1/read:2/stop:3
----created by qinghua.zeng in amlogic shanghai, 2018-11-07---
 */
 
 void sts_opt_by_cfg(struct sts_cfg_data* cfg_data, unsigned  char func_code)

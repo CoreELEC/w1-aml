@@ -582,7 +582,7 @@ struct wlan_net_vif
 
     struct wifi_arp_info  vm_arp_rx;
     void *vm_aclpriv;
-    const struct wifi_mac_aclator *vm_aclop;
+    const struct wifi_mac_actuator *vm_aclop;
 
     unsigned int vm_flags;
     unsigned int vm_flags_ext;
@@ -625,7 +625,7 @@ struct wlan_net_vif
     unsigned char vm_opt_ie[WIFINET_MAX_IV_OPT_IE];
     unsigned short vm_opt_ie_len;
 
-    /* for channge channel when sta receive a channel change announce frame*/
+    /* for change channel when sta receive a channel change announce frame*/
     unsigned char vm_chanchange_count;
     unsigned char vm_bmiss_count;
     struct wifi_mac_rateset vm_legacy_rates;
@@ -663,7 +663,7 @@ struct wlan_net_vif
     /* flag to indicate using default ratemask */
     /*For wakeup AP vmac when wds-sta connect to the AP only use
       when export UMAC_REPEATER_DELAYED_BRINGUP=1*/
-    /* if performe the iwlist scanning */
+    /* if performed the iwlist scanning */
     unsigned int vm_sgi:1,
                  vm_data_sgi:1,
                  vm_ldpc:2,
@@ -934,7 +934,7 @@ wifi_mac_is_vht_enable(struct wlan_net_vif *wnet_vif)
 
 #define IS_UP(_dev) (((_dev)->flags & (IFF_UP)) == (IFF_UP))
 
-struct wifi_mac_aclator
+struct wifi_mac_actuator
 {
     const char *iac_name;
     int (*iac_attach)(struct wlan_net_vif *);
