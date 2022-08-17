@@ -407,7 +407,7 @@ static int aml_android_cmdstr_to_num(char *cmdstr)
         case ANDROID_WIFI_CMD_WFD_SET_MAX_TPUT:
         {
             struct wifi_mac_wfd_info *pwfd_info= &wnet_vif->vm_p2p->wfd_info;
-            pwfd_info->max_throuput = (unsigned short)get_num_from_cmd(priv_cmd.buf, priv_cmd.total_len);
+            pwfd_info->max_thruput = (unsigned short)get_num_from_cmd(priv_cmd.buf, priv_cmd.total_len);
 
             break;
         }

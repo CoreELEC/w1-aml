@@ -57,8 +57,8 @@ enum p2p_status_code
 #define P2P_GO_NEGO_REQ 0
 #define P2P_GO_NEGO_RESP 1
 #define P2P_GO_NEGO_CONF 2
-#define P2P_INVIT_REQ 3
-#define P2P_INVIT_RESP 4
+#define P2P_INVITE_REQ 3
+#define P2P_INVITE_RESP 4
 #define P2P_DEVDISC_REQ 5
 #define P2P_DEVDISC_RESP 6
 #define P2P_PROVISION_DISC_REQ 7
@@ -266,7 +266,7 @@ struct wifi_mac_wfd_info
     unsigned char peer_ip_address[4];
     unsigned char wfd_pc;
     unsigned char wfd_device_type;
-    unsigned short max_throuput;
+    unsigned short max_thruput;
     unsigned char wfd_tdls_enable;
     unsigned char session_available;
 };

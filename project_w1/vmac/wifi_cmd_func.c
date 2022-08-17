@@ -1821,7 +1821,7 @@ int aml_wpa_get_chan_list(struct wlan_net_vif *wnet_vif, char* buf, int len)
     WIFI_CHANNEL_LOCK(wifimac);
     for (i = 0; i < wifimac->wm_nchans; i++) {
         c = &wifimac->wm_channels[i];
-        printk("channel:%d\tfrequency:%d \tbandwidth:%dMHz \n", c->chan_pri_num, c->chan_cfreq1, ((1 << c->chan_bw) * 20));
+        printk("channel:%d\t frequency:%d \t bandwidth:%dMHz \n", c->chan_pri_num, c->chan_cfreq1, ((1 << c->chan_bw) * 20));
     }
     WIFI_CHANNEL_UNLOCK(wifimac);
 
@@ -1908,7 +1908,7 @@ int aml_wpa_set_preamble(struct wlan_net_vif *wnet_vif, char* buf, int len)
     }
     data = simple_strtol(arg[1], NULL, 0);
     phy_set_preamble_type(data);
-    printk("wpa cli set premble type %d\n", data);
+    printk("wpa cli set preamble type %d\n", data);
 
     FREE(arg, "cmd_arg");
     return 0;

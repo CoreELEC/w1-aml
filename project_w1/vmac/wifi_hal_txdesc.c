@@ -31,7 +31,7 @@ namespace FW_NAME
 static struct rate_control our_rate_controls[ WIFI_11BG_MAX +1];
 static struct ht_mcs_control our_htmcs_controls[ WIFI_11N_MAX+1];
 static struct vht_mcs_control our_vhtmcs_controls[ WIFI_11AC_MAX+1];
-//short premble
+//short preamble
 static const unsigned short our_ack_time_short[WIFI_11BG_MAX+1]=
 {
     314,/*PHY_RATE_1_LONG*/
@@ -47,7 +47,7 @@ static const unsigned short our_ack_time_short[WIFI_11BG_MAX+1]=
     44, /*PHY_RATE_48  = 0x8,*/
     44, /*PHY_RATE_54  = 0xC,*/
 };
-//long premble
+//long preamble
 static const unsigned short our_ack_time_11b_long[]=
 {
     314,/*PHY_RATE_1_LONG*/
@@ -1028,18 +1028,18 @@ void hal_tx_desc_build_sub(struct hi_tx_priv_hdr* HI_TxPriv,
 
 unsigned int max_send_packet_len(unsigned char rate,unsigned char bw, unsigned char short_gi, unsigned char streams)
 {
-    unsigned int preable_time = 0;
+    unsigned int preamble_time = 0;
     unsigned int mcs = 0;
     unsigned int max_symbol_number = 0;
     unsigned int max_data_field_tx_time = 0;
 
     if( IS_HT_RATE(rate) )
     {
-        preable_time = Hal_TxDescriptor_HT_GetPreamble(rate, 0);
+        preamble_time = Hal_TxDescriptor_HT_GetPreamble(rate, 0);
     }
     else if ( IS_VHT_RATE(rate) )
     {
-        preable_time = Hal_TxDescriptor_VHT_GetPreamble(rate, 0);
+        preamble_time = Hal_TxDescriptor_VHT_GetPreamble(rate, 0);
     }
     else
     {
@@ -1047,8 +1047,8 @@ unsigned int max_send_packet_len(unsigned char rate,unsigned char bw, unsigned c
         return 0;
     }
 
-     max_data_field_tx_time = 4095 -  preable_time;
-    // printk("preable_time =%d\n", preable_time);
+     max_data_field_tx_time = 4095 -  preamble_time;
+    // printk("preamble_time =%d\n", preamble_time);
      if( !short_gi )
      {
         max_symbol_number = max_data_field_tx_time>>2;   /*long gi every symbol time is 4 us*/

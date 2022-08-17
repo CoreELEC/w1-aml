@@ -292,7 +292,7 @@ int dut_stop_capture(void)
 }
 
 //0x12 0x34 0x56 0x78 -> 0x12345678 0x11223344(ASCII) big end
-static void str_2_acsi_32bits(char* str_in, char* str_out)
+static void str_2_ascii_32bits(char* str_in, char* str_out)
 {
     int i = 0;
     short high = 0;
@@ -301,13 +301,13 @@ static void str_2_acsi_32bits(char* str_in, char* str_out)
     ASSERT(str_in);
     ASSERT(str_out);
 
-    // to be the ASCI from a str
+    // to be the ASCII from a str
     for (i = 0; i < 4 ; i++) {
         high = ((*(str_in+i) >>  4) & 0xf);
         low = ((*(str_in+i)) & 0xf);
 
         if ((high <= 0x9) && (high >= 0x0)) {
-            str_out[7 - (i * 2 + 1)] = high + 0x30; // 0 ~ 9 -> ASCI 0~9
+            str_out[7 - (i * 2 + 1)] = high + 0x30; // 0 ~ 9 -> ASCII 0~9
         } else if (high <= 0xf && high >= 0xa) {
             str_out[7 - (i * 2 + 1)] = high + 0x37; //A~F -> ASCII A~F
         }
@@ -399,7 +399,7 @@ int  dut_stop_tbus_to_get_sram(struct file *filep, int stop_ctrl, int save_file)
     AML_OUTPUT("len=0x%08x\n", len);
     if (save_file) {
         for (i = 0; i < len; i += 4) {
-            str_2_acsi_32bits((char*)pdata, wt_file);
+            str_2_ascii_32bits((char*)pdata, wt_file);
             for (j = 0 ; j < 8; j++) {
                 vfs_write(filep, &wt_file[j], sizeof(unsigned char), &file_pos);
             }

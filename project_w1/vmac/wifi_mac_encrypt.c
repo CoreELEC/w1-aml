@@ -6,7 +6,7 @@
  * Project: 11N 80211 mac  layer Software
  *
  * Description:
- *     wifi_mac layer encrypt/decrypt mudule
+ *     wifi_mac layer encrypt/decrypt module
  *
  *
  ****************************************************************************************

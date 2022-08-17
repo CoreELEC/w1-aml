@@ -69,10 +69,10 @@
 #define DEFAULT_CHANNEL                     149
 
 #define DEFAULT_RTC_ENABLE          0
-#define DEFAULT_INTIAL_POWERMODE  0 //0 no powersave ,1:powersave
+#define DEFAULT_INITIAL_POWERMODE  0 //0 no powersave ,1:powersave
 
-#define DEFAULT_TXAMPDU_EN              1   //default  support Aggr tx : Leagcy & capture mode: AMPDU=0; 
-#define DEFAULT_RXAMPDU_EN              1    //default  support Aggr rx : Leagcy & capture mode: AMPDU=0; 
+#define DEFAULT_TXAMPDU_EN              1   //default  support Aggr tx : Legacy & capture mode: AMPDU=0; 
+#define DEFAULT_RXAMPDU_EN              1    //default  support Aggr rx : Legacy & capture mode: AMPDU=0; 
 
 
 #define SRAM_16KMODE 0  // 0: normal ; 1: capture 

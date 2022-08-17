@@ -184,7 +184,7 @@ enum sts_sys_idx{
         sts_drv_tx_pkts_idx, 
         sts_drv_tx_drops_idx,
         sts_drv_tx_normal_idx,
-        sts_drv_tx_end_nornal_idx,
+        sts_drv_tx_end_normal_idx,
         sts_drv_tx_end_ampdu_idx,
         sts_drv_tx_ampdu_idx,
         sts_drv_tx_ampdu_on_frm_idx,

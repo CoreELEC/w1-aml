@@ -5,6 +5,6 @@
 #define ACL_HASH(addr)  \
         (((const unsigned char *)(addr))[WIFINET_ADDR_LEN - 1] % ACL_HASHSIZE)
         
-struct wifi_mac_aclator *wifi_mac_acl_attach(void);
+struct wifi_mac_actuator *wifi_mac_acl_attach(void);
 void wifi_mac_acl_deattach(void);
 #endif

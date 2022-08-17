@@ -21,8 +21,8 @@ unsigned char p2p_public_action_tmp[][32]=
     "P2P_GO_NEGO_REQ",
     "P2P_GO_NEGO_RESP",
     "P2P_GO_NEGO_CONF",
-    "P2P_INVIT_REQ",
-    "P2P_INVIT_RESP",
+    "P2P_INVITE_REQ",
+    "P2P_INVITE_RESP",
     "P2P_DEVDISC_REQ",
     "P2P_DEVDISC_RESP",
     "P2P_PROVISION_DISC_REQ",
@@ -553,7 +553,7 @@ int vm_wfd_initial(struct wifi_mac_p2p *p2p)
 
     pwfdinfo->peer_session_avail = true;
     pwfdinfo->wfd_pc = false;
-    pwfdinfo->max_throuput = 150;
+    pwfdinfo->max_thruput = 150;
 
     memset( pwfdinfo->ip_address, 0x00, 4 );
     memset( pwfdinfo->peer_ip_address, 0x00, 4 );
@@ -659,7 +659,7 @@ vm_wfd_build_devinfo_attrib(struct wifi_mac_wfd_info *pwfdinfo,
     WRITE_16B(wfdie + wfdielen, pwfdinfo->rtsp_ctrlport );
     wfdielen += 2;
 
-    WRITE_16B(wfdie + wfdielen, pwfdinfo->max_throuput);
+    WRITE_16B(wfdie + wfdielen, pwfdinfo->max_thruput);
     wfdielen += 2;
     return wfdielen;
 }
@@ -1181,12 +1181,12 @@ unsigned int vm_wfd_add_ie(struct wlan_net_vif *wnet_vif,
                         wfdielen =vm_wfd_add_nego_confirm_ie(p2p, wfdie);
                         break;
                     }
-                    case P2P_INVIT_REQ:
+                    case P2P_INVITE_REQ:
                     {
                         wfdielen =vm_wfd_add_invitation_req_ie(p2p, wfdie);
                         break;
                     }
-                    case P2P_INVIT_RESP:
+                    case P2P_INVITE_RESP:
                     {
                         wfdielen =vm_wfd_add_invitation_resp_ie(p2p, wfdie);
                         break;
@@ -1229,7 +1229,7 @@ unsigned int vm_wfd_add_ie(struct wlan_net_vif *wnet_vif,
                             p2p_action_tmp[p2p_pub_act->subtype]);
                     break;
                 default:
-                    AML_PRINT(AML_DBG_MODULES_P2P,"ACTION_CAT subtype %d UNKNOW\n",
+                    AML_PRINT(AML_DBG_MODULES_P2P,"ACTION_CAT subtype %d UNKNOWN\n",
                             p2p_act->subtype);
                     break;
             }
@@ -2105,7 +2105,7 @@ void vm_p2p_switch_nego_state(struct wifi_mac_p2p *p2p, struct wifi_mac_p2p_pub_
             }
             break;
 
-        case P2P_INVIT_REQ:
+        case P2P_INVITE_REQ:
             if (p2p->p2p_negotiation_state == NET80211_P2P_STATE_TX_IDLE) {
                 vm_get_p2pie_channelList(p2p, frm->elts, len, tx);
                 if (tx) {
@@ -2122,7 +2122,7 @@ void vm_p2p_switch_nego_state(struct wifi_mac_p2p *p2p, struct wifi_mac_p2p_pub_
             }
             break;
 
-        case P2P_INVIT_RESP:
+        case P2P_INVITE_RESP:
             vm_get_p2pie_channelList(p2p, frm->elts, len, tx);
             if (p2p->p2p_negotiation_state == NET80211_P2P_STATE_TX_INVITE_REQ) {
                 if (!tx) {
@@ -2289,8 +2289,8 @@ int vm_p2p_parse_negotiation_frames(struct wifi_mac_p2p *p2p,
         switch (p2p_action_type) {
             case P2P_GO_NEGO_REQ:
             case P2P_GO_NEGO_RESP:
-            case P2P_INVIT_RESP:
-                if (p2p_action_type != P2P_INVIT_RESP) {
+            case P2P_INVITE_RESP:
+                if (p2p_action_type != P2P_INVITE_RESP) {
 #ifndef WFA_P2P_TEST
                     vm_change_p2pie_go_intent(p2p, p2p_pub_act->elts, len, tx, p2p_action_type);
 #endif

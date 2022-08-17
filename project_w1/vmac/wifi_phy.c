@@ -305,7 +305,7 @@ void phy_register_set(void)
 
 #endif
    /* rf phase and the iq swap value need to change by the final FPGA version*/
-    //hif->hif_ops.hi_write_word(RG_PHY_FPGA_CONTORL, 0x00600701);
+    //hif->hif_ops.hi_write_word(RG_PHY_FPGA_CONTROL, 0x00600701);
 
 }
 

@@ -89,7 +89,7 @@ static void drv_txdesc_list_queue (struct drv_private *drv_priv, struct list_hea
 
     if (list_empty(txdesc_list_head))
     {
-        DPRINTF(AML_DEBUG_ERROR, "<ERROR>%s %d bufhead qcnt=%d !\n",__func__,__LINE__, (*qcnt));
+        DPRINTF(AML_DEBUG_ERROR, "<ERROR>%s %d buffer head qcnt=%d !\n",__func__,__LINE__, (*qcnt));
         return;
     }
     ptxdesc = list_first_entry(txdesc_list_head, struct drv_txdesc, txdesc_queue);
@@ -110,7 +110,7 @@ static void drv_txdesc_list_queue (struct drv_private *drv_priv, struct list_hea
     (*qcnt) ++;
     DRV_TX_QUEUE_UNLOCK(drv_priv);
 
-    //DPRINTF(AML_DEBUG_PWR_SAVE, "%s %d bufhead qcnt=%d\n",__func__,__LINE__, (*qcnt));
+    //DPRINTF(AML_DEBUG_PWR_SAVE, "%s %d bufffer head qcnt=%d\n",__func__,__LINE__, (*qcnt));
 }
 
 #ifdef CONFIG_P2P
@@ -152,7 +152,7 @@ static int drv_if_noa_started (struct drv_txdesc *ptxdesc)
             {
                 if (P2P_NoA_START_FLAG(wnet_vif->vm_p2p->HiP2pNoaCountNow))
                 {
-                    DPRINTF(AML_DEBUG_PWR_SAVE, "%s %d cancled by noa start\n",__func__,__LINE__);
+                    DPRINTF(AML_DEBUG_PWR_SAVE, "%s %d canceled by noa start\n",__func__,__LINE__);
                     ret = 1;
                 }
             }
@@ -426,7 +426,7 @@ void drv_tx_mcastq_cleanup (struct drv_private *drv_priv, int wnet_vif_id)
     wnet_vif->vm_mqueue_flag_send = 0;
 }
 
-//when Multcast, put it into Tid8
+//when multicast, put it into Tid8
 void drv_tx_mcastq_addbuf(struct drv_private *drv_priv, struct list_head *head)
 {
     struct drv_txlist *txlist = &drv_priv->drv_txlist_table[HAL_WME_MCAST];
@@ -469,7 +469,7 @@ int drv_tx_mcastq_send (struct drv_private *drv_priv)
         if (sta)
         {
             struct wlan_net_vif *wnet_vif = sta->sta_wnet_vif;
-            if (txlist->txlist_backup_qcnt && !wnet_vif->vm_ps_sta) //as ap, if has no ps sta, then send bufferred mcast pakcets
+            if (txlist->txlist_backup_qcnt && !wnet_vif->vm_ps_sta) //as ap, if has no ps sta, then send bufferred mcast packets
             {
 #ifdef CONFIG_P2P
                 if (drv_if_noa_started(ptxdesc) >= 0) {

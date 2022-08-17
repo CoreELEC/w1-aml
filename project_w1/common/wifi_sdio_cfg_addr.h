@@ -1,5 +1,5 @@
-#ifndef __WIFI_SDIIO_CFG_ADDR_H__
-#define __WIFI_SDIIO_CFG_ADDR_H__
+#ifndef __WIFI_SDIO_CFG_ADDR_H__
+#define __WIFI_SDIO_CFG_ADDR_H__
 
 //Base ADDR
 // for statistic host module

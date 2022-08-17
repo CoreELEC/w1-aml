@@ -415,13 +415,11 @@ void efuse_manual_write(unsigned int bit, unsigned int addr)
     //*(RG_EFUSE_CNTL3) = tmp;
     new_set_reg(0xf0400c, tmp);
 
-    //stimulus_print("hgahahahah0");
     udelay(2);  //wait at least 12 uS  for STROBE
     for ( k = 0; k < 6; k++) {  //do something in order to delay more time for accurate 12uS
         //tmp = *(RG_EFUSE_CNTL3);
         tmp = fi_ahb_read(0xf0400c);
     }
-    //stimulus_print("hgahahahah1");
 
     //////////////////////////////////////////////////////
     // set STROBE = 0 (bit[28] = 0)

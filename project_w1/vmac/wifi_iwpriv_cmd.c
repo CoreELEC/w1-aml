@@ -221,11 +221,11 @@ int aml_set_ldpc(struct wlan_net_vif *wnet_vif, unsigned int set)
     if (1 == set) {
         sta->sta_vhtcap |= WIFINET_VHTCAP_RX_LDPC;
         wifimac->wm_flags |=WIFINET_F_LDPC;
-        printk("Enable LDPC, if need to change, the action must be excuted before connecting to ap or creating ap\n");
+        printk("Enable LDPC, if need to change, the action must be executed before connecting to ap or creating ap\n");
     } else if (0 == set) {
         sta->sta_vhtcap &= ~WIFINET_VHTCAP_RX_LDPC;
         wifimac->wm_flags &=~WIFINET_F_LDPC;
-        printk("Disable LDPC, if need to change, the action must be excuted before connecting to ap or creating ap\n");
+        printk("Disable LDPC, if need to change, the action must be executed before connecting to ap or creating ap\n");
     } else {
         ERROR_DEBUG_OUT("Invalid parameter\n");
     }
@@ -270,7 +270,7 @@ int aml_set_beamforming(struct wlan_net_vif *wnet_vif, unsigned int set1,unsigne
             printk("%s:%d, disable mu mimo\n", __func__, __LINE__);
         }
     } else {
-        ERROR_DEBUG_OUT("invlalid parameter!\n");
+        ERROR_DEBUG_OUT("initial parameter!\n");
     }
     return 0;
 
@@ -782,7 +782,7 @@ static int aml_iwpriv_send_para1(struct net_device *dev,
 
         case AML_IWP_SET_PREAMBLE_TYPE:
             phy_set_preamble_type((unsigned char)set);
-            printk("iwpriv set premble type %d\n", set);
+            printk("iwpriv set preamble type %d\n", set);
             break;
 
         case AML_IWP_SET_FIX_BAND:
@@ -960,7 +960,7 @@ static int aml_iwpriv_get(struct net_device *dev,
             WIFI_CHANNEL_LOCK(wifimac);
             for (i = 0; i < wifimac->wm_nchans; i++) {
                 c = &wifimac->wm_channels[i];
-                printk("channel:%d\tfrequency:%d \tbandwidth:%dMHz \n", c->chan_pri_num, c->chan_cfreq1, ((1 << c->chan_bw) * 20));
+                printk("channel:%d\t frequency:%d \t bandwidth:%dMHz \n", c->chan_pri_num, c->chan_cfreq1, ((1 << c->chan_bw) * 20));
             }
             WIFI_CHANNEL_UNLOCK(wifimac);
             break;
@@ -1056,7 +1056,7 @@ static int aml_iwpriv_get_csi_info(struct net_device *dev,
         || (wnet_vif->vm_curchan == WIFINET_CHAN_ERR)
         || (wnet_vif->vm_mainsta == NULL)) {
 
-        ERROR_DEBUG_OUT("%s curchan or mainsta not avilable\n", __func__);
+        ERROR_DEBUG_OUT("%s curchan or mainsta not available\n", __func__);
         return 0;
     }
 
@@ -1393,7 +1393,7 @@ static int aml_get_channel_list(struct net_device *dev,
     WIFI_CHANNEL_LOCK(wifimac);
     for (i = 0; i < wifimac->wm_nchans; i++) {
         c = &wifimac->wm_channels[i];
-        printk("channel:%d\tfrequency:%d \tbandwidth:%dMHz \n", c->chan_pri_num, c->chan_cfreq1, ((1 << c->chan_bw) * 20));
+        printk("channel:%d\t frequency:%d \t bandwidth:%dMHz \n", c->chan_pri_num, c->chan_cfreq1, ((1 << c->chan_bw) * 20));
     }
     WIFI_CHANNEL_UNLOCK(wifimac);
 

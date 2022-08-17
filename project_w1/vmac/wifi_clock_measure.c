@@ -195,7 +195,7 @@ unsigned char * clk_mux_name(CLOCK_MUX clk_mux)
         case SYS_OSCIN_I_POS        : clk_name = "    sys_osc_in";           break;
         case WF_DIG_OUT_POS         : clk_name = "    wf_dig_out";           break;
 
-        default                     : clk_name = "    unknow, not support";  break;
+        default                     : clk_name = "    unknown, not support";  break;
     }
 
     return clk_name;

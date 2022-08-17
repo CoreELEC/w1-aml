@@ -249,15 +249,15 @@ int aml_w1_sdio_bottom_read(unsigned char func_num, int addr, void *buf, size_t 
 
     if (!wifi_sdio_access) {
         if (func_num == SDIO_FUNC5) {
-            /*SDIO_FUNC5 ignor*/
+            /*SDIO_FUNC5 ignore*/
             ERROR_DEBUG_OUT("SDIO_FUNC5, func num %d, addr 0x%08x\n", func_num, addr);
 
         } else if (func_num == SDIO_FUNC1) {
-            /*SDIO_FUNC1 ignor*/
+            /*SDIO_FUNC1 ignore*/
             ERROR_DEBUG_OUT("SDIO_FUNC1, func num %d, addr 0x%08x\n", func_num, addr);
 
         }  else if ((func_num == SDIO_FUNC2) && (addr == 0x00005080)) {
-            /*SDIO_FUNC2 && 0x00005080 ignor*/
+            /*SDIO_FUNC2 && 0x00005080 ignore*/
             ERROR_DEBUG_OUT("SDIO_FUNC1, func num %d, addr 0x%08x\n", func_num, addr);
 
         } else {
@@ -332,15 +332,15 @@ int aml_w1_sdio_bottom_write(unsigned char func_num, int addr, void *buf, size_t
 
     if (!wifi_sdio_access) {
         if (func_num == SDIO_FUNC5) {
-            /*SDIO_FUNC5 ignor*/
+            /*SDIO_FUNC5 ignore*/
             ERROR_DEBUG_OUT("SDIO_FUNC5, func num %d, addr 0x%08x\n", func_num, addr);
 
         } else if (func_num == SDIO_FUNC1) {
-            /*SDIO_FUNC1 ignor*/
+            /*SDIO_FUNC1 ignore*/
             ERROR_DEBUG_OUT("SDIO_FUNC1, func num %d, addr 0x%08x\n", func_num, addr);
 
         }  else if ((func_num == SDIO_FUNC2) && (addr == 0x00005080)) {
-            /*SDIO_FUNC2 && 0x00005080 ignor*/
+            /*SDIO_FUNC2 && 0x00005080 ignore*/
             ERROR_DEBUG_OUT("SDIO_FUNC2, func num %d, addr 0x%08x\n", func_num, addr);
 
         } else {

@@ -308,7 +308,7 @@ void CO_SharedFifoGetNElt(struct _CO_SHARED_FIFO *const SharedFifoPtr, const uns
  *    unsigned short   CO_BAD_PARAM2 / CO_STATUS_OK
  *
  * description:
- *    Let avalailable N elements of the shared FIFO for the next block.
+ *    Let available N elements of the shared FIFO for the next block.
  *
  *****************************************************************************************
  */
@@ -341,7 +341,7 @@ unsigned short CO_SharedFifoPut(struct _CO_SHARED_FIFO * const SharedFifoPtr, un
  *    unsigned short   CO_BAD_PARAM2 / CO_STATUS_OK
  *
  * description:
- *    Let avalailable N elements of the shared FIFO for the next block.
+ *    Let available N elements of the shared FIFO for the next block.
  *
  *    The function can be called from an interrupt handler or inside a critical section.
  *    The function can be called from background task if the next "block" performs
@@ -432,7 +432,7 @@ unsigned int CO_SharedFifoNbElt(struct _CO_SHARED_FIFO *SharedFifoPtr, unsigned 
  *    unsigned int
  *
  * description:
- *    Compute the number of contiguoug element owned by the specified block
+ *    Compute the number of contiguous element owned by the specified block
  *  Note that for the producer block, compute the number of elements available (not owned)
  *
  *****************************************************************************************
@@ -447,7 +447,7 @@ unsigned int CO_SharedFifoNbEltCont_NonRound(struct _CO_SHARED_FIFO *SharedFifoP
     /* Compute the number of elements belonging to the specified block */
     if (BlockIdxPtr->In >= BlockIdxPtr->Out)
     {
-        /* Elements belonged by the block are contigous  */
+        /* Elements belonged by the block are contiguous*/
         NbElt = BlockIdxPtr->In - BlockIdxPtr->Out;
     }
     else
@@ -469,7 +469,7 @@ unsigned int CO_SharedFifoNbEltCont(struct _CO_SHARED_FIFO *SharedFifoPtr, unsig
     /* Compute the number of elements belonging to the specified block  */
     if (BlockIdxPtr->In >= BlockIdxPtr->Out)
     {
-        /* Elements belonged by the block are contigous */
+        /* Elements belonged by the block are contiguous*/
         NbElt = BlockIdxPtr->In - BlockIdxPtr->Out;
     }
     else

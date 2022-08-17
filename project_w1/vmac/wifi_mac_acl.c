@@ -227,7 +227,7 @@ acl_getpolicy(struct wlan_net_vif *wnet_vif)
     return aclpriv->as_policy;
 }
 
-static const struct wifi_mac_aclator mac_acl=
+static const struct wifi_mac_actuator mac_acl=
 {
     .iac_name   = "acl",
     .iac_attach = acl_attach,
@@ -241,9 +241,9 @@ static const struct wifi_mac_aclator mac_acl=
 };
 
 
-struct wifi_mac_aclator * wifi_mac_acl_attach(void)
+struct wifi_mac_actuator * wifi_mac_acl_attach(void)
 {
-    return (struct wifi_mac_aclator *)&mac_acl;
+    return (struct wifi_mac_actuator *)&mac_acl;
 }
 
 void wifi_mac_acl_deattach(void)

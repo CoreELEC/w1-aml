@@ -89,7 +89,7 @@ enum
     AML_DBG_MODULES_HAL_TX = BIT(3),    /* hal_tx */
     AML_DBG_MODULES_TX_ERROR = BIT(4),
     AML_DBG_MODULES_SCAN = BIT(5),
-    AML_DEBUG_MODDULES_ALL = 0xffffffffffffffff,
+    AML_DEBUG_MODULES_ALL = 0xffffffffffffffff,
 };
 
 #define AML_PRINT( _m,format,...) do {         \
@@ -227,4 +227,4 @@ void WRITE_32B( unsigned char* address, unsigned int value );
 
 void ie_dbg(unsigned char *ie ) ;
 
-#endif /* _DRV_AH_INTERAL_H_ */
+#endif 

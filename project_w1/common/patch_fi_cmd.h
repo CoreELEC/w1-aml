@@ -53,12 +53,12 @@ typedef struct Channel_Switch
     unsigned int pri_chan;
 }Channel_Switch;
 
-typedef struct DPD_Memory_Downlod
+typedef struct DPD_Memory_Download
 {
     unsigned char Cmd;
     unsigned char vid;
     unsigned char reserved[6];
-} DPD_Memory_Downlod;
+} DPD_Memory_Download;
 
 typedef struct Fwlog_Mode_Control
 {

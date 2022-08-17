@@ -47,7 +47,7 @@ int drv_reset(void *);
 int drv_tx_init(struct drv_private *drv_priv, int nbufs);
 int drv_txlist_cleanup(struct drv_private *drv_priv);
 struct drv_txlist *drv_txlist_initial(struct drv_private *drv_priv, int subtype);
-void drv_txlist_destory(struct drv_private *drv_priv, struct drv_txlist *txlist);
+void drv_txlist_destroy(struct drv_private *drv_priv, struct drv_txlist *txlist);
 int drv_txlist_setup(struct drv_private *drv_priv);
 int drv_update_wmmq_param( struct drv_private *drv_priv, unsigned char wnet_vif_id,int ac, int  aifs,int cwmin,int cwmax,int txoplimit);
 void drv_tx_irq_tasklet(void *drv_priv, struct txdonestatus *tx_done_status, SYS_TYPE callback, unsigned char queue_id);

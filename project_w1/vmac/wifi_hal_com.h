@@ -103,7 +103,7 @@ struct hw_interface;
 #define SRAM_MAX_LEN (1024*4)
 #define MAX_OFFSET (1024*100)
 #define SLOT_MASK (0x3f<<16)
-// 1:level senstive interrupt; 0:edge sensitive interrupt
+// 1:level sensitive interrupt; 0:edge sensitive interrupt
 #define SDIO_GPIO_IRQ_TRIG_MODE_LEVEL  (BIT(30))
 //bit0~bit11, if edge sensitive interrupt mode enabled, interrupt
 //will generate pulse, this is the pulse width, unit is ahb clk
@@ -237,7 +237,7 @@ enum
     FRAME_SUBTYPE_ASSOCIATION_RESPONSE      = 0x00000010,
     FRAME_SUBTYPE_REASSOCIATION_REQUEST     = 0x00000020,
     FRAME_SUBTYPE_REASSOCIATION_RESPONSE    = 0x00000030,
-    FRAME_SUBTYPE_PROBE_REQEUST                 = 0x00000040,
+    FRAME_SUBTYPE_PROBE_REQUEST                 = 0x00000040,
     FRAME_SUBTYPE_PROBE_RESPONSE                = 0x00000050,
     FRAME_SUBTYPE_BEACON                            = 0x00000080,
     FRAME_SUBTYPE_ATIM                              = 0x00000090,
@@ -434,7 +434,7 @@ struct  hal_work_task
 /****************************** aml hi**************************************************/
 
 /* tx+rx page <= 448 pagenum, the other pages 512-(tx+rx)
-    (at least 32KB) are for captuer or dpd traning */
+    (at least 32KB) are for capture or dpd training*/
 #define DEFAULT_TXPAGENUM 224
 
 #ifdef SRAM_FULL_TEST
@@ -548,7 +548,7 @@ enum dhd_bus_wake_state
     WAKE_LOCK_WORK,
     WAKE_LOCK_RX,
     WAKE_LOCK_IRQ,
-    WAKE_LOCK_TIMEOT,
+    WAKE_LOCK_TIMEOUT,
     WAKE_LOCK_HI_IRQ_THREAD,
     WAKE_LOCK_TXOK,
     WAKE_LOCK_MAX
@@ -738,7 +738,7 @@ struct  hw_interface
 #define READ_LEN_PER_ONCE               (32 * 1024)
 #endif
 
-// last 1024 word memory of sram for dpd trainning
+// last 1024 word memory of sram for dpd training
 #define DPD_MEMORY_ADDR (0x00b00000 + (512 * PAGE_LEN) - (8 * PAGE_LEN))
 #define DPD_MEMORY_LEN (1024 * 4)
 
@@ -767,7 +767,7 @@ struct hal_layer_ops
     struct aml_hal_call_backs* (*get_hal_call_back_table)(void);
 #endif
 
-    unsigned int (* phy_enable_bcn)(unsigned char wnet_vif_id,unsigned short BecaonInterval, unsigned short DtimPeriod, unsigned char BssType);
+    unsigned int (* phy_enable_bcn)(unsigned char wnet_vif_id,unsigned short BeaconInterval, unsigned short DtimPeriod, unsigned char BssType);
     unsigned int (* phy_set_bcn_buf)(unsigned char wnet_vif_id,unsigned char *pBeacon, unsigned short len,unsigned short Rate,unsigned short Flag);
     unsigned int (* phy_switch_chan)(unsigned short channel, unsigned char bw, unsigned char restore);
     unsigned int (* phy_set_rf_chan)(struct hal_channel *hchan, unsigned char flag, unsigned char vid);
@@ -998,7 +998,7 @@ struct hal_layer_ops
 #if defined (HAL_FPGA_VER)
     unsigned int sts_hirq[hirq_max_idx +1];
     unsigned int gpio_irq_cnt;
-    /* for host sw statisitic */
+    /* for host sw statistic*/
     struct sts_sw_cnt_ctrl sts_hst_sw[sts_hst_sw_max_idx];
     unsigned int sts_en_bcn[2];
     unsigned int sts_dis_bcn[2];

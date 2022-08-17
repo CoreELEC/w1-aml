@@ -39,9 +39,9 @@
 
 /*
 * BT device baseAddr seen from wifi system side
-* is different from BT device actual baseAddr at BT sytem side.
+* is different from BT device actual baseAddr at BT system side.
 * For example, actual ICCM baseAddr at BT system may be 0x00900000,
-* but ICCM baseAddr seen from wifi sytem side may be 0x00300000
+* but ICCM baseAddr seen from wifi system side may be 0x00300000
 */
 #define WF2BT_APB_BASE      (0x00200000)  //BT APB baseAddr seen from wifi system side
 #define WF2BT_ICCM_RAM      (0x00300000)  //BT DCCM RAM baseAddr seen from wifi system side
@@ -141,7 +141,7 @@
 #define FW_RX_PTR_MASK  0xffff0000
 #define FW_RX_PTR_OFFSET  16
 
-/*Rate Defintion*/
+/*Rate definition*/
 #define WIFI_11N_MASK  0x80
 #define WIFI_11AC_MASK  0xc0
 #define WIFI_RATE_MASK  0xf0
@@ -250,7 +250,7 @@ enum
         QUEUE_AC_FIAC = 9
 };
 
-//friwmare version
+//firmware version
 #define FW_UNUSED_IRQ_VERSION   0x0000
 #define FW_IRQ_VERSION          FW_VERSION_W1
 
@@ -401,13 +401,13 @@ typedef struct hw_tx_vector_bits
         unsigned int tv_reserved0:1,
                      tv_fw_duration_valid:1,
                      tv_rty_flag:1,
-                     /*ip/tcp/udp checksum hw cacluate enable, hw will check if ip/tcp/udp */
+                     /*ip/tcp/udp checksum hw calculate enable, hw will check if ip/tcp/udp */
                      tv_txcsum_enbale:1,
                      /*the final encrypted function is decided by tv_encrypted_disable and "encrypt type" */
                      tv_encrypted_disable:1,
                      /*not use, must be 0 */
                      tv_htc_modify:1,
-                     /*defualt 0, only beacon use 1 */
+                     /*default 0, only beacon use 1 */
                      tv_sq_valid:1,
                      /*now 1, always use tv_FrameControl of txvector */
                      tv_fc_valid:1,
@@ -522,7 +522,7 @@ typedef struct hw_tx_vector_bits
            [20]: fec_coding:
            Indicates which FEC encoding is used.
            Enumerated type:
-           BCC_CODING indicates binary convolutional code.
+           BCC_CODING indicates binary code.
            LDPC_CODING indicates low-density parity check code.
 
            [21:22]: num_exten_ss
@@ -930,7 +930,7 @@ typedef struct _FIFO_SHARE_CTRL
         unsigned int    FDH;
         /* 4 Byte fifo descripter tail */
         unsigned int    FDT;
-        /* 4 Byte fifo ctrl  bease address */
+        /* 4 Byte fifo ctrl  base address */
         unsigned int    FCB;
         /* 4 Byte fifo per descripter len */
         unsigned int    FDL;
@@ -948,7 +948,7 @@ typedef struct _FIFO_SHARE_CTRL_PACKET
         unsigned int    FDH2;
         /* 4 Byte fifo descripter tail */
         unsigned int    FDT;
-        /* 4 Byte fifo ctrl  bease address */
+        /* 4 Byte fifo ctrl  base address */
         unsigned int    FCB;
         /* 4 Byte fifo per descripter len */
         unsigned int    FDL;

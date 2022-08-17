@@ -178,12 +178,12 @@ int wifi_mac_parse_mmie(struct wifi_station *sta, struct sk_buff *skb, unsigned 
     /* save the frame body + MME (w/o mic) */
     memcpy(bip_aad + BIP_AAD_SIZE, frm + hdr_len, pkt_len - hdr_len - mic_len);
 
-    /* conscruct AAD, copy frame control field */
+    /* construct AAD, copy frame control field */
     memcpy(bip_aad, &wh->i_fc[0], 2);
     clear_retry(bip_aad);
     clear_pwr_mgt(bip_aad);
     clear_more_data(bip_aad);
-    /* conscruct AAD, copy address 1 to address 3 */
+    /* construct AAD, copy address 1 to address 3 */
     memcpy(bip_aad + 2, wh->i_addr1, 6);
     memcpy(bip_aad + 8, wh->i_addr2, 6);
     memcpy(bip_aad + 14, wh->i_addr3, 6);
@@ -517,16 +517,16 @@ int wifi_mac_add_mmie(struct wifi_station *sta, struct sk_buff *skb) {
         /* add MME IE with MIC all zero, MME string doesn't include element id and length */
         memcpy(frm_end, mme_cont, mme_clen + 2);
 
-        /* conscruct AAD, copy frame control field */
+        /* construct AAD, copy frame control field */
         memcpy(bip_aad, &wh->i_fc[0], 2);
         clear_retry(bip_aad);
         clear_pwr_mgt(bip_aad);
         clear_more_data(bip_aad);
-        /* conscruct AAD, copy address 1 to address 3 */
+        /* construct AAD, copy address 1 to address 3 */
         memcpy(bip_aad + 2, wh->i_addr1, 6);
         memcpy(bip_aad + 8, wh->i_addr2, 6);
         memcpy(bip_aad + 14, wh->i_addr3, 6);
-        /* copy management fram body */
+        /* copy management frame body */
         memcpy(bip_aad + BIP_AAD_SIZE, mgmt_body, frame_body_len);
 
         /* dump total packet include MME with zero MIC */

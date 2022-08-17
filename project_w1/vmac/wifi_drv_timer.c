@@ -141,7 +141,7 @@ unsigned char os_timer_ex_cancel (struct os_timer_ext* timer_object, enum timer_
             OS_SLEEP(10);   // sleep; can only be executed at IRQL < DISPATCH_LEVEL
         }
     }
-    //here, normaly, timer_lock should be 1
+    //here, normally, timer_lock should be 1
 
     if (! OS_CANCEL_TIMER(&timer_object->os_timer))
     {
