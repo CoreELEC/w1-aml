@@ -26,3 +26,4 @@ modules.builtin
 *.ko.cmd
 .tmp_versions/
 Module.symvers
+print_version.*
