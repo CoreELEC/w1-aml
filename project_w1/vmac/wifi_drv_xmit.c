@@ -819,15 +819,12 @@ int drv_tx_start( struct drv_private *drv_priv, struct sk_buff *skbbuf)
     unsigned short header_room = os_skb_hdrspace(skbbuf);
     unsigned short tail_room = os_skb_get_tailroom(skbbuf);
 
-    wnet_vif = sta->sta_wnet_vif;
-    if (!sta  || (wnet_vif->vm_opmode == WIFINET_M_HOSTAP && sta->is_disconnecting
-        && txinfo->b_datapkt)) {
+    if (sta)
+        wnet_vif = sta->sta_wnet_vif;
+
+    if (!sta  || wnet_vif == NULL || wnet_vif->vm_wmac == NULL ||
+        (wnet_vif->vm_opmode == WIFINET_M_HOSTAP && sta->is_disconnecting && txinfo->b_datapkt)) {
         ERROR_DEBUG_OUT("sta is NULL or softap disconnect\n");
-        return -1;
-    }
-    if (wnet_vif == NULL || wnet_vif->vm_wmac == NULL)
-    {
-        ERROR_DEBUG_OUT("-----%p is NULL should return \n",wnet_vif);
         return -1;
     }
 

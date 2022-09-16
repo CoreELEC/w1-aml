@@ -44,7 +44,7 @@ const char *wifi_mac_state_name[WIFINET_S_MAX] =
     "ASSOC",
     "CONNECTED"
 };
-static int g_auto_gain_base = 0;
+int g_auto_gain_base = 0;
 
 static struct wifi_mac wm_mac;
 struct wifi_mac* wifi_mac_get_mac_handle(void)

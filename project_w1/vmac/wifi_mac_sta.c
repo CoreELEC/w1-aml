@@ -86,7 +86,8 @@ wifi_mac_start_bss_ex(unsigned long arg)
     struct wifi_mac *wifimac = selbs->sta_wmac;
     struct net_device *dev = wnet_vif->vm_ndev;
     struct wifi_station *obss;
-    int canreassoc;
+    int canreassoc, cnt = 0;
+    struct hal_private * hal_priv = hal_get_priv();
 
     WIFINET_VMACS_LOCK(wifimac);
 
@@ -113,7 +114,9 @@ wifi_mac_start_bss_ex(unsigned long arg)
         wifi_mac_rm_sta_from_wds_by_sta(&wnet_vif->vm_sta_tbl, obss);
 
         printk("%s, obss:%p\n", __func__, obss);
+        WIFINET_VMACS_UNLOCK(wifimac);
         wifi_mac_free_sta_from_list(obss);
+        WIFINET_VMACS_LOCK(wifimac);
     }
 
      WIFINET_VMACS_UNLOCK(wifimac);
@@ -123,6 +126,12 @@ wifi_mac_start_bss_ex(unsigned long arg)
         wnet_vif->vm_curchan->chan_bw, wnet_vif->wnet_vif_id);
 #endif
     if (wnet_vif->vm_curchan != WIFINET_CHAN_ERR) {
+        while (hal_priv->bhalPowerSave != 0 && cnt < 50) {
+            msleep(20);
+            cnt++;
+        }
+        DPRINTF(AML_DEBUG_CONNECT,"%s bhalPowerSave %d, cnt %d\n",__func__, hal_priv->bhalPowerSave, cnt);
+
         wifi_mac_ChangeChannel(wifimac, wnet_vif->vm_curchan, 3, wnet_vif->wnet_vif_id);
 
         is_connect_need_set_gain(wnet_vif);
@@ -554,7 +563,7 @@ static void nsta_cleanup(struct wifi_station *sta)
     if (!(sta->sta_ucastkey.wk_flags & WIFINET_KEY_NOFREE))
     {
         while (total_delay < 1000 && !drv_priv->hal_priv->hal_ops.hal_tx_empty()) {
-            mdelay(10);
+            msleep(10);
             total_delay += 10;
         }
         DPRINTF(AML_DEBUG_WARNING, "<running>disconnect %d %s sta:%p total_delay %d empty %d\n",sta->is_disconnecting, __func__, sta,
@@ -1180,7 +1189,7 @@ struct wifi_station * wifi_mac_find_tx_sta(struct wlan_net_vif *wnet_vif, const 
     {
         if ((wnet_vif->vm_sta_assoc > 0)||(wnet_vif->vm_opmode == WIFINET_M_IBSS))
         {
-            DPRINTF(AML_DEBUG_WARNING,"<WARNING> %s %d \n",__func__,__LINE__);
+            //DPRINTF(AML_DEBUG_WARNING,"<WARNING> %s %d \n",__func__,__LINE__);
             return wnet_vif->vm_mainsta;
         }
         else
@@ -1466,7 +1475,7 @@ static void wifi_mac_TimeoutStations(struct wifi_station_tbl *nt)
             wnet_vif = sta->sta_wnet_vif;
             WIFINET_NODE_UNLOCK(nt);
             wifi_softap_allsta_stopping(wnet_vif,1);
-            wifi_mac_sta_disconnect_from_ap(sta);
+            wifi_mac_notify_nsta_disconnect(sta, 0);
             WIFINET_NODE_LOCK(nt);
         }
     }

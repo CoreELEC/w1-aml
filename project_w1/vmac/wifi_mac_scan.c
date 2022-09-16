@@ -2,6 +2,8 @@
 #include "wifi_mac_rate.h"
 #include "wifi_iwpriv_cmd.h"
 
+extern int g_auto_gain_base;
+
 int saveie(unsigned char *iep, const unsigned char *ie)
 {
     if (ie == NULL)
@@ -1662,9 +1664,16 @@ void wifi_mac_end_scan( struct wifi_mac_scan_state *ss)
         ss->scan_CfgFlags &= (~WIFINET_SCANCFG_USERREQ);
     }
 
-    if ((wnet_vif->vm_opmode == WIFINET_M_STA) && (wnet_vif->vm_state == WIFINET_S_CONNECTED)) {
-        wifi_mac_set_channel_rssi(wifimac, (unsigned char)(wnet_vif->vm_mainsta->sta_avg_bcn_rssi));
+    if ((wnet_vif->vm_opmode == WIFINET_M_STA) && ((wnet_vif->vm_state == WIFINET_S_CONNECTED) ||
+       (wnet_vif->vm_scan_before_connect_flag))) {
+        if (g_auto_gain_base != 0) {
+            wifi_mac_set_channel_rssi(wifimac, g_auto_gain_base);
+        }
+        else {
+            wifi_mac_scan_set_gain(wifimac, 174);
+        }
     }
+
     wifi_mac_restore_wnet_vif_channel(wnet_vif);
     wifimac->wm_flags &= ~WIFINET_F_SCAN;
     ss->scan_CfgFlags = 0;
