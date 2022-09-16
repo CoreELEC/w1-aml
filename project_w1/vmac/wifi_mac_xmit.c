@@ -3401,11 +3401,6 @@ int wifi_mac_send_mgmt(struct wifi_station *sta, int type, void *arg)
 
     KASSERT(sta != NULL, ("null nsta"));
 
-    if (sta->sta_wnet_vif->vm_curchan == NULL) {
-        ERROR_DEBUG_OUT("vm_curchan is NULL, just return\n");
-        ret = EINVAL;
-        return ret;
-    }
 
     switch (type) {
         case WIFINET_FC0_SUBTYPE_PROBE_RESP:

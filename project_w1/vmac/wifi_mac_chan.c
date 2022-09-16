@@ -4,6 +4,7 @@
 #define ARR_SIZE_OF(arr) (sizeof(arr)/sizeof(arr[0]))
 #define CHAN_2_FREQ_5G(chan) ((chan) * 5 + 5000)
 #define CHAN_2_FREQ_2G(chan) ((chan) * 5 + 2407)
+#define CHAN_2_FREQ_14(chan) ((chan) * 5 + 2414)
 
 #define IS_5G_BAND1(chan) ((chan) >= 36 && (chan) <= 48)
 #define IS_5G_BAND2(chan) ((chan) >= 52 && (chan) <= 64)
@@ -35,7 +36,7 @@ struct class_chan_set global_chan_set [256] =
                  }
     }, //class 81
     {82, 20, 1, {
-                    {CHAN_2_FREQ_2G(14), WIFINET_CHAN_2GHZ, 14, 4, 2, WIFINET_BWC_WIDTH20, 82}
+                    {CHAN_2_FREQ_14(14), WIFINET_CHAN_2GHZ, 14, 4, 2, WIFINET_BWC_WIDTH20, 82}
                 }
     },//82
     {83, 40, 9, {

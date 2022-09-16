@@ -474,7 +474,7 @@ struct sk_buff *wifi_mac_amsdu_ex( struct sk_buff *skbbuf)
     {
         tx_amsdu_sub_max = DEFAULT_TXAMSDU_SUB_MAX_BW80/4;
     }
-    else if (txcnt <= 8)
+    else
     {
        tx_amsdu_sub_max = DEFAULT_TXAMSDU_SUB_MAX_BW80/2;
     }

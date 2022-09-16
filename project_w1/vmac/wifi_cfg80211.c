@@ -42,6 +42,7 @@ const struct nl80211_vendor_cmd_info vendor_events[] = {
 
 unsigned long long g_dbg_info_enable = 0;
 unsigned long long g_dbg_modules = 0;
+extern int g_auto_gain_base;
 
 static struct device *cfg80211_parent_dev = NULL;
 static const unsigned int aml_cipher_suites[] =
@@ -423,9 +424,9 @@ drv_opmode_2_nl80211_iftype (enum wifi_mac_opmode drv_type,
     return out;
 }
 
-static int get_cipher_rsn (unsigned int ecipher)
+static unsigned int get_cipher_rsn (unsigned int ecipher)
 {
-    int cipher;
+    unsigned int cipher;
 
     switch (ecipher)
     {
@@ -2725,6 +2726,7 @@ static int vm_cfg80211_connect(struct wiphy *wiphy, struct net_device *dev,
 
     wifimac->wm_lastroaming = jiffies;
     wnet_vif->vm_chan_roaming_scan_flag = 0;
+    g_auto_gain_base = 0;
 
     /*if change AP,change roaming_ssid and clean roaming candidate channel*/
     if(!wnet_vif->vm_wmac->wm_scan->roaming_ssid.len

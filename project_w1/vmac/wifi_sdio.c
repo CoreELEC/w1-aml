@@ -1587,6 +1587,7 @@ void aml_disable_wifi(void)
 {
     wifi_sdio_access = 0;
     printk("aml_disable_wifi start sdio access %d\n", wifi_sdio_access);
+    aml_sdio_disable_irq(SDIO_FUNC1);
     config_pmu_reg(AML_W1_WIFI_POWER_OFF);
     msleep(50);
 }
@@ -1601,6 +1602,7 @@ void aml_enable_wifi(void)
 
     hal_recovery_init_priv();
     config_pmu_reg(AML_W1_WIFI_POWER_ON);
+    aml_sdio_enable_irq(SDIO_FUNC1);
     wifi_sdio_access = 1;
     printk("aml_enable_wifi start sdio access %d\n", wifi_sdio_access);
     hal_fw_repair();

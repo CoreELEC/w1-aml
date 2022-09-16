@@ -3702,7 +3702,7 @@ static void wifi_mac_recv_auth(struct wlan_net_vif *wnet_vif,
             return;
         }
         wifi_softap_allsta_stopping(wnet_vif,1);
-        wifi_mac_sta_disconnect_from_ap(sta);
+        wifi_mac_notify_nsta_disconnect(sta, 0);
         return;
     }
 
