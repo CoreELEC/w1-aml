@@ -92,7 +92,8 @@ cmd_to_func_table_t cmd_to_func[] =
     {"set_pkt_fetch", aml_wpa_set_pkt_fetch},
     {"set_frag_thr", aml_wpa_set_frag_thr},
     {"set_preamble", aml_wpa_set_preamble},
-    {"set_band", aml_wpa_set_conn_band},
+    {"set_band", aml_wpa_set_band},
+    {"set_mac_mode", aml_wpa_set_mac_mode},
     {"set_gain_hang", aml_wpa_set_initial_gain_change_hang},
     {"set_tpc_hang", aml_wpa_set_tx_power_change_hang},
     {"set_tx_pw_plan", aml_set_tx_power_plan},
@@ -853,18 +854,18 @@ int aml_set_short_gi(struct wlan_net_vif *wnet_vif, char* buf, int len)
         return 0;
     }
 
-#ifdef DRV_PT_SUPPORT
     if (aml_wifi_is_enable_rf_test())
         gB2BTestCasePacket.if_shortGI = usr_data;
-#endif
-        if (1 == usr_data) {
-            wnet_vif->vm_wmac->wm_flags_ext |= WIFINET_FEXT_SHORTGI_ENABLE;
-            printk("%s: enable short GI done\n", __func__);
 
-        } else {
-            wnet_vif->vm_wmac->wm_flags_ext &= ~WIFINET_FEXT_SHORTGI_ENABLE;
-            printk("%s: disable short GI done.\n", __func__);
-        }
+    if (1 == usr_data) {
+        wnet_vif->vm_wmac->wm_flags_ext |= WIFINET_FEXT_SHORTGI_ENABLE;
+        printk("%s: enable short GI done\n", __func__);
+
+    } else {
+        wnet_vif->vm_wmac->wm_flags_ext &= ~WIFINET_FEXT_SHORTGI_ENABLE;
+        printk("%s: disable short GI done.\n", __func__);
+    }
+
 
     FREE(arg, "cmd_arg");
     return 0;
@@ -1913,12 +1914,13 @@ int aml_wpa_set_preamble(struct wlan_net_vif *wnet_vif, char* buf, int len)
     return 0;
 }
 
-int aml_wpa_set_conn_band(struct wlan_net_vif *wnet_vif, char* buf, int len)
+int aml_wpa_set_band(struct wlan_net_vif *wnet_vif, char* buf, int len)
 {
     char **arg;
     char sep = ' ';
     int cmd_arg;
     int data = 0;
+    struct drv_private *drv_priv = drv_get_drv_priv();
 
     arg = aml_cmd_char_prase(sep, buf, &cmd_arg);
     if (arg[1] == NULL) {
@@ -1926,11 +1928,32 @@ int aml_wpa_set_conn_band(struct wlan_net_vif *wnet_vif, char* buf, int len)
         return -EINVAL;
     }
     data = simple_strtol(arg[1], NULL, 0);
-    set_conn_band = data;
+    drv_priv->drv_config.cfg_band = data;
 
     FREE(arg, "cmd_arg");
     return 0;
 }
+
+int aml_wpa_set_mac_mode(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    char **arg;
+    char sep = ' ';
+    int cmd_arg;
+    int data = 0;
+    struct drv_private *drv_priv = drv_get_drv_priv();
+
+    arg = aml_cmd_char_prase(sep, buf, &cmd_arg);
+    if (arg[1] == NULL) {
+        FREE(arg, "cmd_arg");
+        return -EINVAL;
+    }
+    data = simple_strtol(arg[1], NULL, 0);
+    drv_priv->drv_config.cfg_mac_mode = data;
+
+    FREE(arg, "cmd_arg");
+    return 0;
+}
+
 
 int aml_wpa_set_initial_gain_change_hang(struct wlan_net_vif *wnet_vif, char* buf, int len)
 {

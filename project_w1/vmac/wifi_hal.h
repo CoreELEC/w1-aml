@@ -27,6 +27,8 @@ enum aml_pkt_position {
 
 
 int hal_host_init(struct hal_private *hal_priv);
+int hal_host_recovery_init(struct hal_private *hal_priv);
+
 int hal_probe(void);
 int hal_free(void);
 int hal_open(void *   drv_priv);
@@ -37,9 +39,11 @@ struct aml_hal_call_backs  *hal_get_drv_func(void);
 void hal_ops_attach(void);
 void hal_ops_detach(void);
 int hal_init_priv(void);
+int hal_recovery_init_priv(void);
 int hal_reinit_priv(void);
 void hal_exit_priv(void);
 int hal_init_task(void);
+int hal_fw_repair(void);
 
 int hal_calc_mpdu_page (int mpdulen);
 int hal_get_agg_pend_cnt(void);

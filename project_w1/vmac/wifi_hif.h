@@ -191,8 +191,6 @@ int hal_calc_block_in_mpdu (int mpdulen);
 unsigned int  MAC_RD_REG(unsigned int addr);
 void MAC_WR_REG(unsigned int addr,unsigned int data);
 
-#ifdef DRV_PT_SUPPORT
 void b2b_rx_throughput_calc(HW_RxDescripter_bit *RxPrivHdr);
-#endif
 
 #endif //_HI_SDIO_H_

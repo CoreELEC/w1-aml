@@ -129,7 +129,8 @@ extern int aml_wpa_set_bcn_intv(struct wlan_net_vif *wnet_vif, char* buf, int le
 extern int aml_wpa_set_pkt_fetch(struct wlan_net_vif *wnet_vif, char* buf, int len);
 extern int aml_wpa_set_frag_thr(struct wlan_net_vif *wnet_vif, char* buf, int len);
 extern int aml_wpa_set_preamble(struct wlan_net_vif *wnet_vif, char* buf, int len);
-extern int aml_wpa_set_conn_band(struct wlan_net_vif *wnet_vif, char* buf, int len);
+extern int aml_wpa_set_band(struct wlan_net_vif *wnet_vif, char* buf, int len);
+extern int aml_wpa_set_mac_mode(struct wlan_net_vif *wnet_vif, char* buf, int len);
 extern int aml_wpa_set_initial_gain_change_hang(struct wlan_net_vif *wnet_vif, char* buf, int len);
 extern int aml_wpa_set_tx_power_change_hang(struct wlan_net_vif *wnet_vif, char* buf, int len);
 extern int aml_set_tx_power_plan(struct wlan_net_vif *wnet_vif, char* buf, int len);

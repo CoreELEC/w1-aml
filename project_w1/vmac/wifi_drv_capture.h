@@ -17,6 +17,6 @@ int dut_v32_tx(unsigned int *outbuffer, unsigned int *inbufer, const unsigned lo
 int dut_dump_data(unsigned int addr, unsigned char *data, int len);
 void dut_set_bcap_log_name(unsigned int value);
 void dut_set_gain(unsigned int value);
-int iwp_stop_tbus_to_get_sram(unsigned int *buf);
+int iwp_stop_tbus_to_get_sram(unsigned char *buf);
 
 #endif

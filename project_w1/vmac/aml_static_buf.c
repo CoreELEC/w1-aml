@@ -27,10 +27,14 @@
 #include <linux/skbuff.h>
 #include <linux/wlan_plat.h>
 
+#ifdef NOT_AMLOGIC_PLATFORM
+extern void *aml_mem_prealloc(int section, unsigned long size);
+#else
 extern void *bcmdhd_mem_prealloc(int section, unsigned long size);
+#endif
 enum aml_prealloc_index {
-	AML_RX_FIFO = 0,
-	AML_TX_DESC_BUF = 1
+    AML_RX_FIFO = 0,
+    AML_TX_DESC_BUF = 1
 };
 #define AML_RX   11
 #define AML_TX   20
@@ -39,25 +43,33 @@ enum aml_prealloc_index {
 
 void *wifi_mem_prealloc(int section, unsigned long size)
 {
-	pr_info("sectoin %d, size %ld\n", section, size);
-	if (section == AML_RX_FIFO ) {
-		if (size > AML_RX_FIFO_SIZE) {
-			pr_err("request AML_RX_FIFO (%lu) > %d\n",
-				size, AML_RX_FIFO_SIZE);
-			return NULL;
-		}
+    pr_info("sectoin %d, size %ld\n", section, size);
+    if (section == AML_RX_FIFO ) {
+        if (size > AML_RX_FIFO_SIZE) {
+            pr_err("request AML_RX_FIFO (%lu) > %d\n",
+               size, AML_RX_FIFO_SIZE);
+            return NULL;
+        }
 
-		return bcmdhd_mem_prealloc(AML_RX, size);
-	}
-	if (section == AML_TX_DESC_BUF) {
-		if (size > AML_TX_DESC_BUF_SIZE) {
-			pr_err("request AML_TX_DESC_BUF(%lu) > %d\n",
-				size, AML_TX_DESC_BUF_SIZE);
-			return NULL;
-		}
+#ifdef NOT_AMLOGIC_PLATFORM
+        return aml_mem_prealloc(AML_RX, size);
+#else
+        return bcmdhd_mem_prealloc(AML_RX, size);
+#endif
+    }
+    if (section == AML_TX_DESC_BUF) {
+        if (size > AML_TX_DESC_BUF_SIZE) {
+            pr_err("request AML_TX_DESC_BUF(%lu) > %d\n",
+                size, AML_TX_DESC_BUF_SIZE);
+            return NULL;
+        }
 
-		return bcmdhd_mem_prealloc(AML_TX, size);;
-	}
-	return NULL;
+#ifdef NOT_AMLOGIC_PLATFORM
+        return aml_mem_prealloc(AML_TX, size);;
+#else
+        return bcmdhd_mem_prealloc(AML_TX, size);;
+#endif
+    }
+    return NULL;
 }
 

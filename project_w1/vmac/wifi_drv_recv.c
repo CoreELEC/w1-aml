@@ -113,26 +113,12 @@ int drv_rx_addbareq(struct drv_private *drv_priv, void *nsta, unsigned char dial
 }
 
 
-void
-drv_rx_addbarsp(
-    struct drv_private *drv_priv, void * nsta,
-    unsigned char tid_index,
-    unsigned char *dialogtoken,
-    unsigned short *statuscode,
-    struct wifi_mac_ba_parameterset *baparamset,
-    unsigned short *batimeout
-)
+void drv_rx_addbarsp(struct drv_private *drv_priv, void * nsta, unsigned char tid_index)
 {
     struct aml_driver_nsta *drv_sta = DRIVER_NODE(nsta);
     struct wifi_station *sta = (struct wifi_station *)drv_sta->net_nsta;
     struct drv_rx_scoreboard *RxTidState  = &drv_sta->rx_scb[tid_index];
 
-
-    /* setup ADDBA response paramters */
-    *dialogtoken = RxTidState->dialogtoken;
-    *statuscode = RxTidState->statuscode;
-    *baparamset = RxTidState->baparamset;
-    *batimeout  = RxTidState->batimeout;
     if ( RxTidState->statuscode == WIFINET_STATUS_SUCCESS)
     {
         hal_phy_addba_ok(
@@ -236,7 +222,6 @@ drv_rx_bar(struct drv_private *drv_priv, struct aml_driver_nsta *drv_sta,  struc
     return WIFINET_FC0_TYPE_CTL;
 }
 
-
 int drv_rx_input( struct drv_private *drv_priv, void *nsta,
     struct sk_buff *skbbuf, struct wifi_mac_rx_status* rs)
 {
@@ -264,6 +249,8 @@ int drv_rx_input( struct drv_private *drv_priv, void *nsta,
     type = wh->i_fc[0] & WIFINET_FC0_TYPE_MASK;
     subtype = wh->i_fc[0] & WIFINET_FC0_SUBTYPE_MASK;
     b_mcast = WIFINET_IS_MULTICAST(wh->i_addr1);
+
+    wifi_mac_scan_chking_leakap(drv_sta->net_nsta, wh);
 
     if (WIFINET_IS_BAR(wh))
     {

@@ -41,7 +41,7 @@
 #define WME_MAX_BA          DEFAULT_BLOCKACK_BITMAPSIZE //WME_BA_BMP_SIZE
 #define DRV_TID_MAX_BUFS    (2 * WME_BA_BMP_SIZE)
 #define DRV_RX_TIMEOUT      80
-#define NET80211_AMSDU_TIMEOUT 10
+#define NET80211_AMSDU_TIMEOUT 4
 #define DRV_GET_TIDTXINFO(_sta, _tid)   (&(_sta)->tx_agg_st.tid[(_tid)])
 
 #define DRV_RXTID_LOCK_INIT(_rxtid)     spin_lock_init(&(_rxtid)->agg_tid_slock)
@@ -83,6 +83,10 @@
 #define DRV_HRTIMER_LOCK(_tq) do { OS_SPIN_LOCK(&(_tq)->hr_timer_lock);} while(0)
 #define DRV_HRTIMER_UNLOCK(_tq) do { OS_SPIN_UNLOCK(&(_tq)->hr_timer_lock);} while(0)
 
+#define DRV_MINSTREL_LOCK_INIT(_tq) spin_lock_init(&(_tq)->minstrel_lock)
+#define DRV_MINSTREL_LOCK_DESTROY(_tq)
+#define DRV_MINSTREL_LOCK(_tq) do { OS_SPIN_LOCK_IRQ(&(_tq)->minstrel_lock, (_tq)->minstrel_lockflags);} while(0)
+#define DRV_MINSTREL_UNLOCK(_tq) do { OS_SPIN_UNLOCK_IRQ(&(_tq)->minstrel_lock, (_tq)->minstrel_lockflags);} while(0)
 
 /*
  * returns delimiter padding required given the packet length
@@ -135,6 +139,7 @@ struct drv_tx_scoreboard
     struct drv_txdesc *tx_desc[DRV_TID_MAX_BUFS];
     struct list_head txds_queue;// tx_ds node
     struct list_head tid_queue_elem; //tid node
+    struct sk_buff_head tid_tx_buffer_queue;
     struct aml_driver_nsta *drv_sta;
     struct drv_queue_ac *ac;
     struct os_timer_ext addba_requesttimer;
@@ -144,6 +149,7 @@ struct drv_tx_scoreboard
     unsigned char addba_exchangecomplete;
     unsigned char addba_amsdusupported;
     unsigned char addba_exchangestatuscode;
+    unsigned char tid_tx_buff_sending;
     unsigned long baw_map;
 } ;
 
@@ -153,7 +159,7 @@ struct drv_queue_ac
     int queue_id;
     struct list_head ac_queue;
     struct list_head tid_queue; // it's the head node of "struct drv_tx_scoreboard" by struct drv_tx_scoreboard->tid_queue_elem
-}  ;
+};
 
 struct drv_rxdesc
 {
@@ -316,6 +322,8 @@ struct drv_config
     unsigned short cfg_aggr_thresh;
     unsigned short cfg_no_aggr_thresh;
     unsigned char cfg_hrtimer_interval;
+    unsigned char cfg_mac_mode;
+    unsigned char cfg_band;
 };
 
 /* Reset flag */
@@ -332,7 +340,6 @@ struct driver_ops
 
     /* Notification of event/state of virtual interface */
     int         (*down_interface)(struct drv_private *, int wnet_vif_id);
-    int         (*up_interface)(struct drv_private *, int wnet_vif_id, const unsigned char bssid[WIFINET_ADDR_LEN], unsigned char aid, unsigned int flags);
 
     /* To attach/detach per-destination info (i.e., nsta) */
     void *  (*alloc_nsta)(struct drv_private *, int wnet_vif_id, void* sta);
@@ -354,6 +361,9 @@ struct driver_ops
     void        (*scan_start)(struct drv_private *);
     void        (*scan_end)(struct drv_private *);
 
+    /* fw recovery */
+    void        (*fw_repair)(struct drv_private *);
+
     /* connect notifications */
     void        (*connect_start)(struct drv_private *);
     void        (*connect_end)(struct drv_private *);
@@ -374,6 +384,7 @@ struct driver_ops
 
     /* aggregation callbacks */
     int          (*check_aggr)(struct drv_private *, void *, unsigned char tid_index);
+    int          (*check_aggr_allow_to_send)(struct drv_private *, void *, unsigned char tid_index);
     void        (*set_ampdu_params)(struct drv_private *, void *, unsigned short maxampdu, unsigned int mpdudensity);
     void        (*addba_request_setup)(struct drv_private *, void *, unsigned char tid_index,
                                        struct wifi_mac_ba_parameterset *baparamset,
@@ -381,10 +392,7 @@ struct driver_ops
                                        struct wifi_mac_ba_seqctrl *basequencectrl,
                                        unsigned short buffersize);
     void        (*addba_response_setup)(struct drv_private *, void * drv_sta,
-                                        unsigned char tid_index, unsigned char *dialogtoken,
-                                        unsigned short *statuscode,
-                                        struct wifi_mac_ba_parameterset *baparamset,
-                                        unsigned short *batimeout);
+                                        unsigned char tid_index);
     int         (*addba_request_process)(struct drv_private *, void * drv_sta,
                                          unsigned char dialogtoken,
                                          struct wifi_mac_ba_parameterset *baparamset,
@@ -473,7 +481,7 @@ struct driver_ops
     int (*drv_set_suspend)(struct drv_private *drv_priv, unsigned char vid, unsigned char enable,
         unsigned char mode, unsigned int filters);
     int (*drv_p2p_client_opps_cwend_may_spleep) (struct wlan_net_vif *wnet_vif);
-    int (*drv_txq_backup_send) (struct drv_private *drv_priv, struct drv_txlist *txlist);    
+    int (*drv_txq_backup_send) (struct drv_private *drv_priv, struct drv_txlist *txlist);
 
     void (*dut_rx_start)(void);
     void (*dut_rx_stop)(void);
@@ -512,6 +520,9 @@ struct driver_ops
     void (*drv_cfg_cali_param)(void);
     void (*drv_cfg_txpwr_cffc_param)(struct wifi_channel * ,struct tx_power_plan *);
     void (*drv_print_fwlog)(unsigned char *logbuf_ptr, int databyte);
+    int (*drv_set_bssid)(struct drv_private *drv_priv, unsigned char wnet_vif_id,unsigned char *bssid);
+    void (*drv_set_tx_livetime)(unsigned int tx_livetime);
+
 } ;
 
 struct drv_powersave
@@ -573,6 +584,8 @@ struct drv_private
     struct os_timer_ext drv_txtimer;
     struct tasklet_struct ampdu_tasklet;
     struct tasklet_struct forward_tasklet;
+    struct tasklet_struct retransmit_tasklet;
+    struct sk_buff_head retransmit_queue;
 
     enum prot_mode drv_protect_mode;    /* protection mode */
     unsigned char drv_protect_rateindex;     /* protection rate index */
@@ -583,6 +596,8 @@ struct drv_private
     const struct drv_rate_table *drv_currratetable;   /* current rate table */
     struct aml_ratecontrol minstrel_sample_rate[DRV_TXDESC_RATE_NUM];
     spinlock_t hr_timer_lock;
+    spinlock_t minstrel_lock;
+    unsigned long minstrel_lockflags;
 };
 
 #ifdef CONFIG_P2P

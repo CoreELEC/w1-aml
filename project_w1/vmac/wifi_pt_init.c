@@ -19,8 +19,6 @@
 #include "wifi_hal.h"
 #include "wifi_drv_main.h"
 
-#ifdef DRV_PT_SUPPORT
-
 extern int send_frame_num;
 extern int recv_frame_num;
 
@@ -949,10 +947,10 @@ void Pool_Create( struct _Pool* my, unsigned short size,
 
 struct sk_buff* TxBuffer_Alloc(void)
 {
-    struct sk_buff *skb = os_skb_alloc(TX_BUFFER_SIZE+HI_TXDESC_DATAOFFSET);
+    struct sk_buff *skb = os_skb_alloc(gB2BTestCasePacket.pkt_length + RESERVED_LEN + HI_TXDESC_DATAOFFSET);
 
     while (!skb) {
-        skb = os_skb_alloc(TX_BUFFER_SIZE+HI_TXDESC_DATAOFFSET);
+        skb = os_skb_alloc(gB2BTestCasePacket.pkt_length + RESERVED_LEN + HI_TXDESC_DATAOFFSET);
     }
 
     ASSERT(skb);
@@ -1036,6 +1034,4 @@ void mib_init(void)
     DBG_HAL_THR_EXIT();
 
  }
-
-#endif//DRV_PT_SUPPORT
 

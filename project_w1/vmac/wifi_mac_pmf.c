@@ -275,11 +275,17 @@ int aml_pkt_decrypt(struct wifi_station *sta, struct sk_buff *skb)
     return res;
 }
 
-unsigned char is_robust_management_frame(struct wifi_frame *wh) {
-    unsigned char subtype;
+unsigned char is_robust_management_frame(struct wifi_frame *wh)
+{
+    unsigned char type, subtype;
     unsigned char category;
 
+    type = wh->i_fc[0] & WIFINET_FC0_TYPE_MASK;
     subtype = wh->i_fc[0] & WIFINET_FC0_SUBTYPE_MASK;
+
+    if (type != WIFINET_FC0_TYPE_MGT) {
+        return 0;
+    }
     if (subtype == WIFINET_FC0_SUBTYPE_ACTION) {
         category = *((unsigned char *)wh + sizeof(struct wifi_frame));
     }

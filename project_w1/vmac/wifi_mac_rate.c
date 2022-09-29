@@ -735,7 +735,9 @@ void wifi_mac_rate_newassoc(struct wifi_station *sta, int isnew)
 void wifi_mac_rate_disassoc(struct wifi_station *sta)
 {
     struct drv_private *drv_priv = ((struct aml_driver_nsta *)sta->drv_sta)->sta_drv_priv;
+    DRV_MINSTREL_LOCK(drv_priv);
     drv_priv->ratctrl_ops->rate_disassoc(sta);
+    DRV_MINSTREL_UNLOCK(drv_priv);
 }
 
 void wifi_mac_rate_init(void * ieee,

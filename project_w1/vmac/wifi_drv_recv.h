@@ -14,8 +14,8 @@ void drv_clr_addba_rsp_status(struct drv_private *drv_priv, void * nsta);
 int drv_rx_addbareq( struct drv_private *drv_priv, void *, unsigned char dialogtoken, struct wifi_mac_ba_parameterset *baparamset,
     unsigned short batimeout, struct wifi_mac_ba_seqctrl basequencectrl);
 
-void drv_rx_addbarsp(struct drv_private *drv_priv, void *, unsigned char tid_index, unsigned char *dialogtoken,
-    unsigned short *statuscode, struct wifi_mac_ba_parameterset *baparamset, unsigned short *batimeout);
+void drv_rx_addbarsp(struct drv_private *drv_priv, void * nsta, unsigned char tid_index);
+
 
 void drv_rx_delba(struct drv_private *drv_priv, void *, struct wifi_mac_delba_parameterset *delbaparamset, unsigned short reasoncode);
 void drv_rxampdu_del(struct drv_private *drv_priv, struct aml_driver_nsta *drv_sta, unsigned char tid_index);

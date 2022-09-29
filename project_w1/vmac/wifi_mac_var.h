@@ -430,7 +430,8 @@ struct wifi_mac
 
     unsigned char scan_gain_thresh_unconnect;
     unsigned char scan_gain_thresh_connect;
-    unsigned char is_scan_noisy;
+    unsigned char scan_max_gain_thresh;
+    enum wifi_scan_noise scan_noisy_status;
     unsigned char is_connect_set_gain;
 
     unsigned char wm_doth_tbtt;
@@ -450,7 +451,6 @@ struct wifi_mac
     unsigned char is_miracast_connect;
     unsigned char vsdb_mode_set_noa_enable;
 
-
     struct drv_txdesc *txdesc_bufptr;/* TX descriptors buffer point*/
     struct list_head txdesc_freequeue;/* transmit buffer */
     spinlock_t tx_desc_buf_lock;
@@ -466,6 +466,10 @@ struct wifi_mac
     wait_queue_head_t wm_suspend_wq;
     unsigned char wm_esco_en;
     unsigned char wm_bt_en;
+
+    enum wifi_mac_recovery_state fw_recovery_stat;
+    struct os_timer_ext wm_monitor_fw;
+    spinlock_t fw_stat_lock;
 
 #if defined(SU_BF) || defined(MU_BF)
     int max_spatial;
@@ -565,6 +569,7 @@ struct wlan_net_vif
     struct conn_chan_list vm_connchan;
     enum wifi_mac_bwc_width vm_bandwidth;
     unsigned char vm_scan_before_connect_flag;
+    unsigned char vm_phase_flags; // bit0: connecting; bit1: disconnecting; bit2:flush_tx_buff_q
     int vm_scanchan_rssi;
     struct scaninfo_entry vm_connect_scan_entry;
     unsigned char vm_chan_simulate_scan_flag;
@@ -621,7 +626,6 @@ struct wlan_net_vif
     /* for channge channel when sta receive a channel change announce frame*/
     unsigned char vm_chanchange_count;
     unsigned char vm_bmiss_count;
-    unsigned char vm_cur_authmode;
     struct wifi_mac_rateset vm_legacy_rates;
 
     struct wifi_mac_wmm_ac_params vm_wmm_ac_params;
@@ -632,6 +636,7 @@ struct wlan_net_vif
     unsigned char vm_ht40_intolerant;
 
     struct sk_buff_head vm_tx_buffer_queue;
+
     unsigned short vm_pstxqueue_flags;
     unsigned short vm_legacyps_txframes;
 

@@ -16,8 +16,6 @@
 #include "wifi_hal_com.h"
 #include "wifi_skbbuf.h"
 
-#ifdef DRV_PT_SUPPORT
-
 struct _Network  my_network;
 
 const char the_hex_table[16] = {
@@ -507,6 +505,4 @@ void prepare_test_hal_layer_thr_init(int usrtesttype)
 
     DBG_HAL_THR_EXIT();
 }
-
-#endif//DRV_PT_SUPPORT
 

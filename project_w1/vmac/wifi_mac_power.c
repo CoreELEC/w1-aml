@@ -742,15 +742,15 @@ int wifi_mac_forward_txq_enqueue (struct sk_buff_head *fwdtxqueue, struct sk_buf
 }
 
 
-static int wifi_mac_buffer_txq_send(struct sk_buff_head *pstxqueue)
+int wifi_mac_buffer_txq_send(struct sk_buff_head *txqueue)
 {
     struct sk_buff *skb = NULL;
-    unsigned int qlen_real = WIFINET_SAVEQ_QLEN(pstxqueue);
+    unsigned int qlen_real = WIFINET_SAVEQ_QLEN(txqueue);
 
     while (qlen_real) {
-        WIFINET_SAVEQ_LOCK(pstxqueue);
-        WIFINET_SAVEQ_DEQUEUE(pstxqueue, skb, qlen_real);
-        WIFINET_SAVEQ_UNLOCK(pstxqueue);
+        WIFINET_SAVEQ_LOCK(txqueue);
+        WIFINET_SAVEQ_DEQUEUE(txqueue, skb, qlen_real);
+        WIFINET_SAVEQ_UNLOCK(txqueue);
 
         if (!skb) {
             break;
@@ -773,25 +773,28 @@ static int wifi_mac_buffer_txq_send(struct sk_buff_head *pstxqueue)
     return qlen_real;
 }
 
-int wifi_mac_buffer_txq_send_pre (struct wlan_net_vif *wnet_vif)
+int wifi_mac_buffer_txq_send_pre(struct wlan_net_vif *wnet_vif)
 {
     struct wifi_mac *wifimac = wnet_vif->vm_wmac;
     if (!(wnet_vif->vm_pstxqueue_flags & WIFINET_PSQUEUE_MASK))
     {
         wifimac->drv_priv->drv_ops.drv_hal_tx_frm_pause(wifimac->drv_priv, 0);
+        wnet_vif->vm_phase_flags |= PHASE_TX_BUFF_QUEUE;
         wifi_mac_buffer_txq_send(&wnet_vif->vm_tx_buffer_queue);
+        wnet_vif->vm_phase_flags &= ~PHASE_TX_BUFF_QUEUE;
         return 0;
     }
 
     return -1;
 }
 
+
 void wifi_mac_pwrsave_notify_txq_empty(struct wifi_mac *wifimac)
 {
 
 }
 
-int wifi_mac_pwrsave_send_nulldata(struct wifi_station *sta, 
+int wifi_mac_pwrsave_send_nulldata(struct wifi_station *sta,
     unsigned char pwr_save, unsigned char pwr_flag)
 {
     if (sta == NULL) {

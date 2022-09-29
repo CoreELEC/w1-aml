@@ -57,6 +57,7 @@ const char *android_wifi_cmd_str[ANDROID_WIFI_CMD_MAX] =
     "WFD-SET-TCPPORT",
     "WFD-SET-MAXTPUT",
     "WFD-SET-DEVTYPE",
+    "RESET",
 
 };
 static int aml_android_get_rssi(struct wlan_net_vif *wnet_vif, char *command, int total_len)
@@ -425,6 +426,25 @@ static int aml_android_cmdstr_to_num(char *cmdstr)
             break;
         }
 #endif
+
+        case ANDROID_WIFI_CMD_FW_REPAIR:
+        {
+#if 0
+            struct wifi_mac *wifimac = wnet_vif->vm_wmac;
+
+            WIFINET_FW_STAT_LOCK(wifimac);
+            if (wifimac->fw_recovery_stat != WIFINET_RECOVERY_END) {
+                WIFINET_FW_STAT_UNLOCK(wifimac);
+                break;
+            }
+            wifimac->fw_recovery_stat = WIFINET_RECOVERY_START;
+            WIFINET_FW_STAT_UNLOCK(wifimac);
+
+            wifimac->drv_priv->drv_ops.fw_repair(wifimac->drv_priv);
+            wifimac->fw_recovery_stat = WIFINET_RECOVERY_END;
+#endif
+            break;
+        }
 
         default:
             DPRINTF(AML_DEBUG_ANDROID,"Unknown PRIVATE command %s - ignored\n", command);

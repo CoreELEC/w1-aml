@@ -17,6 +17,7 @@ namespace FW_NAME
 #include "wifi_mac_com.h"
 #include <linux/delay.h>
 #endif
+#include "patch_fi_cmd.h"
 
 #if defined (HAL_FPGA_VER)
 struct platform_wifi_gpio amlhal_gpio =
@@ -563,7 +564,7 @@ void wifi_cpu_clk_switch(unsigned int clk_cfg)
 
 #endif
 
-
+extern unsigned char wifi_in_insmod;
 #ifdef ICCM_CHECK
 static unsigned char buf_iccm_rd[ICCM_BUFFER_RD_LEN];
 #endif
@@ -574,6 +575,7 @@ unsigned char hal_download_wifi_fw_img(void)
     int len =0;
     int offset =0;
     int offset_base = 0;
+    int rd_offset = 0;
     SYS_TYPE databyte = 0;
     unsigned int regdata =0;
     struct hw_interface *hif = hif_get_hw_interface();
@@ -629,16 +631,14 @@ unsigned char hal_download_wifi_fw_img(void)
      * ICCM_ROM_LEN to ICCM_RAM_LEN-1 for iccm ram.
      */
     offset = ICCM_ROM_LEN;
-    len -= ICCM_ROM_LEN;
+    len -= offset;
 #else
     offset = 0;
 #endif
 
-    do
-    {
+    do {
         databyte = (len > SRAM_MAX_LEN) ? SRAM_MAX_LEN : len;
-        if((offset + databyte) >= MAX_OFFSET)
-        {
+        if((offset + databyte) >= MAX_OFFSET) {
             offset_base += offset;
             hif->hif_ops.hi_write_reg32(RG_SCFG_SRAM_FUNC, MAC_ICCM_AHB_BASE + offset_base);
             offset = 0;
@@ -651,32 +651,30 @@ unsigned char hal_download_wifi_fw_img(void)
         len -= databyte;
     } while(len > 0);
 
-    offset = 0;
-    offset_base =0;
-
 #ifdef ICCM_CHECK
+    offset_base =0;
+    offset = ICCM_ROM_LEN;
     len = ICCM_CHECK_LEN;
     hif->hif_ops.hi_write_reg32(RG_SCFG_SRAM_FUNC,MAC_ICCM_AHB_BASE);
     //host rom read
-    do
-    {
+    do {
         databyte = (len > SRAM_MAX_LEN) ? SRAM_MAX_LEN : len;
 
-        if((offset + SRAM_MAX_LEN) >= MAX_OFFSET)
-        {
+        if((offset + SRAM_MAX_LEN) >= MAX_OFFSET) {
             offset_base += offset;
             hif->hif_ops.hi_write_reg32(RG_SCFG_SRAM_FUNC, MAC_ICCM_AHB_BASE + offset_base);
             offset = 0;
         }
 
-        hif->hif_ops.hi_read_sram(buf_iccm_rd + offset + offset_base,
+        hif->hif_ops.hi_read_sram(buf_iccm_rd + rd_offset,
             (unsigned char*)(SYS_TYPE)(0 + offset) ,databyte);
 
         offset += databyte;
+        rd_offset += databyte;
         len -= databyte;
     } while(len > 0);
 
-    if (memcmp(buf_iccm_rd, bufferICCM, ICCM_CHECK_LEN)) {
+    if (memcmp(buf_iccm_rd, (bufferICCM + ICCM_ROM_LEN), ICCM_CHECK_LEN)) {
         ERROR_DEBUG_OUT("Host HAL: write ICCM ERROR!!!! \n");
         return false;
 
@@ -690,8 +688,7 @@ unsigned char hal_download_wifi_fw_img(void)
     offset = 0;
     hif->hif_ops.hi_write_reg32(RG_SCFG_SRAM_FUNC, MAC_DCCM_AHB_BASE);
 
-    do
-    {
+    do {
         databyte = (len > SRAM_MAX_LEN) ? SRAM_MAX_LEN : len;
         hif->hif_ops.hi_write_sram(bufferDCCM + offset,
             (unsigned char*)(SYS_TYPE)(0 + offset), databyte);
@@ -724,17 +721,14 @@ unsigned char hal_download_wifi_fw_img(void)
 #endif
 
     /* arc cpu domain power save for t9026  */
-    if (0)
-    {
+    if (0) {
         //cpu select arc
         //enable cpu
         regdata = hif->hif_ops.hi_read_word(RG_WIFI_MAC_ARC_CTRL);
         /* start frimware chip cpu */
         regdata |= CPU_RUN;
         hif->hif_ops.hi_write_word(RG_WIFI_MAC_ARC_CTRL, regdata);
-    }
-    else
-    {
+    } else {
     //cpu select riscv
       regdata = hif->hif_ops.hi_read_word(RG_WIFI_CPU_CTRL);
       regdata |= 0x10000;
@@ -753,11 +747,12 @@ unsigned char hal_download_wifi_fw_img(void)
     wifi_cpu_clk_switch(0x4f770033);
     /* mac clock 160 Mhz */
     hif->hif_ops.hi_write_word(RG_INTF_MAC_CLK, 0x00030001);
-#ifdef DRV_PT_SUPPORT
     if (aml_wifi_is_enable_rf_test())
         hal_dpd_memory_download();
 #endif
-#endif
+
+    hif->hif_ops.hi_write_word(CMD_DOWN_FIFO_FDH_ADDR, 0);
+    hif->hif_ops.hi_write_word(CMD_DOWN_FIFO_FDT_ADDR, 0);
 
     //cpu select riscv
     regdata = hif->hif_ops.hi_read_word(RG_WIFI_CPU_CTRL);
@@ -772,6 +767,10 @@ unsigned char hal_download_wifi_fw_img(void)
 #endif
 
     printk("fw download success!\n");
+#ifdef SDIO_BUILD_IN
+    wifi_in_insmod = 0;
+#endif
+
     return true;
 }
 
@@ -793,8 +792,8 @@ static int en_rf_test = 0;
 
 static char * plt_ver = NULL;
 struct version_info version_map[] = {
-    {"gva", 1},
-    {"gva_mrt", 2}
+    {"gva", VERSION_GVA},
+    {"gva_mrt", VERSION_GVA_MRT}
 
 };
 
@@ -969,12 +968,10 @@ static int aml_insmod(void)
         goto  insmod_failed;
     }
 
-#ifdef DRV_PT_SUPPORT
     if (aml_wifi_is_enable_rf_test()) {
         printk("---Aml drv---:Before calling %s:(%d) \n",__func__,__LINE__);
         Init_B2B_Resource();
     }
-#endif
 
     aml_insmod_flag = 1;
 

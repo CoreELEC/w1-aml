@@ -2,7 +2,6 @@
 #include "wifi_mac_rate.h"
 #include "wifi_iwpriv_cmd.h"
 
-
 int saveie(unsigned char *iep, const unsigned char *ie)
 {
     if (ie == NULL)
@@ -271,7 +270,8 @@ wifi_mac_scan_connect(struct wifi_mac_scan_state *ss, struct wlan_net_vif *wnet_
     }
 
     if (pwdev_priv->connect_request == NULL) {
-        return 0;
+        if (wnet_vif->vm_wmac->fw_recovery_stat != WIFINET_RECOVERY_VIF_UP)
+            return 0;
     }
 
     if (wnet_vif->vm_state > WIFINET_S_SCAN) {
@@ -492,7 +492,7 @@ void wifi_mac_update_chan_overlapping_map(struct wlan_net_vif *wnet_vif) {
 
 void is_connect_need_set_gain(struct wlan_net_vif *wnet_vif) {
     struct wifi_mac *wifimac = wnet_vif->vm_wmac;
-    unsigned char overlapping = 0;
+    unsigned char overlapping_max = 0;
     unsigned char i = 0;
     unsigned char bw = wnet_vif->vm_curchan->chan_bw;
     unsigned char low_chan = 0;
@@ -506,10 +506,15 @@ void is_connect_need_set_gain(struct wlan_net_vif *wnet_vif) {
 
     get_ovlapping_chan_index(wifimac, center_chan, bw, &low_chan, &up_chan);
     for (i = low_chan; i <= up_chan; ++i) {
-        overlapping += wifimac->chan_overlapping_map[i].overlapping;
+        if (overlapping_max < wifimac->chan_overlapping_map[i].overlapping) {
+            overlapping_max = wifimac->chan_overlapping_map[i].overlapping;
+        }
     }
 
-    if ((overlapping > 80) && is_2g) {
+    if (is_2g && (overlapping_max > OVERLAPPING_24G_GIAN_THRESHOLD)) {
+        wifimac->is_connect_set_gain = 1;
+
+    } else if (!is_2g && (overlapping_max > OVERLAPPING_5G_GIAN_THRESHOLD)) {
         wifimac->is_connect_set_gain = 1;
 
     } else {
@@ -517,7 +522,7 @@ void is_connect_need_set_gain(struct wlan_net_vif *wnet_vif) {
     }
 
     AML_OUTPUT("overlapping:%d, is_connect_set_gain:%d, low_chan:%d, up_chan:%d, bw:%d, center:%d\n",
-        overlapping, wifimac->is_connect_set_gain, low_chan, up_chan, bw, center_chan);
+        overlapping_max, wifimac->is_connect_set_gain, low_chan, up_chan, bw, center_chan);
 }
 
 
@@ -545,18 +550,21 @@ int wifi_mac_scan_parse(struct wlan_net_vif *wnet_vif, wifi_mac_ScanIterFunc *f,
         ss->scan_ssid_count = count;
 
         if (wifi_mac_is_in_noisy_enviroment(wifimac)) {
-            wifimac->is_scan_noisy = 1;
+            wifimac->scan_noisy_status = WIFINET_S_SCAN_ENV_NOISE;
 
-        } else {
+        } else if (wifi_mac_is_in_clear_enviroment(wifimac)) {
             //clear environment, set to max gain
             wifimac->drv_priv->drv_ops.set_channel_rssi(wifimac->drv_priv, 174);
-            wifimac->is_scan_noisy = 0;
+            wifimac->scan_noisy_status = WIFINET_S_SCAN_ENV_CLEAR;
+
+        } else {
+            wifimac->scan_noisy_status = WIFINET_S_SCAN_ENV_MID;
         }
     }
 
-    AML_OUTPUT("%s scan_res:%d, chan_count:%d, thresh_unconnect:%d, thresh_connect:%d, is_scan_noisy:%d\n",
+    AML_OUTPUT("%s scan_res:%d, chan_count:%d, thresh_unconnect:%d, thresh_connect:%d, scan_noisy_status:%d\n",
         __func__, count, ss->scan_next_chan_index, wifimac->scan_gain_thresh_unconnect,
-        wifimac->scan_gain_thresh_connect, wifimac->is_scan_noisy);
+        wifimac->scan_gain_thresh_connect, wifimac->scan_noisy_status);
     return 0;
 }
 
@@ -888,9 +896,9 @@ static int vm_scan_setup_chan(struct wifi_mac_scan_state *ss, struct wlan_net_vi
             c = &wifimac->wm_channels[i];
             /* both 2.4G and 5G set WIFINET_BW_20 flag.*/
             if ((c->chan_bw == WIFINET_BWC_WIDTH20) && (wifimac->wm_curchan != c)) {
-                if ((aml_iwpriv_get_conn_band() == 2) && (!WIFINET_IS_CHAN_2GHZ(c))) {
+                if ((aml_iwpriv_get_band() == CFG_BAND_B) && (!WIFINET_IS_CHAN_2GHZ(c))) {
                     continue;
-                } else if ((aml_iwpriv_get_conn_band() == 5) && (!WIFINET_IS_CHAN_5GHZ(c))) {
+                } else if ((aml_iwpriv_get_band() == CFG_BAND_A) && (!WIFINET_IS_CHAN_5GHZ(c))) {
                     continue;
                 }
 
@@ -953,9 +961,9 @@ static int vm_scan_setup_chan(struct wifi_mac_scan_state *ss, struct wlan_net_vi
                         continue;
                     }
 
-                    if ((aml_iwpriv_get_conn_band() == 2) && (!WIFINET_IS_CHAN_2GHZ(c))) {
+                    if ((aml_iwpriv_get_band() == CFG_BAND_B) && (!WIFINET_IS_CHAN_2GHZ(c))) {
                         continue;
-                    } else if ((aml_iwpriv_get_conn_band() == 5) && (!WIFINET_IS_CHAN_5GHZ(c))) {
+                    } else if ((aml_iwpriv_get_band() == CFG_BAND_A) && (!WIFINET_IS_CHAN_5GHZ(c))) {
                         continue;
                     }
 
@@ -964,9 +972,9 @@ static int vm_scan_setup_chan(struct wifi_mac_scan_state *ss, struct wlan_net_vi
                 else
     #endif//CONFIG_P2P
                 {
-                    if ((aml_iwpriv_get_conn_band() == 2) && (!WIFINET_IS_CHAN_2GHZ(c))) {
+                    if ((aml_iwpriv_get_band() == CFG_BAND_B) && (!WIFINET_IS_CHAN_2GHZ(c))) {
                         continue;
-                    } else if ((aml_iwpriv_get_conn_band() == 5) && (!WIFINET_IS_CHAN_5GHZ(c))) {
+                    } else if ((aml_iwpriv_get_band() == CFG_BAND_A) && (!WIFINET_IS_CHAN_5GHZ(c))) {
                         continue;
                     }
 
@@ -1038,6 +1046,67 @@ int wifi_mac_scan_send_probe_timeout_ex(void *arg)
 
     return OS_TIMER_NOT_REARMED;
 }
+
+
+static enum hrtimer_restart
+wifi_mac_scan_chk_leakap_done_process(struct hrtimer *timer)
+{
+    static unsigned char count = 0;
+    struct wifi_mac *wifimac = wifi_mac_get_mac_handle();
+
+    if (wifimac->wm_scan->scan_StateFlags & SCANSTATE_F_RX_LEAKAP_HAPPEN) {
+        wifimac->wm_scan->scan_StateFlags &= ~SCANSTATE_F_RX_LEAKAP_HAPPEN;
+
+        count ++;
+        if (count < 5) {
+            wifimac->wm_scan->scan_StateFlags |= SCANSTATE_F_RX_CHKING_LEAKAP_PKT;
+            wifimac->wm_scan->scan_kt = ktime_set(0, 2000000);
+            hrtimer_forward_now(&wifimac->wm_scan->scan_hr_timer, wifimac->wm_scan->scan_kt);
+            return HRTIMER_RESTART;
+        }
+    }
+
+    AML_PRINT(AML_DBG_MODULES_SCAN, "retry %d\n", count);
+    wifimac->wm_scan->scan_StateFlags &= ~SCANSTATE_F_RX_CHKING_LEAKAP_PKT;
+    os_timer_ex_cancel(&wifimac->wm_scan->ss_scan_timer, 1);
+    wifi_mac_scan_timeout_ex(wifimac->wm_scan);
+    count = 0;
+    return HRTIMER_NORESTART;
+}
+
+
+void wifi_mac_scan_chk_leakap_hrtimer_attach(struct wifi_mac *wifimac)
+{
+    hrtimer_init(&wifimac->wm_scan->scan_hr_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+    wifimac->wm_scan->scan_hr_timer.function = wifi_mac_scan_chk_leakap_done_process;
+}
+
+
+void wifi_mac_scan_chk_leakap_hrtimer_start(struct wifi_mac *wifimac)
+{
+    wifimac->wm_scan->scan_kt = ktime_set(0, 2000000);
+    hrtimer_start(&wifimac->wm_scan->scan_hr_timer, wifimac->wm_scan->scan_kt, HRTIMER_MODE_REL);
+}
+
+void wifi_mac_scan_chk_leakap_hrtimer_cancel(struct wifi_mac *wifimac)
+{
+    hrtimer_cancel(&wifimac->wm_scan->scan_hr_timer);
+}
+
+void wifi_mac_scan_chking_leakap(void * station, struct wifi_frame *wh)
+{
+        struct wifi_station *sta = (struct wifi_station *)station;
+        struct wifi_mac *wifimac = sta->sta_wmac;
+        struct wifi_mac_scan_state *ss = wifimac->wm_scan;
+
+        if ((ss->scan_StateFlags & SCANSTATE_F_START) && (ss->scan_StateFlags & SCANSTATE_F_NOTIFY_AP)
+            && (ss->scan_StateFlags & SCANSTATE_F_RX_CHKING_LEAKAP_PKT)) {
+            if (WIFINET_ADDR_EQ(wh->i_addr1, sta->sta_wnet_vif->vm_myaddr)) {
+                ss->scan_StateFlags |= SCANSTATE_F_RX_LEAKAP_HAPPEN;
+            }
+        }
+}
+
 
 void wifi_mac_scan_channel(struct wifi_mac *wifimac)
 {
@@ -1341,7 +1410,8 @@ void wifi_mac_scan_timeout(SYS_TYPE param1,SYS_TYPE param2,
             struct wlan_net_vif *connect_wnet = wifi_mac_running_wnet_vif(wifimac);
 
             if (!((connect_wnet != NULL) && (connect_wnet->vm_opmode == WIFINET_M_HOSTAP))) {
-                if ((wifimac->wm_nrunning == 1) || ((wifimac->wm_nrunning == 2) && concurrent_check_is_vmac_same_pri_channel(wifimac))) {
+                if ((wifimac->wm_nrunning == 1) || ((wifimac->wm_nrunning == 2) && concurrent_check_is_vmac_same_pri_channel(wifimac))) {                    
+
                     if (!(ss->scan_StateFlags & SCANSTATE_F_TX_DONE)) {
                         if (wifi_mac_scan_buff_and_chk_tx(wifimac)) {
                             return;
@@ -1451,7 +1521,7 @@ scan_start_task(SYS_TYPE param1,SYS_TYPE param2,
     if (wifimac->wm_nrunning == 0) {
         wifi_mac_scan_timeout_ex(ss);
 
-    } else if( (wifimac->wm_nrunning == 1) ||(wifimac->wm_nrunning == 2)) {
+    } else {
         ss->scan_StateFlags |= SCANSTATE_F_WAIT_TBTT;
         os_timer_ex_start_period(&ss->ss_scan_timer, 110);
     }
@@ -1581,13 +1651,15 @@ void wifi_mac_end_scan( struct wifi_mac_scan_state *ss)
     if ((wnet_vif->vm_opmode == WIFINET_M_STA) && (wnet_vif->vm_state == WIFINET_S_CONNECTED)) {
         wifi_mac_scan_set_gain(wifimac, 174);
     }
-
     wifi_mac_restore_wnet_vif_channel(wnet_vif);
     wifimac->wm_flags &= ~WIFINET_F_SCAN;
     ss->scan_CfgFlags = 0;
     wifimac->wm_p2p_connection_protect = 0;
     wnet_vif->vm_pstxqueue_flags &= ~WIFINET_PSQUEUE_PS4QUIET;
     wnet_vif->vm_scan_before_connect_flag = 0;
+    //clear saved_ssids
+    ss->ss_nssid = 0;
+    memset(ss->ss_ssid,0,sizeof(ss->ss_ssid));
     if (wnet_vif->vm_chan_switch_scan_flag) {
         wifi_mac_check_switch_chan_result(wnet_vif);
         if (wnet_vif->vm_mainsta && wnet_vif->vm_mainsta->sta_channel_switch_mode) {
@@ -1648,7 +1720,9 @@ void wifi_mac_notify_ap_success(struct wlan_net_vif *wnet_vif) {
         && (wifimac->wm_scan->scan_StateFlags & SCANSTATE_F_NOTIFY_AP)) {
         if (drv_priv->hal_priv->hal_ops.hal_tx_empty()) {
             os_timer_ex_cancel(&wifimac->wm_scan->ss_scan_timer, 1);
-            wifi_mac_scan_timeout_ex(wifimac->wm_scan);
+            wifimac->wm_scan->scan_StateFlags |= SCANSTATE_F_RX_CHKING_LEAKAP_PKT;
+            wifi_mac_scan_chk_leakap_hrtimer_start(wifimac);
+            AML_PRINT(AML_DBG_MODULES_SCAN, "notify success and start check leakap timer\n");
         }
     }
 
@@ -1765,9 +1839,9 @@ int vm_scan_user_set_chan(struct wlan_net_vif *wnet_vif,
                     continue;
                 }
 
-                if ((aml_iwpriv_get_conn_band() == 2) && (!WIFINET_IS_CHAN_2GHZ(c))) {
+                if ((aml_iwpriv_get_band() == CFG_BAND_B) && (!WIFINET_IS_CHAN_2GHZ(c))) {
                     continue;
-                } else if ((aml_iwpriv_get_conn_band() == 5) && (!WIFINET_IS_CHAN_5GHZ(c))) {
+                } else if ((aml_iwpriv_get_band() == CFG_BAND_A) && (!WIFINET_IS_CHAN_5GHZ(c))) {
                     continue;
                 }
 
@@ -1811,8 +1885,7 @@ int wifi_mac_start_scan(struct wlan_net_vif *wnet_vif, int flags,
     struct wifi_mac *wifimac = wnet_vif->vm_wmac;
     struct wifi_mac_scan_state *ss = wifimac->wm_scan;
 
-    if (wifimac->wm_mac_exit)
-    {
+    if (wifimac->wm_mac_exit) {
         DPRINTF(AML_DEBUG_WARNING, "<%s> : %s drop scan due to interface down\n", wnet_vif->vm_ndev->name, __func__);
         return 0;
 
@@ -1822,6 +1895,10 @@ int wifi_mac_start_scan(struct wlan_net_vif *wnet_vif, int flags,
 
     } else if (wnet_vif->vm_scan_hang) {
         DPRINTF(AML_DEBUG_WARNING, "<%s> : %s drop scan due to scan hang\n", wnet_vif->vm_ndev->name, __func__);
+        return 0;
+
+    } else if (wifimac->fw_recovery_stat == WIFINET_RECOVERY_START) {
+        DPRINTF(AML_DEBUG_WARNING, "<%s> : %s drop scan due to fw recoverying \n", wnet_vif->vm_ndev->name, __func__);
         return 0;
     }
 
@@ -1971,6 +2048,7 @@ void wifi_mac_scan_attach(struct wifi_mac *wifimac)
 #ifdef FW_RF_CALIBRATION
     os_timer_ex_initialize(&ss->ss_probe_timer, 0, wifi_mac_scan_send_probe_timeout_ex, ss);
 #endif
+    wifi_mac_scan_chk_leakap_hrtimer_attach(wifimac);
 
     wifimac->wm_scan->ScanTablePriv = st;
 }
@@ -1983,6 +2061,7 @@ void wifi_mac_scan_detach(struct wifi_mac *wifimac)
     {
         DPRINTF(AML_DEBUG_INIT, "<running> %s %d \n",__func__,__LINE__);
         os_timer_ex_del(&ss->ss_scan_timer, CANCEL_SLEEP);
+        wifi_mac_scan_chk_leakap_hrtimer_cancel(wifimac);
 
 #ifdef FW_RF_CALIBRATION
         os_timer_ex_del(&ss->ss_probe_timer, CANCEL_SLEEP);
@@ -2002,6 +2081,7 @@ void wifi_mac_scan_detach(struct wifi_mac *wifimac)
     }
 }
 
+static struct cfg80211_scan_request *request = NULL;
 void wifi_mac_process_tx_error(struct wlan_net_vif *wnet_vif)
 {
     struct wifi_mac *wifimac = wnet_vif->vm_wmac;
@@ -2010,25 +2090,47 @@ void wifi_mac_process_tx_error(struct wlan_net_vif *wnet_vif)
         | WIFINET_SCANCFG_USERREQ | WIFINET_SCANCFG_FLUSH;
     int cnt = 0;
 
-    printk("%s, %d \n", __func__, __LINE__);
-
-    if ((wifimac->wm_flags & WIFINET_F_SCAN) && (pwdev_priv->scan_request != NULL)) {
-        return;
-    }
-
-    wifi_mac_cancel_scan(wifimac);
-    /* waiting for completing scan process */
-    while (wifimac->wm_flags & WIFINET_F_SCAN)
-    {
-        msleep(20);
-        if (cnt++ > 20)
-        {
-            printk("<%s>:%s %d wait scan end fail when process tx error \n",
-                wnet_vif->vm_ndev->name, __func__, __LINE__);
-            return;
+    AML_OUTPUT("process tx error\n");
+    // make sure scan cmd download to fw and reset phy/mac
+    if (wifimac->wm_flags & WIFINET_F_SCAN) {
+        OS_SPIN_LOCK(&pwdev_priv->scan_req_lock);
+        if (pwdev_priv->scan_request != NULL) {
+            request = pwdev_priv->scan_request;
+            pwdev_priv->scan_request = NULL;
         }
-    }
+        OS_SPIN_UNLOCK(&pwdev_priv->scan_req_lock);
 
-//    wnet_vif->vm_chan_simulate_scan_flag = 1;
-    wifi_mac_start_scan(wnet_vif, flag, wnet_vif->vm_des_nssid, wnet_vif->vm_des_ssid);
+        wifi_mac_cancel_scan(wifimac);
+        /* waiting for completing scan process */
+        while (wifimac->wm_flags & WIFINET_F_SCAN) {
+            msleep(20);
+            if (cnt++ > 20) {
+                ERROR_DEBUG_OUT("<%s>:wait scan end fail when process tx error \n", wnet_vif->vm_ndev->name);
+                if (request != NULL) {
+                    OS_SPIN_LOCK(&pwdev_priv->scan_req_lock);
+                    pwdev_priv->scan_request = request;
+                    request = NULL;
+                    OS_SPIN_UNLOCK(&pwdev_priv->scan_req_lock);
+                }
+                return;
+            }
+        }
+
+        if (request != NULL) {
+            OS_SPIN_LOCK(&pwdev_priv->scan_req_lock);
+            pwdev_priv->scan_request = request;
+            request = NULL;
+            OS_SPIN_UNLOCK(&pwdev_priv->scan_req_lock);
+        }
+
+        wifi_mac_start_scan(wnet_vif, flag, wnet_vif->vm_des_nssid, wnet_vif->vm_des_ssid);
+    } else {
+        AML_OUTPUT("simulate scan start\n");
+        wifimac->wm_flags |= WIFINET_F_SCAN;
+        wifi_mac_scan_start(wifimac);
+        msleep(5);
+        wifi_mac_scan_end(wifimac);
+        wifimac->wm_flags &= ~WIFINET_F_SCAN;
+        AML_OUTPUT("simulate scan end\n");
+    }
 }

@@ -89,7 +89,6 @@ void hif_init_ops(void)
     ops->hif_pt_rx_stop = hif_pt_rx_stop;
 }
 
-#ifdef DRV_PT_SUPPORT
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 20, 0))
 extern void do_gettimeofday(struct timeval *tv);
 #endif
@@ -146,7 +145,6 @@ void b2b_rx_throughput_calc(HW_RxDescripter_bit *RxPrivHdr)
         }
     }
 }
-#endif
 
 
 
@@ -599,10 +597,8 @@ void hi_cfg_firmware(void)
     hif->hw_config.rxpagenum = DEFAULT_RXPAGENUM;
     hif->hw_config.bcn_page_num   = DEFAULT_BCN_NUM;
 
-#ifdef DRV_PT_SUPPORT
     if (aml_wifi_is_enable_rf_test())
         hif->hw_config.flags = PT_MODE;
-#endif
 
 #if defined (HAL_SIM_VER)
     if( STA1_VMAC0_SEND_RATE <= WIFI_11B_11M)
@@ -615,6 +611,7 @@ void hi_cfg_firmware(void)
 }
 
 //asynchronous
+extern unsigned char  wifi_sdio_access;
 unsigned char hi_set_cmd(unsigned char *pdata,unsigned int len)
 {
     struct hal_private * hal_priv = hal_get_priv();
@@ -628,6 +625,11 @@ unsigned char hi_set_cmd(unsigned char *pdata,unsigned int len)
     ASSERT(hif != NULL);
     ASSERT(hal_priv != NULL);
     ASSERT(pCmdDownFifo != NULL);
+
+    if (!wifi_sdio_access) {
+        AML_OUTPUT("recoverying downloading frimware\n");
+        return false;
+    }
 
     POWER_BEGIN_LOCK();
     if (((hal_priv->hal_drv_ps_status & HAL_DRV_IN_SLEEPING) != 0)
@@ -661,7 +663,6 @@ unsigned char hi_set_cmd(unsigned char *pdata,unsigned int len)
         }
         OS_UDELAY(20);
     }
-
     aml_wifi_sdio_power_lock();
     POWER_BEGIN_LOCK();
     if (((hal_priv->powersave_init_flag == 0) && (pscmd.Cmd == Power_Save_Cmd) && (pscmd.psmode == PS_DOZE))
@@ -751,7 +752,6 @@ void hi_soft_tx_irq(void)
         hal_priv->HalTxFrameDoneCounter++;
 
 #if defined (HAL_FPGA_VER)
-        hal_priv->st_frame_done_counter++;
         txok_status_node = tx_status_node_alloc(txok_status_list);
         if (txok_status_node != NULL)
         {
@@ -802,10 +802,8 @@ void hi_soft_fw_event(void)
     hif->hif_ops.hi_read_sram((unsigned char *)event,
         (unsigned char *)(SYS_TYPE)hw_event_addr, (SYS_TYPE)sizeof(struct fw_event_to_driver));
 
-#ifdef DRV_PT_SUPPORT
     if (aml_wifi_is_enable_rf_test())
         return;
-#endif
 
     while (hal_priv->fw_event->event_counter !=  hal_priv->hal_fw_event_counter)
     {
@@ -892,6 +890,7 @@ void hi_soft_rx_irq(struct hal_private *hal_priv, unsigned int rx_fw_ptr)
 #if (SDIO_UPDATE_HOST_RDPTR != 0)
     int host_wrapper_len = 0;
 #endif
+    static unsigned char print_cnt = 0;
 
     hif = hif_get_hw_interface();
     hal_open = hal_priv->bhalOpen;
@@ -901,6 +900,9 @@ void hi_soft_rx_irq(struct hal_private *hal_priv, unsigned int rx_fw_ptr)
     /*if slave rx fifo is empty or hal not open*/
     if ((hal_priv->rx_host_offset == rx_fifo_fw) || !hal_open)
     {
+        if (print_cnt++ == 200) {
+            AML_OUTPUT("rx_host_offset:%d, rx_fifo_fw:%d, hal_open:%d\n", hal_priv->rx_host_offset, rx_fifo_fw, hal_open);
+        }
         return;
     }
 
@@ -1067,10 +1069,9 @@ void hi_soft_rx_irq(struct hal_private *hal_priv, unsigned int rx_fw_ptr)
                 }
                 memcpy(OS_SKBBUF_DATA(skb), &rx_buffer[frame_offset], framelen);
                 RxPrivHdr = (HW_RxDescripter_bit *)OS_SKBBUF_DATA(skb);
-#ifdef DRV_PT_SUPPORT
                 if (aml_wifi_is_enable_rf_test())
                     b2b_rx_throughput_calc(RxPrivHdr);
-#endif
+
                 /*SKB PUT one by one */
                 OS_SKBBUF_PUT(skb, framelen);
                 hal_soft_rx_cs(hal_priv, skb);

@@ -45,7 +45,7 @@ typedef struct {
     unsigned short channel;
     unsigned char reserved[2];
     unsigned int packet_idx;
-    unsigned int csi[256];
+    unsigned char csi[1024];
 }csi_stream_t;
 
 #endif

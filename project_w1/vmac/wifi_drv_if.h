@@ -131,7 +131,7 @@ struct country_chan_mapping {
 
 struct country_chan_plan {
     char support_class_num;
-    int support_class[20];
+    int support_class[17];
     char class_na_freq_plan;
     unsigned char dfs_chan_flag;
     unsigned char tx_power_plan;
@@ -395,13 +395,6 @@ static inline void drv_hal_wnet_vifdisconnect(unsigned char wnet_vif_id)
     hal_priv->hal_ops.phy_vmac_disconnect(wnet_vif_id);
 }
 
-static inline void drv_hal_wnet_vifconnect(unsigned char wnet_vif_id)
-{
-    struct hal_private* hal_priv = hal_get_priv();
-    DPRINTF(AML_DEBUG_HAL|AML_DEBUG_BEACON,"<running> %s %d wnet_vif_id=%d\n",
-            __func__,__LINE__,wnet_vif_id);
-    hal_priv->hal_ops.phy_vmac_connect(wnet_vif_id);
-}
 static inline void drv_hal_wnet_vifStop(unsigned char wnet_vif_id)
 {
     DPRINTF(AML_DEBUG_HAL|AML_DEBUG_BEACON,"<running> %s %d wnet_vif_id=%d\n",

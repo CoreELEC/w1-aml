@@ -1737,7 +1737,7 @@ vm_change_p2pie_go_intent(struct wifi_mac_p2p *p2p, const unsigned char *frm, un
                     intent_attr->go_intent &= ~0x1e;
                 }
             }
-            AML_PRINT(AML_DBG_MODULES_P2P, "p2p_action_type:%s, go_intent=%d\n", p2p_action_type, intent_attr->go_intent);
+            AML_PRINT(AML_DBG_MODULES_P2P, "p2p_action_type:%d, go_intent=%d\n", p2p_action_type, intent_attr->go_intent);
         }
 
         if (ielt_len <= 2 + (p2p_ie -frm + p2p_ielen))

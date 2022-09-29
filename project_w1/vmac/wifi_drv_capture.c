@@ -375,6 +375,8 @@ int  dut_stop_tbus_to_get_sram(struct file *filep, int stop_ctrl, int save_file)
     stopaddr = (stopaddr & 0x1c) ? (stopaddr + 4) : stopaddr ;
     if ((stopaddr <= TBC_ADDR_BEGIN_OFFSET) || (stopaddr >= TBC_ADDR_END_OFFSET)) {
         ERROR_DEBUG_OUT("stopaddr=0x%x out of capture range\n", stopaddr);
+        vfs_fsync(filep, 0);
+        set_fs(fs);
         return 0;
     }
 
@@ -410,7 +412,7 @@ int  dut_stop_tbus_to_get_sram(struct file *filep, int stop_ctrl, int save_file)
 }
 
 //0:use sw stop   1:use hw stop
-int iwp_stop_tbus_to_get_sram(unsigned int *buf)
+int iwp_stop_tbus_to_get_sram(unsigned char *buf)
 {
     unsigned int read_tmp = 0;
     unsigned int stopaddr = 0;
@@ -459,8 +461,10 @@ int iwp_stop_tbus_to_get_sram(unsigned int *buf)
     }
 
     pdata = (unsigned int *)&testbuf[0];
-     for (i = 0; i < 1024; i += 4) {
-        *buf = *pdata;
+     for (i = 0; i < 4096; i += 4) {
+        /*bit6:1 is csi data, 4096 can be changed as uplay buffer*/
+        *pdata = *pdata & 0x0000007e;
+        *buf = *pdata >> 1;
         buf++;
         pdata++;
     }

@@ -8,6 +8,8 @@ unsigned char w1_sdio_wifi_bt_alive;
 unsigned char w1_sdio_driver_insmoded;
 unsigned char w1_sdio_after_porbe;
 unsigned char wifi_in_insmod;
+unsigned char  wifi_sdio_access = 1;
+
 static DEFINE_MUTEX(wifi_bt_sdio_mutex);
 
 #define AML_W1_BT_WIFI_MUTEX_ON() do {\
@@ -23,17 +25,18 @@ static DEFINE_MUTEX(wifi_sdio_power_mutex);
 
 void aml_wifi_sdio_power_lock(void)
 {
-        mutex_lock(&wifi_sdio_power_mutex);
+    mutex_lock(&wifi_sdio_power_mutex);
 }
 
 void aml_wifi_sdio_power_unlock(void)
 {
-        mutex_unlock(&wifi_sdio_power_mutex);
+    mutex_unlock(&wifi_sdio_power_mutex);
 }
 
 unsigned char (*host_wake_w1_req)(void);
 int (*host_suspend_req)(struct device *device);
 int (*host_resume_req)(struct device *device);
+
 
 struct sdio_func *aml_priv_to_func(int func_n)
 {
@@ -178,7 +181,6 @@ static int _aml_w1_sdio_request_byte(unsigned char func_num,
     return (err_ret == 0) ? SDIOH_API_RC_SUCCESS : SDIOH_API_RC_FAIL;
 }
 
-unsigned char aml_w1_sdio_bottom_read8(unsigned char  func_num, int addr);
 static int _aml_w1_sdio_request_buffer(unsigned char func_num,
     unsigned int fix_incr, unsigned char write, unsigned int addr, void *buf, unsigned int nbytes)
 {
@@ -224,16 +226,23 @@ static int _aml_w1_sdio_request_buffer(unsigned char func_num,
     return (err_ret == 0) ? SDIOH_API_RC_SUCCESS : SDIOH_API_RC_FAIL;
 }
 
+unsigned char aml_w1_sdio_bottom_read8(unsigned char  func_num, int addr);
+
 //cmd53
 int aml_w1_sdio_bottom_read(unsigned char func_num, int addr, void *buf, size_t len, int incr_addr)
 {
     void *kmalloc_buf = NULL;
     int result;
-    int align_len = 0;
+    int align_len = 0;    
 
     ASSERT(func_num != SDIO_FUNC0);
 
+    if (!wifi_sdio_access) {
+        ERROR_DEBUG_OUT("fw recovery downloading\n");
+        return -1;
+    }
     aml_wifi_sdio_power_lock();
+
     if (host_wake_w1_req != NULL)
     {
         if (host_wake_w1_req() == 0)
@@ -243,7 +252,11 @@ int aml_w1_sdio_bottom_read(unsigned char func_num, int addr, void *buf, size_t 
             return -1;
         }
     }
-
+    {
+        unsigned char fw_st = aml_w1_sdio_bottom_read8(SDIO_FUNC1, 0x23c) & 0xF;
+        if (fw_st != 6)
+            printk("%s:%d, BUG! fw_st %x, func_num %x, addr %x \n", __func__, __LINE__, fw_st, func_num, addr);
+    }
     AML_W1_BT_WIFI_MUTEX_ON();
     /* read block mode */
     if (func_num != SDIO_FUNC6)
@@ -281,7 +294,6 @@ int aml_w1_sdio_bottom_read(unsigned char func_num, int addr, void *buf, size_t 
 
     AML_W1_BT_WIFI_MUTEX_OFF();
     aml_wifi_sdio_power_unlock();
-
     return result;
 }
 
@@ -291,10 +303,14 @@ int aml_w1_sdio_bottom_write(unsigned char func_num, int addr, void *buf, size_t
 {
     void *kmalloc_buf;
     int result;
-  
+
+    if (!wifi_sdio_access) {
+        ERROR_DEBUG_OUT("fw recovery downloading\n");
+        return -1;
+    }
+    aml_wifi_sdio_power_lock();
     ASSERT(func_num != SDIO_FUNC0);
 
-    aml_wifi_sdio_power_lock();
     if (host_wake_w1_req != NULL)
     {
         if (host_wake_w1_req() == 0)
@@ -303,6 +319,12 @@ int aml_w1_sdio_bottom_write(unsigned char func_num, int addr, void *buf, size_t
             ERROR_DEBUG_OUT("aml_w1_sdio_bottom_write, host wake w1 fail\n");
             return -1;
         }
+    }
+
+    {
+        unsigned char fw_st = aml_w1_sdio_bottom_read8(SDIO_FUNC1, 0x23c) & 0xF;
+        if (fw_st != 6)
+            printk("%s:%d, BUG! fw_st %x, func_num %x, addr %x \n", __func__, __LINE__, fw_st, func_num, addr);
     }
 
     AML_W1_BT_WIFI_MUTEX_ON();
@@ -818,20 +840,115 @@ static struct sdio_driver aml_w1_sdio_driver =
     .drv.pm = &aml_sdio_pm_ops,
 };
 
+#ifdef NOT_AMLOGIC_PLATFORM
+
+#define	AML_STATIC_VERSION_STR      "101.10.361.10 (wlan=r892223-20210623-1)"
+
+#define DHD_SKB_1PAGE_BUFSIZE       (PAGE_SIZE * 1)
+#define DHD_SKB_2PAGE_BUFSIZE       (PAGE_SIZE * 2)
+#define DHD_SKB_4PAGE_BUFSIZE       (PAGE_SIZE * 4)
+
+#define DHD_SKB_1PAGE_BUF_NUM   8
+#define DHD_SKB_2PAGE_BUF_NUM   8
+#define DHD_SKB_4PAGE_BUF_NUM   1
+
+#define FW_VERBOSE_RING_SIZE            (256 * 1024)
+#define DHD_PREALLOC_MEMDUMP_RAM_SIZE       (1290 * 1024)
+#define NAN_EVENT_RING_SIZE     (64 * 1024)
+#define WLAN_SKB_1_2PAGE_BUF_NUM ((DHD_SKB_1PAGE_BUF_NUM) + \
+        (DHD_SKB_2PAGE_BUF_NUM))
+#define WLAN_SKB_BUF_NUM ((WLAN_SKB_1_2PAGE_BUF_NUM) + (DHD_SKB_4PAGE_BUF_NUM))
+
+void *wlan_static_dhd_memdump_ram_buf;
+void *wlan_static_nan_event_ring_buf;
+void *wlan_static_fw_verbose_ring_buf;
+
+enum dhd_prealloc_index {
+    DHD_PREALLOC_SKB_BUF = 4,
+    DHD_PREALLOC_MEMDUMP_RAM = 11,
+    DHD_PREALLOC_FW_VERBOSE_RING = 20,
+    DHD_PREALLOC_NAN_EVENT_RING = 23,
+    DHD_PREALLOC_MAX
+};
+
+void *aml_mem_prealloc(int section, unsigned long size)
+{
+    PRINT("sectoin %d, size %ld\n", section, size);
+
+    if (section == DHD_PREALLOC_MEMDUMP_RAM) {
+        if (size > DHD_PREALLOC_MEMDUMP_RAM_SIZE) {
+            PRINT("request MEMDUMP_RAM(%lu) > %d\n",
+                size, DHD_PREALLOC_MEMDUMP_RAM_SIZE);
+            return NULL;
+        }
+        return wlan_static_dhd_memdump_ram_buf;
+    }
+
+    if (section == DHD_PREALLOC_FW_VERBOSE_RING) {
+        if (size > FW_VERBOSE_RING_SIZE) {
+            PRINT("request FW_VERBOSE_RING(%lu) > %d\n",
+                size, FW_VERBOSE_RING_SIZE);
+            return NULL;
+        }
+        return wlan_static_fw_verbose_ring_buf;
+    }
+
+    if (section < 0 || section > DHD_PREALLOC_MAX)
+        PRINT("request section id(%d) is out of max %d\n",
+            section, DHD_PREALLOC_MAX);
+
+    PRINT("failed to alloc section %d, size=%ld\n",
+        section, size);
+
+    return NULL;
+}
+EXPORT_SYMBOL(aml_mem_prealloc);
+
+int aml_init_wlan_mem(void)
+{
+    unsigned long size = 0;
+    PRINT("%s\n", AML_STATIC_VERSION_STR);
+
+    wlan_static_dhd_memdump_ram_buf = kmalloc(DHD_PREALLOC_MEMDUMP_RAM_SIZE, GFP_KERNEL);
+    if (!wlan_static_dhd_memdump_ram_buf)
+         goto err_mem_alloc;
+    size += DHD_PREALLOC_MEMDUMP_RAM_SIZE;
+    PRINT("sectoin %d, size=%d\n",
+        DHD_PREALLOC_MEMDUMP_RAM, DHD_PREALLOC_MEMDUMP_RAM_SIZE);
+
+    wlan_static_fw_verbose_ring_buf = kmalloc(FW_VERBOSE_RING_SIZE, GFP_KERNEL);
+    if (!wlan_static_fw_verbose_ring_buf)
+        goto err_mem_alloc;
+    size += FW_VERBOSE_RING_SIZE;
+    PRINT("sectoin %d, size=%d\n",
+        DHD_PREALLOC_FW_VERBOSE_RING, FW_VERBOSE_RING_SIZE);
+
+    PRINT("prealloc ok: %ld(%ldK)\n", size, size / 1024);
+    return 0;
+
+err_mem_alloc:
+    kfree(wlan_static_dhd_memdump_ram_buf);
+    kfree(wlan_static_fw_verbose_ring_buf);
+    PRINT("Failed to mem_alloc for WLAN\n");
+
+    return -ENOMEM;
+}
+#endif
+
 int  aml_w1_sdio_init(void)
 {
-	int err = 0;
+    int err = 0;
 
-	//amlwifi_set_sdio_host_clk(200000000);//200MHZ
+    //amlwifi_set_sdio_host_clk(200000000);//200MHZ
 
-	err = sdio_register_driver(&aml_w1_sdio_driver);
-	w1_sdio_driver_insmoded = 1;
-	wifi_in_insmod = 0;
-	PRINT("*****************aml sdio common driver is insmoded********************\n");
-	if (err)
-        	PRINT("failed to register sdio driver: %d \n", err);
+    err = sdio_register_driver(&aml_w1_sdio_driver);
+    w1_sdio_driver_insmoded = 1;
+    wifi_in_insmod = 0;
+    PRINT("*****************aml sdio common driver is insmoded********************\n");
+    if (err)
+        PRINT("failed to register sdio driver: %d \n", err);
 
-    	return err;
+        return err;
 }
 EXPORT_SYMBOL(aml_w1_sdio_init);
 
@@ -851,26 +968,27 @@ EXPORT_SYMBOL(w1_sdio_after_porbe);
 EXPORT_SYMBOL(host_wake_w1_req);
 EXPORT_SYMBOL(host_suspend_req);
 EXPORT_SYMBOL(host_resume_req);
+EXPORT_SYMBOL(wifi_sdio_access);
+
 EXPORT_SYMBOL(aml_wifi_sdio_power_lock);
 EXPORT_SYMBOL(aml_wifi_sdio_power_unlock);
-
 /*set_wifi_bt_sdio_driver_bit() is used to determine whether to unregister sdio power driver.
   *Only when w1_sdio_wifi_bt_alive is 0, then call aml_w1_sdio_exit().
 */
 void set_wifi_bt_sdio_driver_bit(bool is_register, int shift)
 {
-	AML_W1_BT_WIFI_MUTEX_ON();
-	if (is_register) {
-		w1_sdio_wifi_bt_alive |= (1 << shift);
-		PRINT("Insmod %s sdio driver!\n", (shift ? "WiFi":"BT"));
-	} else {
-		PRINT("Rmmod %s sdio driver!\n", (shift ? "WiFi":"BT"));
-		w1_sdio_wifi_bt_alive &= ~(1 << shift);
-		if (!w1_sdio_wifi_bt_alive) {
-			aml_w1_sdio_exit();
-		}
-	}
-	AML_W1_BT_WIFI_MUTEX_OFF();
+    AML_W1_BT_WIFI_MUTEX_ON();
+    if (is_register) {
+        w1_sdio_wifi_bt_alive |= (1 << shift);
+        PRINT("Insmod %s sdio driver!\n", (shift ? "WiFi":"BT"));
+    } else {
+        PRINT("Rmmod %s sdio driver!\n", (shift ? "WiFi":"BT"));
+        w1_sdio_wifi_bt_alive &= ~(1 << shift);
+        if (!w1_sdio_wifi_bt_alive) {
+            aml_w1_sdio_exit();
+        }
+    }
+    AML_W1_BT_WIFI_MUTEX_OFF();
 }
 EXPORT_SYMBOL(set_wifi_bt_sdio_driver_bit);
 EXPORT_SYMBOL(g_w1_hwif_sdio);
@@ -878,14 +996,22 @@ EXPORT_SYMBOL(g_w1_hif_ops);
 
 static int aml_w1_sdio_insmod(void)
 {
-	aml_w1_sdio_init();
-	printk("%s(%d) start...\n",__func__, __LINE__);
-	return 0;
+#ifdef NOT_AMLOGIC_PLATFORM
+    int ret;
+    ret = aml_init_wlan_mem();
+    if (ret) {
+        PRINT("aml_init_wlan_mem err: %d \n", ret);
+        return -ENOMEM;
+    }
+#endif
+    aml_w1_sdio_init();
+    printk("%s(%d) start...\n",__func__, __LINE__);
+    return 0;
 }
 
 static void aml_w1_sdio_rmmod(void)
 {
-	aml_w1_sdio_exit();
+    aml_w1_sdio_exit();
 }
 
 module_init(aml_w1_sdio_insmod);

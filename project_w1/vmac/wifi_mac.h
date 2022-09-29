@@ -97,8 +97,6 @@ enum wifi_mac_bwc_width
 enum sta_connect_status
 {
     CONNECT_IDLE,
-    CONNECT_WAIT_FW_CONFIG,
-    CONNECT_FW_CONFIG_COMPLETED,
     CONNECT_FOUR_WAY_HANDSHAKE_COMPLETED,
     CONNECT_DHCP_GET_ACK,
 };
@@ -148,12 +146,10 @@ enum wifi_mac_protmode
 
 enum wifi_mac_authmode
 {
-    WIFINET_AUTH_NONE = 0,
-    WIFINET_AUTH_OPEN = 1,
-    WIFINET_AUTH_SHARED = 2,
-    WIFINET_AUTH_SAE = 3,
-    WIFINET_AUTH_8021X = 4,
-    WIFINET_AUTH_AUTO = 5,
+    WIFINET_AUTH_OPEN   = 0,
+    WIFINET_AUTH_SHARED = 1,
+    WIFINET_AUTH_FT     = 2,
+    WIFINET_AUTH_SAE    = 3,
 };
 
 enum wifi_mac_roamingmode
@@ -184,19 +180,19 @@ enum wifi_mac_ht_prot_update_flag
 
 struct wifi_channel
 {
-    unsigned short     chan_cfreq1;  /* center frequency1 for 20/40/80/160, in Mhz */
+    unsigned short chan_cfreq1;  /* center frequency1 for 20/40/80/160, in Mhz */
     //unsigned short     chan_cfreq2;   /* center frequency2 for 80P80, in Mhz */
-    unsigned short     chan_flags;
-    unsigned short     chan_pri_num;   /* primary channel number */
-    int8_t  chan_maxpower;  /* maximum tx power in dBm */
-    int8_t  chan_minpower;  /* minimum tx power in dBm */
+    unsigned short chan_flags;
+    unsigned short chan_pri_num;   /* primary channel number */
+    int8_t chan_maxpower;  /* maximum tx power in dBm */
+    int8_t chan_minpower;  /* minimum tx power in dBm */
     enum wifi_mac_bwc_width chan_bw; /* bandwidth */
     unsigned char global_operating_class;
 };
 
 struct wifi_candidate_channel
 {
-    struct wifi_channel * channel;
+    struct wifi_channel *channel;
     int avg_rssi;
 };
 
@@ -222,7 +218,7 @@ struct country_set
     struct county_global_map opt_idx_map[MAX_CLASS_NUM];
 };
 
-#define MAX_NA_FREQ_NUM (5)
+#define MAX_NA_FREQ_NUM (8)
 struct country_na_freq_info
 {
     char g_operating_class;
@@ -232,7 +228,7 @@ struct country_na_freq_info
 struct country_na_freq_set
 {
     int na_freq_class_num;
-    struct country_na_freq_info na_freq_info[7];
+    struct country_na_freq_info na_freq_info[10];
 };
 
 #define MAX_P2PIE_NUM         4
@@ -269,42 +265,55 @@ struct country_na_freq_set
 
 struct wifi_mac_rateset
 {
-    unsigned char      dot11_rate_num;
-    unsigned char      dot11_rate[WIFINET_HT_RATE_SIZE];
+    unsigned char dot11_rate_num;
+    unsigned char  dot11_rate[WIFINET_HT_RATE_SIZE];
 };
 
 enum wifi_mac_state
 {
-    WIFINET_S_INIT  = 0,
-    WIFINET_S_SCAN  = 1,
-    WIFINET_S_CONNECTING    = 2,
-    WIFINET_S_AUTH  = 3,
+    WIFINET_S_INIT = 0,
+    WIFINET_S_SCAN = 1,
+    WIFINET_S_CONNECTING = 2,
+    WIFINET_S_AUTH = 3,
     WIFINET_S_ASSOC = 4,
-    WIFINET_S_CONNECTED     = 5,
+    WIFINET_S_CONNECTED = 5,
     WIFINET_S_MAX,
 };
 
 enum wifi_mac_main_state
 {
-    WIFINET_MAIN_INIT   = 0,
-    WIFINET_MAIN_SCAN   = 1,
+    WIFINET_MAIN_INIT = 0,
+    WIFINET_MAIN_SCAN = 1,
     WIFINET_MAIN_CONNECTING = 2,
-    WIFINET_MAIN_CONNECTED  = 5,
+    WIFINET_MAIN_CONNECTED = 5,
     WIFINET_MAIN_MAX,
 };
 
 enum wifi_mac_connect_state
 {
-    WIFINET_CON_INIT        = 1,
-    WIFINET_CON_AUTH        = 2,
-    WIFINET_CON_ASSOC   = 3,
-    WIFINET_CON_DONE        = 4,
+    WIFINET_CON_INIT = 1,
+    WIFINET_CON_AUTH = 2,
+    WIFINET_CON_ASSOC = 3,
+    WIFINET_CON_DONE = 4,
     WIFINET_CON_MAX,
 };
 
-#define WIFINET_F_DOSORT    0x00000001
-#define WIFINET_F_DOFRATE   0x00000002
-#define WIFINET_F_DOXSECT   0x00000004
+#define PHASE_CONNECTING 1
+#define PHASE_DISCONNECTING 2
+#define PHASE_TX_BUFF_QUEUE 4
+
+enum wifi_mac_recovery_state
+{
+    WIFINET_RECOVERY_INIT = 0,
+    WIFINET_RECOVERY_START = 1,
+    WIFINET_RECOVERY_UNDER_CONNECT = 2,
+    WIFINET_RECOVERY_VIF_UP = 4,
+    WIFINET_RECOVERY_END,
+};
+
+#define WIFINET_F_DOSORT 0x00000001
+#define WIFINET_F_DOFRATE 0x00000002
+#define WIFINET_F_DOXSECT 0x00000004
 #define WIFINET_F_DOBRS 0x00000008
 
 struct wmeParams
@@ -322,8 +331,8 @@ struct wmeParams
 
 struct chanAccParams
 {
-    unsigned char      cap_info_count;
-    struct wmeParams    cap_wmeParams[WME_NUM_AC];
+    unsigned char cap_info_count;
+    struct wmeParams cap_wmeParams[WME_NUM_AC];
 };
 
 struct wifi_mac_wme_state
@@ -626,6 +635,8 @@ enum wifi_mac_status_code {
     WIFINET_STATUS_REFUSED_TEMPORARILY = 30,
     WIFINET_STATUS_REFUSED = 37,
     WIFINET_STATUS_INVALID_PARAM = 38,
+    WIFINET_STATUS_INVALID_PMKID = 53,
+
 };
 
 #define WIFINET_COUNTRY_MAX_TRIPLETS (83)
@@ -1197,14 +1208,11 @@ struct wifi_mac_erp_ie
 #define P2P_OUI_BE         0x506f9a09
 #define WFD_OUI_BE         0x506f9a0a
 
-#define WIFINET_AUTH_ALG_OPEN       0x0000
-#define WIFINET_AUTH_ALG_SHARED 0x0001
-#define WIFINET_AUTH_ALG_SAE 0x0003
-
 #define IE_HDR_LEN    2
 #define IE_LEN_OFFSET 1
 #define OUI_LEN       4
 #define WPA_PMKID_LEN 16
+
 
 
 enum
@@ -1340,7 +1348,7 @@ struct wifi_mac_ie_vht_opt {
     unsigned char vht_op_chwidth;              /* BSS Operational Channel width */
     unsigned char vht_op_ch_freq_seg1;         /* Channel Center frequency */
     unsigned char vht_op_ch_freq_seg2;         /* Channel Center frequency applicable
-                                                  * for 80+80MHz mode of operation */ 
+                                                  * for 80+80MHz mode of operation */
     unsigned short vhtop_basic_mcs_set;         /* Basic MCS set */
 } __packed;
 
@@ -1389,7 +1397,7 @@ struct wifi_mac_ie_vht_wide_bw_switch {
     unsigned char    elem_len;
     unsigned char    new_ch_width;       /* New channel width */
     unsigned char    new_ch_freq_seg1;   /* Channel Center frequency 1 */
-    unsigned char    new_ch_freq_seg2;   /* Channel Center frequency 2 */ 
+    unsigned char    new_ch_freq_seg2;   /* Channel Center frequency 2 */
 } __packed;
 
 struct wifi_mac_ie_vht_ext_bss_ld{

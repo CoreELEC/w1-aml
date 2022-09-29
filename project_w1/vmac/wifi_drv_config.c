@@ -316,3 +316,125 @@ int drv_get_config(void *dev, enum cip_param_id id)
 
     return supported;
 }
+
+unsigned int process_drv_cfg_content(char *varbuf, unsigned int len)
+{
+    char *dp;
+    bool findNewline;
+    int column;
+    unsigned int buf_len, n;
+    unsigned int pad = 0;
+
+    dp = varbuf;
+    findNewline = false;
+    column = 0;
+
+    for (n = 0; n < len; n++) {
+        if (varbuf[n] == '\r')
+            continue;
+
+        if (findNewline && varbuf[n] != '\n')
+            continue;
+        findNewline = false;
+        if (varbuf[n] == '#') {
+            findNewline = true;
+            continue;
+        }
+        if (varbuf[n] == '\n') {
+            if (column == 0)
+                continue;
+            *dp++ = 0;
+            column = 0;
+            continue;
+        }
+        *dp++ = varbuf[n];
+        column++;
+    }
+    buf_len = (unsigned int)(dp - varbuf);
+    if (buf_len % 4) {
+        pad = 4 - buf_len % 4;
+        if (pad && (buf_len + pad <= len)) {
+            buf_len += pad;
+        }
+    }
+
+    while (dp < varbuf + n)
+        *dp++ = 0;
+
+    return buf_len;
+}
+
+extern unsigned char get_s16_item(char *varbuf, int len, char *item, short *item_value);
+extern unsigned char get_s8_item(char *varbuf, int len, char *item, char *item_value);
+unsigned char parse_drv_cfg_param(char *varbuf, int len)
+{
+    struct drv_private *drv_priv = drv_get_drv_priv();
+
+    get_s8_item(varbuf, len, "cfg_band", &drv_priv->drv_config.cfg_band);
+    //get_s16_item(varbuf, len, "cali_config", cali_config);
+    AML_OUTPUT("======>>>>>> drv_config cfg_band = %d\n", drv_priv->drv_config.cfg_band);
+
+    return 0;
+}
+
+
+int drv_cfg_load_from_file(void)
+{
+    struct file *fp;
+    struct kstat stat;
+    int size, len;
+    int error = 0;
+    char *content =  NULL;
+    mm_segment_t fs;
+    char conf_path[30] = "/vendor/etc/wifi/w1";
+    unsigned char cfg_file[100];
+
+    sprintf(cfg_file, "%s/aml_wifi_drv_cfg_%d.conf", conf_path, 0);
+
+    fs = get_fs();
+    set_fs(KERNEL_DS);
+
+    fp = filp_open(cfg_file, O_RDONLY, 0);
+
+    if (IS_ERR(fp)) {
+        fp = NULL;
+        goto err;
+    }
+
+    error = vfs_stat(cfg_file, &stat);
+    if (error) {
+        filp_close(fp, NULL);
+        goto err;
+    }
+
+    size = (int)stat.size;
+    if (size <= 0) {
+        filp_close(fp, NULL);
+        goto err;
+    }
+
+    content = ZMALLOC(size, "aml_drv_cfg", GFP_KERNEL);
+
+    if (content == NULL) {
+        filp_close(fp, NULL);
+        goto err;
+    }
+
+    if (vfs_read(fp, content, size, &fp->f_pos) != size) {
+        FREE(content, "aml_drv_cfg");
+        filp_close(fp, NULL);
+        goto err;
+    }
+
+    len = process_drv_cfg_content(content, size);
+    parse_drv_cfg_param(content, len);
+
+    FREE(content, "aml_drv_cfg");
+    filp_close(fp, NULL);
+    set_fs(fs);
+
+    return 0;
+err:
+    set_fs(fs);
+    return 1;
+}
