@@ -466,7 +466,6 @@ unsigned char hal_wake_fw_req(void)
     // check fw power save status
     while (halpriv->hal_fw_ps_status != HAL_FW_IN_ACTIVE)
     {
-        POWER_END_LOCK();
         fw_ps_st = halpriv->hal_ops.hal_get_fw_ps_status();
         fw_sleep = ((fw_ps_st & FW_SLEEP) != 0) ? 1 : 0;
         host_req_status = hif->hif_ops.hi_bottom_read8(SDIO_FUNC1, RG_SDIO_PMU_HOST_REQ);
@@ -483,7 +482,6 @@ unsigned char hal_wake_fw_req(void)
                 //delay 10ms for pmu deep sleep
                 OS_MDELAY(10);
 
-                POWER_BEGIN_LOCK();
                 continue;
             }
             else if ((fw_ps_st == PMU_SLEEP_MODE) && (wake_flag == 1))
@@ -507,7 +505,6 @@ unsigned char hal_wake_fw_req(void)
             {
                 hal_clear_fw_wake();
             }
-            POWER_BEGIN_LOCK();
             if (halpriv->hal_fw_ps_status == HAL_FW_IN_SLEEP)
                 halpriv->hal_fw_ps_status = HAL_FW_IN_AWAKE;
             POWER_END_LOCK();
@@ -521,10 +518,10 @@ unsigned char hal_wake_fw_req(void)
         }
         else
         {
+            POWER_END_LOCK();
             printk("fw ps st 0x%x, fw_sleep 0x%x, host_sleep_req 0x%x\n", fw_ps_st, fw_sleep, host_sleep_req);
             return 0;
         }
-        POWER_BEGIN_LOCK();
     }
     POWER_END_LOCK();
     return 1;

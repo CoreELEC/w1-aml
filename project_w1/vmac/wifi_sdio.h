@@ -176,6 +176,8 @@ extern void sdio_read_write(int idx, int addr, svBitPackedArrRef buff, int len, 
     extern unsigned char (*host_wake_w1_req)(void);
     extern int (*host_suspend_req)(struct device* device);
     extern int (*host_resume_req)(struct device* device);
+    extern void aml_wifi_sdio_power_lock(void);
+    extern void aml_wifi_sdio_power_unlock(void);
     #define AML_W1_WIFI_POWER_ON 1
     #define AML_W1_WIFI_POWER_OFF 0
 

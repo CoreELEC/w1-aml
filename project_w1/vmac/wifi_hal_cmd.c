@@ -92,6 +92,11 @@ unsigned int phy_set_param_cmd(unsigned char cmd,unsigned char vid,unsigned int 
             // set driver sleep flag to protect power save flow
             hal_priv->hal_drv_ps_status |= HAL_DRV_IN_SLEEPING;
         }
+
+        if (data == PS_DOZE)
+        {
+            hal_priv->hal_fw_ps_status = HAL_FW_IN_SLEEP;
+        }
     }
     POWER_END_LOCK();
 
@@ -99,30 +104,22 @@ unsigned int phy_set_param_cmd(unsigned char cmd,unsigned char vid,unsigned int 
     ret = hi_set_cmd(CmdData,8);
 
     POWER_BEGIN_LOCK();
-
-    if (ret && (cmd == Power_Save_Cmd)
-            && (data == PS_DOZE)
-            && (hal_priv->powersave_init_flag == 0))
-    {
-        hal_priv->hal_fw_ps_status = HAL_FW_IN_SLEEP;
-        hal_priv->hal_drv_ps_status &= ~HAL_DRV_IN_SLEEPING;
-    }
-    else if ((ret && (cmd == Power_Save_Cmd) && (data == PS_ACTIVE))
-                || (!ret && (cmd == Power_Save_Cmd)))
+    if ((ret && (cmd == Power_Save_Cmd) && (data == PS_ACTIVE))
+        || (!ret && (cmd == Power_Save_Cmd) && (data == PS_DOZE)))
     {
         if (hal_priv->hal_suspend_mode == HIF_SUSPEND_STATE_NONE)
         {
             hal_priv->hal_fw_ps_status = HAL_FW_IN_ACTIVE;
         }
-        hal_priv->hal_drv_ps_status &= ~HAL_DRV_IN_SLEEPING;
     }
+    hal_priv->hal_drv_ps_status &= ~HAL_DRV_IN_SLEEPING;
 
     POWER_END_LOCK();
     HAL_END_LOCK();
 
 #ifdef POWER_SAVE_NO_SDIO
     if ((ret && (cmd == Power_Save_Cmd) && (data == PS_ACTIVE))
-        || (!ret && (cmd == Power_Save_Cmd)))
+        || (!ret && (cmd == Power_Save_Cmd) && (data == PS_DOZE)))
     {
         ptr = hal_priv->hal_ops.phy_get_rw_ptr(0);
         hal_priv->rx_host_offset = ((ptr >> 16) & 0xffff) * 4;
@@ -132,6 +129,7 @@ unsigned int phy_set_param_cmd(unsigned char cmd,unsigned char vid,unsigned int 
     if (cmd == Power_Save_Cmd)
         hal_priv->hal_call_back->drv_pwrsave_wake_req(hal_priv->drv_priv, 0);
     DBG_EXIT();
+
     return 1;
 }
 
