@@ -448,19 +448,16 @@ int drv_tx_mcastq_send (struct drv_private *drv_priv)
     if (*qcnt == 0)
         return 0;
 
-    bf_qnode = wnet_vif_mcast_q->next;
     INIT_LIST_HEAD(&tx_queue);
-
-    if (list_empty(wnet_vif_mcast_q))
-    {
-        DPRINTF(AML_DEBUG_ERROR|AML_DEBUG_PWR_SAVE, "%s %d\n",__func__,__LINE__);
-        return 0;
-    }
-
 
     do
     {
         DRV_TX_QUEUE_LOCK(drv_priv);
+        if (list_empty(wnet_vif_mcast_q)) {
+            DRV_TX_QUEUE_UNLOCK(drv_priv);
+            break;
+        }
+        bf_qnode = wnet_vif_mcast_q->next;
         ptxdesc = list_entry(bf_qnode, struct drv_txdesc, txdesc_queue);
         skbbuf = ptxdesc->txdesc_mpdu;
         bf_qnode = bf_qnode->next;
@@ -495,10 +492,11 @@ int drv_tx_mcastq_send (struct drv_private *drv_priv)
                 DRV_TXQ_UNLOCK(txlist);
             }
         }
-        DRV_TX_QUEUE_UNLOCK(drv_priv);
-
-        if (bf_qnode == wnet_vif_mcast_q)
+        if (bf_qnode == wnet_vif_mcast_q) {
+            DRV_TX_QUEUE_UNLOCK(drv_priv);
             break;
+        }
+        DRV_TX_QUEUE_UNLOCK(drv_priv);
 
     }
     while ((*qcnt > 0) && !list_empty(wnet_vif_mcast_q));

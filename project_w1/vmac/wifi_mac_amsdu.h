@@ -29,6 +29,11 @@ struct wifi_mac_msdu_node
     struct list_head msdu_node;
     struct sk_buff *skbbuf;
 };
+enum wifi_mac_tran_mode
+{
+   TX_MODE = 0,
+   RX_MODE,
+};
 
 struct wifi_mac_amsdu_tx
 {
@@ -39,7 +44,6 @@ struct wifi_mac_amsdu_tx
     int framelen;
     struct list_head msdu_list;
     /*record the time when the buffer first msdu in ' msdu_tmp_buf ' */
-    unsigned long in_time;
     struct sk_buff *msdu_tmp_buf[DEFAULT_TXAMSDU_SUB_MAX_BW80 * 2];
     int tid;
     unsigned char vid;
@@ -50,6 +54,8 @@ struct wifi_mac_amsdu
     struct wifi_mac_amsdu_tx amsdutx[WME_NUM_TID];
     unsigned int amsdu_max_length ;
     unsigned int amsdu_max_sub;
+    unsigned short sta_maxamsdu_tx;
+    unsigned short sta_maxamsdu_rx;
 };
 
 #define AMSDU_SIZE_3839 3839

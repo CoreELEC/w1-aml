@@ -29,6 +29,10 @@ namespace FW_NAME
 #include "patch_fi_cmd.h"
 #include "wifi_mac_if.h"
 #include "wifi_mac_chan.h"
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(5, 15, 0))
+#include <linux/firmware.h>
+#include "wifi_mac_com.h"
+#endif
 
 #if defined (HAL_FPGA_VER)
 #include "wifi_drv_statistic.h"
@@ -657,7 +661,7 @@ unsigned int phy_set_mac_bssid(unsigned char wnet_vif_id,unsigned char * Bssid)
     temp = Bssid[4] | ( Bssid[5] << 8 );
     hif->hif_ops.hi_write_word(addr_high, temp);
     PRINT(" %s:wnet_vif_id= %d bssid=%02x:%02x:%02x:%02x:%02x:%02x\n",__func__,
-		wnet_vif_id, Bssid[0], Bssid[1], Bssid[2], Bssid[3], Bssid[4], Bssid[5]);
+        wnet_vif_id, Bssid[0], Bssid[1], Bssid[2], Bssid[3], Bssid[4], Bssid[5]);
     return 1;
 }
 
@@ -748,14 +752,14 @@ unsigned int phy_set_ucast_key(unsigned char wnet_vif_id,unsigned short StaAid,
     unitikey->Cmd = UniCast_Key_Set_Cmd;
     unitikey->vid = wnet_vif_id;
     unitikey->StaId= StaAid;
-    unitikey->KeyType =encryType;
+    unitikey->KeyType = encryType;
     unitikey->KeyLen = keyLen;
     unitikey->KeyId= keyId;
 
     if(encryType== WIFI_WPI)
-        unitikey->PNStep=2;
+        unitikey->PNStep = 2;
     else
-        unitikey->PNStep=1;
+        unitikey->PNStep = 1;
 
     memcpy(unitikey->Key,pKey,keyLen);
     memcpy((void *)&(hal_priv->sta_con_msg.unitikey), (void *)unitikey, sizeof(struct UniCastKeyCmd));
@@ -784,19 +788,19 @@ unsigned int phy_set_mcast_key(unsigned char wnet_vif_id, unsigned char *pKey,
     multikey->Cmd = Multicast_Key_Set_Cmd;
     multikey->vid  = wnet_vif_id;
     multikey->AuthRole = AuthRole;
-    multikey->KeyType =encryType;
+    multikey->KeyType = encryType;
     multikey->KeyLen = keyLen;
     multikey->KeyId= keyId;
-    multikey->PNStep=1;
+    multikey->PNStep = 1;
     memcpy(multikey->Key,pKey,keyLen);
     memcpy((void *)&(hal_priv->sta_con_msg.multikey), (void *)multikey, sizeof(struct MultiCastKeyCmd));
     HAL_BEGIN_LOCK();
     hi_set_cmd((unsigned char *)multikey, sizeof(struct MultiCastKeyCmd) );
     HAL_END_LOCK();
-    hal_priv->bhalMKeySet[0] =1;
-    hal_priv->bhalMKeySet[1] =1;
-    hal_priv->bhalMKeySet[2] =1;
-    hal_priv->bhalMKeySet[3] =1;
+    hal_priv->bhalMKeySet[0] = 1;
+    hal_priv->bhalMKeySet[1] = 1;
+    hal_priv->bhalMKeySet[2] = 1;
+    hal_priv->bhalMKeySet[3] = 1;
     hal_mrep_cnt_init(hal_priv,wnet_vif_id,encryType);
     hal_pn_win_init(AML_MCAST_TYPE, wnet_vif_id);
     return 1;
@@ -1176,18 +1180,6 @@ int phy_set_suspend(unsigned char vid, unsigned char enable,
         return -1;
     }
 
-    /* wait for set driver sleep flag */
-    while ((enable == 1) && (hal_priv->hal_drv_ps_status & HAL_DRV_IN_ACTIVE))
-    {
-        msleep(20);
-        cnt++;
-        if (cnt > 10)
-        {
-            //AML_OUTPUT("suspend hal_drv_ps_status=%d   time=%d\n",hal_priv->hal_drv_ps_status,cnt);
-            break;
-        }
-    }
-
     POWER_BEGIN_LOCK();
     if ((enable == 1) && (hal_priv->powersave_init_flag == 0))
     {
@@ -1273,17 +1265,32 @@ int phy_set_suspend(unsigned char vid, unsigned char enable,
             printk("%s:%d, txdoneframecounter:%x, HalTxFrameDoneCounter:%x\n", __func__, __LINE__,
                 hal_priv->txcompletestatus->txdoneframecounter, hal_priv->HalTxFrameDoneCounter);
         }
-
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0)
         if ((hif->HiStatus.Tx_Free_num != hif->HiStatus.Tx_Send_num)
             || (hif->HiStatus.Tx_Done_num != hif->HiStatus.Tx_Send_num))
+#else
+        if ((atomic_read(&hif->HiStatus.Tx_Free_num) != atomic_read(&hif->HiStatus.Tx_Send_num))
+            || (atomic_read(&hif->HiStatus.Tx_Done_num) != atomic_read(&hif->HiStatus.Tx_Send_num)))
+#endif
         {
             printk("%s:%d, free %d, done %d, send %d\n",  __func__, __LINE__,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0)
                 hif->HiStatus.Tx_Free_num, hif->HiStatus.Tx_Done_num, hif->HiStatus.Tx_Send_num);
+#else
+                atomic_read(&hif->HiStatus.Tx_Free_num),
+                atomic_read(&hif->HiStatus.Tx_Done_num),
+                atomic_read(&hif->HiStatus.Tx_Send_num));
+#endif
         }
         /* flush packetes when suspend and when resume restore initial value */
         hal_priv->HalTxFrameDoneCounter = hal_priv->txcompletestatus->txdoneframecounter;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0)
         hif->HiStatus.Tx_Free_num = hif->HiStatus.Tx_Send_num;
         hif->HiStatus.Tx_Done_num = hif->HiStatus.Tx_Send_num;
+#else
+        atomic_set(&hif->HiStatus.Tx_Free_num, atomic_read(&hif->HiStatus.Tx_Send_num));
+        atomic_set(&hif->HiStatus.Tx_Done_num, atomic_read(&hif->HiStatus.Tx_Send_num));
+#endif
     }
     printk("%s end, wow enable %d, mode %d, filter 0x%x, ret %d\n",
         ((enable == 1) ? "suspend" : "resume"), enable, mode, filters, ret);
@@ -2045,13 +2052,18 @@ void phy_set_tx_power_accord_rssi(int bw, unsigned short channel, unsigned char 
 unsigned char get_cali_param(struct Cali_Param *cali_param, struct WF2G_Txpwr_Param *wf2g_txpwr_param,
                                                              struct WF5G_Txpwr_Param *wf5g_txpwr_param)
 {
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
     struct file *fp;
     struct kstat stat;
-    int size, len;
-    int error = 0;
-    char *content =  NULL;
     mm_segment_t fs;
-
+#else
+    const struct firmware *fw = NULL;
+    struct device *dev = vm_cfg80211_get_parent_dev();
+#endif
+    int error = 0;
+    int size, len;
+    char *content =  NULL;
     unsigned int chip_id_l = 0;
     unsigned char chip_id_buf[100];
 
@@ -2076,6 +2088,8 @@ unsigned char get_cali_param(struct Cali_Param *cali_param, struct WF2G_Txpwr_Pa
         printk("aml wifi module SN:%04x  sn txt not found, the rf config: %s\n", chip_id_l, chip_id_buf);
     } else
         printk("aml wifi module SN:%04x  the rf config: %s\n", chip_id_l, chip_id_buf);
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
     fs = get_fs();
     set_fs(KERNEL_DS);
 
@@ -2085,7 +2099,6 @@ unsigned char get_cali_param(struct Cali_Param *cali_param, struct WF2G_Txpwr_Pa
         fp = NULL;
         goto err;
     }
-
     error = vfs_stat(chip_id_buf, &stat);
     if (error) {
         filp_close(fp, NULL);
@@ -2097,19 +2110,25 @@ unsigned char get_cali_param(struct Cali_Param *cali_param, struct WF2G_Txpwr_Pa
         filp_close(fp, NULL);
         goto err;
     }
-
     content = ZMALLOC(size, "wifi_cali_param", GFP_KERNEL);
 
     if (content == NULL) {
         filp_close(fp, NULL);
         goto err;
     }
-
     if (vfs_read(fp, content, size, &fp->f_pos) != size) {
         FREE(content, "wifi_cali_param");
         filp_close(fp, NULL);
         goto err;
     }
+#else
+    error = request_firmware(&fw, chip_id_buf, dev);
+    if (error) {
+         goto err;
+    }
+    size = fw->size;
+    content = (char *)fw->data;
+#endif
 
     len = process_cali_content(content, size);
     parse_cali_param(content, len, cali_param);
@@ -2145,13 +2164,16 @@ unsigned char get_cali_param(struct Cali_Param *cali_param, struct WF2G_Txpwr_Pa
             cali_param->rf_num = 1;
         printk("rf_cout is: %d\n", cali_param->rf_num);
     }
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
     FREE(content, "wifi_cali_param");
     filp_close(fp, NULL);
     set_fs(fs);
-
+#endif
     return 0;
 err:
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
     set_fs(fs);
+#endif
     return 1;
 }
 

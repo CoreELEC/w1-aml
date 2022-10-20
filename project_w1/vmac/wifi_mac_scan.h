@@ -66,6 +66,17 @@ enum wifi_scan_noise
 };
 
 
+enum forbidden_scan_reason
+{
+    FORBIDDEN_SCAN_FOR_CONNECTING = 0,
+    FORBIDDEN_SCAN_FOR_CONNECT_SCAN,
+    FORBIDDEN_SCAN_FOR_DISCONNECTING,
+    FORBIDDEN_SCAN_FOR_ROAMING,
+    FORBIDDEN_SCAN_FOR_RECOVERY,
+    FORBIDDEN_SCAN_MAX
+};
+
+
 #define STA_HASHSIZE 32
 #define STA_HASH(addr) (((const unsigned char *)(addr))[WIFINET_ADDR_LEN - 1] % STA_HASHSIZE)
 
@@ -105,6 +116,7 @@ struct wifi_mac_scan_state
 
     struct os_timer_ext ss_scan_timer;
     struct os_timer_ext ss_probe_timer;
+    struct os_timer_ext ss_forbidden_timer;
     struct hrtimer scan_hr_timer;
     ktime_t scan_kt;
 };
@@ -213,6 +225,15 @@ struct wifi_scan_info
     unsigned char ie_vht_opt_md_ntf[sizeof(struct wifi_mac_ie_vht_opt_md_ntf)];
 };
 
+
+#define FORBIDDEN_SCAN_FOR_DISCONNECTING_TIMEOUT 15*1000
+#define FORBIDDEN_SCAN_FOR_CONNECTING_TIMEOUT 30*1000
+#define FORBIDDEN_SCAN_FOR_CONNECT_SCAN_TIMEOUT 9*1000
+#define FORBIDDEN_SCAN_FOR_ROAMING_TIMEOUT 30*1000
+#define FORBIDDEN_SCAN_FOR_RECOVERY_TIMEOUT 90*1000
+
+
+
 #define WIFINET_SCAN_AGE_NUM 3
 #define WIFINET_CONNECT_FAILS 5
 #define WIFINET_CONNECT_CNT_AGE (120)
@@ -290,6 +311,12 @@ void wifi_mac_update_roaming_candidate_chan(struct wlan_net_vif *wnet_vif,const 
 int wifi_mac_scan_chk_11g_bss(struct wifi_mac_scan_state *ss, struct wlan_net_vif *wnet_vif);
 void is_connect_need_set_gain(struct wlan_net_vif *wnet_vif);
 void wifi_mac_scan_chking_leakap(void * station, struct wifi_frame *wh);
+int wifi_mac_scan_forbidden(struct wlan_net_vif *wnet_vif, int timeout, int reason);
+int wifi_mac_scan_access(struct wlan_net_vif *wnet_vif);
+int wifi_mac_scan_forbidden_timeout(void *arg);
+unsigned char wifi_mac_scan_check_available(struct wlan_net_vif *wnet_vif);
+
+
 
 
 #endif /* _WIFI_NET_SCAN_H_ */

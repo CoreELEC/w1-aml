@@ -184,8 +184,13 @@ void wifi_mac_xmit_pkt_parse(struct sk_buff *skb, struct wifi_mac *wifimac)
                 __constant_htonl(th->seq), __constant_htonl(th->ack_seq));
 
             rtsp = (char *)th + 32;
-            if (rtsp && wifimac->is_miracast_connect) {
+            if (rtsp && sta->sta_wnet_vif->vm_p2p) {
+                unsigned char zero_session[MAC_WFD_SESSION_LEN] = {0};
                 wifi_mac_get_rtsp_session(rtsp, sta->sta_wnet_vif->vm_p2p);
+                if (memcmp(sta->sta_wnet_vif->vm_p2p->wfd_session_id, zero_session, MAC_WFD_SESSION_LEN)) {
+                    wifimac->is_miracast_connect = 1;
+                    AML_OUTPUT("set wifimac->is_miracast_connect=%d\n",wifimac->is_miracast_connect);
+                }
             }
 
             if ((!th->fin) && (!th->syn)) {
@@ -419,7 +424,7 @@ int wifi_mac_hardstart(struct sk_buff *skb, struct net_device *dev)
 
     // find a sta by mac address
     sta = wifi_mac_find_tx_sta(wnet_vif, eh->ether_dhost);
-    if ((sta == NULL) || ((wnet_vif->vm_opmode == WIFINET_M_HOSTAP) && (sta->is_disconnecting == 1))) {
+    if (sta == NULL) {
         error = 6;
         goto bad;
     }
@@ -743,7 +748,8 @@ int wifi_mac_send_nulldata(struct wifi_station *sta, unsigned char pwr_save,
             ((sta->sta_chbw == WIFINET_BWC_WIDTH40) ? CHAN_BW_40M : CHAN_BW_80M);
     }
 
-    if((sta->sta_flags & WIFINET_NODE_HT) || (sta->sta_flags & WIFINET_NODE_VHT))
+    if((sta->sta_flags & WIFINET_NODE_HT) || (sta->sta_flags & WIFINET_NODE_VHT) ||
+        (WIFINET_IS_CHAN_5GHZ(wnet_vif->vm_curchan)))
     {
         null_data.rate = WIFI_11G_6M;
     }

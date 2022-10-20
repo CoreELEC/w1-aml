@@ -132,9 +132,10 @@ struct vm_wlan_net_vif_params
 #define WIFINET_BINTVAL_DEFAULT  100
 #define DEFAULT_MGMT_RETRY_TIMES 3
 #define DEFAULT_P2P_ACTION_RETRY_TIMES 5
-#define DEFAULT_MGMT_RETRY_INTERVAL 100
+#define DEFAULT_MGMT_RETRY_INTERVAL 512
 #define DEFAULT_P2P_ACTION_RETRY_INTERVAL 50
 #define DEFAULT_AUTH_RETRY_INTERVAL 512
+#define DEFAULT_DEAUTH_TOT 5000
 
 #define WIFINET_PS_MAX_QUEUE  100
 
@@ -333,6 +334,13 @@ struct wifi_mac_chan_overlapping {
     unsigned short overlapping;
 };
 
+struct wifi_amsutx_hrtimer
+{
+    unsigned char is_timeout;
+    unsigned char active;
+    struct hrtimer amsdu_hr_timer;
+};
+
 struct wifi_mac
 {
     unsigned char wm_mac_exit;
@@ -428,6 +436,7 @@ struct wifi_mac
     struct _wifi_mac_country_iso wm_country;
     struct wifi_mac_country_ie* wm_11dinfo;
 
+    unsigned char scan_available;
     unsigned char scan_gain_thresh_unconnect;
     unsigned char scan_gain_thresh_connect;
     unsigned char scan_max_gain_thresh;
@@ -468,6 +477,8 @@ struct wifi_mac
     wait_queue_head_t wm_suspend_wq;
     unsigned char wm_esco_en;
     unsigned char wm_bt_en;
+    struct wifi_amsutx_hrtimer amsdu_timer[WME_NUM_TID];
+    unsigned char amsdu_aggr_time; //ms
 
     enum wifi_mac_recovery_state recovery_stat;
     struct os_timer_ext wm_monitor_fw;

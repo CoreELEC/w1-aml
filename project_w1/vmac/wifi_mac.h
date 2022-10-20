@@ -300,10 +300,10 @@ enum wifi_mac_connect_state
     WIFINET_CON_MAX,
 };
 
-#define PHASE_CONNECTING 1
-#define PHASE_DISCONNECTING 2
-#define PHASE_TX_BUFF_QUEUE 4
-#define PHASE_DISCONNECT_DELAY 8
+#define PHASE_CONNECTING BIT(0)
+#define PHASE_DISCONNECTING BIT(1)
+#define PHASE_TX_BUFF_QUEUE BIT(2)
+#define PHASE_WAIT_DISCONNECT_RESULT BIT(3)
 
 enum wifi_mac_recovery_state
 {

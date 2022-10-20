@@ -25,7 +25,12 @@
 #include <linux/err.h>
 #include "wifi_common.h"
 #include <linux/skbuff.h>
+#include <linux/version.h>
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
 #include <linux/wlan_plat.h>
+#else
+#include <linux/amlogic/wlan_plat.h>
+#endif
 
 #ifdef NOT_AMLOGIC_PLATFORM
 extern void *aml_mem_prealloc(int section, unsigned long size);

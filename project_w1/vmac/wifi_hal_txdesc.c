@@ -609,7 +609,6 @@ unsigned short Hal_TxDescriptor_GetAckTimeout( unsigned char data_rate,unsigned 
     }
 }
 
-
 /*+SIGNAL_EXTENSION_VALUE+TXTIME(pclp+data+signalextension)*/
 unsigned short Hal_TxDescriptor_GetAckTime(
     unsigned char data_rate ,

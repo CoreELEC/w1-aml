@@ -336,16 +336,17 @@ int  dut_stop_tbus_to_get_sram(struct file *filep, int stop_ctrl, int save_file)
     int temp_addr = 0;
     unsigned int stop_flag = 0;
     int testbitwidth = 0;
-    loff_t  file_pos = 0;
     char wt_file[8];
+    loff_t  file_pos = 0;
     int j = 0;
     char enter = '\n';
 
     struct hw_interface* hif = hif_get_hw_interface();
-
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
     mm_segment_t fs;
     fs = get_fs();
     set_fs(KERNEL_DS);
+#endif
 
     //cap_len = hif->hif_ops.hi_read_word(TBC_OFFSET_110);
     cap_len = TBC_ADDR_END_OFFSET-TBC_ADDR_BEGIN_OFFSET;
@@ -378,8 +379,10 @@ int  dut_stop_tbus_to_get_sram(struct file *filep, int stop_ctrl, int save_file)
     stopaddr = (stopaddr & 0x1c) ? (stopaddr + 4) : stopaddr ;
     if ((stopaddr <= TBC_ADDR_BEGIN_OFFSET) || (stopaddr >= TBC_ADDR_END_OFFSET)) {
         ERROR_DEBUG_OUT("stopaddr=0x%x out of capture range\n", stopaddr);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
         vfs_fsync(filep, 0);
         set_fs(fs);
+#endif
         return 0;
     }
 
@@ -401,15 +404,25 @@ int  dut_stop_tbus_to_get_sram(struct file *filep, int stop_ctrl, int save_file)
         for (i = 0; i < len; i += 4) {
             str_2_ascii_32bits((char*)pdata, wt_file);
             for (j = 0 ; j < 8; j++) {
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
                 vfs_write(filep, &wt_file[j], sizeof(unsigned char), &file_pos);
+#else
+                kernel_write(filep, &wt_file[j], sizeof(unsigned char), &file_pos);
+#endif
             }
             pdata++;
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
             vfs_write(filep, (char*)&enter, sizeof(unsigned char), &file_pos);
+#else
+            kernel_write(filep, (char*)&enter, sizeof(unsigned char), &file_pos);
+#endif
         }
     }
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
     vfs_fsync(filep, 0);
     set_fs(fs);
+#endif
     AML_OUTPUT("handle capture data complete\n");
     return 1;
 }

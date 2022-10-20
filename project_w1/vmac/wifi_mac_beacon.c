@@ -836,6 +836,7 @@ void wifi_mac_process_beacon_miss_ex(SYS_TYPE arg)
         DPRINTF(AML_DEBUG_WARNING,"bcn lost...re-scan\n");
 
         wnet_vif->vm_chan_roaming_scan_flag = 0;
+        wifi_mac_scan_access(wnet_vif);
 
         wifi_mac_top_sm(wnet_vif, WIFINET_S_SCAN, 0);
     }

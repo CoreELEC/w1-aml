@@ -374,7 +374,15 @@ drv_set_channel( struct drv_private *drv_priv, struct hal_channel *hchan, unsign
         driv_ps_wakeup(drv_priv);
 
         if (hchan != NULL) {
+            static unsigned long switch_time;
+            if ((OS_GET_TIMESTAMP() - switch_time) < MIN_DWELL_DUR) {
+                ERROR_DEBUG_OUT("chan switch time less,pchan_num:%d cur:%d,time:%d\n",
+                    hchan->pchan_num,
+                    drv_priv->drv_curchannel.pchan_num,
+                    OS_GET_TIMESTAMP() - switch_time);
+            }
             drv_hal_setchannel(hchan, flag, vid);
+            switch_time = OS_GET_TIMESTAMP();
             drv_hal_set_chan_support(hchan);
             drv_priv->drv_curchannel = *hchan;
 
@@ -844,7 +852,7 @@ int drv_add_wnet_vif(struct drv_private *drv_priv,
 
     if ((drv_priv->drv_wnet_vif_table[wnet_vif_id] != NULL)
         && (drv_priv->drv_wnet_vif_table[wnet_vif_id]->vm_wmac->recovery_stat == WIFINET_RECOVERY_END)) {
-        ERROR_DEBUG_OUT("Invalid interface id = %u, recovery %d \n", wnet_vif_id, drv_priv->drv_wnet_vif_table[wnet_vif_id]->vm_wmac->recovery_stat);
+        ERROR_DEBUG_OUT("Invalid interface id = %u\n", wnet_vif_id);
         return -EINVAL;
     }
 

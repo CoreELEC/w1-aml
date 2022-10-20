@@ -597,7 +597,13 @@ int check_is_rate_fitable(struct wifi_station *sta, struct ieee80211_tx_info *in
         return -1;
 
     fitable_bw = get_fitable_bw(sta);
-    if (bw < fitable_bw) {
+
+    if (mi->sample_clear_flag) {
+        minstrel_clear_unfitable_prob_ewma(mi);
+        mi->sample_clear_flag = 0;
+    }
+
+    if ((!mi->sample_all_bw) && (bw < fitable_bw)) {
         AML_PRINT(AML_DBG_MODULES_RATE_CTR, "bandwidth too low, no need to sample. bw:%d, fitable_bw:%d\n", bw, fitable_bw);
         return -1;
     }

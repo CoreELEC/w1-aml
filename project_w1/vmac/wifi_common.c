@@ -118,20 +118,23 @@ int isFileReadable(const char *path, u32 *sz)
 {
     struct file *fp;
     int ret = 0;
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
     mm_segment_t oldfs;
+#endif
     char buf;
 
     fp = filp_open(path, O_RDONLY, 0);
     if (IS_ERR(fp)) {
         ret = PTR_ERR(fp);
     } else {
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
         oldfs = get_fs();
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 1, 0))
         set_fs(KERNEL_DS);
 #else
         set_fs(get_ds());
 #endif
-
+#endif //5.15
         if (1 != readFile(fp, &buf, 1)) {
             ret = PTR_ERR(fp);
         }
@@ -144,7 +147,9 @@ int isFileReadable(const char *path, u32 *sz)
 #endif
         }
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
         set_fs(oldfs);
+#endif
         filp_close(fp, NULL);
     }
     return ret;
@@ -160,22 +165,27 @@ int isFileReadable(const char *path, u32 *sz)
 static int retriveFromFile(const char *path, u8 *buf, u32 sz)
 {
     int ret = -1;
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
     mm_segment_t oldfs;
+#endif
     struct file *fp;
 
     if (path && buf) {
         ret = openFile(&fp, path, O_RDONLY, 0);
         if (0 == ret) {
             printk("openFile path:%s fp=%p\n", path , fp);
-
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
             oldfs = get_fs();
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 1, 0))
             set_fs(KERNEL_DS);
 #else
             set_fs(get_ds());
 #endif
+#endif // 5.15
             ret = readFile(fp, buf, sz);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
             set_fs(oldfs);
+#endif
             closeFile(fp);
 
             printk("readFile, ret:%d\n", ret);
@@ -199,22 +209,27 @@ static int retriveFromFile(const char *path, u8 *buf, u32 sz)
 static int storeToFile(const char *path, u8 *buf, u32 sz)
 {
     int ret = 0;
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
     mm_segment_t oldfs;
+#endif
     struct file *fp;
-
 
     if (path && buf) {
         ret = openFile(&fp, path, O_CREAT | O_WRONLY, 0666);
         if (0 == ret) {
             printk("openFile path:%s fp=%p\n", path , fp);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
             oldfs = get_fs();
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 1, 0))
             set_fs(KERNEL_DS);
 #else
             set_fs(get_ds());
 #endif
+#endif//5.15
             ret = writeFile(fp, buf, sz);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
             set_fs(oldfs);
+#endif
             closeFile(fp);
             printk("writeFile, ret:%d\n", ret);
         } else {

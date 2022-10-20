@@ -98,6 +98,7 @@ cmd_to_func_table_t cmd_to_func[] =
     {"set_tpc_hang", aml_wpa_set_tx_power_change_hang},
     {"set_tx_pw_plan", aml_set_tx_power_plan},
     {"set_debug", aml_wpa_set_debug},
+    {"set_agg_amsdutm", aml_wpa_set_amsdu_aggrtimer},
     {"", NULL},
 };
 
@@ -2054,4 +2055,28 @@ int aml_wpa_set_debug(struct wlan_net_vif *wnet_vif, char* buf, int len)
 
     FREE(arg, "cmd_arg");
     return 0;
+}
+
+int aml_wpa_set_amsdu_aggrtimer(struct wlan_net_vif *wnet_vif, char* buf, int len)
+{
+    char **arg;
+    char sep = ' ';
+    int cmd_arg;
+    unsigned char time;
+    struct wifi_mac *wifimac = wifi_mac_get_mac_handle();
+    arg = aml_cmd_char_prase(sep, buf, &cmd_arg);
+    if (arg[1] == NULL) {
+        FREE(arg, "cmd_arg");
+        return -EINVAL;
+    }
+    AML_OUTPUT("AMSDU AGGR time is %s \n",arg[1]);
+    time = simple_strtoul(arg[1], NULL, 0);
+    if(0 < time &&  time <= 100) {
+        wifimac->amsdu_aggr_time = time;
+        FREE(arg, "cmd_arg");
+        return 0;
+    }
+    ERROR_DEBUG_OUT("should input 1-100\n");
+    FREE(arg, "cmd_arg");
+    return -EINVAL;
 }

@@ -245,6 +245,13 @@ struct minstrel_ht_sta {
 	/* tx flags to add for frames for this sta */
 	u32 tx_flags;
 
+    u8 sample_init_flag;
+    u8 sample_init_counts;
+    u8 sample_force_counts;
+    u32 sample_init_idx;
+    u8 sample_all_bw;
+    u8 sample_clear_flag;
+    u8 sample_clear_bw;
 	u8 sample_wait;
 	u8 sample_tries;
 	u32 sample_count;
@@ -280,5 +287,6 @@ int minstrel_ht_get_tp_avg(struct minstrel_ht_sta *mi, int group, int rate, int 
 struct minstrel_rate_control_ops *get_rate_control_ops_ht(void);
 void minstrel_clear_unfitable_rate_stats(struct minstrel_ht_sta *mi, unsigned char rate_index);
 void minstrel_init_start_stats(void *priv, void *priv_sta, unsigned char max_rate, unsigned char bw);
+void minstrel_clear_unfitable_prob_ewma(struct minstrel_ht_sta *mi);
 
 #endif

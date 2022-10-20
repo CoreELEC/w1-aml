@@ -433,7 +433,7 @@ static int drv_rx_sort_timer(void *context)
     {
         nosched = OS_TIMER_NOT_REARMED;
     }
-    DRV_RXTID_UNLOCK_IRQ(RxTidState,lockflags);;
+    DRV_RXTID_UNLOCK_IRQ(RxTidState,lockflags);
 
     return nosched;
 }
