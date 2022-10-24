@@ -1825,10 +1825,18 @@ vm_cfg80211_change_vif(struct wiphy *wiphy,
     struct wlan_net_vif *wnet_vif = wiphy_to_adapter(wiphy);
     struct wireless_dev *pwdev = wiphy_to_wdev(wiphy);
     int ret = 0;
-
-    if (!aml_insmod_flag) {
-        printk("%s %d, aml insmod not complete\n",__func__,__LINE__);
-        return -1;
+    int retry;
+    for (retry = 0; ++retry; ) {
+        if (!aml_insmod_flag) {
+            printk("%s %d, aml insmod not complete\n",__func__,__LINE__);
+            if (retry > 6) {
+                return -1;
+            } else {
+                msleep(1000);
+            }
+        } else {
+            break;
+        }
     }
 
     old_nl80211type = pwdev->iftype;
