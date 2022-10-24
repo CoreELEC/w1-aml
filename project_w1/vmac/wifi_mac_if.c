@@ -2512,9 +2512,18 @@ int wifi_mac_initial(struct net_device *dev, int forcescan)
 
 int wifi_mac_open(struct net_device *dev)
 {
-    if (!aml_insmod_flag) {
-        ERROR_DEBUG_OUT("<running> dev = %p, aml insmod not complete\n",dev);
-        return -1;
+    int retry;
+    for (retry = 0; ++retry; ) {
+        if (!aml_insmod_flag) {
+            ERROR_DEBUG_OUT("<running> dev = %p, aml insmod not complete\n", dev);
+            if (retry > 6) {
+                return -1;
+            } else {
+                msleep(1000);
+            }
+        } else {
+            break;
+        }
     }
 
     printk("<running> %s %d dev = %p\n",__func__,__LINE__,dev);
@@ -2526,10 +2535,18 @@ int wifi_mac_stop(struct net_device *dev)
     struct wlan_net_vif *wnet_vif = netdev_priv(dev);
     struct wifi_mac *wifimac = wnet_vif->vm_wmac;
     int index = 0;
-
-    if (!aml_insmod_flag) {
-        ERROR_DEBUG_OUT("<running> dev = %p, aml insmod not complete\n", dev);
-        return -1;
+    int retry;
+    for (retry = 0; ++retry; ) {
+        if (!aml_insmod_flag) {
+            ERROR_DEBUG_OUT("<running> dev = %p, aml insmod not complete\n", dev);
+            if (retry > 6) {
+                return -1;
+            } else {
+                msleep(1000);
+            }
+        } else {
+            break;
+        }
     }
 
     printk("%s wm_nopened %d, wm_dev_flags:%08x\n", __func__, wifimac->wm_nopened, wifimac->wm_dev_flags);
