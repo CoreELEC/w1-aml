@@ -35,7 +35,7 @@ namespace FW_NAME
 #endif
 
 
-#define WIFI_CONF_PATH "/vendor/etc/wifi/w1"
+#define WIFI_CONF_PATH "/usr/lib/firmware/w1"
 
 static char * conf_path = WIFI_CONF_PATH;
 module_param(conf_path, charp, S_IRUGO);
