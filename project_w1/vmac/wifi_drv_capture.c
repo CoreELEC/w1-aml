@@ -263,6 +263,7 @@ int dut_stop_capture(void)
         }
     }
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
     printk("cap_log file %s\n", fp_path);
     fp = filp_open(fp_path, O_RDWR | O_CREAT | O_APPEND | O_TRUNC, 0777);
 
@@ -270,6 +271,7 @@ int dut_stop_capture(void)
         printk("create file error/n");
         return -1;
     }
+#endif
 
     //ram_share =  hif->hif_ops.hi_read_word(TBC_RAM_SHARE);
 
@@ -406,15 +408,11 @@ int  dut_stop_tbus_to_get_sram(struct file *filep, int stop_ctrl, int save_file)
             for (j = 0 ; j < 8; j++) {
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
                 vfs_write(filep, &wt_file[j], sizeof(unsigned char), &file_pos);
-#else
-                kernel_write(filep, &wt_file[j], sizeof(unsigned char), &file_pos);
 #endif
             }
             pdata++;
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
             vfs_write(filep, (char*)&enter, sizeof(unsigned char), &file_pos);
-#else
-            kernel_write(filep, (char*)&enter, sizeof(unsigned char), &file_pos);
 #endif
         }
     }
@@ -563,6 +561,7 @@ int dut_bt_stop_capture(void)
         }
     }
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
     printk("cap_log file %s\n", fp_path);
     fp = filp_open(fp_path,O_RDWR | O_CREAT | O_APPEND | O_TRUNC, 0777);
 
@@ -570,6 +569,7 @@ int dut_bt_stop_capture(void)
         ERROR_DEBUG_OUT("create file error/n");
         return -1;
     }
+#endif
 
 
     dut_stop_tbus_to_get_sram(fp, 0, 1);

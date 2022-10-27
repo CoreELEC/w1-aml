@@ -5492,13 +5492,10 @@ void record_reg_value(unsigned int address, unsigned int value)
     struct kstat stat;
     mm_segment_t fs;
     int error = 0;
-#endif
     struct file *fp;
     char buf[512] = {0};
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
     fs = get_fs();
     set_fs(KERNEL_DS);
-#endif
 
     fp = filp_open(reg_result_path, O_CREAT|O_RDWR, 0644);
 
@@ -5506,7 +5503,6 @@ void record_reg_value(unsigned int address, unsigned int value)
             sprintf(buf, "address: 0x%08x 0x%08x\r\n",
                 address,
                 value);
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
             error = vfs_stat(reg_result_path, &stat);
             if (error) {
                 filp_close(fp, NULL);
@@ -5520,15 +5516,11 @@ void record_reg_value(unsigned int address, unsigned int value)
         }
 
             vfs_write(fp, buf, strlen(buf), &fp->f_pos);
-#else
-            kernel_write(fp, buf, strlen(buf), &fp->f_pos);
-#endif
         filp_close(fp, NULL);
     }
     else {
         ERROR_DEBUG_OUT("open file %s failed.\n", reg_result_path);
     }
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
 err:
     set_fs(fs);
 #endif
@@ -5873,20 +5865,17 @@ int vm_cfg80211_vnd_cmd_set_para(struct wiphy *wiphy, struct wireless_dev *wdev,
         }
         break;
     case VM_NL80211_VENDOR_GET_STA_RSSI_NOISE:
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
         if (wnet_vif->vm_state == WIFINET_S_CONNECTED) {
             struct file *fp;
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
             struct kstat stat;
             mm_segment_t fs;
             int error = 0;
-#endif
             char buf[512] = {0};
             unsigned int arr[8] = {0};
  
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
             fs = get_fs();
             set_fs(KERNEL_DS);
-#endif
             fp = filp_open(rssi_result_path, O_CREAT|O_RDWR, 0644);
 
             if (!IS_ERR(fp)) {
@@ -5900,7 +5889,6 @@ int vm_cfg80211_vnd_cmd_set_para(struct wiphy *wiphy, struct wireless_dev *wdev,
                     sprintf(&buf[strlen(buf)], "snr_qdb:%d crc_err:%d, crc_ok:%d, noise_f:%d\r\n",
                         arr[5], arr[2], arr[3], arr[4]);
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
                     error = vfs_stat(rssi_result_path, &stat);
                     if (error) {
                         filp_close(fp, NULL);
@@ -5913,20 +5901,16 @@ int vm_cfg80211_vnd_cmd_set_para(struct wiphy *wiphy, struct wireless_dev *wdev,
                         goto err;
                     }
                     vfs_write(fp, buf, strlen(buf), &fp->f_pos);
-#else
-                    kernel_write(fp, buf, strlen(buf), &fp->f_pos);
-#endif
                 }
                 filp_close(fp, NULL);
             }
             else {
                 ERROR_DEBUG_OUT("open file %s failed.\n", rssi_result_path);
             }
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
 err:
             set_fs(fs);
-#endif
         }
+#endif
         break;
 
     case VM_NL80211_VENDOR_UPDATE_WIPHY_PARAMS:
