@@ -1023,7 +1023,7 @@ wifi_mac_get_sta(struct wifi_station_tbl *nt, const unsigned char *macaddr,int w
 
 struct wifi_station *
 wifi_mac_fake_adhos_sta(struct wlan_net_vif *wnet_vif,
-                        const unsigned char macaddr[WIFINET_ADDR_LEN])
+                        const unsigned char macaddr[])
 {
     struct wifi_station *sta;
     printk("<running> %s %d \n",__func__,__LINE__);

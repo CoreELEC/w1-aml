@@ -859,6 +859,9 @@ vm_p2p_set_probersp_ie(struct wlan_net_vif *wnet_vif, char *frm, int len)
     struct wifi_mac_app_ie_t *wps_app_ie = &wnet_vif->app_ie[WIFINET_APPIE_FRAME_PROBE_RESP];
     int tmplen = 0;
     unsigned char *tmp = NULL;
+#ifdef CONFIG_WFD
+    unsigned char wfd_ie[WIFINET_MAX_WDF_IE] = {0};
+#endif
 
 #ifdef  CONFIG_P2P
     const unsigned char *p2p_ie = NULL;
@@ -875,7 +878,6 @@ vm_p2p_set_probersp_ie(struct wlan_net_vif *wnet_vif, char *frm, int len)
 
 #ifdef CONFIG_WFD
     {
-        unsigned char wfd_ie[WIFINET_MAX_WDF_IE] = {0};
         struct wifi_mac_app_ie_t *wfd_app_ie = &wnet_vif->vm_p2p->wfd_app_ie[WIFINET_APPIE_FRAME_PROBE_RESP];
         tmp = vm_get_wfd_ie(frm, len, NULL, &tmplen);
 

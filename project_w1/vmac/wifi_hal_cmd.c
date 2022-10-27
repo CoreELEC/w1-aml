@@ -42,7 +42,7 @@ namespace FW_NAME
 MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
 #endif
 
-#define WIFI_CONF_PATH "/vendor/etc/wifi/w1"
+#define WIFI_CONF_PATH "/usr/lib/firmware/w1"
 
 static char * conf_path = WIFI_CONF_PATH;
 module_param(conf_path, charp, S_IRUGO);
