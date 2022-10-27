@@ -29,6 +29,7 @@ namespace FW_NAME
 #include "patch_fi_cmd.h"
 #include "wifi_mac_if.h"
 #include "wifi_mac_chan.h"
+#include "version.h"
 #include <linux/firmware.h>
 #include "wifi_mac_com.h"
 
@@ -2214,6 +2215,10 @@ unsigned int hal_cfg_cali_param(void)
     }
 
     return true;
+}
+
+void print_driver_version(void) {
+  printk("driver version: %s\n", DRIVERVERSION);
 }
 
 #ifdef HAL_SIM_VER
