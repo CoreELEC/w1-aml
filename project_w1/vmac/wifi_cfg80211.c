@@ -5319,7 +5319,7 @@ vm_cfg80211_set_cqm_rssi_cfg(struct wiphy *wiphy,
     wnet_vif->vm_wmac->drv_priv->drv_config.cqm_rssi_thold = rssi_thold;
     wnet_vif->vm_wmac->drv_priv->drv_config.cqm_rssi_hyst = rssi_hyst;
     printk("---rssi_thold:%d, rssi_hyst:%d\n", rssi_thold, rssi_hyst);
-    wifi_mac_top_sm(wnet_vif, WIFINET_S_SCAN, 0);
+    //wifi_mac_top_sm(wnet_vif, WIFINET_S_SCAN, 0);
 
     return 0;
 }
