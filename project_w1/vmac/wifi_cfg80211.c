@@ -1452,8 +1452,9 @@ void vm_cfg80211_indicate_connect(struct wlan_net_vif *wnet_vif)
 }
 
 static void
-vm_cfg80211_connect_timeout_task(struct wlan_net_vif *wnet_vif)
+vm_cfg80211_connect_timeout_task(SYS_TYPE net)
 {
+	struct wlan_net_vif *wnet_vif = (struct wlan_net_vif*)net;
     vm_cfg80211_indicate_disconnect(wnet_vif);
     wifi_mac_top_sm(wnet_vif, WIFINET_S_SCAN, 0);
     wnet_vif->vm_des_nssid = 0;

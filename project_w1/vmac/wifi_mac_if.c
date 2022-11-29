@@ -1435,7 +1435,7 @@ static int aml_inetaddr_event(struct notifier_block *this, unsigned long event, 
 
 
 
-int wifi_mac_set_ipv6_addr(SYS_TYPE param1, SYS_TYPE param2,SYS_TYPE param3, SYS_TYPE param4,SYS_TYPE param5)
+void wifi_mac_set_ipv6_addr(SYS_TYPE param1, SYS_TYPE param2,SYS_TYPE param3, SYS_TYPE param4,SYS_TYPE param5)
 {
     struct wifi_station *sta = (struct wifi_station *)param1;
     unsigned char vif_id = (unsigned char)param2;
@@ -1443,7 +1443,7 @@ int wifi_mac_set_ipv6_addr(SYS_TYPE param1, SYS_TYPE param2,SYS_TYPE param3, SYS
     unsigned char *ipv6_addr = (unsigned char *)param4;
 
     aml_notify_ip(sta, vif_id, type, ipv6_addr);
-    return 0;
+    return;
 }
 
 static int aml_inet6addr_event(struct notifier_block *this, unsigned long event, void *ptr)
