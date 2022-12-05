@@ -3582,11 +3582,6 @@ vm_wlan_net_vif_register(struct wlan_net_vif *wnet_vif, char* name)
 
     WIFINET_ADDR_COPY(dev->dev_addr, wnet_vif->vm_myaddr);
     AML_OUTPUT("<running>\n");
-    if (register_netdev(dev))
-    {
-        ERROR_DEBUG_OUT("ERROR::%s: unable to register device\n", dev->name);
-        return 0;
-    }
     return 1;
 }
 

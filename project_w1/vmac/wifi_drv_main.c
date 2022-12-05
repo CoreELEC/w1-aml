@@ -2339,6 +2339,7 @@ drv_dev_probe(void)
     struct hal_private *hal_priv = hal_get_priv();
     struct drv_private *drv_priv = drv_get_drv_priv();
     struct wifi_mac *wm_mac = wifi_mac_get_mac_handle();
+    struct net_device *ndev;
     int ret = 0;
     int vif0opmode = -1;
     int vif1opmode = -1;
@@ -2402,6 +2403,24 @@ drv_dev_probe(void)
     //sholdn't be here
     drv_priv->drv_ops.drv_set_bmfm_info(drv_priv, 0, 0, 0, 0);
     drv_hal_enable_coexist(drv_priv->drv_config.cfg_wifi_bt_coexist_support );
+
+    rtnl_lock();
+    ndev = drv_priv->drv_wnet_vif_table[0]->vm_ndev;
+    if (register_netdevice(ndev))
+    {
+        ERROR_DEBUG_OUT("ERROR::%s: unable to register device\n", ndev->name);
+        rtnl_unlock();
+        goto err_ret;
+    }
+
+    ndev = drv_priv->drv_wnet_vif_table[1]->vm_ndev;
+    if (register_netdevice(ndev))
+    {
+        ERROR_DEBUG_OUT("ERROR::%s: unable to register device\n", ndev->name);
+        rtnl_unlock();
+        goto err_ret;
+    }
+    rtnl_unlock();
 
     return ret;
 
