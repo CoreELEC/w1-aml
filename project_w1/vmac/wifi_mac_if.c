@@ -3703,11 +3703,6 @@ vm_wlan_net_vif_register(struct wlan_net_vif *wnet_vif, char* name)
 
     dev_addr_mod(dev, 0, wnet_vif->vm_myaddr, WIFINET_ADDR_LEN);
     AML_OUTPUT("<running>\n");
-    if (register_netdev(dev))
-    {
-        ERROR_DEBUG_OUT("ERROR::%s: unable to register device\n", dev->name);
-        return 0;
-    }
     aml_regd_init(wnet_vif->vm_wdev->wiphy, aml_reg_notifier);
     return 1;
 }
