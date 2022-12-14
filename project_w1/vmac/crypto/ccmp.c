@@ -212,14 +212,14 @@ u8 * ccmp_encrypt(const u8 *tk, u8 *frame, size_t len, size_t hdrlen, u8 *qos,
 		hdr = (struct ieee80211_hdr *) crypt;
 		hdr->frame_control |= (WLAN_FC_ISWEP);
 		pos = crypt + hdrlen;
-		*pos++ = pn[5]; /* PN0 */
-		*pos++ = pn[4]; /* PN1 */
+		*pos++ = pn[0]; /* PN0 */
+		*pos++ = pn[1]; /* PN1 */
 		*pos++ = 0x00; /* Rsvd */
 		*pos++ = 0x20 | (keyid << 6);
-		*pos++ = pn[3]; /* PN2 */
-		*pos++ = pn[2]; /* PN3 */
-		*pos++ = pn[1]; /* PN4 */
-		*pos++ = pn[0]; /* PN5 */
+		*pos++ = pn[2]; /* PN2 */
+		*pos++ = pn[3]; /* PN3 */
+		*pos++ = pn[4]; /* PN4 */
+		*pos++ = pn[5]; /* PN5 */
 		pdata = frame + hdrlen;
 	}
 
@@ -352,14 +352,14 @@ u8 * ccmp_256_encrypt(const u8 *tk, u8 *frame, size_t len, size_t hdrlen,
 		hdr = (struct ieee80211_hdr *) crypt;
 		hdr->frame_control |= (WLAN_FC_ISWEP);
 		pos = crypt + hdrlen;
-		*pos++ = pn[5]; /* PN0 */
-		*pos++ = pn[4]; /* PN1 */
+		*pos++ = pn[0]; /* PN0 */
+		*pos++ = pn[1]; /* PN1 */
 		*pos++ = 0x00; /* Rsvd */
 		*pos++ = 0x20 | (keyid << 6);
-		*pos++ = pn[3]; /* PN2 */
-		*pos++ = pn[2]; /* PN3 */
-		*pos++ = pn[1]; /* PN4 */
-		*pos++ = pn[0]; /* PN5 */
+		*pos++ = pn[2]; /* PN2 */
+		*pos++ = pn[3]; /* PN3 */
+		*pos++ = pn[4]; /* PN4 */
+		*pos++ = pn[5]; /* PN5 */
 		pdata = frame + hdrlen;
 	}
 

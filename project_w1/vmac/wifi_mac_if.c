@@ -251,7 +251,7 @@ void wifi_mac_set_channel_rssi(struct wifi_mac *wifimac, unsigned char rssi)
 {
     unsigned char rssi_set = rssi;
 
-    if (wifimac->bt_lk) {
+    if (wifimac->bt_lk && rssi >= 218) {
         //for bt wifi coexit need set -50 gian
         wifimac->drv_priv->drv_ops.set_channel_rssi(wifimac->drv_priv, 226);
 

@@ -34,6 +34,7 @@ unsigned int rxframenum =0;
 #define CHIP_ID_EFUASE_L 0x8
 #define CHIP_ID_EFUASE_H 0x9
 unsigned char  host_wake_w1_fail_cnt = 0;
+unsigned int   tx_up_required = 0;
 
 extern struct aml_hal_call_backs * get_hal_call_back_table(void);
 extern unsigned char *g_rx_fifo;
@@ -1034,6 +1035,27 @@ int hal_is_empty_tx_id(struct hal_private * hal_priv)
     return 0;
 }
 
+unsigned char hal_get_free_tx_id_num(struct hal_private * hal_priv)
+{
+    unsigned char bit_num = 0;
+    unsigned char i;
+    unsigned long * map;
+
+    COMMON_LOCK();
+    map = hal_priv->tx_frames_map;
+    for (i=0; i<(sizeof(unsigned long) *BITS_PER_BYTE); i++) {
+        if (((*map >> i) & 0x01) == 0)
+            bit_num++;
+    }
+
+    for (i=0; i<(sizeof(unsigned long) *BITS_PER_BYTE); i++) {
+        if (((*(map+1) >> i) & 0x01) == 0)
+            bit_num++;
+    }
+    COMMON_UNLOCK();
+    return bit_num;
+}
+
 int hal_free_tx_id(struct hal_private * hal_priv, struct txdonestatus *txstatus,
     unsigned long *callback, unsigned char *queue_id)
 {
@@ -1149,6 +1171,9 @@ void hal_txframe_pre(void)
                 id = hal_alloc_tx_id(hal_priv,pTxDescFiFo);
                 if (id == TXID_INVALID)
                 {
+                    if (hif->HiStatus.Tx_Done_num == hif->HiStatus.Tx_Free_num) {
+                        tx_up_required = 1;
+                    }
                     return ;
                 }
                 pTxDescFiFo->pTxDPape->TxPriv.hostcallbackid= (unsigned char)id;
@@ -1171,6 +1196,9 @@ void hal_txframe_pre(void)
             id = hal_alloc_tx_id(hal_priv,pTxDescFiFo);
             if (id == TXID_INVALID)
             {
+                if (hif->HiStatus.Tx_Done_num == hif->HiStatus.Tx_Free_num) {
+                    tx_up_required = 1;
+                }
                 return ;
             }
             pTxDescFiFo->pTxDPape->TxPriv.hostcallbackid = id;
@@ -2558,6 +2586,10 @@ int hal_txok_thread(void *param)
             txok_status_node = NULL;
        }
         WAKE_UNLOCK(hal_priv, WAKE_LOCK_TXOK);
+        if (tx_up_required && hal_get_free_tx_id_num(hal_priv) >= 32) {
+            tx_up_required = 0;
+            up(&hal_priv->hi_irq_thread_sem);
+        }
     }
 
     printk("%s(%d)  =====> exit TXOK Thread <=====\n",__func__,__LINE__);

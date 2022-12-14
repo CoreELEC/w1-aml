@@ -1084,6 +1084,7 @@ enum
     WIFINET_ELEMID_QUIET_CHANNEL = 198,  /* Quiet Channel */
     WIFINET_ELEMID_OP_MODE_NOTIFY = 199,  /* Operating Mode Notification */
     WIFINET_ELEMID_VENDOR = 221,
+    WIFINET_ELEMID_RSNX = 244,
 
 #ifdef CONFIG_WAPI
     WIFINET_ELEMID_WAI = 68,

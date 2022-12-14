@@ -1810,7 +1810,7 @@ void vm_p2p_print_attr(const void *frm)
     unsigned char *subel;
     unsigned char subelt_id;
     unsigned short subelt_len;
-    unsigned char i;
+    unsigned short i;
 
     if (!frm)
     {

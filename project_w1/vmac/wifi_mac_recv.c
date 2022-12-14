@@ -3067,6 +3067,10 @@ void wifi_mac_pkt_parse_element(struct wlan_net_vif *wnet_vif,
                 scan->vht_opt_md_ntf = frm;
                 break;
 
+            case WIFINET_ELEMID_RSNX:
+                scan->rsnxe = frm;
+                break;
+
             default:
                 DPRINTF(AML_DEBUG_ELEMID, "unhandled id %u, len %u", *frm, frm[1]);
                 break;

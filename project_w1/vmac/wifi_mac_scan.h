@@ -142,6 +142,7 @@ struct wifi_mac_scan_param
     unsigned char *tpc;
     unsigned char *quiet;
     unsigned char *rsn;
+    unsigned char *rsnxe;
     unsigned char *wps;
     unsigned char *timeout_ie;
 #ifdef CONFIG_P2P
@@ -190,6 +191,7 @@ struct wifi_scan_info
     unsigned char  SI_country_ie[SCANINFO_IE_LENGTH];
     unsigned int SI_age;
     unsigned char  SI_rsn_ie[SCANINFO_IE_LENGTH];
+    unsigned char  SI_rsnx_ie[SCANINFO_IE_LENGTH];
     unsigned short si_rsn_capa;
     unsigned char  SI_wps_ie[SCANINFO_IE_LENGTH];
 

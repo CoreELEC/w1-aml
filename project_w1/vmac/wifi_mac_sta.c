@@ -111,6 +111,11 @@ wifi_mac_start_bss_ex(unsigned long arg)
         if (WIFINET_M_IBSS == wnet_vif->vm_opmode) {
             copy_bss(wnet_vif->vm_mainsta, obss);
         }
+
+        if (WIFINET_M_STA == wnet_vif->vm_opmode) {
+            memcpy(wnet_vif->vm_mainsta->sta_txseqs, obss->sta_txseqs, sizeof(obss->sta_txseqs));
+        }
+
         wifi_mac_rm_sta_from_wds_by_sta(&wnet_vif->vm_sta_tbl, obss);
 
         printk("%s, obss:%p\n", __func__, obss);

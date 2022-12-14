@@ -618,6 +618,14 @@ cfg80211_informbss_cb(void *arg, const struct wifi_scan_info *se)
         pbuf += ielen;
         len += ielen;
     }
+
+    if (lse->SI_rsnx_ie[1])
+    {
+        ielen = wifi_mac_copy_ie(pbuf, lse->SI_rsnx_ie, SCANINFO_IE_DATA_LENGTH);
+        pbuf += ielen;
+        len += ielen;
+    }
+
     if (lse->SI_htcap_ie[1])
     {
         ielen = wifi_mac_copy_ie(pbuf, lse->SI_htcap_ie, SCANINFO_IE_DATA_LENGTH);

@@ -702,6 +702,10 @@ void wifi_mac_scan_rx(struct wlan_net_vif *wnet_vif, const struct wifi_mac_scan_
         }
     }
 
+    if (sp->rsnxe != NULL) {
+        saveie(&ise->SI_rsnx_ie[0], sp->rsnxe);
+    }
+
     WIFINET_ADDR_COPY(se->scaninfo.SI_macaddr, macaddr);
     DPRINTF(AML_DEBUG_SCAN, "<running> %s se %p se->se_list 0x%p, %s, mac:%02x:%02x:%02x:%02x:%02x:%02x\n",
         __func__, se, &se->se_list, ssidie_sprintf(sp->ssid), macaddr[0], macaddr[1], macaddr[2], macaddr[3], macaddr[4], macaddr[5]);
