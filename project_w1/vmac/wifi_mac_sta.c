@@ -184,17 +184,17 @@ wifi_mac_start_bss_ex(unsigned long arg)
     return 1;
 }
 
-static int wifi_mac_start_bss_ex_task(SYS_TYPE param1,
+static void wifi_mac_start_bss_ex_task(SYS_TYPE param1,
                                   SYS_TYPE param2,SYS_TYPE param3,SYS_TYPE param4,SYS_TYPE param5)
 {
     struct wifi_station *selbs= (struct wifi_station *)param1;
     struct wlan_net_vif *wnet_vif = (struct wlan_net_vif *)param4;
     if(wnet_vif->wnet_vif_replaycounter != (int)param5)
-        return -1;
+        return;
 
     wifi_mac_start_bss_ex((unsigned long)selbs);
 
-    return 0;
+    return;
 }
 
 static int wifi_mac_start_bss (struct wifi_station *selbs)
@@ -1635,7 +1635,7 @@ void wifi_mac_sta_keep_alive(struct wlan_net_vif *wnet_vif, int enable, int peri
     wnet_vif->vm_wmac->drv_priv->drv_ops.drv_keep_alive(wifimac->drv_priv, null_data, len, enable, period);
 }
 
-int wifi_mac_sta_keep_alive_ex (SYS_TYPE param1,
+void wifi_mac_sta_keep_alive_ex (SYS_TYPE param1,
                                 SYS_TYPE param2,SYS_TYPE param3,
                                 SYS_TYPE param4,SYS_TYPE param5)
 {
@@ -1644,10 +1644,10 @@ int wifi_mac_sta_keep_alive_ex (SYS_TYPE param1,
     int enable = (int)param3;
 
     if ((period == 0) || (wnet_vif->vm_mainsta == NULL))
-        return -1;
+        return ;
 
     wifi_mac_sta_keep_alive(wnet_vif, enable, period);
-    return 0;
+    return ;
 }
 
 static void wifi_mac_StationTimeoutEx(SYS_TYPE param1,

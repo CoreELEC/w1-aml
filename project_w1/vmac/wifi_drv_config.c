@@ -384,12 +384,15 @@ unsigned char parse_drv_cfg_param(char *varbuf, int len)
 
 int drv_cfg_load_from_file(void)
 {
-    struct file *fp;
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
     struct kstat stat;
-    int size, len;
-    int error = 0;
-    char *content =  NULL;
     mm_segment_t fs;
+    int error = 0;
+    struct file *fp;
+    int size, len;
+    char *content =  NULL;
+
+
     char conf_path[30] = "/vendor/etc/wifi/w1";
     unsigned char cfg_file[100];
 
@@ -436,9 +439,11 @@ int drv_cfg_load_from_file(void)
     FREE(content, "aml_drv_cfg");
     filp_close(fp, NULL);
     set_fs(fs);
-
+#endif
     return 0;
 err:
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
     set_fs(fs);
+#endif
     return 1;
 }

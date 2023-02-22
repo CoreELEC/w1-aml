@@ -36,7 +36,7 @@ unsigned char hal_set_sys_clk_for_fpga(void);
 
 unsigned char hal_set_sys_clk(int clockdiv);
 unsigned char hal_set_sys_clk_Core(unsigned int addr, unsigned int value);
-unsigned char hal_download_wifi_fw_img(void);
+unsigned char  hal_download_wifi_fw_img(void);
 extern void aml_wifi_set_mac_addr(void);
 extern char * aml_wifi_get_country_code(void);
 extern char * aml_wifi_get_vif0_name(void);

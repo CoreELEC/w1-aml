@@ -1427,7 +1427,7 @@ static int aml_inetaddr_event(struct notifier_block *this, unsigned long event, 
 
 
 
-int wifi_mac_set_ipv6_addr(SYS_TYPE param1, SYS_TYPE param2,SYS_TYPE param3, SYS_TYPE param4,SYS_TYPE param5)
+void wifi_mac_set_ipv6_addr(SYS_TYPE param1, SYS_TYPE param2,SYS_TYPE param3, SYS_TYPE param4,SYS_TYPE param5)
 {
     struct wifi_station *sta = (struct wifi_station *)param1;
     unsigned char vif_id = (unsigned char)param2;
@@ -1435,7 +1435,7 @@ int wifi_mac_set_ipv6_addr(SYS_TYPE param1, SYS_TYPE param2,SYS_TYPE param3, SYS
     unsigned char *ipv6_addr = (unsigned char *)param4;
 
     aml_notify_ip(sta, vif_id, type, ipv6_addr);
-    return 0;
+    return;
 }
 
 static int aml_inet6addr_event(struct notifier_block *this, unsigned long event, void *ptr)
@@ -4245,7 +4245,12 @@ void wifi_mac_connect_repair_task(SYS_TYPE param1,SYS_TYPE param2, SYS_TYPE para
 #endif
 
     /*free_page/send/done/free all same as last value, go into else branch*/
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0)
     if (((free_page == hal_priv->txPageFreeNum) && (done == hif->HiStatus.Tx_Done_num) && (free == hif->HiStatus.Tx_Free_num) && (done > free))
+#else
+    if (((free_page == hal_priv->txPageFreeNum) && (done == atomic_read(&hif->HiStatus.Tx_Done_num))
+        && (free == atomic_read(&hif->HiStatus.Tx_Free_num)) && (done > free))
+#endif
         || ((hif->HiStatus.tx_ok_num == tx_ok_num) && (hif->HiStatus.tx_fail_num - tx_fail_num > 200))
         || (wifi_mac_get_host_wake_status() > 0)
         || (hal_priv->txPageFreeNum > 224)) {
@@ -4258,7 +4263,13 @@ void wifi_mac_connect_repair_task(SYS_TYPE param1,SYS_TYPE param2, SYS_TYPE para
         if (count == 2) {
 
             AML_OUTPUT("last send %d, current send %d, last done %d, current done %d, last free %d, current free %d, count %d\n",
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0)
                 send, hif->HiStatus.Tx_Send_num, done, hif->HiStatus.Tx_Done_num, free, hif->HiStatus.Tx_Free_num, count);
+#else
+                send, atomic_read(&hif->HiStatus.Tx_Send_num),
+                done, atomic_read(&hif->HiStatus.Tx_Done_num),
+                free, atomic_read(&hif->HiStatus.Tx_Free_num), count);
+#endif
 
             AML_OUTPUT("last free page %d, current free page %d, tx_ok %d, last tx_ok %d, tx_fail:%d, last_tx_fail:%d\n",
                     free_page, hal_priv->txPageFreeNum, tx_ok_num, hif->HiStatus.tx_ok_num, tx_fail_num, hif->HiStatus.tx_fail_num);
@@ -4269,9 +4280,15 @@ void wifi_mac_connect_repair_task(SYS_TYPE param1,SYS_TYPE param2, SYS_TYPE para
 
     } else {
         free_page = hal_priv->txPageFreeNum;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0)
         send = hif->HiStatus.Tx_Send_num;
         done = hif->HiStatus.Tx_Done_num;
         free = hif->HiStatus.Tx_Free_num;
+#else
+        send = atomic_read(&hif->HiStatus.Tx_Send_num);
+        done = atomic_read(&hif->HiStatus.Tx_Done_num);
+        free = atomic_read(&hif->HiStatus.Tx_Free_num);
+#endif
         tx_ok_num = hif->HiStatus.tx_ok_num;
         tx_fail_num = hif->HiStatus.tx_fail_num;
         count = 0;

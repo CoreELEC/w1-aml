@@ -29,6 +29,10 @@ namespace FW_NAME
 #include "patch_fi_cmd.h"
 #include "wifi_mac_if.h"
 #include "wifi_mac_chan.h"
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(5, 15, 0))
+#include <linux/firmware.h>
+#include "wifi_mac_com.h"
+#endif
 
 #if defined (HAL_FPGA_VER)
 #include "wifi_drv_statistic.h"
@@ -1273,17 +1277,32 @@ int phy_set_suspend(unsigned char vid, unsigned char enable,
             printk("%s:%d, txdoneframecounter:%x, HalTxFrameDoneCounter:%x\n", __func__, __LINE__,
                 hal_priv->txcompletestatus->txdoneframecounter, hal_priv->HalTxFrameDoneCounter);
         }
-
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0)
         if ((hif->HiStatus.Tx_Free_num != hif->HiStatus.Tx_Send_num)
             || (hif->HiStatus.Tx_Done_num != hif->HiStatus.Tx_Send_num))
+#else
+        if ((atomic_read(&hif->HiStatus.Tx_Free_num) != atomic_read(&hif->HiStatus.Tx_Send_num))
+            || (atomic_read(&hif->HiStatus.Tx_Done_num) != atomic_read(&hif->HiStatus.Tx_Send_num)))
+#endif
         {
             printk("%s:%d, free %d, done %d, send %d\n",  __func__, __LINE__,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0)
                 hif->HiStatus.Tx_Free_num, hif->HiStatus.Tx_Done_num, hif->HiStatus.Tx_Send_num);
+#else
+                atomic_read(&hif->HiStatus.Tx_Free_num),
+                atomic_read(&hif->HiStatus.Tx_Done_num),
+                atomic_read(&hif->HiStatus.Tx_Send_num));
+#endif
         }
         /* flush packetes when suspend and when resume restore initial value */
         hal_priv->HalTxFrameDoneCounter = hal_priv->txcompletestatus->txdoneframecounter;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0)
         hif->HiStatus.Tx_Free_num = hif->HiStatus.Tx_Send_num;
         hif->HiStatus.Tx_Done_num = hif->HiStatus.Tx_Send_num;
+#else
+        atomic_set(&hif->HiStatus.Tx_Free_num, atomic_read(&hif->HiStatus.Tx_Send_num));
+        atomic_set(&hif->HiStatus.Tx_Done_num, atomic_read(&hif->HiStatus.Tx_Send_num));
+#endif
     }
     printk("%s end, wow enable %d, mode %d, filter 0x%x, ret %d\n",
         ((enable == 1) ? "suspend" : "resume"), enable, mode, filters, ret);
@@ -2045,13 +2064,18 @@ void phy_set_tx_power_accord_rssi(int bw, unsigned short channel, unsigned char 
 unsigned char get_cali_param(struct Cali_Param *cali_param, struct WF2G_Txpwr_Param *wf2g_txpwr_param,
                                                              struct WF5G_Txpwr_Param *wf5g_txpwr_param)
 {
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
     struct file *fp;
     struct kstat stat;
-    int size, len;
-    int error = 0;
-    char *content =  NULL;
     mm_segment_t fs;
-
+#else
+    const struct firmware *fw = NULL;
+    struct device *dev = vm_cfg80211_get_parent_dev();
+#endif
+    int error = 0;
+    int size, len;
+    char *content =  NULL;
     unsigned int chip_id_l = 0;
     unsigned char chip_id_buf[100];
 
@@ -2076,6 +2100,8 @@ unsigned char get_cali_param(struct Cali_Param *cali_param, struct WF2G_Txpwr_Pa
         printk("aml wifi module SN:%04x  sn txt not found, the rf config: %s\n", chip_id_l, chip_id_buf);
     } else
         printk("aml wifi module SN:%04x  the rf config: %s\n", chip_id_l, chip_id_buf);
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
     fs = get_fs();
     set_fs(KERNEL_DS);
 
@@ -2085,7 +2111,6 @@ unsigned char get_cali_param(struct Cali_Param *cali_param, struct WF2G_Txpwr_Pa
         fp = NULL;
         goto err;
     }
-
     error = vfs_stat(chip_id_buf, &stat);
     if (error) {
         filp_close(fp, NULL);
@@ -2097,19 +2122,30 @@ unsigned char get_cali_param(struct Cali_Param *cali_param, struct WF2G_Txpwr_Pa
         filp_close(fp, NULL);
         goto err;
     }
-
     content = ZMALLOC(size, "wifi_cali_param", GFP_KERNEL);
 
     if (content == NULL) {
         filp_close(fp, NULL);
         goto err;
     }
-
     if (vfs_read(fp, content, size, &fp->f_pos) != size) {
         FREE(content, "wifi_cali_param");
         filp_close(fp, NULL);
         goto err;
     }
+#else
+    error = request_firmware(&fw, chip_id_buf, dev);
+    if (error) {
+        // sn txt not found, the rf set default config
+        sprintf(chip_id_buf, "%s/aml_wifi_rf.txt", conf_path);
+        error = request_firmware(&fw, chip_id_buf, dev);
+        if (error) {
+            goto err;
+        }
+    }
+    size = fw->size;
+    content = (char *)fw->data;
+#endif
 
     len = process_cali_content(content, size);
     parse_cali_param(content, len, cali_param);
@@ -2145,13 +2181,16 @@ unsigned char get_cali_param(struct Cali_Param *cali_param, struct WF2G_Txpwr_Pa
             cali_param->rf_num = 1;
         printk("rf_cout is: %d\n", cali_param->rf_num);
     }
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
     FREE(content, "wifi_cali_param");
     filp_close(fp, NULL);
     set_fs(fs);
-
+#endif
     return 0;
 err:
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
     set_fs(fs);
+#endif
     return 1;
 }
 

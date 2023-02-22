@@ -367,7 +367,7 @@ int wifi_mac_tcp_csum(struct sk_buff *skb)
     return 0;
 }
 
-int wifi_mac_hardstart(struct sk_buff *skb, struct net_device *dev)
+netdev_tx_t wifi_mac_hardstart(struct sk_buff *skb, struct net_device *dev)
 {
     struct wlan_net_vif *wnet_vif = netdev_priv(dev);
     struct wifi_mac *wifimac = wnet_vif->vm_wmac;

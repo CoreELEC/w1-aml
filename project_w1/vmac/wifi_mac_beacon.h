@@ -17,7 +17,7 @@ int _wifi_mac_beacon_update(struct wifi_station *sta,            struct wifi_mac
 int wifi_mac_beacon_alloc(void * ieee, int wnet_vif_id);
 int wifi_mac_beacon_alloc_ex(SYS_TYPE param1,             SYS_TYPE param2,SYS_TYPE param3, SYS_TYPE param4,SYS_TYPE param5);
 int wifi_mac_sta_beacon_init(struct wlan_net_vif *wnet_vif);
-int wifi_mac_sta_beacon_init_ex (SYS_TYPE param1,               SYS_TYPE param2,SYS_TYPE param3, SYS_TYPE param4,SYS_TYPE param5);
+void wifi_mac_sta_beacon_init_ex (SYS_TYPE param1,               SYS_TYPE param2,SYS_TYPE param3, SYS_TYPE param4,SYS_TYPE param5);
 void wifi_mac_beacon_free(void * ieee, int wnet_vif_id);
 void wifi_mac_beacon_config(void * ieee, int wnet_vif_id);
 void wifi_mac_beacon_sync(void * ieee, int wnet_vif_id);
@@ -25,6 +25,6 @@ int wifi_mac_update_beacon(void * ieee, int wnet_vif_id,            struct sk_bu
 int wifi_mac_process_beacon_miss(struct wlan_net_vif *wnet_vif);
 void wifi_mac_process_beacon_miss_ex(SYS_TYPE arg);
 int wifi_mac_set_beacon_miss_ex(struct wlan_net_vif *wnet_vif, unsigned char enable, int period);
-int wifi_mac_set_beacon_miss(SYS_TYPE param1,             SYS_TYPE param2,SYS_TYPE param3, SYS_TYPE param4,SYS_TYPE param5);
+void wifi_mac_set_beacon_miss(SYS_TYPE param1,             SYS_TYPE param2,SYS_TYPE param3, SYS_TYPE param4,SYS_TYPE param5);
 int wifi_mac_set_vsdb(SYS_TYPE param1,         SYS_TYPE param2,SYS_TYPE param3, SYS_TYPE param4,SYS_TYPE param5);
 

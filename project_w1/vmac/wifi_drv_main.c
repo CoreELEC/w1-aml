@@ -543,7 +543,7 @@ int  drv_hal_tx_frm_pause(struct drv_private *drv_priv, int pause)
     return drv_priv->hal_priv->hal_ops.hal_txframe_pause(pause);
 }
 
-static int
+static void
 clear_staid_and_bssid_ex(SYS_TYPE param1,
     SYS_TYPE param2, SYS_TYPE param3,
     SYS_TYPE param4,SYS_TYPE param5)
@@ -557,7 +557,7 @@ clear_staid_and_bssid_ex(SYS_TYPE param1,
     wnet_vif = drv_priv->drv_wnet_vif_table[wnet_vif_id];
     if (wnet_vif == NULL)
     {
-        return -EINVAL;
+        return ;
     }
 
     driv_ps_wakeup(drv_priv);
@@ -566,7 +566,7 @@ clear_staid_and_bssid_ex(SYS_TYPE param1,
         drv_set_bssid(drv_priv, wnet_vif_id, bssid);
     }
     driv_ps_sleep(drv_priv);
-    return 0;
+    return ;
 }
 
 static int

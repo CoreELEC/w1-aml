@@ -426,7 +426,7 @@ struct wifi_station *wifi_mac_find_mgmt_tx_sta(struct wlan_net_vif *wnet_vif, co
 
 void wifi_mac_list_sta( struct wlan_net_vif *wnet_vif);
 void wifi_mac_sta_keep_alive(struct wlan_net_vif *wnet_vif, int enable, int period);
-int wifi_mac_sta_keep_alive_ex (SYS_TYPE param1, SYS_TYPE param2,SYS_TYPE param3, SYS_TYPE param4,SYS_TYPE param5);
+void wifi_mac_sta_keep_alive_ex (SYS_TYPE param1, SYS_TYPE param2,SYS_TYPE param3, SYS_TYPE param4,SYS_TYPE param5);
 void wifi_mac_set_arp_agent(struct wlan_net_vif *wnet_vif, int enable);
 int wifi_mac_sta_arp_agent_ex (SYS_TYPE param1, SYS_TYPE param2,SYS_TYPE param3, SYS_TYPE param4,SYS_TYPE param5);
 

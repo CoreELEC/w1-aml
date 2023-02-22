@@ -111,6 +111,7 @@ void wpa_hexdump_key(int level, const char *title, const void *buf, size_t len);
 
 void forced_memzero(void *ptr, size_t len);
 void bin_clear_free(void *bin, size_t len);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
 u32 crc32(const u8 *frame, size_t frame_len);
-
+#endif
 #endif//_AML_CRYTO_WRAP_H_

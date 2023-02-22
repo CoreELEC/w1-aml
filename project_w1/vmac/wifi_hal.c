@@ -1009,9 +1009,13 @@ unsigned char hal_alloc_fw_event_buf( struct hal_private *hal_priv)
 unsigned char hal_tx_empty()
 {
     struct hw_interface* hif = hif_get_hw_interface();
-
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0)
     if ((hif->HiStatus.Tx_Send_num == hif->HiStatus.Tx_Free_num)
         &&(hif->HiStatus.Tx_Send_num ==hif->HiStatus.Tx_Done_num))
+#else
+    if ((atomic_read(&hif->HiStatus.Tx_Send_num) == atomic_read(&hif->HiStatus.Tx_Free_num))
+        &&(atomic_read(&hif->HiStatus.Tx_Send_num) == atomic_read(&hif->HiStatus.Tx_Done_num)))
+#endif
     {
         return true;
     }
@@ -1162,7 +1166,11 @@ void hal_txframe_pre(void)
             if (CO_SharedFifoEmpty(pTxShareFifo, CO_TX_BUFFER_MAKE))
             {
                 if ((txqueueid == HAL_WME_NOQOS)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0)
                     && (hif->HiStatus.Tx_Done_num - hif->HiStatus.Tx_Free_num > 32)) {
+#else
+                && (atomic_read(&hif->HiStatus.Tx_Done_num) - atomic_read(&hif->HiStatus.Tx_Free_num) > 32)) {
+#endif
                     return;
                 }
                 EltPtr = CO_SharedFifoPick(pTxShareFifo, CO_TX_BUFFER_MAKE);
@@ -1171,7 +1179,11 @@ void hal_txframe_pre(void)
                 id = hal_alloc_tx_id(hal_priv,pTxDescFiFo);
                 if (id == TXID_INVALID)
                 {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0)
                     if (hif->HiStatus.Tx_Done_num == hif->HiStatus.Tx_Free_num) {
+#else
+                    if (atomic_read(&hif->HiStatus.Tx_Done_num) == atomic_read(&hif->HiStatus.Tx_Free_num)) {
+#endif
                         tx_up_required = 1;
                     }
                     return ;
@@ -1196,7 +1208,11 @@ void hal_txframe_pre(void)
             id = hal_alloc_tx_id(hal_priv,pTxDescFiFo);
             if (id == TXID_INVALID)
             {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0)
                 if (hif->HiStatus.Tx_Done_num == hif->HiStatus.Tx_Free_num) {
+#else
+                if (atomic_read(&hif->HiStatus.Tx_Done_num) == atomic_read(&hif->HiStatus.Tx_Free_num)) {
+#endif
                     tx_up_required = 1;
                 }
                 return ;
@@ -1381,7 +1397,11 @@ void  hal_tx_frame(void)
                     memcpy(tmp+offset, pTxDPape, len);
                     offset += len;
 #endif
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
                     __sync_fetch_and_add(&hif->HiStatus.Tx_Done_num,1);
+#else
+                    atomic_add(1, &hif->HiStatus.Tx_Done_num);
+#endif
                     EltPtr = CO_SharedFifoPick(pTxShareFifo,CO_TX_BUFFER_SET);
                     pTxDescFiFo = ( struct fw_txdesc_fifo *)EltPtr ;
                     pTxDPape = pTxDescFiFo->pTxDPape;
@@ -1560,8 +1580,11 @@ struct sk_buff *hal_fill_agg_start(struct hi_agg_tx_desc *HI_AGG,struct hi_tx_pr
 
     pTxDPape->TxOption.pkt_position = AML_PKT_IN_HAL;
     hal_priv->Hi_TxAgg[txqueueid] = pTxDPape;
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
     __sync_fetch_and_add(&hif->HiStatus.Tx_Send_num,1);
-
+#else
+    atomic_add(1, &hif->HiStatus.Tx_Send_num);
+#endif
     STATUS = CO_SharedFifoPut(&hal_priv->txds_trista_fifo[txqueueid],CO_TX_BUFFER_GET,1);
     ASSERT(STATUS==CO_STATUS_OK)
 
@@ -1628,8 +1651,11 @@ struct sk_buff *hal_fill_priv(struct hi_tx_priv_hdr* HI_TxPriv,unsigned char que
         hal_show_txframe(pTxDPape);
     }
 #endif
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
     __sync_fetch_and_add(&hif->HiStatus.Tx_Send_num,1);
-
+#else
+    atomic_add(1, &hif->HiStatus.Tx_Send_num);
+#endif
     STATUS = CO_SharedFifoPut(&hal_priv->txds_trista_fifo[txqueueid],CO_TX_BUFFER_GET,1);
     ASSERT(STATUS==CO_STATUS_OK);
 
@@ -1659,7 +1685,11 @@ int hal_get_priv_cnt(unsigned char queue_id)
 int hal_get_agg_pend_cnt(void)
 {
     struct hw_interface* hif = hif_get_hw_interface();
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0)
     return hif->HiStatus.Tx_Send_num - hif->HiStatus.Tx_Free_num;
+#else
+    return atomic_read(&hif->HiStatus.Tx_Send_num) - atomic_read(&hif->HiStatus.Tx_Free_num);
+#endif
 }
 
  int hal_tx_flush(unsigned char vid)
@@ -1720,8 +1750,13 @@ int hal_get_agg_pend_cnt(void)
                 hal_free_tx_id(hal_priv, &txstatus, &callback, &queue_id);
                 hal_priv->hal_call_back->intr_tx_handle(hal_priv->drv_priv, &txstatus, pTxDescFiFo->callback, queue_id);
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
                 __sync_fetch_and_add(&hif->HiStatus.Tx_Done_num,1);
                 __sync_fetch_and_add(&hif->HiStatus.Tx_Free_num,1);
+#else
+                atomic_add(1,&hif->HiStatus.Tx_Done_num);
+                atomic_add(1,&hif->HiStatus.Tx_Free_num);
+#endif
 
             } else {
                 remain_eltptr[remain_count++] = EltPtr;
@@ -1826,7 +1861,14 @@ void hal_get_sts(unsigned int op_code, unsigned int ctrl_code)
 
             printk("hal:tx_free_page %d \n", hal_priv->txPageFreeNum);
             printk("hal:tx_ok_num:%d, tx_fail_num:%d\n", hif->HiStatus.tx_ok_num, hif->HiStatus.tx_fail_num);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0)
             printk("hal:send_frm:%d, done_frm:%d, free_frm:%d\n",  hif->HiStatus.Tx_Send_num, hif->HiStatus.Tx_Done_num, hif->HiStatus.Tx_Free_num);
+#else
+            printk("hal:send_frm:%d, done_frm:%d, free_frm:%d\n",
+                   atomic_read(&hif->HiStatus.Tx_Send_num),
+                   atomic_read(&hif->HiStatus.Tx_Done_num),
+                   atomic_read(&hif->HiStatus.Tx_Free_num));
+#endif
             printk("hal:gpio irq cnt %d \n",  hal_priv->gpio_irq_cnt);
             printk("tx_cmp: tx_done_frm %d, tx_mng_frm %d, tx_page %d\n",
                 hal_priv->txcompletestatus->txdoneframecounter,
@@ -3320,9 +3362,15 @@ void hal_txinfo_show()
         PRINT("pTxShareFifo->IdxTab[2] %d,%d,\n", pTxShareFifo->IdxTab[2].In,pTxShareFifo->IdxTab[2].Out);
     }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0)
     PRINT("HiStatus.Tx_Send_num %d \n",hif->HiStatus.Tx_Send_num);
     PRINT("HiStatus.Tx_Free_num %d \n",hif->HiStatus.Tx_Free_num);
     PRINT("HiStatus.Tx_Done_num %d \n",hif->HiStatus.Tx_Done_num);
+#else
+    PRINT("HiStatus.Tx_Send_num %d \n",atomic_read(&hif->HiStatus.Tx_Send_num));
+    PRINT("HiStatus.Tx_Free_num %d \n",atomic_read(&hif->HiStatus.Tx_Free_num));
+    PRINT("HiStatus.Tx_Done_num %d \n",atomic_read(&hif->HiStatus.Tx_Done_num));
+#endif
     PRINT(" hal_priv->txPageFreeNum%d,\n",  hal_priv->txPageFreeNum);
     PRINT(" hal_priv->bitmap[0]=%lx,\n",   hal_priv->tx_frames_map[0]);
     PRINT(" hal_priv->bitmap[1]=%lx,\n",   hal_priv->tx_frames_map[1]);

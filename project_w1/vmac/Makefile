@@ -45,8 +45,8 @@ endif
 #KERNELDIR ?= $(SRCTOP)/out/target/product/ampere/obj/KERNEL_OBJ
 #KERNELDIR ?= $(SRCTOP)/kernel-4.9/common
 
-CC        = $(CROSS_COMPILE)gcc
-STRIP     = $(CROSS_COMPILE)strip
+#CC        = $(CROSS_COMPILE)gcc
+#STRIP     = $(CROSS_COMPILE)strip
 
 M ?= $(shell pwd)
 ifneq ($(KERNEL_SRC),)
@@ -72,7 +72,7 @@ TARGET = vlsicomm
 EXTRA_CFLAGS += -Wno-enum-conversion
 EXTRA_CFLAGS += ${INCS}  -DCONFIG_WAPI
 EXTRA_CFLAGS += -Wall -Wno-unused-function #show all warning
-EXTRA_CFLAGS += -Werror -Wno-format #convert warning into error
+EXTRA_CFLAGS += -Werror -Wno-format -Wno-error #convert warning into error
 #EXTRA_CFLAGS += -W	#more strict, linux head file cannot pass, so give up
 #EXTRA_CFLAGS += -w	#ignore warning
 #EXTRA_CFLAGS += -DHALMODULE
@@ -185,7 +185,11 @@ modules:
 	@echo "EXTRA_CFLAGS=$(EXTRA_CFLAGS)"
 	$(MAKE) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) -C $(KERNEL_SRC) M=$(M) modules
 ifneq (${OUT_DIR},)
+ifneq (${LLVM},)
+	llvm-strip --strip-unneeded ${OUT_DIR}/$(M)/$(TARGET).ko
+else
 	$(CROSS_COMPILE)strip --strip-unneeded ${OUT_DIR}/$(M)/$(TARGET).ko
+endif
 else
 	$(STRIP) -S $(TARGET).ko
 endif

@@ -1969,7 +1969,7 @@ int drv_get_amsdu_supported(struct drv_private *drv_priv, void *nsta, int tid_in
 }
 
 
-static int
+static void
 drv_addba_timer_ex(unsigned long param1,unsigned long param2,
     unsigned long param3,unsigned long param4,unsigned long param5)
 {

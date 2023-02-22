@@ -29,6 +29,10 @@
                 (ptr)->next = (ptr); (ptr)->prev = (ptr); \
         } while (0)
 
+#ifdef _LINUX_LIST_H
+#define thr_list_head list_head
+#endif
+
 #define OS_LIST			struct thr_list_head
 #define OS_LIST_INIT		INIT_LIST_HEAD
 #define OS_DEL_HEAD	list_del
@@ -45,9 +49,11 @@
 #define DRIVER_SKBBUFER_LEN        (MAX_SKB_NUM * sizeof(struct sk_buff) )
 #define  THR_OS_DDR2DMAAddress(__t)  ((void*)__t)
 
+#ifndef _LINUX_LIST_H
 struct thr_list_head {
         struct thr_list_head *next, *prev;
 };
+#endif
 
 struct _HI_TxPrivDescripter_chain {
         OS_LIST  workList;

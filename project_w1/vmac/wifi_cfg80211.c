@@ -1460,10 +1460,13 @@ void vm_cfg80211_indicate_connect(struct wlan_net_vif *wnet_vif)
 }
 
 static void
-vm_cfg80211_connect_timeout_task(struct wlan_net_vif *wnet_vif)
+vm_cfg80211_connect_timeout_task(SYS_TYPE net)
 {
+    struct wlan_net_vif *wnet_vif = (struct wlan_net_vif*)net;
     vm_cfg80211_indicate_disconnect(wnet_vif);
     wifi_mac_top_sm(wnet_vif, WIFINET_S_SCAN, 0);
+    wnet_vif->vm_des_nssid = 0;
+    memset(wnet_vif->vm_des_ssid, 0, IV_SSID_SCAN_AMOUNT*sizeof(struct wifi_mac_ScanSSID));
     return;
 }
 
@@ -2135,7 +2138,11 @@ vm_cfg80211_update_wiphy_params(struct wiphy *wiphy)
     vm_wdev = wnet_vif->vm_wdev;
     printk("vm_wdev:0x%p, %s, %d\n", vm_wdev, __func__, __LINE__);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0)
     chandef = &vm_wdev->preset_chandef;
+#else
+    chandef = &vm_wdev->u.ap.preset_chandef;
+#endif
     if (chandef->chan == NULL) {
         ERROR_DEBUG_OUT("chandef->chan NULL\n");
         return -1;
@@ -2339,9 +2346,13 @@ int softap_get_sta_num(struct wlan_net_vif *wnet_vif)
     WIFINET_NODE_UNLOCK(nt);
     return sta_num -1;
 }
-
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0)
 static  int vm_cfg80211_add_key(struct wiphy *wiphy, struct net_device *dev, unsigned char key_index,
     bool pairwise, const unsigned char *mac_addr, struct key_params *params)
+#else
+static  int vm_cfg80211_add_key(struct wiphy *wiphy, struct net_device *dev, int link_id,
+        unsigned char key_index, bool pairwise, const unsigned char *mac_addr, struct key_params *params)
+#endif
 {
     struct wlan_net_vif *wnet_vif = wiphy_to_adapter(wiphy);
     const struct key_params *lparams = params;
@@ -2547,8 +2558,13 @@ vm_cfg80211_set_rekey_data(struct wiphy *wiphy,
     return -1;
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0)
 static int vm_cfg80211_del_key(struct wiphy *wiphy, struct net_device *dev,
     unsigned char key_index, bool pairwise, const unsigned char *mac_addr)
+#else
+static int vm_cfg80211_del_key(struct wiphy *wiphy, struct net_device *dev, int link_id,
+    unsigned char key_index, bool pairwise, const unsigned char *mac_addr)
+#endif
 {
     struct wlan_net_vif *wnet_vif = wiphy_to_adapter(wiphy);
     struct wifi_station *sta = NULL;
@@ -2607,24 +2623,41 @@ exit:
     return 0;
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0)
 static int
 vm_cfg80211_get_key(struct wiphy *wiphy, struct net_device *dev,
     unsigned char key_index, bool pairwise, const unsigned char *mac_addr,
     void *cookie,void (*callback)(void *cookie,struct key_params*))
+#else
+static int
+vm_cfg80211_get_key(struct wiphy *wiphy, struct net_device *dev, int link_id,
+    unsigned char key_index, bool pairwise, const unsigned char *mac_addr,
+    void *cookie,void (*callback)(void *cookie,struct key_params*))
+#endif
 {
     DPRINTF(AML_DEBUG_CFG80211, "%s %d <%s>\n", __func__, __LINE__, dev->name);
     return 0;
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0)
 static int vm_cfg80211_config_default_key(struct wiphy *wiphy,
     struct net_device *dev,unsigned char key_index, bool unicast, bool multicast)
+#else
+static int vm_cfg80211_config_default_key(struct wiphy *wiphy, struct net_device *dev,
+        int link_id, unsigned char key_index, bool unicast, bool multicast)
+#endif
 {
     DPRINTF(AML_DEBUG_CFG80211, "%s<%s>, index:%d, uni:%d, mul:%d\n", __func__, dev->name, key_index, unicast, multicast);
     return 0;
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0)
 static int vm_cfg80211_set_default_mgmt_key(struct wiphy *wiphy,
     struct net_device *dev, unsigned char key_idx)
+#else
+static int vm_cfg80211_set_default_mgmt_key(struct wiphy *wiphy,
+    struct net_device *dev, int link_id, unsigned char key_idx)
+#endif
 {
     struct wlan_net_vif *wnet_vif = wiphy_to_adapter(wiphy);
 
@@ -3262,10 +3295,18 @@ legacy_k2dot11_rate_map(unsigned int kernel_rate)
     return ret ;
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0)
 int vm_cfg80211_set_bitrate_mask(struct wiphy *wiphy,
     struct net_device *dev,
     const unsigned char *peer,
     const struct cfg80211_bitrate_mask *mask)
+#else
+int vm_cfg80211_set_bitrate_mask(struct wiphy *wiphy,
+    struct net_device *dev,
+    unsigned int link_id,
+    const unsigned char *peer,
+    const struct cfg80211_bitrate_mask *mask)
+#endif
 {
     struct wlan_net_vif *wnet_vif = netdev_priv(dev);
     unsigned int legacy_ratemask[AML_MAX_NUM_BANDS];
@@ -4090,7 +4131,11 @@ static int vm_cfg80211_change_beacon(struct wiphy *wiphy,
     return ret;
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0)
 static int vm_cfg80211_stop_ap(struct wiphy *wiphy, struct net_device *ndev)
+#else
+static int vm_cfg80211_stop_ap(struct wiphy *wiphy, struct net_device *ndev, unsigned int link_id)
+#endif
 {
     struct wlan_net_vif *wnet_vif = wiphy_to_adapter(wiphy);
     struct drv_private *drv_priv = drv_get_drv_priv();
@@ -5006,9 +5051,15 @@ vm_cfg80211_set_antenna(struct wiphy *wiphy, unsigned int tx_ant, unsigned int r
     return -1;
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0)
 static int
 vm_cfg80211_get_channel(struct wiphy *wiphy, struct wireless_dev *wdev,
                         struct cfg80211_chan_def *chandef)
+#else
+static int
+vm_cfg80211_get_channel(struct wiphy *wiphy, struct wireless_dev *wdev,
+                        unsigned int link_id, struct cfg80211_chan_def *chandef)
+#endif
 {
     struct wlan_net_vif *wnet_vif = NULL;
     struct wifi_mac *wifimac = NULL;
@@ -5051,6 +5102,7 @@ vm_cfg80211_get_channel(struct wiphy *wiphy, struct wireless_dev *wdev,
     return 0;
 }
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
 static int
 vm_cfg80211_set_wds_peer(struct wiphy *wiphy, struct net_device *dev,
                         const unsigned char *addr)
@@ -5058,6 +5110,7 @@ vm_cfg80211_set_wds_peer(struct wiphy *wiphy, struct net_device *dev,
     ERROR_DEBUG_OUT("no support yet\n");
     return -1;
 }
+#endif
 
 static int
 vm_cfg80211_set_qos_map(struct wiphy *wiphy,struct net_device *dev,
@@ -5328,7 +5381,9 @@ static struct cfg80211_ops vm_cfg80211_ops =
     .set_wiphy_params = vm_cfg80211_set_wiphy_params,
     .set_tx_power = vm_cfg80211_set_tx_power,
     .get_tx_power = vm_cfg80211_get_tx_power,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
     .set_wds_peer = vm_cfg80211_set_wds_peer,
+#endif
 
     .set_bitrate_mask = vm_cfg80211_set_bitrate_mask,
     .set_pmksa = aml_cfg80211_set_pmksa,
@@ -5479,12 +5534,12 @@ char *reg_result_path = "/data/reg.txt";
 
 void record_reg_value(unsigned int address, unsigned int value)
 {
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
     struct kstat stat;
-    struct file *fp;
     mm_segment_t fs;
     int error = 0;
+    struct file *fp;
     char buf[512] = {0};
-
     fs = get_fs();
     set_fs(KERNEL_DS);
 
@@ -5494,21 +5549,19 @@ void record_reg_value(unsigned int address, unsigned int value)
             sprintf(buf, "address: 0x%08x 0x%08x\r\n",
                 address,
                 value);
-
             error = vfs_stat(reg_result_path, &stat);
             if (error) {
                 filp_close(fp, NULL);
                 goto err;
             }
 
-            fp->f_pos = (int)stat.size;
-            if ((int)stat.size < 0) {
-                filp_close(fp, NULL);
-                goto err;
-            }
+        fp->f_pos = (int)stat.size;
+        if ((int)stat.size < 0) {
+            filp_close(fp, NULL);
+            goto err;
+        }
 
             vfs_write(fp, buf, strlen(buf), &fp->f_pos);
-
         filp_close(fp, NULL);
     }
     else {
@@ -5516,6 +5569,7 @@ void record_reg_value(unsigned int address, unsigned int value)
     }
 err:
     set_fs(fs);
+#endif
 }
 
 int vm_cfg80211_vnd_cmd_set_para(struct wiphy *wiphy, struct wireless_dev *wdev, const void *data, int data_len)
@@ -5857,9 +5911,10 @@ int vm_cfg80211_vnd_cmd_set_para(struct wiphy *wiphy, struct wireless_dev *wdev,
         }
         break;
     case VM_NL80211_VENDOR_GET_STA_RSSI_NOISE:
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
         if (wnet_vif->vm_state == WIFINET_S_CONNECTED) {
-            struct kstat stat;
             struct file *fp;
+            struct kstat stat;
             mm_segment_t fs;
             int error = 0;
             char buf[512] = {0};
@@ -5867,7 +5922,6 @@ int vm_cfg80211_vnd_cmd_set_para(struct wiphy *wiphy, struct wireless_dev *wdev,
 
             fs = get_fs();
             set_fs(KERNEL_DS);
-
             fp = filp_open(rssi_result_path, O_CREAT|O_RDWR, 0644);
 
             if (!IS_ERR(fp)) {
@@ -5892,7 +5946,6 @@ int vm_cfg80211_vnd_cmd_set_para(struct wiphy *wiphy, struct wireless_dev *wdev,
                         filp_close(fp, NULL);
                         goto err;
                     }
-
                     vfs_write(fp, buf, strlen(buf), &fp->f_pos);
                 }
                 filp_close(fp, NULL);
@@ -5902,8 +5955,8 @@ int vm_cfg80211_vnd_cmd_set_para(struct wiphy *wiphy, struct wireless_dev *wdev,
             }
 err:
             set_fs(fs);
-
         }
+#endif
         break;
 
     case VM_NL80211_VENDOR_UPDATE_WIPHY_PARAMS:

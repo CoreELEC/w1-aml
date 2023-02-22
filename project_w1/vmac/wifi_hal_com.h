@@ -499,9 +499,15 @@ struct  hal_work_task
     unsigned int TX_SEND_OK_EVENT_num[HAL_NUM_TX_QUEUES];
     unsigned int RX_No_buffer_err_num;
     unsigned int RX_No_buffer_err2_num;
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(5,15,0)
     unsigned int Tx_Send_num;
     unsigned int Tx_Done_num;
     unsigned int Tx_Free_num;    //num of tx frames have been freed after tx completed
+#else
+    atomic_t Tx_Send_num;
+    atomic_t Tx_Done_num;
+    atomic_t Tx_Free_num;
+#endif
     unsigned int tx_ok_num;
     unsigned int tx_fail_num;
     unsigned int Rx_Rcv_num;

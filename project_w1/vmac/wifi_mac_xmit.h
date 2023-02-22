@@ -2,6 +2,7 @@
 #define __VM_WIFI_OUTPUT_H__
 
 #include "wifi_mac_var.h"
+#include <linux/netdevice.h>
 
 #define ETHERTYPE_IPV6 (0x86dd)
 #define DEFAULT_LISTEN_INTERVAL (10)
@@ -32,7 +33,7 @@ int wifi_mac_is_allow_send(struct wlan_net_vif *wnet_vif, struct wifi_station *s
 void wifi_mac_xmit_pkt_parse(struct sk_buff *skb, struct wifi_mac *wifimac);
 unsigned short wifi_mac_udp_sum_calc(unsigned short len_udp, unsigned char * src_addr, unsigned char *dest_addr, unsigned char *buff);
 int wifi_mac_udp_csum(struct sk_buff *skb);
-int wifi_mac_hardstart(struct sk_buff *, struct net_device *);
+netdev_tx_t wifi_mac_hardstart(struct sk_buff *, struct net_device *);
 int wifi_mac_send_nulldata(struct wifi_station *sta, unsigned char pwr_save, unsigned char pwr_flag, unsigned char qos, int ac);
 int wifi_mac_send_nulldata_for_ap(struct wifi_station *sta, unsigned char pwr_save,unsigned char pwr_flag, unsigned char qos, int ac);
 
