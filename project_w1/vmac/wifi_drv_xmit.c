@@ -1991,7 +1991,7 @@ drv_addba_timer_ex(unsigned long param1,unsigned long param2,
 
     os_timer_ex_cancel(&tid->addba_requesttimer, CANCEL_NO_SLEEP);
 
-    return 1;   /* don't re-arm itself */
+    return ;   /* don't re-arm itself */
 }
 
 // static unsigned int my_drvaddbatimer_taskid,my_drvaddbatimer_once=0;
