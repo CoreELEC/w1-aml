@@ -375,8 +375,8 @@ struct wifi_mac* wifi_mac_get_mac_handle(void);
 void wifi_mac_restore_wnet_vif_channel_task(struct wlan_net_vif *wnet_vif);
 void wifi_mac_roaming_trigger(struct wlan_net_vif * wnet_vif);
 void wifi_mac_sm_switch (SYS_TYPE param1,SYS_TYPE param2,SYS_TYPE param3,SYS_TYPE param4,SYS_TYPE param5);
-int wifi_mac_trigger_recovery(void *arg);
+int wifi_mac_trigger_recovery(void * arg);
 void wifi_mac_fw_recovery(struct wlan_net_vif *wnet_vif);
-void wifi_mac_fw_recovery_task(SYS_TYPE param1,SYS_TYPE param2, SYS_TYPE param3,SYS_TYPE param4,SYS_TYPE param5);
+int wifi_mac_connect_repair(struct wifi_mac *wifimac);
 
 #endif

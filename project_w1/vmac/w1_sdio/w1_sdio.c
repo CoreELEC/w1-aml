@@ -10,16 +10,13 @@
 
 struct amlw1_hwif_sdio g_w1_hwif_sdio;
 struct amlw1_hif_ops g_w1_hif_ops;
-struct amlw1_hif_ops g_auc_hif_ops;
+
 unsigned char w1_sdio_wifi_bt_alive;
 unsigned char w1_sdio_driver_insmoded;
 unsigned char w1_sdio_after_porbe;
 unsigned char wifi_in_insmod;
+unsigned char wifi_in_rmmod;
 unsigned char  wifi_sdio_access = 1;
-unsigned char  chip_en_access = 0;
-unsigned char  wifi_sdio_timeout = 0;
-
-unsigned char wifi_sdio_shutdown = 0;
 unsigned int  shutdown_i = 0;
 #define  I2C_CLK_QTR   0x4
 
@@ -50,11 +47,6 @@ unsigned char (*host_wake_w1_req)(void);
 int (*host_suspend_req)(struct device *device);
 int (*host_resume_req)(struct device *device);
 
-// combine w1 and W1U BT driver need this symbol
-int auc_send_cmd(unsigned int addr, unsigned int len)
-{
-    return 0;
-}
 
 struct sdio_func *aml_priv_to_func(int func_n)
 {
@@ -161,11 +153,9 @@ static int _aml_w1_sdio_request_byte(unsigned char func_num,
     ASSERT(func != NULL);
     ASSERT(byte != NULL);
     ASSERT(func->num == func_num);
-    if (chip_en_access || wifi_sdio_shutdown)
-        return SDIOH_API_RC_FAIL;
 
     AML_W1_BT_WIFI_MUTEX_ON();
-    kmalloc_buf =  (unsigned char *)kzalloc(len, GFP_DMA | GFP_ATOMIC);//virt_to_phys(fwICCM);
+    kmalloc_buf =  (unsigned char *)kzalloc(len, GFP_DMA);//virt_to_phys(fwICCM);
     if (kmalloc_buf == NULL)
     {
         ERROR_DEBUG_OUT("kmalloc buf fail\n");
@@ -198,18 +188,6 @@ static int _aml_w1_sdio_request_byte(unsigned char func_num,
 
     kfree(kmalloc_buf);
     AML_W1_BT_WIFI_MUTEX_OFF();
-
-    if (err_ret == 0) {
-        wifi_sdio_timeout = 0;
-
-    } else {
-        wifi_sdio_timeout++;
-        if(wifi_sdio_timeout > 10) {
-          chip_en_access = 1;
-        }
-        printk("%s %d timeout times = %d\n", __func__, __LINE__, wifi_sdio_timeout);
-    }
-
     return (err_ret == 0) ? SDIOH_API_RC_SUCCESS : SDIOH_API_RC_FAIL;
 }
 
@@ -225,8 +203,6 @@ static int _aml_w1_sdio_request_buffer(unsigned char func_num,
     ASSERT(func != NULL);
     ASSERT(fix_incr == SDIO_OPMODE_FIXED|| fix_incr == SDIO_OPMODE_INCREMENT);
     ASSERT(func->num == func_num);
-    if (chip_en_access || wifi_sdio_shutdown)
-        return SDIOH_API_RC_FAIL;
 
     /* Claim host controller */
     sdio_claim_host(func);
@@ -257,17 +233,6 @@ static int _aml_w1_sdio_request_buffer(unsigned char func_num,
     /* Release host controller */
     sdio_release_host(func);
 
-    if (err_ret == 0) {
-        wifi_sdio_timeout = 0;
-
-    } else {
-        wifi_sdio_timeout++;
-        if(wifi_sdio_timeout > 10) {
-            chip_en_access = 1;
-        }
-        printk("%s %d timeout times = %d\n", __func__, __LINE__, wifi_sdio_timeout);
-    }
-
     return (err_ret == 0) ? SDIOH_API_RC_SUCCESS : SDIOH_API_RC_FAIL;
 }
 
@@ -281,9 +246,6 @@ int aml_w1_sdio_bottom_read(unsigned char func_num, int addr, void *buf, size_t 
     int align_len = 0;
 
     ASSERT(func_num != SDIO_FUNC0);
-
-    if (chip_en_access || wifi_sdio_shutdown)
-        return -1;
 
     if (!wifi_sdio_access) {
         if (func_num == SDIO_FUNC5) {
@@ -303,6 +265,7 @@ int aml_w1_sdio_bottom_read(unsigned char func_num, int addr, void *buf, size_t 
             return -1;
         }
     }
+
 
     aml_wifi_sdio_power_lock();
 
@@ -366,8 +329,6 @@ int aml_w1_sdio_bottom_write(unsigned char func_num, int addr, void *buf, size_t
 {
     void *kmalloc_buf;
     int result;
-    if (chip_en_access || wifi_sdio_shutdown)
-        return -1;
 
     if (!wifi_sdio_access) {
         if (func_num == SDIO_FUNC5) {
@@ -408,7 +369,7 @@ int aml_w1_sdio_bottom_write(unsigned char func_num, int addr, void *buf, size_t
     }
 
     AML_W1_BT_WIFI_MUTEX_ON();
-    kmalloc_buf =  (unsigned char *)kzalloc(len, GFP_DMA | GFP_ATOMIC);//virt_to_phys(fwICCM);
+    kmalloc_buf =  (unsigned char *)kzalloc(len, GFP_DMA);//virt_to_phys(fwICCM);
     if(kmalloc_buf == NULL)
     {
         ERROR_DEBUG_OUT("kmalloc buf fail\n");
@@ -498,9 +459,6 @@ int aml_w1_sdio_bottom_write8(unsigned char  func_num, int addr, unsigned char d
 {
     int ret = 0;
 
-    if (chip_en_access || wifi_sdio_shutdown)
-        return 0;
-
     ASSERT(func_num != SDIO_FUNC0);
     ret =  _aml_w1_sdio_request_byte(func_num, SDIO_WRITE, addr, &data);
 
@@ -511,16 +469,8 @@ int aml_w1_sdio_bottom_write8(unsigned char  func_num, int addr, unsigned char d
 unsigned char aml_w1_sdio_bottom_read8(unsigned char  func_num, int addr)
 {
     unsigned char sramdata;
-    int ret = 0;
-
-        if (chip_en_access || wifi_sdio_shutdown)
-            return 0;
-
-    ret = _aml_w1_sdio_request_byte(func_num, SDIO_READ, addr, &sramdata);
-    if (ret < 0)
-    {
-        return ret;
-    }
+    
+    _aml_w1_sdio_request_byte(func_num, SDIO_READ, addr, &sramdata);
     return sramdata;
 }
 
@@ -531,9 +481,6 @@ unsigned char aml_w1_sdio_bottom_read8(unsigned char  func_num, int addr)
 */
 void aml_w1_sdio_bottom_write8_func0(unsigned long sram_addr, unsigned char sramdata)
 {
-    if (chip_en_access || wifi_sdio_shutdown)
-        return;
-
     _aml_w1_sdio_request_byte(SDIO_FUNC0, SDIO_WRITE, sram_addr, &sramdata);
 }
 
@@ -541,9 +488,6 @@ void aml_w1_sdio_bottom_write8_func0(unsigned long sram_addr, unsigned char sram
 unsigned char aml_w1_sdio_bottom_read8_func0(unsigned long sram_addr)
 {
     unsigned char sramdata;
-
-    if (chip_en_access || wifi_sdio_shutdown)
-        return 0;
 
     _aml_w1_sdio_request_byte(SDIO_FUNC0, SDIO_READ, sram_addr, &sramdata);
     return sramdata;
@@ -1204,7 +1148,7 @@ void config_pmu_reg_off(void)
         reg_aon29_data.b.rg_ana_bpll_cfg |= BIT(1) | BIT(0);
         aml_w1_sdio_write_word(RG_AON_A29, reg_aon29_data.data);
 
-        aml_w1_sdio_write_word(RG_PMU_A12, 0x9ea2e); //set dpll_val(bit16) for fix sdio resp_timeout when shutdown
+        aml_w1_sdio_write_word(RG_PMU_A12, 0x9ea2e); //set dpll_val(bit16) for sdio resp_timeout
         aml_w1_sdio_write_word(RG_PMU_A14, 0x1);
         aml_w1_sdio_write_word(RG_PMU_A16, 0x0);
         aml_w1_sdio_write_word(RG_PMU_A22, 0x707);
@@ -1240,7 +1184,6 @@ static void aml_sdio_shutdown(struct device *device)
     printk("===>>> enter %s <<<===\n", __func__);
     shutdown_i += 1;
     if (shutdown_i == 1) {
-        wifi_sdio_shutdown = 1;
         config_pmu_reg_off();
     } else if (shutdown_i == 7) {
         shutdown_i = 0;
@@ -1377,9 +1320,8 @@ int  aml_w1_sdio_init(void)
     err = sdio_register_driver(&aml_w1_sdio_driver);
     w1_sdio_driver_insmoded = 1;
     wifi_in_insmod = 0;
-    chip_en_access = 0;
-    wifi_sdio_shutdown = 0;
-    PRINT("*****************aml sdio common driver is insmoded  chip_en_access=%d********************\n", chip_en_access);
+    wifi_in_rmmod = 0;
+    PRINT("*****************aml sdio common driver is insmoded********************\n");
     if (err)
         PRINT("failed to register sdio driver: %d \n", err);
 
@@ -1399,13 +1341,13 @@ void  aml_w1_sdio_exit(void)
 
 EXPORT_SYMBOL(w1_sdio_driver_insmoded);
 EXPORT_SYMBOL(wifi_in_insmod);
+EXPORT_SYMBOL(wifi_in_rmmod);
 EXPORT_SYMBOL(w1_sdio_after_porbe);
 EXPORT_SYMBOL(host_wake_w1_req);
 EXPORT_SYMBOL(host_suspend_req);
 EXPORT_SYMBOL(host_resume_req);
 EXPORT_SYMBOL(wifi_sdio_access);
-EXPORT_SYMBOL(chip_en_access);
-EXPORT_SYMBOL(w1_sdio_wifi_bt_alive);
+
 EXPORT_SYMBOL(aml_wifi_sdio_power_lock);
 EXPORT_SYMBOL(aml_wifi_sdio_power_unlock);
 /*set_wifi_bt_sdio_driver_bit() is used to determine whether to unregister sdio power driver.
@@ -1429,8 +1371,6 @@ void set_wifi_bt_sdio_driver_bit(bool is_register, int shift)
 EXPORT_SYMBOL(set_wifi_bt_sdio_driver_bit);
 EXPORT_SYMBOL(g_w1_hwif_sdio);
 EXPORT_SYMBOL(g_w1_hif_ops);
-EXPORT_SYMBOL(g_auc_hif_ops);
-EXPORT_SYMBOL(auc_send_cmd);
 
 static int aml_w1_sdio_insmod(void)
 {

@@ -373,6 +373,8 @@ int wifi_mac_rm_app_ie(struct wifi_mac_app_ie_t  * app_ie);
 int wifi_mac_save_app_ie(struct wifi_mac_app_ie_t  * app_ie, const unsigned char *app_buf,int app_buflen);
 int cipher2cap(int cipher);
 void batch_dump_reg(struct wiphy *wiphy,unsigned int addr[], unsigned int addr_num);
+void wifi_softap_allsta_stopping(struct wlan_net_vif *wnet_vif, unsigned char is_disconnecting);
+int softap_get_sta_num(struct wlan_net_vif *wnet_vif);
 
 #endif
 

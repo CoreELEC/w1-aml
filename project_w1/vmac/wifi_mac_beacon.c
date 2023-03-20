@@ -727,12 +727,14 @@ int wifi_mac_sta_beacon_init(struct wlan_net_vif *wnet_vif)
     return 0;
 }
 
-void wifi_mac_sta_beacon_init_ex (SYS_TYPE param1,
+int wifi_mac_sta_beacon_init_ex (SYS_TYPE param1,
                                 SYS_TYPE param2,SYS_TYPE param3,
                                 SYS_TYPE param4,SYS_TYPE param5)
 {
     struct wlan_net_vif *wnet_vif = (struct wlan_net_vif *)param4;
-        return ;
+    if(wnet_vif->wnet_vif_replaycounter != (int)param5)
+        return -1;
+    return wifi_mac_sta_beacon_init(wnet_vif);
 }
 
 void wifi_mac_beacon_free(void * ieee, int wnet_vif_id)
@@ -834,7 +836,6 @@ void wifi_mac_process_beacon_miss_ex(SYS_TYPE arg)
         DPRINTF(AML_DEBUG_WARNING,"bcn lost...re-scan\n");
 
         wnet_vif->vm_chan_roaming_scan_flag = 0;
-        wifi_mac_scan_access(wnet_vif);
 
         wifi_mac_top_sm(wnet_vif, WIFINET_S_SCAN, 0);
     }
@@ -867,7 +868,7 @@ int wifi_mac_set_beacon_miss_ex(struct wlan_net_vif *wnet_vif,
     return 0;
 }
 
-void wifi_mac_set_beacon_miss(SYS_TYPE param1,
+int wifi_mac_set_beacon_miss(SYS_TYPE param1,
                                 SYS_TYPE param2,SYS_TYPE param3,
                                 SYS_TYPE param4,SYS_TYPE param5)
 {
@@ -878,10 +879,10 @@ void wifi_mac_set_beacon_miss(SYS_TYPE param1,
     if (enable == 1 && period < 100/*ms*/)
     {
         WIFINET_DPRINTF(AML_DEBUG_WARNING, "period: %d, error\n", period);
-        return;
+        return -1;
     }
     wifi_mac_set_beacon_miss_ex(wnet_vif, enable, period);
-    return;
+    return 0;
 }
 
 int wifi_mac_set_vsdb_ex(struct wlan_net_vif *wnet_vif, unsigned char enable)

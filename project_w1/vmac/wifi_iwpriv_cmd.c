@@ -524,17 +524,6 @@ unsigned char aml_iwpriv_set_mac_mode(unsigned int set)
     return 0;
 }
 
-unsigned char aml_iwpriv_set_amsdu_aggr_time(unsigned int set)
-{
-    struct wifi_mac *wifimac = NULL;
-    wifimac = wifi_mac_get_mac_handle();
-    if(0 < set && 100 >= set)
-        wifimac->amsdu_aggr_time = set;
-    else
-        ERROR_DEBUG_OUT("should input 1-100\n");
-    return 0;
-}
-
 static int aml_iwpriv_send_para1(struct net_device *dev,
     struct iw_request_info *info, union iwreq_data *wrqu, char *extra)
 {
@@ -815,27 +804,7 @@ static int aml_iwpriv_send_para1(struct net_device *dev,
         case AML_IWP_SET_MAC_MODE:
             aml_iwpriv_set_mac_mode(set);
             break;
-
-        case AML_IWP_SET_AMSDU_AGGR_TIME:
-            aml_iwpriv_set_amsdu_aggr_time(set);
-            break;
-
-        case AML_IWP_GET_HOST_LOG:
-            AML_OUTPUT(" wifi host log %s\n",param[1]? "on":"off");
-            break;
-
-        case AML_IWP_GET_FW_LOG:
-            AML_OUTPUT(" wifi fw log %s\n",param[1]? "on":"off");
-            if (set == 1) {
-                wifimac->drv_priv->hal_priv->hal_ops.hal_set_fwlog_cmd(1);
-                wifimac->drv_priv->hal_priv->hal_ops.hal_set_fwlog_cmd(4);
-
-            } else if (set == 0) {
-                wifimac->drv_priv->hal_priv->hal_ops.hal_set_fwlog_cmd(0);
-
-            }
-            break;
-        }
+    }
 
     return 0;
 }
@@ -1391,12 +1360,6 @@ int aml_set_debug_modules(char *debug_str)
             return 0;
         }
         g_dbg_modules |= AML_DBG_MODULES_SCAN;
-    } else if(strstr(debug_str,"agg") != NULL) {
-        if(aml_iwpriv_set_debug_switch(debug_str) == AML_DBG_OFF) {
-            g_dbg_modules &= ~(BIT(6));
-            return 0;
-        }
-        g_dbg_modules |= AML_DBG_MODULES_AGGR;
     } else {
         ERROR_DEBUG_OUT("input error\n");
     }
@@ -1811,16 +1774,6 @@ static const struct iw_priv_args aml_iwpriv_private_args[] = {
 {
     AML_IWP_SET_MAC_MODE,
     IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "set_mac_mode"},
-{
-     AML_IWP_SET_AMSDU_AGGR_TIME,
-    IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "set_agg_amsdutm"},
-{
-    AML_IWP_GET_HOST_LOG,
-    IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "get_host_log"},
-{
-    AML_IWP_GET_FW_LOG,
-    IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "get_fw_log"},
-
 
 
 /*iwpriv get command*/

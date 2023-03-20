@@ -703,34 +703,6 @@ static void drv_tx_lower_rate_when_signal_weak(struct wlan_net_vif *wnet_vif, st
     }
 }
 
-static int amsdu_aggr_num_from_rate(struct aml_ratecontrol ratectrl, enum wifi_mac_tran_mode tran_mode)
-{
-    int amsdu_aggr_num = DEFAULT_TXAMSDU_SUB_MAX;
-
-    if(!IS_MCS_RATE(ratectrl.vendor_rate_code))
-    {
-        return DEFAULT_TXAMSDU_SUB_MAX;
-    }
-
-    if(tran_mode == TX_MODE) {
-        if(ratectrl.rate_index >= 7)
-           amsdu_aggr_num = DEFAULT_TXAMSDU_SUB_MAX * 2;
-        else
-           amsdu_aggr_num = DEFAULT_TXAMSDU_SUB_MAX;
-
-    } else {
-       if((ratectrl.rate_index <= 4 && ratectrl.bw == WIFINET_BWC_WIDTH20)
-            || (ratectrl.rate_index <= 2 && ratectrl.bw == WIFINET_BWC_WIDTH40)) {
-            amsdu_aggr_num  = DEFAULT_TXAMSDU_SUB_MAX;
-
-        } else {
-            amsdu_aggr_num = DEFAULT_TXAMSDU_SUB_MAX * 2;
-        }
-    }
-    //AML_PRINT(AML_DBG_MODULES_AGGR, "bw %d rate_index %d, tran_mode %d max_amsdunum%d\n",ratectrl.bw,ratectrl.rate_index,tran_mode,amsdu_aggr_num);
-    return amsdu_aggr_num;
-}
-
 static int drv_tx_prepare(struct drv_private *drv_priv, struct sk_buff *skbbuf,struct drv_txdesc *ptxdesc)
 {
     struct wifi_frame *wh;
@@ -831,9 +803,6 @@ static int drv_tx_prepare(struct drv_private *drv_priv, struct sk_buff *skbbuf,s
             __func__, wnet_vif->wnet_vif_id, sta, txinfo->seqnum, *((unsigned short *)&(wh->i_fc[0])), txinfo->b_mcast);
     }
 
-    sta->sta_amsdu->sta_maxamsdu_tx = amsdu_aggr_num_from_rate(ratectrl[0],TX_MODE);
-    sta->sta_amsdu->sta_maxamsdu_rx = amsdu_aggr_num_from_rate(ratectrl[0],RX_MODE);
-
     return 1;
 }
 
@@ -850,13 +819,19 @@ int drv_tx_start( struct drv_private *drv_priv, struct sk_buff *skbbuf)
     unsigned short header_room = os_skb_hdrspace(skbbuf);
     unsigned short tail_room = os_skb_get_tailroom(skbbuf);
 
-    if (!sta) {
-        ERROR_DEBUG_OUT("sta is NULL\n");
+    wnet_vif = sta->sta_wnet_vif;
+    if (!sta  || (wnet_vif->vm_opmode == WIFINET_M_HOSTAP && sta->is_disconnecting
+        && txinfo->b_datapkt)) {
+        ERROR_DEBUG_OUT("sta is NULL or softap disconnect\n");
+        return -1;
+    }
+    if (wnet_vif == NULL || wnet_vif->vm_wmac == NULL)
+    {
+        ERROR_DEBUG_OUT("-----%p is NULL should return \n",wnet_vif);
         return -1;
     }
 
-    wnet_vif = sta->sta_wnet_vif;
-    if (wnet_vif->vm_wmac->recovery_stat < WIFINET_RECOVERY_VIF_UP) {
+    if (wnet_vif->vm_opmode != WIFINET_M_HOSTAP && wnet_vif->vm_wmac->recovery_stat < WIFINET_RECOVERY_VIF_UP) {
         ERROR_DEBUG_OUT("fw recovery not finish\n");
         return -2;
     }
@@ -961,7 +936,7 @@ int drv_tx_start( struct drv_private *drv_priv, struct sk_buff *skbbuf)
         if ((header_room < HI_TXDESC_DATAOFFSET + 32) || (tail_room < 32) || (((unsigned long)skbbuf->data) % 8)) {
             skb_new = os_skb_copy_expand(skbbuf, HI_TXDESC_DATAOFFSET + 32, 32, GFP_ATOMIC, skb_new);
             if (skb_new == NULL) {
-                error = -6;
+                error = -5;
                 break;
             }
 
@@ -1331,15 +1306,12 @@ static void drv_tx_complete_mgmt_handle(struct drv_private *drv_priv,struct drv_
 
     if (ptxdesc->txdesc_frame_flag == TX_MGMT_DEAUTH && txok
         && sta->sta_wnet_vif->vm_opmode == WIFINET_M_STA) {
-        if (wnet_vif->vm_state != WIFINET_S_SCAN) {
-            wifi_mac_add_work_task(wnet_vif->vm_wmac, wifi_mac_sm_switch, NULL, (SYS_TYPE)wnet_vif, WIFINET_S_SCAN, 0, 0, 0);
-        }
+        wifi_mac_add_work_task(wnet_vif->vm_wmac, wifi_mac_sm_switch, NULL, (SYS_TYPE)wnet_vif, WIFINET_S_SCAN, 0, 0, 0);
         deauth_fail_time = 0;
     }
 
     if (ptxdesc->txdesc_frame_flag == TX_MGMT_DEAUTH && !txok
-        && sta->sta_wnet_vif->vm_opmode == WIFINET_M_STA
-        && wnet_vif->vm_state == WIFINET_S_CONNECTED) {
+        && sta->sta_wnet_vif->vm_opmode == WIFINET_M_STA) {
         deauth_fail_time ++;
     }
 
@@ -1349,9 +1321,7 @@ static void drv_tx_complete_mgmt_handle(struct drv_private *drv_priv,struct drv_
     }
 
     if(deauth_fail_time == 2) {
-        if (wnet_vif->vm_state != WIFINET_S_SCAN) {
-            wifi_mac_add_work_task(wnet_vif->vm_wmac, wifi_mac_sm_switch, NULL, (SYS_TYPE)wnet_vif, WIFINET_S_SCAN, 0, 0, 0);
-        }
+        wifi_mac_add_work_task(wnet_vif->vm_wmac, wifi_mac_sm_switch, NULL, (SYS_TYPE)wnet_vif, WIFINET_S_SCAN, 0, 0, 0);
         deauth_fail_time = 0;
     }
 
@@ -1573,7 +1543,6 @@ static void drv_tx_complete_task(struct drv_private *drv_priv, struct drv_txlist
 
             if (!txok) {
                 ptxdesc->rate_valid = 0;
-                ptxdesc->txinfo->b_Ampdu = 0;
                 skb_reserve(ptxdesc->txdesc_mpdu, HI_TXDESC_DATAOFFSET);
                 drv_priv->net_ops->wifi_mac_buffer_txq_enqueue(&drv_priv->retransmit_queue, ptxdesc->txdesc_mpdu);
                 break;
@@ -1910,9 +1879,10 @@ int drv_txlist_isfull(struct drv_private *drv_priv, int queue_id, struct sk_buff
 
     /*check if txlist is full by mpdu pending cnt is greater than
         (get_fifo free num + WIFI_MAX_TXFRAME/WIFI_MAX_TID))*/
-    if((drv_priv->drv_txlist_table[queue_id].txds_pending_cnt
-        > (fifo_freecnt + WIFI_MAX_TXFRAME/WIFI_MAX_TID + 48))
-        || (fifo_freecnt < 2)) {
+    if(drv_priv->drv_txlist_table[queue_id].txds_pending_cnt
+        > (fifo_freecnt + WIFI_MAX_TXFRAME/WIFI_MAX_TID + 48)
+        || (fifo_freecnt < 2))
+    {
         return 1;
     }
     return 0;
@@ -2002,7 +1972,7 @@ int drv_get_amsdu_supported(struct drv_private *drv_priv, void *nsta, int tid_in
 }
 
 
-static void
+static int
 drv_addba_timer_ex(unsigned long param1,unsigned long param2,
     unsigned long param3,unsigned long param4,unsigned long param5)
 {
@@ -2024,7 +1994,7 @@ drv_addba_timer_ex(unsigned long param1,unsigned long param2,
 
     os_timer_ex_cancel(&tid->addba_requesttimer, CANCEL_NO_SLEEP);
 
-    return;   /* don't re-arm itself */
+    return 1;   /* don't re-arm itself */
 }
 
 // static unsigned int my_drvaddbatimer_taskid,my_drvaddbatimer_once=0;

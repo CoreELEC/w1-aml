@@ -499,15 +499,9 @@ struct  hal_work_task
     unsigned int TX_SEND_OK_EVENT_num[HAL_NUM_TX_QUEUES];
     unsigned int RX_No_buffer_err_num;
     unsigned int RX_No_buffer_err2_num;
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(5,15,0)
     unsigned int Tx_Send_num;
     unsigned int Tx_Done_num;
     unsigned int Tx_Free_num;    //num of tx frames have been freed after tx completed
-#else
-    atomic_t Tx_Send_num;
-    atomic_t Tx_Done_num;
-    atomic_t Tx_Free_num;
-#endif
     unsigned int tx_ok_num;
     unsigned int tx_fail_num;
     unsigned int Rx_Rcv_num;
@@ -958,8 +952,6 @@ struct hal_layer_ops
     struct Tx_FrameDesc tx_frames[WIFI_MAX_TXFRAME];
     unsigned long tx_frames_map[BITS_TO_LONGS(WIFI_MAX_TXFRAME)];
     unsigned int txPageFreeNum;  //the num of free tx pages
-    unsigned int fwRecoveryCnt;
-    unsigned long fwRecoveryStamp;
     struct unicastReplayCnt  uRepCnt[WIFI_MAX_VID][WIFI_MAX_STA];
     struct multicastReplayCnt mRepCnt[WIFI_MAX_VID];
 
@@ -974,7 +966,7 @@ struct hal_layer_ops
     unsigned long tx_spinlock_flag;
     unsigned long com_spinlock_flag;
     unsigned long pn_spinlock_flag;
-
+    
     unsigned char hst_if_init_ok; // shared for DMA & SDIO
     unsigned char hst_if_irq_en; //shared for DMA & SDIO
     unsigned char bhalOpen;

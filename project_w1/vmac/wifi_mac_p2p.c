@@ -2088,6 +2088,8 @@ unsigned char is_need_process_p2p_action(unsigned char* buf) {
 void vm_p2p_switch_nego_state(struct wifi_mac_p2p *p2p, struct wifi_mac_p2p_pub_act_frame *frm, unsigned char tx, int *len)
 {
     unsigned int chanList_len = vm_get_p2pie_len(p2p, (const unsigned char *)frm->elts, len, P2P_ATTR_CHANNEL_LIST);
+    struct wifi_mac *wifimac = p2p->wnet_vif->vm_wmac;
+    int tmplen = 0;
 
     switch (frm->subtype) {
         case P2P_PROVISION_DISC_REQ:
@@ -2141,6 +2143,10 @@ void vm_p2p_switch_nego_state(struct wifi_mac_p2p *p2p, struct wifi_mac_p2p_pub_
             if (0 == *(frm->elts + 9)) //status
             {
                 p2p->p2p_negotiation_state = NET80211_P2P_STATE_GONEGO_CONF;
+                if (vm_get_wfd_ie(frm->elts, *len - 8, NULL, &tmplen)) {
+                    printk("invite rsp set is_miracast_connect 1\n");
+                    wifimac->is_miracast_connect = 1;
+                }
             }else {
                 p2p->p2p_negotiation_state = NET80211_P2P_STATE_TX_IDLE;
                 p2p->change_intent_flag = 0;
@@ -2218,6 +2224,12 @@ void vm_p2p_switch_nego_state(struct wifi_mac_p2p *p2p, struct wifi_mac_p2p_pub_
             p2p->p2p_negotiation_state = NET80211_P2P_STATE_GONEGO_CONF;
             p2p->peer_listen_channel = 0;
             memset(p2p->peer_dev_addr, 0 , MAX_MAC_BUF_LEN);
+            if (0 == *(frm->elts + 9)) {
+                if (vm_get_wfd_ie(frm->elts, *len - 8, NULL, &tmplen)) {
+                    printk("conf set is_miracast_connect 1\n");
+                    wifimac->is_miracast_connect = 1;
+                }
+            }
             break;
 
         default:

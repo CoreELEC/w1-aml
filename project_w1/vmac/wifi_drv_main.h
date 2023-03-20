@@ -124,8 +124,6 @@
                 }                                                           \
         } while (0)
 
-#define MIN_DWELL_DUR 10
-
 struct drv_tx_scoreboard
 {
     unsigned char vid;

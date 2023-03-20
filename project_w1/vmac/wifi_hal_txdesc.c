@@ -121,20 +121,6 @@ static const unsigned char ht_ba_txtime[WIFI_11N_MAX+1][2/*b_shortGI*/][2/*b_40M
     { {44 ,40  } , {44 ,40  } , }, /*mcs7*/
 };
 
-static const unsigned char vht_ba_txtime[WIFI_11AC_MAX+1]=
-{
-    68, /*mcs0*/
-    44, /*mcs1*/
-    44, /*mcs2*/
-    32, /*mcs3*/
-    32, /*mcs4*/
-    32, /*mcs5*/
-    32, /*mcs6*/
-    32, /*mcs7*/
-    32, /*mcs8*/
-    32, /*mcs9*/
-};
-
 static const unsigned char ht_ack_txtime[WIFI_11N_MAX+1][2][2] =
 {
     { {60 ,48  } , {58 ,47  } , }, /*mcs0*/
@@ -623,6 +609,7 @@ unsigned short Hal_TxDescriptor_GetAckTimeout( unsigned char data_rate,unsigned 
     }
 }
 
+
 /*+SIGNAL_EXTENSION_VALUE+TXTIME(pclp+data+signalextension)*/
 unsigned short Hal_TxDescriptor_GetAckTime(
     unsigned char data_rate ,
@@ -672,7 +659,7 @@ unsigned short Hal_TxDescriptor_GetBATime(
     {
         ackrate = GET_VHT_MCS(ackrate);
         return (b_rifs?2:16)//sifs +ack frame Signal Extension
-               +vht_ba_txtime[ackrate]+PHY_TEST;//ack txtime not have Signal Extension
+               +ht_ba_txtime[ackrate][b_shortGI][bw]+PHY_TEST;//ack txtime not have Signal Extension
     }
     else
     {

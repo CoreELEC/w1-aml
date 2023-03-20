@@ -764,20 +764,11 @@ void hi_soft_tx_irq(void)
                 || (tx_null_status->txstatus == TX_DESCRIPTOR_STATUS_NULL_DATA_FAIL)
                 || (tx_null_status->txstatus == TX_DESCRIPTOR_STATUS_NEW)))
             {
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
                 __sync_fetch_and_add(&hif->HiStatus.Tx_Free_num,1);
-#else
-                atomic_add(1, &hif->HiStatus.Tx_Free_num);
-#endif
             }
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
             if ((tx_null_status->txstatus == TX_DESCRIPTOR_STATUS_NEW) && (hif->HiStatus.Tx_Free_num < hif->HiStatus.Tx_Done_num)) {
                 __sync_fetch_and_add(&hif->HiStatus.Tx_Free_num,1);
-#else
-            if ((tx_null_status->txstatus == TX_DESCRIPTOR_STATUS_NEW) && (atomic_read(&hif->HiStatus.Tx_Free_num) < atomic_read(&hif->HiStatus.Tx_Done_num))) {
-                atomic_add(1, &hif->HiStatus.Tx_Free_num);
-#endif
             }
         }
 #elif defined (HAL_SIM_VER)
@@ -1180,7 +1171,7 @@ void hi_irq_task(struct hal_private *hal_priv)
     }
 
     AML_TXLOCK_LOCK();
-    if (hal_priv->need_scheduling_tx || aml_wifi_is_enable_rf_test()) {
+    if (hal_priv->need_scheduling_tx) {
         hal_tx_frame();
     }
     AML_TXLOCK_UNLOCK();

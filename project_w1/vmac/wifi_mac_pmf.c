@@ -11,26 +11,26 @@ void wifi_mac_disable_hw_mgmt_decrypt(void) {
     unsigned int reg_val;
 
     printk("%s\n", __func__);
-    reg_val = fi_ahb_read(0x00a00308);
-    fi_ahb_write(0x00a00308, reg_val | BIT(28));
+    reg_val = fi_ahb_read(0x0a000308);
+    fi_ahb_write(0x0a000308, reg_val | BIT(28));
 
-    reg_val = fi_ahb_read(0x00a00314);
-    fi_ahb_write(0x00a00314, reg_val | BIT(28));
+    reg_val = fi_ahb_read(0x0a000314);
+    fi_ahb_write(0x0a000314, reg_val | BIT(28));
 
-    reg_val = fi_ahb_read(0x00a00320);
-    fi_ahb_write(0x00a00320, reg_val | BIT(28));
+    reg_val = fi_ahb_read(0x0a000320);
+    fi_ahb_write(0x0a000320, reg_val | BIT(28));
 
-    reg_val = fi_ahb_read(0x00a0032c);
-    fi_ahb_write(0x00a0032c, reg_val | BIT(28));
+    reg_val = fi_ahb_read(0x0a00032c);
+    fi_ahb_write(0x0a00032c, reg_val | BIT(28));
 
-    reg_val = fi_ahb_read(0x00a00338);
-    fi_ahb_write(0x00a00338, reg_val | BIT(28));
+    reg_val = fi_ahb_read(0x0a000338);
+    fi_ahb_write(0x0a000338, reg_val | BIT(28));
 
-    reg_val = fi_ahb_read(0x00a00340);
-    fi_ahb_write(0x00a00340, reg_val | BIT(28));
+    reg_val = fi_ahb_read(0x0a000340);
+    fi_ahb_write(0x0a000340, reg_val | BIT(28));
 
-    reg_val = fi_ahb_read(0x00a00354);
-    fi_ahb_write(0x00a00354, reg_val | BIT(28));
+    reg_val = fi_ahb_read(0x0a000354);
+    fi_ahb_write(0x0a000354, reg_val | BIT(28));
 }
 
 unsigned char _bip_ccmp_protect(const unsigned char *key, size_t key_len,

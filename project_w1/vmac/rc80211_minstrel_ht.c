@@ -417,32 +417,6 @@ void minstrel_clear_unfitable_rate_stats(struct minstrel_ht_sta *mi, unsigned ch
     }
 }
 
-void minstrel_clear_unfitable_prob_ewma(struct minstrel_ht_sta *mi)
-{
-    unsigned int i = 0, bw = 0, group = 0;
-    struct minstrel_mcs_group_data *mg;
-    struct minstrel_rate_stats *mrs;
-
-    for (group = 0; group < ARRAY_SIZE(minstrel_mcs_groups); group++) {
-        if (!mi->supported[group])
-            continue;
-
-        bw = minstrel_mcs_groups[group].flags & IEEE80211_TX_RC_80_MHZ_WIDTH ? BW_80
-            : minstrel_mcs_groups[group].flags & IEEE80211_TX_RC_40_MHZ_WIDTH ? BW_40 : BW_20;
-
-        if (!(mi->sample_clear_bw & BIT(bw)))
-            continue;
-
-        mg = &mi->groups[group];
-        for (i = 0; i < MCS_GROUP_RATES; i++) {
-            if (!(mi->supported[group] & BIT(i))) {
-                continue;
-            }
-            mrs = &mg->rates[i];
-            mrs->prob_ewma = 0;
-        }
-    }
-}
 
 /*
  * Update rate statistics and select new primary rates
@@ -515,14 +489,6 @@ minstrel_ht_update_stats(struct minstrel_priv *mp, struct minstrel_ht_sta *mi)
             minstrel_ht_set_best_prob_rate(mi, index);
 
             if ((mrs->att_hist != 0) && (mrs->succ_hist != 0)) {
-                if ((mi->sample_init_flag && (index == mi->sample_init_idx) && mrs->prob_ewma && (mrs->prob_ewma < MINSTREL_FRAC(10, 10)))
-                    || (mrs->prob_ewma && (mrs->prob_ewma < MINSTREL_FRAC(10, 100)))) {
-                    mi->sample_all_bw = 1;
-                    mi->sample_clear_flag = 1;
-                    mi->sample_clear_bw |= minstrel_mcs_groups[group].flags & IEEE80211_TX_RC_80_MHZ_WIDTH ? (1 << BW_80)
-                        : minstrel_mcs_groups[group].flags & IEEE80211_TX_RC_40_MHZ_WIDTH ? (1 << BW_40) : (1 << BW_20);
-                }
-
                 AML_PRINT(AML_DBG_MODULES_RATE_CTR, "group=%d,rate idx =%d, success=%4d,attempts=%4d, succ_hist=%6d, att_hist=%7d,%3d%%, prob_ewma=%4d,tp_avg=%3d,duration=%d\n",
                      group, i, mrs->last_success, mrs->last_attempts, mrs->succ_hist,mrs->att_hist,mrs->succ_hist*100/mrs->att_hist, mrs->prob_ewma, mrs->tp_avg, minstrel_mcs_groups[group].duration[i]);
             }
@@ -565,8 +531,6 @@ void minstrel_init_start_stats(void *priv, void *priv_sta, unsigned char max_rat
     int group;
     unsigned char group_bw = 0;
 
-    mi->sample_init_flag = 1;
-    mi->sample_force_counts = 3;
     for (group = 0; group < ARRAY_SIZE(minstrel_mcs_groups); group++) {
         group_bw = minstrel_mcs_groups[group].flags & IEEE80211_TX_RC_80_MHZ_WIDTH ? BW_80
             : minstrel_mcs_groups[group].flags & IEEE80211_TX_RC_40_MHZ_WIDTH ? BW_40 : BW_20;
@@ -581,23 +545,15 @@ void minstrel_init_start_stats(void *priv, void *priv_sta, unsigned char max_rat
         printk("%s rate_index:%d, bw:%d\n", __func__, max_rate, bw);
         mrs = &mg->rates[max_rate];
         mrs->attempts = 2;
-        mrs->att_hist = 0;
+        mrs->att_hist = 3;
         mrs->success = 2;
-        mrs->succ_hist = 0;
+        mrs->succ_hist = 3;
 
         mrs = &mg->rates[2];
         mrs->attempts = 1;
-        mrs->att_hist = 0;
+        mrs->att_hist = 1;
         mrs->success = 1;
-        mrs->succ_hist = 0;
-
-        mrs = &mg->rates[0];
-        mrs->attempts = 1;
-        mrs->att_hist = 0;
-        mrs->success = 1;
-        mrs->succ_hist = 0;
-
-        mi->sample_init_idx = group * MCS_GROUP_RATES + 0;
+        mrs->succ_hist = 1;
     }
 
     minstrel_ht_update_stats(mp, mi);
@@ -992,14 +948,6 @@ minstrel_get_sample_rate(struct minstrel_priv *mp, struct minstrel_ht_sta *mi, s
     if (sample_idx == mi->max_tp_rate[0] || sample_idx == mi->max_prob_rate)
         return -1;
 
-    if (mi->sample_init_flag) {
-        sample_idx = mi->sample_init_idx;
-        mi->sample_init_counts++;
-        if (mi->sample_init_counts > mi->sample_force_counts) {
-            mi->sample_init_flag = 0;
-        }
-    }
-
     /*
     * Make sure that lower rates get sampled only occasionally,
     * if the link is working perfectly.
@@ -1212,9 +1160,9 @@ minstrel_ht_update_caps(void *priv, struct ieee80211_supported_band *sband,
 			continue;
 
 		if (gflags & IEEE80211_TX_RC_80_MHZ_WIDTH) {
-			if (((gflags & IEEE80211_TX_RC_SHORT_GI) && 
-				!(vht_cap->cap & IEEE80211_VHT_CAP_SHORT_GI_80))
-				 || sta->bandwidth < IEEE80211_STA_RX_BW_80) {
+			if (sta->bandwidth < IEEE80211_STA_RX_BW_80 ||
+				((gflags & IEEE80211_TX_RC_SHORT_GI) &&
+				!(vht_cap->cap & IEEE80211_VHT_CAP_SHORT_GI_80))) {
 				continue;
 			}
 		}

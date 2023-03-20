@@ -89,7 +89,6 @@ enum
     AML_DBG_MODULES_HAL_TX = BIT(3),    /* hal_tx */
     AML_DBG_MODULES_TX_ERROR = BIT(4),
     AML_DBG_MODULES_SCAN = BIT(5),
-    AML_DBG_MODULES_AGGR = BIT(6),
     AML_DEBUG_MODULES_ALL = 0xffffffffffffffff,
 };
 
@@ -106,8 +105,6 @@ enum
                         printk("[TX_ERROR] <%s> %d "format"",__FUNCTION__, __LINE__, ##__VA_ARGS__); \
                     else if(_m == AML_DBG_MODULES_SCAN) \
                         printk("[SCAN] <%s> %d "format"",__FUNCTION__, __LINE__, ##__VA_ARGS__); \
-                    else if(_m == AML_DBG_MODULES_AGGR) \
-                        printk("[AGGRATION] <%s> %d "format"",__FUNCTION__, __LINE__, ##__VA_ARGS__); \
                 }    \
         } while (0)
 

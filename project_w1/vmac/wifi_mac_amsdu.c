@@ -197,54 +197,15 @@ void wifi_mac_txamsdu_free_all(struct wifi_mac *wifimac, unsigned char vid)
     WIFINET_AMSDU_TASKLET_UNLOCK(wifimac);
 }
 
-static enum hrtimer_restart wifi_mac_amsdu_timeout_handle(struct hrtimer *timer)
-{
-    unsigned char tid_index = 0;
-    struct wifi_mac *wifimac = wifi_mac_get_mac_handle();
-    for(tid_index= 0; tid_index < WME_NUM_TID; tid_index++)
-    {
-       if(wifimac->amsdu_timer[tid_index].active && !memcmp(&(wifimac->amsdu_timer[tid_index].amsdu_hr_timer), timer, sizeof(struct hrtimer)))
-       {
-           AML_PRINT(AML_DBG_MODULES_AGGR, "tid--%d--timeout-\n",tid_index);
-           wifimac->amsdu_timer[tid_index].is_timeout = 1;
-           wifimac->amsdu_timer[tid_index].active = 0;
-           break;
-       }
-    }
-
-    return HRTIMER_NORESTART;
-
-}
-
-void wifi_mac_amsdu_hrtimer_attach(struct wifi_mac *wifimac,unsigned char tid_index)
-{
-    hrtimer_init(&wifimac->amsdu_timer[tid_index].amsdu_hr_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-    wifimac->amsdu_timer[tid_index].amsdu_hr_timer.function = wifi_mac_amsdu_timeout_handle;
-    wifimac->amsdu_timer[tid_index].is_timeout = 0;
-    wifimac->amsdu_timer[tid_index].active = 1;
-    hrtimer_start(&wifimac->amsdu_timer[tid_index].amsdu_hr_timer,
-        ktime_set(0, wifimac->amsdu_aggr_time * 1000000), HRTIMER_MODE_REL);
-}
-
-void wifi_mac_amsdu_hrtimer_cancel(struct wifi_mac *wifimac, unsigned char tid_index)
-{
-    if(wifimac->amsdu_timer[tid_index].active) {
-        wifimac->amsdu_timer[tid_index].is_timeout = 0;
-        wifimac->amsdu_timer[tid_index].active = 0;
-        hrtimer_cancel(&wifimac->amsdu_timer[tid_index].amsdu_hr_timer);
-    }
-    return;
-}
-
-
 /*shijie.chen add amsdu tasklet to aggregate amsdu and remove amsdu timer*/
 static void wifi_mac_amsdu_tasklet(unsigned long arg)
 {
     struct wifi_mac *wifimac = (struct wifi_mac *)(SYS_TYPE)arg;
     struct wifi_mac_amsdu_tx *amsdutx = NULL;
     struct wifi_mac_msdu_node *msdu_node = NULL;
+    unsigned long now_time;
     struct drv_private *drv_priv = NULL;
-    unsigned char tid_index;
+
     struct wifi_mac_msdu_node *need_free_node = NULL;
     drv_priv = wifimac->drv_priv;
 
@@ -294,8 +255,8 @@ static void wifi_mac_amsdu_tasklet(unsigned long arg)
     /*flush remain msdus if exist and live time is timeout*/
     if ((amsdutx != NULL) && (amsdutx->amsdunum > 0))
     {
-        tid_index = os_skb_get_tid(amsdutx->msdu_tmp_buf[0]);
-        if (!wifimac->amsdu_timer[tid_index].is_timeout)
+        now_time = jiffies;
+        if (!time_after(now_time, amsdutx->in_time + (AMSDU_MAX_LIVE_TIME*HZ/1000)))
         {
             return;
         }
@@ -414,8 +375,6 @@ struct sk_buff *wifi_mac_amsdu_aggr(struct wifi_mac *wifimac, struct wifi_mac_am
 
     sta = os_skb_get_nsta(amsdutx->msdu_tmp_buf[0]);
     tid_index = os_skb_get_tid(amsdutx->msdu_tmp_buf[0]);
-
-    AML_PRINT(AML_DBG_MODULES_AGGR,"amsdunum %d framelen %d\n",amsdutx->amsdunum,amsdutx->framelen);
     for (i = 0; i < amsdutx->amsdunum; i++)
     {
         if (i == 0)
@@ -485,7 +444,9 @@ struct sk_buff *wifi_mac_amsdu_ex( struct sk_buff *skbbuf)
     struct drv_private *drv_priv = NULL;
     unsigned char tid_index = os_skb_get_tid(skbbuf);
     unsigned int framelen = 0, amsdu_max_buffer_size = 0, amsdu_max_len = 0;
-    int amsdu_deny = 0 , txcnt = 0;
+    int amsdu_deny = 0, tx_amsdu_sub_max = 0, txcnt = 0;
+    unsigned long now_time;
+    static unsigned int ampdu_max_len = 3212;
 
     drv_priv = wifimac->drv_priv;
     amsdutx = &(sta->sta_amsdu->amsdutx[tid_index]);
@@ -495,25 +456,27 @@ struct sk_buff *wifi_mac_amsdu_ex( struct sk_buff *skbbuf)
     {
         amsdu_max_buffer_size = AMSDU_MAX_BUFFER_SIZE_BW80;
         amsdu_max_len = AMSDU_MAX_LEN_BW80;
+        tx_amsdu_sub_max = DEFAULT_TXAMSDU_SUB_MAX_BW80;
     }
     else
     {
        amsdu_max_buffer_size = AMSDU_MAX_BUFFER_SIZE;
        amsdu_max_len = AMSDU_MAX_LEN;
+       tx_amsdu_sub_max = DEFAULT_TXAMSDU_SUB_MAX;
     }
+
     amsdu_max_len = MIN(sta->sta_amsdu->amsdu_max_length, amsdu_max_len);
+    amsdu_max_len = MIN(amsdu_max_len, ampdu_max_len);
 
     /*adjust max subframe num dynamicly to send to hal-layer ASAP if hal-layer no packets to send. */
     txcnt = wifimac->drv_priv->drv_ops.txlist_all_qcnt(wifimac->drv_priv, wifimac->wm_ac2q[os_skb_get_priority(skbbuf)]);
     if (txcnt <= 4)
     {
-       sta->sta_amsdu->sta_maxamsdu_tx = DEFAULT_TXAMSDU_SUB_MAX_BW80/4;
-       sta->sta_amsdu->sta_maxamsdu_rx = DEFAULT_TXAMSDU_SUB_MAX_BW80/4;
+        tx_amsdu_sub_max = DEFAULT_TXAMSDU_SUB_MAX_BW80/4;
     }
-    else
+    else if (txcnt <= 8)
     {
-        sta->sta_amsdu->sta_maxamsdu_tx = DEFAULT_TXAMSDU_SUB_MAX_BW80/2;
-        sta->sta_amsdu->sta_maxamsdu_rx = DEFAULT_TXAMSDU_SUB_MAX_BW80/2;
+       tx_amsdu_sub_max = DEFAULT_TXAMSDU_SUB_MAX_BW80/2;
     }
     amsdu_deny = wifi_mac_amsdu_check(skbbuf);
     framelen = AMSDU_SUBFRAME_TOTAL_LEN(os_skb_get_pktlen(skbbuf));
@@ -521,10 +484,9 @@ struct sk_buff *wifi_mac_amsdu_ex( struct sk_buff *skbbuf)
     /*if skbbuf is deny transmit bufferable skb previously and return current skbbuf */
     if ((framelen > AMSDU_MAX_SUBFRM_LEN) || amsdu_deny )
     {
-        AML_PRINT(AML_DBG_MODULES_AGGR, "tx amsdu firstly\n");
+        DPRINTF(AML_DEBUG_INFO, "%s %d tx amsdu firstly\n", __func__,__LINE__);
         if (amsdutx->amsdunum > 0)
         {
-            wifi_mac_amsdu_hrtimer_cancel(wifimac, tid_index);
             if (wifi_mac_amsdu_aggr(wifimac, amsdutx) != NULL)
             {
                 wifi_mac_amsdu_tx2drvlay(wifimac, amsdutx);
@@ -536,29 +498,25 @@ struct sk_buff *wifi_mac_amsdu_ex( struct sk_buff *skbbuf)
         return NULL;
     }
 
-    if (amsdutx->amsdunum == 0 && !wifimac->amsdu_timer[tid_index].active)
+    if (amsdutx->amsdunum == 0)
     {
-        wifi_mac_amsdu_hrtimer_cancel(wifimac, tid_index);
-        wifi_mac_amsdu_hrtimer_attach(wifimac, tid_index);
+        amsdutx->in_time = jiffies;
     }
 
-    if (((((framelen + amsdutx->framelen + sizeof(struct ether_header)) <= amsdu_max_len)
-        && (amsdutx->amsdunum + 1 <= sta->sta_amsdu->sta_maxamsdu_tx)
-        && !wifimac->amsdu_timer[tid_index].is_timeout))
-        || (((framelen + amsdutx->framelen + sizeof(struct ether_header)) < 600)
-        && amsdutx->amsdunum + 1 <= sta->sta_amsdu->sta_maxamsdu_rx && !wifimac->amsdu_timer[tid_index].is_timeout))
-
+    now_time = jiffies;
+    if (((framelen + amsdutx->framelen + sizeof(struct ether_header)) <= amsdu_max_len)
+        && (amsdutx->amsdunum + 1 <= tx_amsdu_sub_max)
+        && (!time_after(now_time, amsdutx->in_time + (AMSDU_MAX_LIVE_TIME*HZ/1000))))
     {
-        AML_PRINT(AML_DBG_MODULES_AGGR, "just add to amsdu\n");
+        DPRINTF(AML_DEBUG_INFO, "%s %d just add to amsdu\n", __func__,__LINE__);
         amsdutx->msdu_tmp_buf[amsdutx->amsdunum] = skbbuf;
         amsdutx->framelen += framelen;
         amsdutx->amsdunum++;
 
         /*if meet aggregation condition after last aggregating, we shall send amsdu immediately. */
         if ((amsdutx->framelen + sizeof(struct ether_header) == amsdu_max_len)
-          || (amsdutx->amsdunum == sta->sta_amsdu->sta_maxamsdu_tx))
+          || (amsdutx->amsdunum == tx_amsdu_sub_max))
         {
-            wifi_mac_amsdu_hrtimer_cancel(wifimac, tid_index);
             if (wifi_mac_amsdu_aggr(wifimac, amsdutx) != NULL)
             {
                 wifi_mac_amsdu_tx2drvlay(wifimac, amsdutx);
@@ -567,7 +525,6 @@ struct sk_buff *wifi_mac_amsdu_ex( struct sk_buff *skbbuf)
     }
     else
     {
-        wifi_mac_amsdu_hrtimer_cancel(wifimac, tid_index);
         if (wifi_mac_amsdu_aggr(wifimac, amsdutx) != NULL)
         {
             wifi_mac_amsdu_tx2drvlay(wifimac, amsdutx);
@@ -665,8 +622,6 @@ int wifi_mac_amsdu_attach(struct wifi_mac *wifimac)
     for (tid = 0; tid < WME_NUM_TID; tid++)
     {
         wifimac->msdu_cnt[tid] = 0;
-        wifimac->amsdu_timer[tid].active = 0;
-        wifimac->amsdu_timer[tid].is_timeout = 0;
     }
     wifi_mac_msdu_list_init(&(wifimac->msdu_node_list), MAX_MSDU_CNT * WME_NUM_TID);
 
@@ -694,8 +649,6 @@ int wifi_mac_alloc_amsdu_node(struct wifi_mac *wifimac, unsigned char vid, struc
 
     sta->sta_amsdu->amsdu_max_length = AMSDU_MAX_BUFFER_SIZE_BW80;
     sta->sta_amsdu->amsdu_max_sub = DEFAULT_TXAMSDU_SUB_MAX_BW80;
-    sta->sta_amsdu->sta_maxamsdu_tx = DEFAULT_TXAMSDU_SUB_MAX;
-    sta->sta_amsdu->sta_maxamsdu_rx = DEFAULT_TXAMSDU_SUB_MAX;
 
     /*init amsdu max length capability */
     if (wifimac->wm_flags_ext2 & WIFINET_VHTCAP_MAX_MPDU_LEN_11454)

@@ -1008,13 +1008,9 @@ unsigned char hal_alloc_fw_event_buf( struct hal_private *hal_priv)
 unsigned char hal_tx_empty()
 {
     struct hw_interface* hif = hif_get_hw_interface();
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0)
+
     if ((hif->HiStatus.Tx_Send_num == hif->HiStatus.Tx_Free_num)
         &&(hif->HiStatus.Tx_Send_num ==hif->HiStatus.Tx_Done_num))
-#else
-    if ((atomic_read(&hif->HiStatus.Tx_Send_num) == atomic_read(&hif->HiStatus.Tx_Free_num))
-        &&(atomic_read(&hif->HiStatus.Tx_Send_num) == atomic_read(&hif->HiStatus.Tx_Done_num)))
-#endif
     {
         return true;
     }
@@ -1144,11 +1140,7 @@ void hal_txframe_pre(void)
             if (CO_SharedFifoEmpty(pTxShareFifo, CO_TX_BUFFER_MAKE))
             {
                 if ((txqueueid == HAL_WME_NOQOS)
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0)
                     && (hif->HiStatus.Tx_Done_num - hif->HiStatus.Tx_Free_num > 32)) {
-#else
-                && (atomic_read(&hif->HiStatus.Tx_Done_num) - atomic_read(&hif->HiStatus.Tx_Free_num) > 32)) {
-#endif
                     return;
                 }
                 EltPtr = CO_SharedFifoPick(pTxShareFifo, CO_TX_BUFFER_MAKE);
@@ -1289,6 +1281,15 @@ void  hal_tx_frame(void)
             AggrNum     = pTxDPape->TxPriv.AggrNum;
 
             q_fifo_set_cnt = CO_SharedFifoNbEltCont(pTxShareFifo,CO_TX_BUFFER_SET);
+
+            if (!pTxDPape->TxPriv.AggrNum || !pTxDPape->TxPriv.aggr_page_num || pTxDPape->TxPriv.TID > QUEUE_BEACON)
+            {
+                STATUS =CO_SharedFifoGet(pTxShareFifo,CO_TX_BUFFER_SET,1,&EltPtr);
+                STATUS =CO_SharedFifoPut(pTxShareFifo,CO_TX_BUFFER_SET,1);
+                PRINT("!!!error:set_cnt:%d, aggrnum:%d, aggr_page_num:%d, sn:%d, skb:%p, tid:%d, fc:0x%x\n", q_fifo_set_cnt, pTxDPape->TxPriv.AggrNum, pTxDPape->TxPriv.aggr_page_num,
+                       pTxDPape->TxPriv.SN, pTxDescFiFo->ampduskb, pTxDPape->TxPriv.TID, pTxDPape->TxVector.tv_FrameControl);
+                break;
+            }
 #if defined (HAL_FPGA_VER)
             if ((pTxDPape->TxPriv.aggr_page_num <= hal_priv->txPageFreeNum)
                     && (pTxDPape->TxPriv.AggrNum <= q_fifo_set_cnt)
@@ -1320,6 +1321,15 @@ void  hal_tx_frame(void)
 
                     STATUS =CO_SharedFifoGet(pTxShareFifo,CO_TX_BUFFER_SET,1,&EltPtr);
                     ASSERT(STATUS==CO_STATUS_OK);
+                    if (STATUS != CO_STATUS_OK)
+                    {
+                        PRINT("!!!error:TxPriv.aggr_page_num:%d, txPageFreeNum:%d, TxPriv.AggrNum:%d, set_cnt:%d, "\
+                        "AggrNum:%d, mpdu_num:%d, aggr_page_num:%d, aggrlen:%d, sn:%d, queueid:%d, sn:%d, skb:%p, tid:%d, fc:0x%x \n",
+                        pTxDPape->TxPriv.aggr_page_num, hal_priv->txPageFreeNum, pTxDPape->TxPriv.AggrNum, q_fifo_set_cnt,
+                        AggrNum, mpdu_num, aggr_page_num, pTxDPape->TxPriv.AggrLen, pTxDPape->TxPriv.SN, txqueueid,
+                        pTxDPape->TxPriv.SN, pTxDescFiFo->ampduskb, pTxDPape->TxPriv.TID, pTxDPape->TxVector.tv_FrameControl);
+                    }
+
                     STATUS =CO_SharedFifoPut(pTxShareFifo,CO_TX_BUFFER_SET,1);
                     ASSERT(STATUS==CO_STATUS_OK);
 
@@ -1343,11 +1353,7 @@ void  hal_tx_frame(void)
                     memcpy(tmp+offset, pTxDPape, len);
                     offset += len;
 #endif
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
                     __sync_fetch_and_add(&hif->HiStatus.Tx_Done_num,1);
-#else
-                    atomic_add(1, &hif->HiStatus.Tx_Done_num);
-#endif
                     EltPtr = CO_SharedFifoPick(pTxShareFifo,CO_TX_BUFFER_SET);
                     pTxDescFiFo = ( struct fw_txdesc_fifo *)EltPtr ;
                     pTxDPape = pTxDescFiFo->pTxDPape;
@@ -1526,11 +1532,8 @@ struct sk_buff *hal_fill_agg_start(struct hi_agg_tx_desc *HI_AGG,struct hi_tx_pr
 
     pTxDPape->TxOption.pkt_position = AML_PKT_IN_HAL;
     hal_priv->Hi_TxAgg[txqueueid] = pTxDPape;
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
     __sync_fetch_and_add(&hif->HiStatus.Tx_Send_num,1);
-#else
-    atomic_add(1, &hif->HiStatus.Tx_Send_num);
-#endif
+
     STATUS = CO_SharedFifoPut(&hal_priv->txds_trista_fifo[txqueueid],CO_TX_BUFFER_GET,1);
     ASSERT(STATUS==CO_STATUS_OK)
 
@@ -1597,11 +1600,8 @@ struct sk_buff *hal_fill_priv(struct hi_tx_priv_hdr* HI_TxPriv,unsigned char que
         hal_show_txframe(pTxDPape);
     }
 #endif
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
     __sync_fetch_and_add(&hif->HiStatus.Tx_Send_num,1);
-#else
-    atomic_add(1, &hif->HiStatus.Tx_Send_num);
-#endif
+
     STATUS = CO_SharedFifoPut(&hal_priv->txds_trista_fifo[txqueueid],CO_TX_BUFFER_GET,1);
     ASSERT(STATUS==CO_STATUS_OK);
 
@@ -1631,11 +1631,7 @@ int hal_get_priv_cnt(unsigned char queue_id)
 int hal_get_agg_pend_cnt(void)
 {
     struct hw_interface* hif = hif_get_hw_interface();
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0)
     return hif->HiStatus.Tx_Send_num - hif->HiStatus.Tx_Free_num;
-#else
-    return atomic_read(&hif->HiStatus.Tx_Send_num) - atomic_read(&hif->HiStatus.Tx_Free_num);
-#endif
 }
 
  int hal_tx_flush(unsigned char vid)
@@ -1696,13 +1692,8 @@ int hal_get_agg_pend_cnt(void)
                 hal_free_tx_id(hal_priv, &txstatus, &callback, &queue_id);
                 hal_priv->hal_call_back->intr_tx_handle(hal_priv->drv_priv, &txstatus, pTxDescFiFo->callback, queue_id);
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
                 __sync_fetch_and_add(&hif->HiStatus.Tx_Done_num,1);
                 __sync_fetch_and_add(&hif->HiStatus.Tx_Free_num,1);
-#else
-                atomic_add(1,&hif->HiStatus.Tx_Done_num);
-                atomic_add(1,&hif->HiStatus.Tx_Free_num);
-#endif
 
             } else {
                 remain_eltptr[remain_count++] = EltPtr;
@@ -1804,18 +1795,10 @@ void hal_get_sts(unsigned int op_code, unsigned int ctrl_code)
         {
             printk("en_beacon[0]=%d\nen_beacon[1]=%d\n", hal_priv->sts_en_bcn[0], hal_priv->sts_en_bcn[1]);
             printk("dis_beacon[0]=%d\ndis_beacon[1]=%d\n", hal_priv->sts_dis_bcn[0], hal_priv->sts_dis_bcn[1]);
-            printk("hal:fw recovery cnt %d last stamp %lu\n", hal_priv->fwRecoveryCnt, hal_priv->fwRecoveryStamp);
 
             printk("hal:tx_free_page %d \n", hal_priv->txPageFreeNum);
             printk("hal:tx_ok_num:%d, tx_fail_num:%d\n", hif->HiStatus.tx_ok_num, hif->HiStatus.tx_fail_num);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0)
             printk("hal:send_frm:%d, done_frm:%d, free_frm:%d\n",  hif->HiStatus.Tx_Send_num, hif->HiStatus.Tx_Done_num, hif->HiStatus.Tx_Free_num);
-#else
-            printk("hal:send_frm:%d, done_frm:%d, free_frm:%d\n",
-                   atomic_read(&hif->HiStatus.Tx_Send_num),
-                   atomic_read(&hif->HiStatus.Tx_Done_num),
-                   atomic_read(&hif->HiStatus.Tx_Free_num));
-#endif
             printk("hal:gpio irq cnt %d \n",  hal_priv->gpio_irq_cnt);
             printk("tx_cmp: tx_done_frm %d, tx_mng_frm %d, tx_page %d\n",
                 hal_priv->txcompletestatus->txdoneframecounter,
@@ -1872,11 +1855,13 @@ int cmp_vid(struct drv_private *drv_priv)
     /*add p2p0 interface*/
     wnet_vif = drv_priv->drv_wnet_vif_table[NET80211_P2P_VMAC];
     myaddr[2] += NET80211_P2P_VMAC<<4;
-    if (wnet_vif->vm_hal_opmode == WIFI_M_HOSTAP) {
-        drv_add_wnet_vif(drv_priv, NET80211_P2P_VMAC, wnet_vif, wifi_mac_opmode_2_halmode(WIFINET_M_HOSTAP),  myaddr, ipv4);
-
-    } else {
+    if (wnet_vif->vm_opmode == WIFINET_M_P2P_DEV) {
         drv_add_wnet_vif(drv_priv, NET80211_P2P_VMAC, wnet_vif, wifi_mac_opmode_2_halmode(WIFINET_M_STA),  myaddr, ipv4);
+    } else if (wnet_vif->vm_opmode == WIFINET_M_HOSTAP) {
+        drv_add_wnet_vif(drv_priv, NET80211_P2P_VMAC, wnet_vif, wifi_mac_opmode_2_halmode(WIFINET_M_HOSTAP),  myaddr, ipv4);
+    } else {
+        //drv_add_wnet_vif(drv_priv, NET80211_MAIN_VMAC, wnet_vif, wifi_mac_opmode_2_halmode(WIFINET_M_STA),  myaddr, ipv4);
+        ERROR_DEBUG_OUT("error opmode %d\n", wnet_vif->vm_opmode);
     }
 
     return 0;
@@ -1923,7 +1908,7 @@ int hal_probe(void)
     }
 #endif
 
-    if (hal_download_wifi_fw_img() != 0)
+    if(hal_download_wifi_fw_img() != true)
     {
         goto __exit_err;
     }
@@ -1947,25 +1932,23 @@ __exit_err:
 }
 
 
-extern unsigned char chip_en_access;
+
 static int hal_get_did(struct hw_interface* hif)
 {
-    unsigned int Wifi_DeviceID = hi_get_device_id();
+    unsigned int Wifi_DeviceID = 0;
     int delay_ms = 0;
     int ret = false;
 
     PRINT("Wifi_DeviceID = %x\n",Wifi_DeviceID);
-    while ((Wifi_DeviceID!=PRODUCT_AMLOGIC) && (delay_ms < HI_FI_SYNC_DELAY_MS) )
+    while ((Wifi_DeviceID!=PRODUCT_AMLOGIC) /*&& (delay_ms < HI_FI_SYNC_DELAY_MS) */)
     {
         Wifi_DeviceID = hi_get_device_id();
         OS_MDELAY( HI_FI_SYNC_DELAY_MS_STEP);
         delay_ms += HI_FI_SYNC_DELAY_MS_STEP;
     }
-    if (Wifi_DeviceID == PRODUCT_AMLOGIC) {
+    if (Wifi_DeviceID == PRODUCT_AMLOGIC)
+    {
         ret = true;
-
-    } else {
-        chip_en_access = 1;
     }
     hif->Wifi_DeviceID = Wifi_DeviceID;
     return ret;
@@ -1973,19 +1956,18 @@ static int hal_get_did(struct hw_interface* hif)
 
 static int hal_get_vid(struct hw_interface* hif)
 {
-    unsigned int Wifi_VendorID = hi_get_vendor_id();
+    unsigned int Wifi_VendorID = 0;
     int delay_ms = 0;
     int ret = false;
-
-    PRINT("Wifi_VendorID = %x\n",Wifi_VendorID);
-    while ((Wifi_VendorID != VENDOR_AMLOGIC) && (delay_ms < HI_FI_SYNC_DELAY_MS))
+    PRINT("Wifi_DeviceID = %x\n",Wifi_VendorID);
+    while ((Wifi_VendorID!=VENDOR_AMLOGIC) && (delay_ms < HI_FI_SYNC_DELAY_MS) )
     {
         Wifi_VendorID = hi_get_vendor_id();
         OS_MDELAY( HI_FI_SYNC_DELAY_MS_STEP);
         delay_ms += HI_FI_SYNC_DELAY_MS_STEP;
-        PRINT("Wifi_DeviceID = %x  already delayed=%dms\n", Wifi_VendorID, delay_ms);
+        PRINT("Wifi_DeviceID = %x  already delayed=%dms\n",Wifi_VendorID, delay_ms);
     }
-    if (Wifi_VendorID == VENDOR_AMLOGIC)
+    if (Wifi_VendorID == PRODUCT_AMLOGIC)
     {
         ret = true;
     }
@@ -3306,15 +3288,9 @@ void hal_txinfo_show()
         PRINT("pTxShareFifo->IdxTab[2] %d,%d,\n", pTxShareFifo->IdxTab[2].In,pTxShareFifo->IdxTab[2].Out);
     }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0)
     PRINT("HiStatus.Tx_Send_num %d \n",hif->HiStatus.Tx_Send_num);
     PRINT("HiStatus.Tx_Free_num %d \n",hif->HiStatus.Tx_Free_num);
     PRINT("HiStatus.Tx_Done_num %d \n",hif->HiStatus.Tx_Done_num);
-#else
-    PRINT("HiStatus.Tx_Send_num %d \n",atomic_read(&hif->HiStatus.Tx_Send_num));
-    PRINT("HiStatus.Tx_Free_num %d \n",atomic_read(&hif->HiStatus.Tx_Free_num));
-    PRINT("HiStatus.Tx_Done_num %d \n",atomic_read(&hif->HiStatus.Tx_Done_num));
-#endif
     PRINT(" hal_priv->txPageFreeNum%d,\n",  hal_priv->txPageFreeNum);
     PRINT(" hal_priv->bitmap[0]=%lx,\n",   hal_priv->tx_frames_map[0]);
     PRINT(" hal_priv->bitmap[1]=%lx,\n",   hal_priv->tx_frames_map[1]);
