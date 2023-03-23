@@ -4450,11 +4450,11 @@ vm_cfg80211_remain_on_channel(
     DPRINTF(AML_DEBUG_CFG80211, "<%s> %s  channel->center_freq=%d duration=%dms\n",
         ndev->name, __func__, channel->center_freq,  duration);
 
-    if ((p2p->wnet_vif == NULL) || (wnet_vif->vm_p2p_support == 0)) {
-        ERROR_DEBUG_OUT("wnet_vif->vm_p2p_support==0 error!!!\n");
-        err = -EFAULT;
-        goto exit;
-    }
+   // if ((p2p->wnet_vif == NULL) || (wnet_vif->vm_p2p_support == 0)) {
+    //    ERROR_DEBUG_OUT("wnet_vif->vm_p2p_support==0 error!!!\n");
+    //    err = -EFAULT;
+   //     goto exit;
+   // }
 
     if (duration > AML_MAX_REMAIN_ON_CHANNEL_DURATION)
     {

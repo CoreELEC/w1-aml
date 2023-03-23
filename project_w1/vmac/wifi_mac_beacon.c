@@ -699,7 +699,7 @@ int wifi_mac_beacon_alloc(void * ieee, int wnet_vif_id)
 }
 
 
-int wifi_mac_beacon_alloc_ex(SYS_TYPE param1,
+void wifi_mac_beacon_alloc_ex(SYS_TYPE param1,
                             SYS_TYPE param2,SYS_TYPE param3,
                             SYS_TYPE param4,SYS_TYPE param5)
 {
@@ -708,15 +708,15 @@ int wifi_mac_beacon_alloc_ex(SYS_TYPE param1,
     int wnet_vif_id = (int)param2;
 
     if (wnet_vif->wnet_vif_replaycounter != (int)param5) {
-        return -1;
+        return ;
     }
 
     if (wnet_vif->vm_state != WIFINET_S_CONNECTED) {
-        return -1;
+        return ;
     }
 
     printk("%s %d \n",__func__,__LINE__);
-    return wifi_mac_beacon_alloc(ieee, wnet_vif_id);
+    wifi_mac_beacon_alloc(ieee, wnet_vif_id);
 }
 
 int wifi_mac_sta_beacon_init(struct wlan_net_vif *wnet_vif)

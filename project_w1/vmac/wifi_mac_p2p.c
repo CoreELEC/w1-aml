@@ -2483,14 +2483,14 @@ void vm_p2p_cancel_remain_channel(struct wifi_mac_p2p *p2p )
 
 static void
 vm_p2p_listen_timer_expired_ex(SYS_TYPE param1,
-    SYS_TYPE param2,SYS_TYPE param3,unsigned int param4,unsigned int param5)
+    SYS_TYPE param2,SYS_TYPE param3,SYS_TYPE param4,SYS_TYPE param5)
 {
     struct wifi_mac_p2p *p2p = (struct wifi_mac_p2p *) param1;
     vm_p2p_cancel_remain_channel(p2p);
 }
 
 
-static int vm_p2p_listen_timer_expired(unsigned long data)
+static int vm_p2p_listen_timer_expired(void* data)
 {
     struct wifi_mac_p2p *p2p = (struct wifi_mac_p2p *) data;
     struct wlan_net_vif  *wnet_vif=   p2p->wnet_vif;

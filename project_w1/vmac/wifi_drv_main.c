@@ -579,7 +579,7 @@ drv_clear_staid_and_bssid(struct drv_private *drv_priv,
     return 0;
 }
 
-static int
+static void
 drv_wnet_vif_disconnect_ex(SYS_TYPE param1,
     SYS_TYPE param2, SYS_TYPE param3,
     SYS_TYPE param4,SYS_TYPE param5)
@@ -590,7 +590,7 @@ drv_wnet_vif_disconnect_ex(SYS_TYPE param1,
     driv_ps_wakeup(drv_priv);
     drv_hal_wnet_vifdisconnect(wnet_vif_id);
     driv_ps_sleep(drv_priv);
-    return 0;
+    return ;
 }
 
 static int

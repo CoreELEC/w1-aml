@@ -639,7 +639,9 @@ unsigned short Hal_TxDescriptor_GetAckTime(
     }
     else if (IS_VHT_RATE(AckRate) )
     {
-        return Hal_TxDescriptor_HT_GetAckTime(AckRate, b_shortGI, b_rifs,b_40M);
+        AckRate = GET_VHT_MCS(AckRate);
+        return (b_rifs?2:16)//sifs +ack frame Signal Extension
+                +vht_ba_txtime[AckRate]+PHY_TEST;//ack txtime not have Signal Extension
     }
     else
     {

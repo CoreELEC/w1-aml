@@ -202,7 +202,7 @@ static int wifi_mac_start_bss (struct wifi_station *selbs)
     struct wlan_net_vif *wnet_vif = selbs->sta_wnet_vif;
     struct wifi_mac *wifimac = wnet_vif->vm_wmac;
 
-    wifi_mac_add_work_task(wifimac,wifi_mac_start_bss_ex_task,
+    wifi_mac_add_work_task(wifimac, wifi_mac_start_bss_ex_task,
         NULL, (SYS_TYPE)selbs,0,0, (SYS_TYPE)wnet_vif, (SYS_TYPE)wnet_vif->wnet_vif_replaycounter);
     return 1;
 }

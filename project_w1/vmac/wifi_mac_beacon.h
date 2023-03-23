@@ -15,7 +15,7 @@
 struct sk_buff *_wifi_mac_beacon_alloc(struct wifi_station *sta, struct wifi_mac_beacon_offsets *bo);
 int _wifi_mac_beacon_update(struct wifi_station *sta,            struct wifi_mac_beacon_offsets *bo, struct sk_buff *skb, int mcast);
 int wifi_mac_beacon_alloc(void * ieee, int wnet_vif_id);
-int wifi_mac_beacon_alloc_ex(SYS_TYPE param1,             SYS_TYPE param2,SYS_TYPE param3, SYS_TYPE param4,SYS_TYPE param5);
+void wifi_mac_beacon_alloc_ex(SYS_TYPE param1,             SYS_TYPE param2,SYS_TYPE param3, SYS_TYPE param4,SYS_TYPE param5);
 int wifi_mac_sta_beacon_init(struct wlan_net_vif *wnet_vif);
 void wifi_mac_sta_beacon_init_ex (SYS_TYPE param1,               SYS_TYPE param2,SYS_TYPE param3, SYS_TYPE param4,SYS_TYPE param5);
 void wifi_mac_beacon_free(void * ieee, int wnet_vif_id);
