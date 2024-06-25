@@ -1,1 +1,1 @@
-#define DRIVERVERSION    "v1.6.1_20240122-w1-r driver:53a7a7f6f334659aa0c6c5dfb660732f0ad9e803"
+#define DRIVERVERSION    "v1.6.1.1_20240625-w1-r driver:53a7a7f6f334659aa0c6c5dfb+443254"

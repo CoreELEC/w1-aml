@@ -820,12 +820,14 @@ void wifi_mac_scan_rx(struct wlan_net_vif *wnet_vif, const struct wifi_mac_scan_
 
 fail:
      WIFI_SCAN_SE_LIST_LOCK(st);
-     if (WIFINET_ADDR_EQ(se, oldse)) {
-         list_del_init(&se->se_list);
-         list_del_init(&se->se_hash);
-         printk("[Micro]%s_%d,delete oldse\n", __func__, __LINE__);
-     }
-     WIFI_SCAN_SE_LIST_UNLOCK(st);
+     if (se != NULL && oldse != NULL) {
+         if (WIFINET_ADDR_EQ(se, oldse)) {
+             list_del_init(&se->se_list);
+             list_del_init(&se->se_hash);
+             printk("[Micro]%s_%d,delete oldse\n", __func__, __LINE__);
+         }
+    }
+    WIFI_SCAN_SE_LIST_UNLOCK(st);
     FREE(se,"sta_add.se");
     printk("[Micro]%s_%d\n", __func__, __LINE__);
     return;
