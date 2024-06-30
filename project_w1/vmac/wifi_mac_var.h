@@ -260,7 +260,7 @@ struct wifi_mac_ops
     void (*wifi_mac_tx_status)(void * sta,  struct wifi_mac_tx_status * ts);
     int (*wifi_mac_rx_complete)(void *ieee,  struct sk_buff * skbbuf, struct wifi_mac_rx_status* rs);
     int (*wifi_mac_input)(void * sta,  struct sk_buff * skbbuf, struct wifi_mac_rx_status* rs);
-    void (*wifi_mac_ChangeChannel)(void * ieee, struct wifi_channel *chan, unsigned char flag, unsigned char vid);
+    void (*wifi_mac_ChangeChannel)(void * ieee, struct wifi_channel *chan, unsigned char flag, unsigned char vid, unsigned char opmode);
     void (*wifi_mac_switch_mode_static20)(void * ieee);
     void (*wifi_mac_switch_mode_static40)(void * ieee);
     void (*wifi_mac_switch_mode_static80)(void * ieee);

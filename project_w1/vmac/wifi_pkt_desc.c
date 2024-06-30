@@ -27,7 +27,7 @@ struct drv_txdesc *wifi_mac_alloc_txdesc(struct wifi_mac *wifimac)
         }
 
         if (free_page_hold_count >= 50) {
-            //printk("free_page_hold_count lager than 50, maybe we can reboot here\n");
+            //pr_debug("free_page_hold_count lager than 50, maybe we can reboot here\n");
         }
         return NULL;
     }
@@ -47,7 +47,7 @@ void wifi_mac_recycle_txdesc(struct sk_buff *skbbuf)
 
     wifimac = wifi_mac_get_mac_handle();
 
-    //printk("%s ptxdesc:%p, txinfo:%p\n", __func__, txinfo->ptxdesc, txinfo);
+    //pr_debug("%s ptxdesc:%p, txinfo:%p\n", __func__, txinfo->ptxdesc, txinfo);
     INIT_LIST_HEAD(&tx_queue);
 
     if (txinfo->ptxdesc != NULL) {

@@ -77,7 +77,7 @@ void wifi_mac_vht_ie_parse_all(struct wifi_station *sta, struct wifi_mac_scan_pa
 
 void wifi_mac_recv_beacon(struct wlan_net_vif *wnet_vif, struct wifi_station *sta, struct sk_buff *skb, int rssi, unsigned int channel);
 void wifi_mac_recv_probersp(struct wlan_net_vif *wnet_vif, struct wifi_station *sta, struct sk_buff *skb, int rssi, unsigned int channel);
-void wifi_mac_recv_probe_req(struct wlan_net_vif *wnet_vif, struct wifi_station *sta, struct sk_buff *skb,int rssi);
+void wifi_mac_recv_probe_req(struct wlan_net_vif *wnet_vif, struct wifi_station *sta, struct sk_buff *skb,int rssi, unsigned int channel);
 void wifi_mac_recv_assoc_req(struct wlan_net_vif *wnet_vif, struct wifi_station *sta, struct sk_buff *skb, unsigned int channel, int rssi);
 void wifi_mac_recv_assoc_rsp(struct wlan_net_vif *wnet_vif, struct wifi_station *sta, struct sk_buff *skb, unsigned int channel);
 void wifi_mac_recv_deauth(struct wlan_net_vif *wnet_vif, struct wifi_station *sta, struct sk_buff *skb, unsigned int channel);
@@ -89,5 +89,7 @@ void wifi_mac_parse_operate_mode_notification_mgmt(struct wlan_net_vif *wnet_vif
 void wifi_mac_check_mic(struct wifi_station *, struct sk_buff *);
 int wifi_mac_send_arp_req(struct wlan_net_vif *wnet_vif);
 int wifi_mac_set_arp_rsp(struct wlan_net_vif *wnet_vif) ;
+
+unsigned short wifi_mac_eth_type_trans(struct sk_buff *skb, struct net_device *dev);
 
 #endif

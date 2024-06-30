@@ -30,7 +30,7 @@ unsigned int phy_register_sta_id(unsigned char vid,unsigned short StaAid,unsigne
 unsigned int phy_addba_ok(unsigned char wnet_vif_id,unsigned short StaAid,unsigned char TID,unsigned short SeqNumStart,unsigned char BA_Size,unsigned char AuthRole,unsigned char BA_TYPE);
 unsigned int phy_delt_ba_ok(unsigned char wnet_vif_id,unsigned short StaAid,unsigned char TID,unsigned char AuthRole);
 unsigned int phy_get_extern_chan_status(void);
-unsigned int phy_set_rf_chan(struct hal_channel *hchan, unsigned char flag, unsigned char vid);
+unsigned int phy_set_rf_chan(struct hal_channel *hchan, unsigned char flag, unsigned char vid, unsigned char opmode);
 unsigned int phy_set_mac_addr(unsigned char wnet_vif_id,unsigned char * MacAddr);
 unsigned int phy_unregister_sta_id(unsigned char wnet_vif_id,unsigned short StaAid);
 unsigned int phy_unregister_all_sta_id(unsigned char wnet_vif_id);
@@ -87,5 +87,8 @@ unsigned int hal_set_fwlog_cmd(unsigned char mode);
 unsigned int hal_cfg_cali_param(void);
 unsigned int hal_cfg_txpwr_cffc_param(void * chan, void * txpwr_plan);
 
+unsigned char get_s8_item(char *varbuf, int len, char *item, char *item_value);
+unsigned char get_s16_item(char *varbuf, int len, char *item, short *item_value);
+unsigned char get_s32_item(char *varbuf, int len, char *item, unsigned int *item_value);
 
 #endif  //__AML_PHY_H__

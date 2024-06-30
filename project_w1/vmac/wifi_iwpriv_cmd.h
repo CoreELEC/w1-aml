@@ -85,4 +85,16 @@ enum aml_iwpriv_subcmd
 extern unsigned char aml_iwpriv_get_band(void);
 int aml_set_debug_modules(char *debug_str);
 
+unsigned int get_latest_tx_status(struct wifi_mac *wifimac);
+int aml_beacon_intvl_set(struct wlan_net_vif *wnet_vif, unsigned int set);
+int aml_set_ldpc(struct wlan_net_vif *wnet_vif, unsigned int set);
+int aml_iwpriv_set_lagecy_bitrate_mask(struct net_device *dev, unsigned int set);
+int aml_iwpriv_set_ht_bitrate_mask(struct net_device *dev, unsigned int set);
+void aml_iwpriv_set_rate_auto(struct wlan_net_vif *wnet_vif);
+void aml_iwpriv_set_uapsd(struct wlan_net_vif *wnet_vif, unsigned int set);
+int aml_iwpriv_set_vht_bitrate_mask(struct net_device *dev, unsigned int set);
+unsigned char aml_iwpriv_set_band(unsigned int set);
+unsigned int get_reg(struct wlan_net_vif *wnet_vif, unsigned int set);
+unsigned int set_reg(struct wlan_net_vif *wnet_vif, unsigned int set1, unsigned int set2);
+
 #endif

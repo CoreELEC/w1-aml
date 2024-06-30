@@ -318,7 +318,7 @@ int wifi_mac_rx_complete(void * ieee,  struct sk_buff * skbbuf, struct wifi_mac_
 int wifi_mac_tx_send( struct sk_buff * skbbuf);
 int wifi_mac_tx_mgmt_frm(struct wifi_mac *wifimac,  struct sk_buff * skbbuf);
 int wifi_mac_build_txinfo(struct wifi_mac *wifimac,  struct sk_buff * skbbuf, struct wifi_mac_tx_info *txinfo);
-void wifi_mac_ChangeChannel(void * ieee, struct wifi_channel *chan, unsigned char flag, unsigned char vid);
+void wifi_mac_ChangeChannel(void * ieee, struct wifi_channel *chan, unsigned char flag, unsigned char vid, unsigned char opmode);
 int wifi_mac_get_netif_cfg(void *);
 void *wifi_mac_alloc_ndev(unsigned int len);
 void wifi_mac_free_vmac(void *netif);
@@ -382,5 +382,8 @@ void wifi_mac_sm_switch (SYS_TYPE param1,SYS_TYPE param2,SYS_TYPE param3,SYS_TYP
 int wifi_mac_trigger_recovery(void * arg);
 void wifi_mac_fw_recovery(struct wlan_net_vif *wnet_vif);
 int wifi_mac_connect_repair(struct wifi_mac *wifimac);
+
+void wifi_mac_tx_lock_timer_attach(void);
+void wifi_mac_tx_lock_timer_cancel(void);
 
 #endif

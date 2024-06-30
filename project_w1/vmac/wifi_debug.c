@@ -31,38 +31,38 @@ void IPv4_address_print( unsigned char* address )
     PUTC('\n');
 }
 
-  void dump_memory_internel(unsigned char *data,int len)
+  void dump_memory_internal(unsigned char *data,int len)
 {
 
     unsigned char *cursor=data;
     char *xcursor = (char *)data;
     int i,j;
-    printk("\n*********************************\n");
+    pr_debug("\n*********************************\n");
     for (  i = 0; i < len; i++ )
     {
         if (( i != 0)&&(( i & 0x0F ) == 0 ))
         {
 
 #ifdef  ASCII_IN
-            printk("|");
+            pr_debug("|");
             for (j=0; j < len; j++)
             {
                 if (((*xcursor)<' ')||((*xcursor)>'~'))
                 {
-                    printk(".");
+                    pr_debug(".");
                     xcursor++;
                 }
                 else
                 {
-                    printk("%c",*xcursor++);
+                    pr_debug("%c",*xcursor++);
                 }
             }
 #endif
-            printk( "\n");
+            pr_debug( "\n");
         }
 
-        printk( "%02x",*cursor++ );
-        printk(" ");
+        pr_debug( "%02x",*cursor++ );
+        pr_debug(" ");
     }
 
 #ifdef  ASCII_IN
@@ -70,25 +70,25 @@ void IPv4_address_print( unsigned char* address )
     {
         for (i=0; i<LINEBYTE-(len%LINEBYTE); i++)
         {
-            printk("   ");
+            pr_debug("   ");
         }
-        printk("|");
+        pr_debug("|");
         for (i=0; i<(len%LINEBYTE); i++)
         {
             if (((*xcursor)<' ')||((*xcursor)>'~'))
             {
-                printk(".");
+                pr_debug(".");
                 xcursor++;
             }
             else
             {
-                printk("%c",*xcursor++);
+                pr_debug("%c",*xcursor++);
             }
         }
 
     }
 #endif
-    printk("\n*********************************\n");
+    pr_debug("\n*********************************\n");
 }
 
 void address_read( unsigned char* cursor, unsigned char* address )

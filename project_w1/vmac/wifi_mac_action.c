@@ -19,7 +19,7 @@ int wifi_mac_send_addba_req(char* buf, int tid)
             selected_wnet_vif = drv_priv->drv_wnet_vif_table[NET80211_MAIN_VMAC];
         }
     } else {
-        printk("%s, no sta connected\n", __func__);
+        pr_warn("%s, no sta connected\n", __func__);
         return -1;
     }
 
@@ -36,17 +36,17 @@ int wifi_mac_send_addba_req(char* buf, int tid)
 
         for (i = 0 ; i < ETH_ALEN ; i++) {
             if (aml_char_is_hex_digit(buf[i * 3]) == false || aml_char_is_hex_digit(buf[i * 3 + 1]) == false) {
-                printk("%s invalid 8-bit hex format for address offset:%u\n", __func__, i);
+                pr_err("%s invalid 8-bit hex format for address offset:%u\n", __func__, i);
             }
 
             if (i < ETH_ALEN - 1 && buf[i * 3 + 2] != ':') {
-                printk("%s invalid separator after address offset:%u\n", __func__, i);
+                pr_err("%s invalid separator after address offset:%u\n", __func__, i);
             }
 
             temp[0] = buf[i * 3];
             temp[1] = buf[i * 3 + 1];
             if (sscanf(temp, "%hhx", &selected_wnet_vif->vm_mainsta->sta_macaddr[i]) != 1) {
-                printk("%s sscanf fail for address offset:0x%03x\n", __func__, i);
+                pr_err("%s sscanf fail for address offset:0x%03x\n", __func__, i);
             }
         }
     }
@@ -73,7 +73,7 @@ int wifi_mac_send_coexist_mgmt(const char* buf)
             selected_wnet_vif = drv_priv->drv_wnet_vif_table[NET80211_MAIN_VMAC];
         }
     } else {
-        printk("%s, no sta connected\n", __func__);
+        pr_warn("%s, no sta connected\n", __func__);
         return -1;
     }
 
@@ -103,7 +103,7 @@ int wifi_mac_send_wmm_ac_addts(char** buf)
             selected_wnet_vif = drv_priv->drv_wnet_vif_table[NET80211_MAIN_VMAC];
         }
     } else {
-        printk("%s, no sta connected\n", __func__);
+        pr_warn("%s, no sta connected\n", __func__);
         return -1;
     }
 
@@ -146,7 +146,7 @@ int wifi_mac_send_wmm_ac_delts(const char* buf)
             selected_wnet_vif = drv_priv->drv_wnet_vif_table[NET80211_MAIN_VMAC];
         }
     } else {
-        printk("%s, no sta connected\n", __func__);
+        pr_warn("%s, no sta connected\n", __func__);
         return -1;
     }
     sscanf(buf, "%d", &tid);

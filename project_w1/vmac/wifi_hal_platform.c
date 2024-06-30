@@ -44,15 +44,15 @@ extern int wifi_irq_trigger_level(void);
 extern int wifi_irq_num(void);
 #if (USE_GPIO_IRQ==1)
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(3,14,29)
-int platform_wifi_request_gpio_irq (void *data)
+int platform_wifi_request_gpio_irq(void *data)
 {
     unsigned int irq_num = wifi_irq_num();
     int ret = -1;
-    int irq_trigger_type, irq_flag;
+    int irq_trigger_type;
 
-    irq_flag = IRQF_DISABLED;
     amlhal_gpio.gpio_irq_mode = wifi_irq_trigger_level();
     amlhal_gpio.irq_num = irq_num;
+
     switch (amlhal_gpio.gpio_irq_mode)
     {
         case WIFI_GPIO_IRQ_FALLING:
@@ -73,10 +73,13 @@ int platform_wifi_request_gpio_irq (void *data)
     }
     do
     {
+        int irq_flag;
+
         irq_flag = AML_GPIO_IRQ(irq_num, amlhal_gpio.filter_num, irq_trigger_type);
         msleep(10);
-        printk("irq_num %d irq_trigger_type %d irq_flag 0x%08x\n",irq_num,irq_trigger_type,irq_flag);
-        ret  = request_irq(irq_num, hal_irq_top, irq_flag, "WIFI_INT", data);
+        pr_debug("irq_num %d irq_trigger_type %d irq_flag 0x%08x\n", irq_num,
+               irq_trigger_type, irq_flag);
+        ret = request_irq(irq_num, hal_irq_top, irq_flag, "WIFI_INT", data);
         if (ret < 0)
             DPRINTF(AML_DEBUG_ERROR,"%s(%d) request_irq err, ret=%d\n",__func__,__LINE__, ret);
     }
@@ -87,11 +90,11 @@ exit:
 
 #else
 
-int platform_wifi_request_gpio_irq (void *data)
+int platform_wifi_request_gpio_irq(void *data)
 {
-    unsigned int irq_num = 0;
+    unsigned int irq_num;
     int ret = -1;
-    unsigned int irq_flag = 0;
+    unsigned int irq_flag;
 
     irq_num = wifi_irq_num();
 
@@ -101,11 +104,11 @@ int platform_wifi_request_gpio_irq (void *data)
         irq_flag = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHLEVEL | IORESOURCE_IRQ_SHAREABLE;
 
     DPRINTF(AML_DEBUG_INFO, "%s(%d) irq_flag=0x%x  irq=%d\n",
-        __func__, __LINE__, irq_flag,  irq_num);
+            __func__, __LINE__, irq_flag,  irq_num);
 
     do
     {
-        ret  = request_irq(irq_num, hal_irq_top, irq_flag, "WIFI_INT", data);
+        ret = request_irq(irq_num, hal_irq_top, irq_flag, "WIFI_INT", data);
         if (ret < 0)
             DPRINTF(AML_DEBUG_ERROR,"%s(%d) request_irq err, ret=%d\n",__func__,__LINE__, ret);
     }
@@ -117,7 +120,7 @@ int platform_wifi_request_gpio_irq (void *data)
 }
 #endif
 
-void platform_wifi_free_gpio_irq (void *data)
+void platform_wifi_free_gpio_irq(void *data)
 {
     DPRINTF(AML_DEBUG_ANDROID,"%s(%d)\n", __func__, __LINE__);
 
@@ -134,43 +137,42 @@ void platform_wifi_free_gpio_irq (void *data)
 static void clk_source_select(int IS_SSV_CLK)
 {
     int gpio_clk_sel = amlhal_gpio.clk_sel;
-    int ret = 0;
-    int gpio = 0;
+    int ret;
+    int gpio;
 
-    ret = gpio_request(gpio_clk_sel,  OWNER_NAME);
+    ret = gpio_request(gpio_clk_sel, OWNER_NAME);
     if (ret < 0){
         gpio_free(gpio_clk_sel);
-        ret = gpio_request(gpio_clk_sel,  OWNER_NAME); //retry
-        printk("%s(%d) again request gpio_clk_sel ret=%d\n", __func__, __LINE__, ret);
+        ret = gpio_request(gpio_clk_sel, OWNER_NAME); //retry
+        pr_debug("%s(%d) again request gpio_clk_sel ret=%d\n", __func__, __LINE__, ret);
     }
     
     if(IS_SSV_CLK){
         ret = gpio_direction_output(gpio_clk_sel, 1);
         gpio = gpio_get_value(gpio_clk_sel);
-        printk("%s(%d) gpio_clk_sel set 1, now=%d##########\n", __func__,__LINE__, gpio);
+        pr_debug("%s(%d) gpio_clk_sel set 1, now=%d##########\n", __func__,__LINE__, gpio);
     }
     else{
         ret = gpio_direction_output(gpio_clk_sel, 0);        
         gpio = gpio_get_value(gpio_clk_sel);
-        printk("%s(%d) gpio_clk_sel set 0, now=%d##########\n",__func__,__LINE__,  gpio);
+        pr_debug("%s(%d) gpio_clk_sel set 0, now=%d##########\n",__func__,__LINE__,  gpio);
     }
     
     gpio_free(gpio_clk_sel);
-
 }
 
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(3,14,29)
-static void reset_wifi (void)
+static void reset_wifi(void)
 {
     /* use gpio reset */
-    int ret = 0;
+    int ret;
     int gpio_wifi_reset = amlhal_gpio.gpio_reset;
-    int gpio = 0;
+    int gpio;
 
-    ret = gpio_request(gpio_wifi_reset,  OWNER_NAME);
+    ret = gpio_request(gpio_wifi_reset, OWNER_NAME);
     if (ret < 0){
         gpio_free(gpio_wifi_reset);
-        ret = gpio_request(gpio_wifi_reset,  OWNER_NAME); //retry
+        ret = gpio_request(gpio_wifi_reset, OWNER_NAME); /* retry */
         ERROR_DEBUG_OUT("request gpio fail ret=%d\n", ret);
     }
     
@@ -180,11 +182,11 @@ static void reset_wifi (void)
     ret = gpio_direction_output(gpio_wifi_reset, 0); 
     OS_MDELAY(20);
     gpio = gpio_get_value(gpio_wifi_reset);
-    printk("######gpio_wifi_reset set 0, now=%d#########\n", gpio);
+    pr_debug("######gpio_wifi_reset set 0, now=%d#########\n", gpio);
     
     ret = gpio_direction_output(gpio_wifi_reset, 1);
     gpio = gpio_get_value(gpio_wifi_reset);
-    printk("######gpio_wifi_reset set 1, now=%d#########\n", gpio);
+    pr_debug("######gpio_wifi_reset set 1, now=%d#########\n", gpio);
     
     gpio_free(gpio_wifi_reset);
 }
@@ -228,12 +230,14 @@ static inline void set_clk(unsigned int reg, unsigned int data)
 
 void hi_change_sram_concurrent_mode(void)
 {
-    unsigned int regdata = 0;
+    unsigned int regdata;
     struct hw_interface* hif = hif_get_hw_interface();
 
 #ifdef SRAM_CONCURRENT
 #if  (SRAM_16KMODE == 0)
-    //2014 3.4 later FPGA version,need to add the register,because SRAM is used both wifi mac and test bus
+    /* 2014 3.4 later FPGA version,need to add the register,
+     * because SRAM is used both wifi mac and test bus.
+     */
 
     regdata = hif->hif_ops.hi_read_word(RG_INTF_RTC_CLK_CTRL);
     regdata &= ~BIT(31);
@@ -251,21 +255,21 @@ void hi_change_sram_concurrent_mode(void)
 #endif
 }
 
-void set_wifi_baudrate (unsigned int apb_clk)
+void set_wifi_baudrate(unsigned int apb_clk)
 {
     unsigned int data, uart_div;
     unsigned int wifi_dig_timebase;
-    struct hw_interface* hif = hif_get_hw_interface();
+    struct hw_interface *hif = hif_get_hw_interface();
 
-    //set uart baudrate
-    uart_div = apb_clk/(UART_BAUD_RATE*4)-1;
+    /* set uart baudrate */
+    uart_div = apb_clk / (UART_BAUD_RATE * 4) - 1;
     PRINT("for uart baudrate0x%x\n",apb_clk);
 
     data = hif->hif_ops.hi_read_word(RG_UART_WORK_MODE);
     wifi_dig_timebase =  hif->hif_ops.hi_read_word(RG_INTF_CTRL_CLK);
 
     PRINT("uart mode 0x%x=0x%x\n", RG_UART_WORK_MODE, data);
-    data &= (~(0xfff<<0)); //baudrate, bit0~11
+    data &= (~(0xfff << 0)); /* baudrate, bit0~11 */
     data |= uart_div;
     hif->hif_ops.hi_write_word(RG_UART_WORK_MODE, data);
 
@@ -274,14 +278,14 @@ void set_wifi_baudrate (unsigned int apb_clk)
 }
 
 /*
-All valid bits are R/W, the default value is 32h8000_0003
-[0]: soft reset0, which reset the whole MAC. Its set by software,auto cleaned by
-    hardware when soft reset timer0 times out. Active low.
-[1]: soft reset1, which reset MAC except sd2wifi sub-module.
-Its set by software, auto cleaned by hardware when soft reset timer1 times out. Active low.
-[30:2]: reserved
-[31]: soft_arc_reset, which reset ARC625 core and arc_11n_ram_loader sub-module.
-    Its set and cleaned both by software. Active low.
+ * All valid bits are R/W, the default value is 32h8000_0003
+ * [0]: soft reset0, which reset the whole MAC. Its set by software,auto cleaned by
+ *     hardware when soft reset timer0 times out. Active low.
+ * [1]: soft reset1, which reset MAC except sd2wifi sub-module.
+ * Its set by software, auto cleaned by hardware when soft reset timer1 times out. Active low.
+ * [30:2]: reserved
+ * [31]: soft_arc_reset, which reset ARC625 core and arc_11n_ram_loader sub-module.
+ *     Its set and cleaned both by software. Active low.
 */
 int amlhal_resetmac(void)
 {
@@ -302,11 +306,11 @@ int amlhal_resetmac(void)
     hif->hif_ops.hi_write_word(RG_WIFI_RST_CTRL, to_sdio);
    
     sdio_kptr_val = hif->hif_ops.hi_read_reg8(RG_SCFG_RX_EN);
-    printk("reg0x74 0x%x\n", sdio_kptr_val);
+    pr_debug("reg0x74 0x%x\n", sdio_kptr_val);
     sdio_kptr_val &= ~(BIT(2) | BIT(3)); //keep pointer
     hif->hif_ops.hi_write_reg8(RG_SCFG_RX_EN, sdio_kptr_val);
     sdio_kptr_val =hif->hif_ops.hi_read_reg8(RG_SCFG_RX_EN);
-    printk("reg0x74 0x%x\n", sdio_kptr_val);
+    pr_debug("reg0x74 0x%x\n", sdio_kptr_val);
 
     hif->hif_ops.hi_write_reg8(RG_SCFG_SELECT_RST,1);
     // reg_tmp = 0;
@@ -345,87 +349,88 @@ int amlhal_resetsdio(void)
 #if defined (HAL_SIM_VER)
 unsigned char hal_set_sys_clk_Core(unsigned int addr, unsigned int value)
 {
-    unsigned int tmp,tmp1;
-//divide config for clock
-    tmp=MAC_RD_REG(addr);
-    tmp=(tmp&~(0xffffffff))|(value);
-    MAC_WR_REG(addr,tmp);
+    unsigned int tmp, tmp1;
+
+    /* divide config for clock */
+    tmp = MAC_RD_REG(addr);
+    tmp = (tmp & ~(0xffffffff)) | (value);
+    MAC_WR_REG(addr, tmp);
     OS_MDELAY(10);
-//switch clock from osc to real
+    /* switch clock from osc to real */
     tmp=MAC_RD_REG(addr);
-    tmp1 = tmp |(1 << 4);
-    MAC_WR_REG(addr,tmp1);
+    tmp1 = tmp | (1 << 4);
+    MAC_WR_REG(addr, tmp1);
     OS_MDELAY(10);
 }
 
 unsigned char hal_set_sys_clk(int clockdiv)
 {
-    unsigned int tmp,tmp1,tmp2,tmp3;
+    unsigned int tmp, tmp1, tmp2, tmp3;
 
     PRINT("hal_set_sys_clk \n");
-	/* reset bpll , write 1 for bit0 firstly, then write 0 again*/
+    /* reset bpll , write 1 for bit0 firstly, then write 0 again*/
     tmp = AON_RD_REG(RG_DPLL_A3);
-	AON_WR_REG(RG_DPLL_A3, (tmp | BIT(0)));
+    AON_WR_REG(RG_DPLL_A3, (tmp | BIT(0)));
     OS_MDELAY(10);
-	AON_WR_REG(RG_DPLL_A3, (tmp & ~BIT(0)));
+    AON_WR_REG(RG_DPLL_A3, (tmp & ~BIT(0)));
 
-    //select CPU clock by digital divider for 80MHz
+    /* select CPU clock by digital divider for 80MHz */
 #ifdef TX_TIMEOUT_ERR
-    hal_set_sys_clk_Core(RG_INTF_CPU_CLK,TEST_CPU_CLOCK);
+    hal_set_sys_clk_Core(RG_INTF_CPU_CLK, TEST_CPU_CLOCK);
 #else
-    //riscv
-    hal_set_sys_clk_Core(RG_INTF_CPU_CLK,0x4f670031);
-    //arc, cpu clock 0x4f070031
+    /* riscv */
+    hal_set_sys_clk_Core(RG_INTF_CPU_CLK, 0x4f670031);
+    /* arc, cpu clock 0x4f070031 */
 #endif
-    //select BTCPU clock by digital divider for 48MHz
-    hal_set_sys_clk_Core(RG_INTF_BTCPU_CLK,0x940011);
+    /* select BTCPU clock by digital divider for 48MHz */
+    hal_set_sys_clk_Core(RG_INTF_BTCPU_CLK, 0x940011);
 
-    //config mactxdelay
-    tmp=MAC_RD_REG(RG_MAC_COUNT1);
-    tmp= tmp | (0x7000000 );
-    MAC_WR_REG(RG_MAC_COUNT1,tmp);
+    /* config mactxdelay */
+    tmp = MAC_RD_REG(RG_MAC_COUNT1);
+    tmp = tmp | (0x7000000);
+    MAC_WR_REG(RG_MAC_COUNT1, tmp);
     OS_MDELAY(10);
-    //config agc gain not use lut
-    tmp=MAC_RD_REG(RG_AGC_GAIN_SEL);
-    tmp= tmp & (~(1<< 24 ));
-    MAC_WR_REG(RG_AGC_GAIN_SEL,tmp);
+    /* config agc gain not use lut */
+    tmp = MAC_RD_REG(RG_AGC_GAIN_SEL);
+    tmp = tmp & (~(1 << 24));
+    MAC_WR_REG(RG_AGC_GAIN_SEL, tmp);
     OS_MDELAY(10);
-    //switch share 64k ram to mac
-    tmp= 0x00000001;
-    MAC_WR_REG(RG_INTF_SHARE_64K_CAP,tmp);
+    /* switch share 64k ram to mac */
+    tmp = 0x00000001;
+    MAC_WR_REG(RG_INTF_SHARE_64K_CAP, tmp);
     OS_MDELAY(10);
-    //reset mac time rise pulse
-    tmp= 0x81080100;
-    MAC_WR_REG(RG_INTF_MAC_TIMER_CTRL1,tmp);
+    /* reset mac time rise pulse */
+    tmp = 0x81080100;
+    MAC_WR_REG(RG_INTF_MAC_TIMER_CTRL1, tmp);
     OS_MDELAY(10);
-    //gpioB pin mux input
-    tmp= 0xffdfffff;
-    MAC_WR_REG(RG_INTF_PIN_MUX_REG1,tmp);
+    /* gpioB pin mux input */
+    tmp = 0xffdfffff;
+    MAC_WR_REG(RG_INTF_PIN_MUX_REG1, tmp);
     OS_MDELAY(10);
  
 #ifdef B2B_TEST
-    //pin mux config for b2b
-    tmp= 0x9c03330a;
-    MAC_WR_REG(RG_PHY_BT_CTRL,tmp);
+    /* pin mux config for b2b */
+    tmp = 0x9c03330a;
+    MAC_WR_REG(RG_PHY_BT_CTRL, tmp);
     OS_MDELAY(10);
-    //tx out format
-    //tmp= 0x00000004;
-    tmp= 0x00000002;    //bit[1] reg_tx_negate_msb is set to 1 in compliance with FPGA environment
-    //bit[0] reg_tx_iq_swap
-    //bit[1] reg_tx_negate_msb
-    //bit[2] reg_tx_rotate_en is not exist now
-    //bit[5:4]  reg_tx_signal_sel
-    MAC_WR_REG(RG_PHY_TX_CTRL,tmp);
+    /* tx out format */
+    /* tmp= 0x00000004; */
+    tmp = 0x00000002; /* bit[1] reg_tx_negate_msb is set to 1 in compliance with FPGA environment */
+    /* bit[0] reg_tx_iq_swap */
+    /* bit[1] reg_tx_negate_msb */
+    /* bit[2] reg_tx_rotate_en is not exist now */
+    /* bit[5:4]  reg_tx_signal_sel */
+    MAC_WR_REG(RG_PHY_TX_CTRL, tmp);
     OS_MDELAY(10);
-    //add config for rx enable
-    tmp= 0x00000001;
-    MAC_WR_REG(RG_OFDM_RX_FSM_EN,tmp);
+    /* add config for rx enable */
+    tmp = 0x00000001;
+    MAC_WR_REG(RG_OFDM_RX_FSM_EN, tmp);
     OS_MDELAY(10);
     PRINT("B2B_TEST \n");
-    //add ap/fs config,will delete sw ok
-    if(STA1_VMAC0_SEND_40M==2)
+    /* add ap/fs config,will delete sw ok */
+    if (STA1_VMAC0_SEND_40M == 2)
     {
-        tmp= 0xa1000000;
+        tmp = 0xa1000000;
         MAC_WR_REG(RG_PHY_BW_REG, tmp);
         OS_MDELAY(10);
     }
@@ -440,7 +445,7 @@ unsigned char hal_set_sys_clk_for_fpga(void)
     return 1;
 }
 
-unsigned int bbpll_init(void)
+static unsigned int bbpll_init(void)
 {
     RG_DPLL_A0_FIELD_T rg_dpll_a0;
     RG_DPLL_A1_FIELD_T rg_dpll_a1;
@@ -474,29 +479,29 @@ unsigned int bbpll_init(void)
     return 0;
 }
 
-unsigned int bbpll_start (void)
+static unsigned int bbpll_start (void)
 {
-    //RG_DPLL_A0_FIELD_T rg_dpll_a0;
-    //RG_DPLL_A1_FIELD_T rg_dpll_a1;
+    /* RG_DPLL_A0_FIELD_T rg_dpll_a0; */
+    /* RG_DPLL_A1_FIELD_T rg_dpll_a1; */
     RG_DPLL_A2_FIELD_T rg_dpll_a2;
     RG_DPLL_A3_FIELD_T rg_dpll_a3;
     RG_DPLL_A4_FIELD_T rg_dpll_a4;
     RG_DPLL_A5_FIELD_T rg_dpll_a5;
-    //RG_DPLL_A6_FIELD_T rg_dpll_a6;
+    /* RG_DPLL_A6_FIELD_T rg_dpll_a6; */
 
-    printk("bbpll power on -------------->\n");
-    printk("1, start inter Ido \n");
+    pr_debug("bbpll power on -------------->\n");
+    pr_debug("1, start inter Ido \n");
 
     rg_dpll_a4.data = aml_aon_read_reg(RG_DPLL_A4);
     rg_dpll_a4.b.rg_wifi_bb_bt_dac_clk_div = 0x1;
-    rg_dpll_a4.b.rg_wifi_bb_bt_adc_div = 0x5; //for bt adc clock
+    rg_dpll_a4.b.rg_wifi_bb_bt_adc_div = 0x5; /* for bt adc clock */
     aml_aon_write_reg(RG_DPLL_A4, rg_dpll_a4.data);
     udelay(50);
     rg_dpll_a4.b.rg_wifi_bb_bt_dac_clk_div = 0x3;
     aml_aon_write_reg(RG_DPLL_A4, rg_dpll_a4.data);
     udelay(10);
 
-    printk("2, start pll core \n");
+    pr_debug("2, start pll core \n");
 
     rg_dpll_a3.data = aml_aon_read_reg(RG_DPLL_A3);
     rg_dpll_a3.b.rg_wifi_bb_pll_bias_en = 1;
@@ -509,15 +514,15 @@ unsigned int bbpll_start (void)
     udelay(80);
     rg_dpll_a2.data = aml_aon_read_reg(RG_DPLL_A2);
     rg_dpll_a2.b.rg_wifi_bb_pll_reve |= BIT(6);
-    rg_dpll_a2.b.rg_wifi_bb_pll_reve |= BIT(4); //bit18 need pull up
+    rg_dpll_a2.b.rg_wifi_bb_pll_reve |= BIT(4); /* bit18 need pull up */
     aml_aon_write_reg(RG_DPLL_A2, rg_dpll_a2.data);
 
-    printk("3, check \n");
+    pr_debug("3, check \n");
     udelay(10);
     rg_dpll_a5.data = aml_aon_read_reg(RG_DPLL_A5);
     if (rg_dpll_a5.b.ro_wifi_bb_pll_done == 1)
     {
-        printk("bbpll done !\n");
+        pr_debug("bbpll done !\n");
         return 1;
     }
     else
@@ -527,13 +532,12 @@ unsigned int bbpll_start (void)
     }
 }
 
-unsigned int bbpll_stop(void)
+static unsigned int bbpll_stop(void)
 {
-
     RG_DPLL_A3_FIELD_T rg_dpll_a3;
     RG_DPLL_A4_FIELD_T rg_dpll_a4;
 
-    printk("bbpll power down -------------->\n");
+    pr_debug("bbpll power down -------------->\n");
     rg_dpll_a3.data = aml_aon_read_reg(RG_DPLL_A3);
     rg_dpll_a3.b.rg_wifi_bb_pll_bias_en = 0;
     aml_aon_write_reg(RG_DPLL_A3, rg_dpll_a3.data);
@@ -552,14 +556,15 @@ unsigned int bbpll_stop(void)
     return 0;
 }
 
-//0x4f070031: switch to bbp clk
-void wifi_cpu_clk_switch(unsigned int clk_cfg)
+/* 0x4f070031: switch to bbp clk */
+static void wifi_cpu_clk_switch(unsigned int clk_cfg)
 {
-    struct hw_interface   *hif = hif_get_hw_interface();
+    struct hw_interface *hif = hif_get_hw_interface();
+
     hif->hif_ops.hi_write_word(RG_INTF_CPU_CLK,clk_cfg);
 
-    printk("%s(%d):cpu_clk_reg=0x%08x\n", __func__, __LINE__, 
-        hif->hif_ops.hi_read_word(RG_INTF_CPU_CLK));
+    pr_debug("%s(%d):cpu_clk_reg=0x%08x\n", __func__, __LINE__,
+           hif->hif_ops.hi_read_word(RG_INTF_CPU_CLK));
 }
 
 #endif
@@ -573,12 +578,12 @@ unsigned char hal_download_wifi_fw_img(void)
 {
     unsigned char *bufferICCM;
     unsigned char *bufferDCCM;
-    int len =0;
-    int offset =0;
+    int len;
+    int offset;
     int offset_base = 0;
     int rd_offset = 0;
     SYS_TYPE databyte = 0;
-    unsigned int regdata =0;
+    unsigned int regdata;
     struct hw_interface *hif = hif_get_hw_interface();
     unsigned int to_sdio = ~(0);
     RG_PMU_A22_FIELD_T pmu_a22;
@@ -587,38 +592,37 @@ unsigned char hal_download_wifi_fw_img(void)
     bufferICCM = fwICCM;
     bufferDCCM = fwDCCM;
 
-    hif->hif_ops.hi_write_reg32(RG_SCFG_SRAM_FUNC,MAC_REG_BASE);
-    hif->hif_ops.hi_write_reg32(RG_SCFG_SRAM_FUNC,MAC_ICCM_AHB_BASE);
-    hif->hif_ops.hi_write_reg32(RG_SCFG_REG_FUNC,MAC_REG_BASE);
-    hif->hif_ops.hi_write_reg32(RG_SCFG_EEPROM_FUNC,MAC_REG_BASE);
+    hif->hif_ops.hi_write_reg32(RG_SCFG_SRAM_FUNC, MAC_REG_BASE);
+    hif->hif_ops.hi_write_reg32(RG_SCFG_SRAM_FUNC, MAC_ICCM_AHB_BASE);
+    hif->hif_ops.hi_write_reg32(RG_SCFG_REG_FUNC, MAC_REG_BASE);
+    hif->hif_ops.hi_write_reg32(RG_SCFG_EEPROM_FUNC, MAC_REG_BASE);
 
-    // close phy rest
+    /* close phy rest */
     hif->hif_ops.hi_write_word(RG_WIFI_RST_CTRL, to_sdio);
-    PRINT("RG_SCFG_SRAM_FUNC %lx \n",hif->hif_ops.hi_read_reg32(RG_SCFG_SRAM_FUNC));
+    PRINT("RG_SCFG_SRAM_FUNC %lx \n", hif->hif_ops.hi_read_reg32(RG_SCFG_SRAM_FUNC));
 
 #ifdef EFUSE_ENABLE
     efuse_init();
-    printk("%s(%d): called efuse init\n", __func__, __LINE__);
+    pr_debug("%s(%d): called efuse init\n", __func__, __LINE__);
 #endif
 
 #ifdef HAL_FPGA_VER
-    hif->hif_ops.hi_write_reg32(RG_SCFG_SRAM_FUNC,MAC_REG_BASE);
+    hif->hif_ops.hi_write_reg32(RG_SCFG_SRAM_FUNC, MAC_REG_BASE);
 
     rg_dpll_a5.data = aml_aon_read_reg(RG_DPLL_A5);
-    /*bpll not init*/
+    /* bpll not init */
     if (rg_dpll_a5.b.ro_wifi_bb_pll_done != 1) {
         bbpll_init();
         bbpll_start();
-        printk("bbpll  init ok!\n");
-
+        pr_debug("bbpll  init ok!\n");
     } else {
         ERROR_DEBUG_OUT("bbpll  already init,not need to init!\n");
     }
 
     hal_set_sys_clk_for_fpga();
-    hif->hif_ops.hi_write_reg32(RG_SCFG_SRAM_FUNC,MAC_ICCM_AHB_BASE);
-    len = ALIGN(sizeof(fwICCM),4);
-    printk("%s(%d): img len 0x%x, start download fw\n", __func__, __LINE__, len);
+    hif->hif_ops.hi_write_reg32(RG_SCFG_SRAM_FUNC, MAC_ICCM_AHB_BASE);
+    len = ALIGN(sizeof(fwICCM), 4);
+    pr_debug("%s(%d): img len 0x%x, start download fw\n", __func__, __LINE__, len);
 #else
     hif->hif_ops.hi_write_reg32(RG_SCFG_SRAM_FUNC,MAC_REG_BASE);
     hal_set_sys_clk(10);
@@ -646,18 +650,19 @@ unsigned char hal_download_wifi_fw_img(void)
         }
 
         hif->hif_ops.hi_write_sram(bufferICCM + offset + offset_base,
-            (unsigned char*)(SYS_TYPE)(0 + offset), databyte);
+                                   (unsigned char*)(SYS_TYPE)offset,
+                                   databyte);
 
         offset += databyte;
         len -= databyte;
     } while(len > 0);
 
 #ifdef ICCM_CHECK
-    offset_base =0;
+    offset_base = 0;
     offset = ICCM_ROM_LEN;
     len = ICCM_CHECK_LEN;
-    hif->hif_ops.hi_write_reg32(RG_SCFG_SRAM_FUNC,MAC_ICCM_AHB_BASE);
-    //host rom read
+    hif->hif_ops.hi_write_reg32(RG_SCFG_SRAM_FUNC, MAC_ICCM_AHB_BASE);
+    /* host rom read */
     do {
         databyte = (len > SRAM_MAX_LEN) ? SRAM_MAX_LEN : len;
 
@@ -668,7 +673,8 @@ unsigned char hal_download_wifi_fw_img(void)
         }
 
         hif->hif_ops.hi_read_sram(buf_iccm_rd + rd_offset,
-            (unsigned char*)(SYS_TYPE)(0 + offset) ,databyte);
+                                  (unsigned char*)(SYS_TYPE)offset,
+                                  databyte);
 
         offset += databyte;
         rd_offset += databyte;
@@ -678,7 +684,6 @@ unsigned char hal_download_wifi_fw_img(void)
     if (memcmp(buf_iccm_rd, (bufferICCM + ICCM_ROM_LEN), ICCM_CHECK_LEN)) {
         ERROR_DEBUG_OUT("Host HAL: write ICCM ERROR!!!! \n");
         return false;
-
     } else {
         PRINT("Host HAL: write ICCM SUCCESS!!!! \n");
     }
@@ -699,16 +704,16 @@ unsigned char hal_download_wifi_fw_img(void)
     } while(len > 0);
 
     /* Starting run firmware */
-    //set baseaddr to sram
+    /* set baseaddr to sram */
     hif->hif_ops.hi_write_reg32(RG_SCFG_SRAM_FUNC, MAC_REG_BASE);
     len = SRAM_LEN;
     memset(bufferDCCM, 0, len);
     PRINT("set sram zero for simulation, total=0x%x\n", len);
     hif->hif_ops.hi_write_sram(bufferDCCM, (unsigned char*)(SYS_TYPE)MAC_SRAM_BASE, len);
 
-    //configure sram space
+    /* configure sram space */
     hi_cfg_firmware();
-    //set func2 baseaddr
+    /* set func2 baseaddr */
     hif->hif_ops.hi_write_reg32(RG_SCFG_SRAM_FUNC, MAC_REG_BASE);
 
     regdata = hif->hif_ops.hi_read_reg32(RG_SCFG_REG_FUNC);
@@ -721,25 +726,25 @@ unsigned char hal_download_wifi_fw_img(void)
     wifi_cpu_clk_switch(0x4f0700f3);
 #endif
 
-    /* arc cpu domain power save for t9026  */
+    /* arc cpu domain power save for t9026 */
     if (0) {
-        //cpu select arc
-        //enable cpu
+        /* cpu select arc */
+        /* enable cpu */
         regdata = hif->hif_ops.hi_read_word(RG_WIFI_MAC_ARC_CTRL);
         /* start firmware chip cpu */
         regdata |= CPU_RUN;
         hif->hif_ops.hi_write_word(RG_WIFI_MAC_ARC_CTRL, regdata);
     } else {
-    //cpu select riscv
-      regdata = hif->hif_ops.hi_read_word(RG_WIFI_CPU_CTRL);
-      regdata |= 0x10000;
-      hif->hif_ops.hi_write_word(RG_WIFI_CPU_CTRL,regdata);
-      PRINT("RG_WIFI_CPU_CTRL = %x redata= %x \n",RG_WIFI_CPU_CTRL,regdata);
-      //enable cpu
-      pmu_a22.data = hif->hif_ops.bt_hi_read_word(RG_PMU_A22);
-      pmu_a22.b.rg_dev_reset_sw = 0x00;
-      hif->hif_ops.bt_hi_write_word(RG_PMU_A22,pmu_a22.data);
-      PRINT("RG_PMU_A22 = %x redata= %x \n",RG_PMU_A22,pmu_a22.data);
+        /* cpu select riscv */
+        regdata = hif->hif_ops.hi_read_word(RG_WIFI_CPU_CTRL);
+        regdata |= 0x10000;
+        hif->hif_ops.hi_write_word(RG_WIFI_CPU_CTRL, regdata);
+        PRINT("RG_WIFI_CPU_CTRL = %x redata= %x \n", RG_WIFI_CPU_CTRL, regdata);
+        /* enable cpu */
+        pmu_a22.data = hif->hif_ops.bt_hi_read_word(RG_PMU_A22);
+        pmu_a22.b.rg_dev_reset_sw = 0x00;
+        hif->hif_ops.bt_hi_write_word(RG_PMU_A22, pmu_a22.data);
+        PRINT("RG_PMU_A22 = %x redata= %x \n", RG_PMU_A22, pmu_a22.data);
     }
 
 #elif defined (PROJECT_W1)
@@ -757,26 +762,25 @@ unsigned char hal_download_wifi_fw_img(void)
     hif->hif_ops.hi_write_word(RG_WIFI_IF_RXPAGE_BUF_RDPTR, 0);
     hif->hif_ops.hi_write_word(RG_WIFI_IF_MAC_TXTABLE_RD_ID, 0);
 
-    //cpu select riscv
+    /* cpu select riscv */
     regdata = hif->hif_ops.hi_read_word(RG_WIFI_CPU_CTRL);
     regdata |= 0x10000;
-    hif->hif_ops.hi_write_word(RG_WIFI_CPU_CTRL,regdata);
-    PRINT("RG_WIFI_CPU_CTRL = %x redata= %x \n",RG_WIFI_CPU_CTRL,regdata);
-    //enable cpu
+    hif->hif_ops.hi_write_word(RG_WIFI_CPU_CTRL, regdata);
+    PRINT("RG_WIFI_CPU_CTRL = %x redata= %x \n", RG_WIFI_CPU_CTRL, regdata);
+    /* enable cpu */
     pmu_a22.data = hif->hif_ops.bt_hi_read_word(RG_PMU_A22);
     pmu_a22.b.rg_dev_reset_sw = 0x00;
-    hif->hif_ops.bt_hi_write_word(RG_PMU_A22,pmu_a22.data);
-    PRINT("RG_PMU_A22 = %x redata= %x \n",RG_PMU_A22,pmu_a22.data);
+    hif->hif_ops.bt_hi_write_word(RG_PMU_A22, pmu_a22.data);
+    PRINT("RG_PMU_A22 = %x redata= %x \n", RG_PMU_A22, pmu_a22.data);
 #endif
 
-    printk("fw download success!\n");
+    pr_debug("fw download success!\n");
 #ifdef SDIO_BUILD_IN
     wifi_in_insmod = 0;
 #endif
 
     return true;
 }
-
 
 #if defined (HAL_FPGA_VER)
 int mac_addr0 = 0x00;
@@ -788,12 +792,12 @@ int mac_addr5 = 0xcc;
 
 static int vif0opmode = -1;
 static int vif1opmode = -1;
-static char * vmac0 = "wlan0";
-static char * vmac1 = "p2p0";
+static char *vmac0 = "wlan0";
+static char *vmac1 = "p2p0";
 static unsigned int con_mode = ((1 << WIFINET_M_STA) | (1 << WIFINET_M_P2P_DEV));
 static int en_rf_test = 0;
 
-static char * plt_ver = NULL;
+static char *plt_ver = NULL;
 struct version_info version_map[] = {
     {"gva", VERSION_GVA},
     {"gva_mrt", VERSION_GVA_MRT}
@@ -801,9 +805,9 @@ struct version_info version_map[] = {
 };
 
 int aml_debug = AML_DEBUG_LEVEL;
-const unsigned char BROADCAST_ADDRESS[WIFINET_ADDR_LEN] =  {0xff,0xff,0xff,0xff,0xff,0xff};
-static char * mac_addr = "00:01:02:58:00:CC";
-static char * country_code = "WW";
+const unsigned char BROADCAST_ADDRESS[WIFINET_ADDR_LEN] = {0xff,0xff,0xff,0xff,0xff,0xff};
+static char *mac_addr = "00:01:02:58:00:CC";
+static char *country_code = "WW";
 unsigned short dhcp_offload = 0;
 static int sdblksize = BLKSIZE;
 unsigned char aml_insmod_flag = 0;
@@ -826,11 +830,13 @@ void aml_wifi_set_mac_addr(void)
 #ifdef CONFIG_MAC_SUPPORT
     u8 addr[ETH_ALEN];
     u8 cbuf[50];
-    unsigned int efuse_data_l = 0;
-    unsigned int efuse_data_h = 0;
-
+#if defined(NOT_AMLOGIC_PLATFORM)
+    memset(addr, 0xff, ETH_ALEN);
+#else
     memcpy(addr, wifi_get_mac(), ETH_ALEN);
-    if (addr[0] != 0xff || aml_read_macaddr_from_file(WIFIMAC_PATH, addr) == true) {
+#endif
+    if (addr[0] != 0xff ||
+        aml_read_macaddr_from_file(WIFIMAC_PATH, addr) == true) {
         mac_addr0 = addr[0];
         mac_addr1 = addr[1];
         mac_addr2 = addr[2];
@@ -838,8 +844,12 @@ void aml_wifi_set_mac_addr(void)
         mac_addr4 = addr[4];
         mac_addr5 = addr[5];
     } else {
+        unsigned int efuse_data_l;
+        unsigned int efuse_data_h;
+
         efuse_data_l = efuse_manual_read(0x1);
         efuse_data_h = efuse_manual_read(0x2);
+
         if ((efuse_data_h != 0) && (efuse_data_l != 0)) {
             mac_addr0 = (efuse_data_h & 0xff00) >> 8;
             mac_addr1 = efuse_data_h & 0x00ff;
@@ -849,9 +859,10 @@ void aml_wifi_set_mac_addr(void)
             mac_addr5 = efuse_data_l & 0xff;
             aml_retrieve_from_file(WIFIMAC_PATH, cbuf, 48);
 
-            sprintf(cbuf + 21, MAC_FMT, mac_addr0, mac_addr1, mac_addr2, mac_addr3, mac_addr4, mac_addr5);
+            sprintf(cbuf + 21, MAC_FMT, mac_addr0, mac_addr1, mac_addr2,
+                    mac_addr3, mac_addr4, mac_addr5);
             if (aml_store_to_file(WIFIMAC_PATH, cbuf, strlen(cbuf)) > 0) {
-                printk("write the efuse mac to wifimac.txt\n");
+                pr_debug("write the efuse mac to wifimac.txt\n");
             }
         } else {
 #endif
@@ -862,29 +873,31 @@ void aml_wifi_set_mac_addr(void)
 #ifdef CONFIG_MAC_SUPPORT
             aml_retrieve_from_file(WIFIMAC_PATH, cbuf, 48);
 
-            sprintf(cbuf + 21, MAC_FMT, mac_addr0, mac_addr1, mac_addr2, mac_addr3, mac_addr4, mac_addr5);
+            sprintf(cbuf + 21, MAC_FMT, mac_addr0, mac_addr1, mac_addr2,
+                    mac_addr3, mac_addr4, mac_addr5);
             if (aml_store_to_file(WIFIMAC_PATH, cbuf, strlen(cbuf)) > 0)
-                printk("write the random mac to wifimac.txt\n");
+                pr_debug("write the random mac to wifimac.txt\n");
         }
     }
 #endif
 
     if (mac_addr0 & 0x3) {
-        printk("change the mac addr from [0x%x] ", mac_addr0);
+        pr_debug("change the mac addr from [0x%x] ", mac_addr0);
 
         mac_addr0 &= ~0x3;
-        printk("to [0x%x] \n", mac_addr0);
+        pr_debug("to [0x%x] \n", mac_addr0);
 #ifdef CONFIG_MAC_SUPPORT
         aml_retrieve_from_file(WIFIMAC_PATH, cbuf, 48);
 
-        sprintf(cbuf + 21, MAC_FMT, mac_addr0, mac_addr1, mac_addr2, mac_addr3, mac_addr4, mac_addr5);
+        sprintf(cbuf + 21, MAC_FMT, mac_addr0, mac_addr1, mac_addr2,
+                mac_addr3, mac_addr4, mac_addr5);
         if (aml_store_to_file(WIFIMAC_PATH, cbuf, strlen(cbuf)) > 0)
-            printk("write the random mac to wifimac.txt\n");
+            pr_debug("write the random mac to wifimac.txt\n");
 #endif
     }
 }
 
-char * aml_wifi_get_country_code(void)
+char *aml_wifi_get_country_code(void)
 {
     return country_code;
 }
@@ -899,12 +912,12 @@ int aml_wifi_get_vif1_opmode(void)
     return vif1opmode;
 }
 
-char * aml_wifi_get_vif0_name(void)
+char *aml_wifi_get_vif0_name(void)
 {
     return vmac0;
 }
 
-char * aml_wifi_get_vif1_name(void)
+char *aml_wifi_get_vif1_name(void)
 {
     return vmac1;
 }
@@ -914,12 +927,12 @@ unsigned int aml_wifi_get_con_mode(void)
     return con_mode;
 }
 
-char * aml_wifi_get_bus_type(void)
+char *aml_wifi_get_bus_type(void)
 {
     return hif_type;
 }
 
-char * aml_wifi_get_fw_type(void)
+char *aml_wifi_get_fw_type(void)
 {
     unsigned int regdata = hi_get_fw_version();
     if (regdata == FW_VERSION_W1) {
@@ -937,15 +950,17 @@ char * aml_wifi_get_fw_type(void)
 unsigned int aml_wifi_get_platform_verid(void)
 {
     int i;
+
     if (plt_ver == NULL)
     {
         return 0;
     }
+
     for (i = 0; i < sizeof(version_map)/sizeof(struct version_info); ++i)
     {
         if (strcmp(version_map[i].version_name, plt_ver) == 0)
         {
-            printk("%s(%d) version name: %s\n", __func__, __LINE__, version_map[i].version_name);
+            /* pr_debug("%s(%d) version name: %s\n", __func__, __LINE__, version_map[i].version_name); */
             return version_map[i].version_id;
         }
     }
@@ -969,8 +984,8 @@ static int aml_insmod(void)
 #endif
 
     print_driver_version();
-    printk("driver version: %s\n", DRIVERVERSION);
-    printk("%s(%d) dhcp_offload %d set done.\n\n",
+    pr_info("driver version: %s\n", DRIVERVERSION);
+    pr_debug("%s(%d) dhcp_offload %d set done.\n\n",
         __func__,__LINE__, dhcp_offload);
 
 #ifdef DEBUG_MALLOC
@@ -993,13 +1008,13 @@ static int aml_insmod(void)
     }
 
     if (aml_wifi_is_enable_rf_test()) {
-        printk("---Aml drv---:Before calling %s:(%d) \n",__func__,__LINE__);
+        pr_debug("---Aml drv---:Before calling %s:(%d) \n",__func__,__LINE__);
         Init_B2B_Resource();
     }
 
     aml_insmod_flag = 1;
 
-    printk("%s(%d) start...\n",__func__, __LINE__);
+    pr_debug("%s(%d) start...\n",__func__, __LINE__);
     return 0;
 
 insmod_failed:
@@ -1018,20 +1033,22 @@ static void aml_rmmod(void)
 #ifdef SDIO_BUILD_IN
     wifi_in_rmmod = 1;
 #endif
-    printk("===================aml_rmmod start====================\n");
+    pr_debug("===================aml_rmmod start====================\n");
     hal_exit_priv();
-    printk("===================aml_rmmod end====================\n");
+    pr_debug("===================aml_rmmod end====================\n");
     aml_insmod_flag = 0;
 
 #ifdef DEBUG_MALLOC
-    printk("kmalloc_count:%d\n", kmalloc_count);
+    pr_debug("kmalloc_count:%d\n", kmalloc_count);
     for (i = 0; i < kmalloc_count; ++i) {
-        printk("malloc name:%s, count:%d\n", m_pn_buf[i].name, m_pn_buf[i].count);
+        pr_debug("malloc name:%s, count:%d\n", m_pn_buf[i].name,
+                                             m_pn_buf[i].count);
     }
 
-    printk("kfree_count:%d\n", kfree_count);
+    pr_debug("kfree_count:%d\n", kfree_count);
     for (i = 0; i < kfree_count; ++i) {
-        printk("free name:%s, count:%d\n", f_pn_buf[i].name, f_pn_buf[i].count);
+        pr_debug("free name:%s, count:%d\n", f_pn_buf[i].name,
+                                           f_pn_buf[i].count);
     }
 #endif
 #ifdef SDIO_BUILD_IN
@@ -1054,19 +1071,19 @@ module_param(sdblksize, int, S_IRUGO);
 module_param(en_rf_test, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 
 
-/*Added for pass mac address when load wifi driver
- *Usage: insmod ***.ko mac_addr=xx:xx:xx:xx:xx:xx
- *Default: 00:01:02:58:00:12
-*/
-module_param(mac_addr,charp,0644);
-MODULE_PARM_DESC(mac_addr,"A string variable to describe wifi mac address");
+/* Added for pass mac address when load wifi driver
+ * Usage: insmod ***.ko mac_addr=xx:xx:xx:xx:xx:xx
+ * Default: 00:01:02:58:00:12
+ */
+module_param(mac_addr, charp, 0644);
+MODULE_PARM_DESC(mac_addr, "A string variable to describe wifi mac address");
 
 module_param(dhcp_offload, ushort, S_IRUGO);
-MODULE_PARM_DESC(dhcp_offload,"A short variable to control dhcp offload function");
+MODULE_PARM_DESC(dhcp_offload, "A short variable to control dhcp offload function");
 
-/*Usage: insmod ***.ko country_code=xx*/
+/* Usage: insmod ***.ko country_code=xx */
 
-module_param(country_code,charp,0644);
+module_param(country_code, charp, 0644);
 MODULE_PARM_DESC(country_code,"A string variable to describe country code");
 
 

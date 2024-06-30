@@ -94,7 +94,7 @@ void* Queue_Dequeue( struct _Queue* my )
 
 
 
-unsigned char Queue_HasObject( struct _Queue* my, void* object )
+static unsigned char Queue_HasObject( struct _Queue* my, void* object )
 {
         void** start = my->start;
         void** end   = my->end;
@@ -111,7 +111,7 @@ unsigned char Queue_HasObject( struct _Queue* my, void* object )
 
 
 
-unsigned char Queue_IsFull( struct _Queue* my )
+static unsigned char Queue_IsFull( struct _Queue* my )
 {
         void** front = my->front;
         void** back  = my->back;
@@ -162,7 +162,7 @@ unsigned char Pool_PutBlock( struct _Pool* my, void* block )
 
 #if 1
 
-void TxDescriptor_Destroy( struct _TxDescriptor* my )
+static void TxDescriptor_Destroy( struct _TxDescriptor* my )
 {
 
         DBG_HAL_THR_ENTER();
@@ -220,7 +220,7 @@ static unsigned char uno_rate[RATE_LEN + 1] =
     WIFI_11N_MCS0
 };
 
-void thr_list_add(struct thr_list_head *new_head,
+static void thr_list_add(struct thr_list_head *new_head,
                                 struct thr_list_head *prev,
                                 struct thr_list_head *next)
 {
@@ -230,7 +230,7 @@ void thr_list_add(struct thr_list_head *new_head,
         prev->next = new_head;
 }
 
-struct _HI_TxPrivDescripter_chain*
+static struct _HI_TxPrivDescripter_chain*
 Do_HI_AGG_TxDP(struct _HI_AGG_TxDescripter_chain  *HI_AGG_chain,
                     struct _HI_TxPrivDescripter_chain* HI_TxPriv[],
                     int length[],unsigned char TID,
@@ -289,7 +289,7 @@ Do_HI_AGG_TxDP(struct _HI_AGG_TxDescripter_chain  *HI_AGG_chain,
             ERROR_DEBUG_OUT("not support, bw in flag 0x%x\n", (HI_AGG_TxDP->FLAG >> 8) & 0x3);
      }
 
-    //printk("%s (%d) bw in flag 0x%x\n",__func__, __LINE__, (HI_AGG_TxDP->FLAG >> 8) & 0x3);
+    //pr_debug("%s (%d) bw in flag 0x%x\n",__func__, __LINE__, (HI_AGG_TxDP->FLAG >> 8) & 0x3);
 
     HI_AGG_TxDP->FLAG2  = TrcConfMib.dot11RDSupport ? TX_DESCRIPTER_RD_SUPPORT : 0;
     HI_AGG_TxDP->FLAG2 |= TrcConfMib.dot11RDSupport ? TX_DESCRIPTER_HTC : 0;
@@ -340,7 +340,7 @@ Do_HI_AGG_TxDP(struct _HI_AGG_TxDescripter_chain  *HI_AGG_chain,
         for (i = 0; i< MpduNum-1; i++) {
             HI_AGG_TxDP->AGGR_len += ALIGN(length[i]+exlen,4)+4+4+0;
             HI_AGG_TxDP->aggr_page_num += howmanypage(length[i]+FW_TXDESC_DATAOFFSET, PAGE_LEN);
-            //printk("HI_AGG_TxDP->AGGR_len 0x%x ,length[%d] 0x%x\n",HI_AGG_TxDP->AGGR_len,i,length[i]);
+            //pr_debug("HI_AGG_TxDP->AGGR_len 0x%x ,length[%d] 0x%x\n",HI_AGG_TxDP->AGGR_len,i,length[i]);
         }
 
         if (IS_VHT_RATE(HI_AGG_TxDP->CurrentRate)) {
@@ -352,7 +352,7 @@ Do_HI_AGG_TxDP(struct _HI_AGG_TxDescripter_chain  *HI_AGG_chain,
         }
 
         HI_AGG_TxDP->aggr_page_num += howmanypage(length[i]+FW_TXDESC_DATAOFFSET, PAGE_LEN);
-        //printk("current vht rate 0x%x\n",HI_AGG_TxDP->CurrentRate);
+        //pr_debug("current vht rate 0x%x\n",HI_AGG_TxDP->CurrentRate);
     }
     else {
         HI_AGG_TxDP->AGGR_len += exlen;
@@ -366,10 +366,10 @@ Do_HI_AGG_TxDP(struct _HI_AGG_TxDescripter_chain  *HI_AGG_chain,
             HI_TxPriv[i]->HI_TxPriv.MPDULEN -= DP_SEC_TKIP_MIC_LEN;
         }
     }
-    // printk("HI_AGG_TxDP->AGGR_len %x ,MPDULEN %x\n",HI_AGG_TxDP->AGGR_len,HI_TxPriv[0]->HI_TxPriv.MPDULEN);
-    // printk("---xman debug---: Before OS_ADD_TAIL, HI_TxPrivNum: %d.\n",HI_TxPrivNum);
+    // pr_debug("HI_AGG_TxDP->AGGR_len %x ,MPDULEN %x\n",HI_AGG_TxDP->AGGR_len,HI_TxPriv[0]->HI_TxPriv.MPDULEN);
+    // pr_debug("---xman debug---: Before OS_ADD_TAIL, HI_TxPrivNum: %d.\n",HI_TxPrivNum);
     for (i = 0; i < HI_TxPrivNum ; i ++) {
-        // printk(" Do_HI_AGG_TxDP +HI_TxPriv =%p DMAADDR =%x\n",HI_TxPriv[i],HI_TxPriv[i]->HI_TxPriv.DMAADDR);
+        // pr_debug(" Do_HI_AGG_TxDP +HI_TxPriv =%p DMAADDR =%x\n",HI_TxPriv[i],HI_TxPriv[i]->HI_TxPriv.DMAADDR);
         //OS_ADD_TAIL(&HI_TxPriv[i]->workList,&HI_AGG_chain->workList);
         thr_list_add(&HI_TxPriv[i]->workList,(&HI_AGG_chain->workList)->prev,&HI_AGG_chain->workList);
     }
@@ -378,7 +378,7 @@ Do_HI_AGG_TxDP(struct _HI_AGG_TxDescripter_chain  *HI_AGG_chain,
     return HI_TxPriv[0];
 }
 
-int HostSendTYPE_AMSDU(unsigned char* buffer[],int length[],
+static int HostSendTYPE_AMSDU(unsigned char* buffer[],int length[],
     int packetNum,unsigned char TID,unsigned short FLAG)
 {
         //int i;
@@ -404,7 +404,7 @@ int HostSendTYPE_AMSDU(unsigned char* buffer[],int length[],
 
 }
 
-int HostSendTYPE_AMPDU(unsigned char* buffer[],int length[],
+static int HostSendTYPE_AMPDU(unsigned char* buffer[],int length[],
     int packetNum,unsigned char TID,unsigned short FLAG)
 {
         int i;
@@ -412,7 +412,7 @@ int HostSendTYPE_AMPDU(unsigned char* buffer[],int length[],
         struct _HI_TxPrivDescripter_chain **HI_TxPriv = NULL;
         int privnum = packetNum;
         if (!Driver_IsTxPrivEnough(packetNum)) {
-                printk("warning: no tx desc\n");
+                pr_warn("warning: no tx desc\n");
                 return 0;
         }
         Hi_TxAgg = Driver_GetAGG();
@@ -435,7 +435,7 @@ int HostSendTYPE_AMPDU(unsigned char* buffer[],int length[],
         return 0;
 }
 
-int  HostSendTYPE_COMMO(unsigned char* buffer,int length,unsigned char TID,unsigned short FLAG)
+static int  HostSendTYPE_COMMO(unsigned char* buffer,int length,unsigned char TID,unsigned short FLAG)
 {
 
     int privnum =1;
@@ -464,7 +464,7 @@ int  HostSendTYPE_COMMO(unsigned char* buffer,int length,unsigned char TID,unsig
 }
 #endif
 
-void HostSendDataPacket(int type, int packetNum, unsigned short FLAG)
+static void HostSendDataPacket(int type, int packetNum, unsigned short FLAG)
 {
         int i;
         struct _TxDescriptor* descriptor = NULL;
@@ -494,7 +494,7 @@ void HostSendDataPacket(int type, int packetNum, unsigned short FLAG)
             }
             packetNum = i;
             if (packetNum ==0) {
-                printk(" HostSendDataPacket packetNum=0\n");
+                pr_debug(" HostSendDataPacket packetNum=0\n");
                 goto end;
             }
         }
@@ -509,7 +509,7 @@ void HostSendDataPacket(int type, int packetNum, unsigned short FLAG)
                     goto end;
                 //if (TrcConfMib.dot11FragmentationThreshold < descriptor1->len )
                  //       FLAG = WIFI_IS_FRAGMENT;
-                //printk("---b2b debug ---Common type before HostSendTYPE_COMMO, FLAG is : %d\n", FLAG);
+                //pr_debug("---b2b debug ---Common type before HostSendTYPE_COMMO, FLAG is : %d\n", FLAG);
                 HostSendTYPE_COMMO((unsigned char *)descriptor1->skb,descriptor1->len, descriptor1->Tid,FLAG);
                 TxDescriptor_Destroy(descriptor1);
                 break;
@@ -521,17 +521,17 @@ void HostSendDataPacket(int type, int packetNum, unsigned short FLAG)
                     goto end;
                 //if (TrcConfMib.dot11FragmentationThreshold < descriptor1->len )
                  //       FLAG = WIFI_IS_FRAGMENT;
-                //printk("---b2b debug ---Common type before HostSendTYPE_COMMO, FLAG is : %d\n", FLAG);
+                //pr_debug("---b2b debug ---Common type before HostSendTYPE_COMMO, FLAG is : %d\n", FLAG);
                 HostSendTYPE_COMMO((unsigned char *)descriptor1->skb,descriptor1->len, descriptor1->Tid,FLAG);
                 TxDescriptor_Destroy(descriptor1);
                 break;
         case TYPE_AMPDU:
-                //printk("----length: %d, packetNum: %d, TID: %d, FLAG: %d.\n",*length,packetNum, TID, FLAG);
+                //pr_debug("----length: %d, packetNum: %d, TID: %d, FLAG: %d.\n",*length,packetNum, TID, FLAG);
                 FLAG |= WIFI_IS_AGGR;
                 HostSendTYPE_AMPDU( buffer,length,packetNum, TID, FLAG);
                 break;
         case TYPE_AMSDU:
-                printk("\n---xman debug---,length:%d, packetNum:%d, TID: %d, FLAG:%x.\n",*length,packetNum, TID, FLAG);
+                pr_debug("\n---xman debug---,length:%d, packetNum:%d, TID: %d, FLAG:%x.\n",*length,packetNum, TID, FLAG);
                 HostSendTYPE_AMSDU(buffer,length,packetNum, TID, FLAG);
                 break;
         case  TYPE_AMSDU_AMPDU:
@@ -573,7 +573,7 @@ static int b2b_tx_thread_function(void *param)
         }
 
         hal_full = 0;
-        printk("pt max tx: %d\n", gB2BTestCasePacket.send_frame_num);
+        pr_debug("pt max tx: %d\n", gB2BTestCasePacket.send_frame_num);
 
         TrcConfMib.tid = STA2_VMAC1_SEND_TID;
         loop = 0;
@@ -582,14 +582,14 @@ static int b2b_tx_thread_function(void *param)
             if(gB2BTestCasePacket.send_frame_num > loop)
             {
                 if (FiOpt2Driver->hal_get_priv_cnt == NULL) {
-                    printk("===>>> %s ==>> hal_get_priv_cnt is NULL\n", __func__);
+                    pr_err("===>>> %s ==>> hal_get_priv_cnt is NULL\n", __func__);
                     break;
                 }
                 if ((FiOpt2Driver->hal_get_priv_cnt(TrcConfMib.tid) < TrcConfMib.testmpdunum ))//+1
                 {
                     if(hal_full == 0)
                     {
-                        printk("%s %d: hal buffer full.\n", __func__, __LINE__);
+                        pr_warn("%s %d: hal buffer full.\n", __func__, __LINE__);
                         hal_full = 1;
                     }
                     msleep(10);
@@ -597,20 +597,24 @@ static int b2b_tx_thread_function(void *param)
                 }
 
                 HostSendDataPacket(TrcConfMib.testtype,TrcConfMib.testmpdunum,TrcConfMib.testflag);
-                //printk("test flag = 0x%x bw =0x%x\n", TrcConfMib.testflag, (TrcConfMib.testflag >>WIFI_CHANNEL_BW_OFFSET) & 0x3 );
+                //pr_debug("test flag = 0x%x bw =0x%x\n", TrcConfMib.testflag, (TrcConfMib.testflag >>WIFI_CHANNEL_BW_OFFSET) & 0x3 );
                 loop++;
             }//tx max pkt
             else
             {
-                printk("**** pt send pkt %d done  ***", loop);
+                pr_debug("**** pt send pkt %d done  ***", loop);
                 break; // quite into to thread to sleep
             }
         }// start/stop loop
-        printk("**** stop : when pt send pkt %d done ***", loop);
+        pr_debug("**** stop : when pt send pkt %d done ***", loop);
     }// thread loop
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 17, 0)
     complete_and_exit(&b2b_tx_struct.b2b_thread_cmplt, 0);
-    printk("**** exit b2b_tx_thread_function ***");
+#else
+    kthread_complete_and_exit(&b2b_tx_struct.b2b_thread_cmplt, 0);
+#endif
+    pr_debug("**** exit b2b_tx_thread_function ***");
     return 0;
 }
 
@@ -688,13 +692,13 @@ void Task_Schedule(int usrtesttype)
         // 8
         case TYPE_STOP_TX:
             TrcConfMib.testtype=TYPE_STOP_TX;
-            printk("send stop!\n");
+            pr_debug("send stop!\n");
             break;
         default:
             break;
     }
 
-     printk("%s(%d) test flag =0x%x, test type = 0x%x\n",
+     pr_debug("%s(%d) test flag =0x%x, test type = 0x%x\n",
                     __func__, __LINE__, TrcConfMib.testflag, usrtesttype);
 
     DBG_HAL_THR_EXIT();
@@ -712,7 +716,7 @@ void b2b_tx_thread_remove(void)
             wait_for_completion(&b2b_tx_struct.b2b_thread_cmplt);
             b2b_tx_struct.b2b_tx_thread =NULL;
     /*
-        printk("======> Remove b2b tx thread\n");
+        pr_debug("======> Remove b2b tx thread\n");
         b2b_tx_struct.b2b_tx_quit = 1;
         kthread_stop(b2b_tx_struct.b2b_tx_thread);
         b2b_tx_struct.b2b_tx_thread = NULL;
@@ -740,7 +744,7 @@ int b2b_compare_local_and_bssid(void)
     {
         if ( TrcConfMib.the_bssid[i] != TrcConfMib.the_mac_address[i] )
         {
-            printk("\n\nb2b_compare_local_and_bssid: NOT the same\n");
+            pr_err("\n\nb2b_compare_local_and_bssid: NOT the same\n");
             ret = 1;
             break;
         }
@@ -755,7 +759,7 @@ void driver_open(void)
     DBG_HAL_THR_ENTER();
 
 
-    printk("********* b2b debug enter driver_open ***************\n");
+    pr_debug("********* b2b debug enter driver_open ***************\n");
 
     callback.mic_error_event = Driver_mic_error_event;
     callback.intr_tx_handle = Driver_intr_tx_handle;
@@ -807,7 +811,7 @@ void driver_open(void)
 
     if ( 0 != b2b_compare_local_and_bssid() )//Tx side
     {
-        printk("\n---B2B debug---: Tx side\n");
+        pr_debug("\n---B2B debug---: Tx side\n");
         TrcConfMib.dot11EncryptType = gB2BTestCasePacket.encryp_type;
         TrcConfMib.dot11EncryptLen = STA1_VMAC0_KEY_LEN;
         if(STA1_VMAC0_IBSS)
@@ -831,7 +835,7 @@ void driver_open(void)
     }
     else
     {
-        printk("\n---B2B debug---: Rx side\n");
+        pr_debug("\n---B2B debug---: Rx side\n");
         TrcConfMib.dot11EncryptType = gB2BTestCasePacket.encryp_type;
         TrcConfMib.dot11EncryptLen = STA1_VMAC0_KEY_LEN;
         if(STA1_VMAC0_IBSS)
@@ -860,18 +864,18 @@ void driver_open(void)
 
     if(BSS_BW_80M == 2)
     {
-        printk("\n---B2B debug---: 80M bw\n");
+        pr_debug("\n---B2B debug---: 80M bw\n");
         //amlhal_SetChannel_BW(SW_CBW80,SW_COFF_U30M);
     }
     else if(BSS_BW_40M == 1)
     {
         //amlhal_SetChannel_BW(SW_CBW40,SW_HI_CH_OFF_20U);
-        printk("\n---B2B debug---: 40M bw\n");
+        pr_debug("\n---B2B debug---: 40M bw\n");
         //PhySetChanSupportType(WIFINET_BW_40PLUS);
     }
     else
     {
-        printk("\n---B2B debug---: 20M bw\n");
+        pr_debug("\n---B2B debug---: 20M bw\n");
         //amlhal_SetChannel_BW(SW_CBW20,SW_HI_CH_OFF_20);
         //PhySetChanSupportType(WIFINET_BW_20);
     }
@@ -887,11 +891,11 @@ void driver_open(void)
 
     if (IS_ERR(b2b_tx_struct.b2b_tx_thread)) {
         b2b_tx_struct.b2b_tx_thread = NULL;
-        printk(KERN_INFO "B2B: Create b2b tx task failed!\n");
+        pr_info("B2B: Create b2b tx task failed!\n");
         goto b2b_tx_thread_create_fail;
     }
     else {
-        printk(KERN_INFO "B2B: Create b2b tx task success!\n");
+        pr_info("B2B: Create b2b tx task success!\n");
         return;
     }
 
@@ -959,7 +963,7 @@ struct sk_buff* TxBuffer_Alloc(void)
     return skb;
 }
 
-void TxDescriptor_Initialize(void)
+static void TxDescriptor_Initialize(void)
 {
         Pool_Create(&our_tx_descriptor_pool,
                     TX_DESCRIPTOR_SIZE,

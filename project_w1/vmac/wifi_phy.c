@@ -133,11 +133,11 @@ void phy_stc(void)
     avg_num[2] = reg[6]&0xffff;
     avg_num[3] = (reg[6]>>16)&0xffff;
 
-    printk("phy statistic(dec): \n");
-    printk("0) CP1   detect:%8d  avg:%8d  min:%8d  max:%8d  \n", trig_num[0],avg_num[0],min_num[0],max_num[0]);
-    printk("1) L-SIG   SNR :%8d  avg:%8d  min:%8d  max:%8d  \n", trig_num[1],avg_num[1],min_num[1],max_num[1]);
-    printk("2) data CRC err:%8d  avg:%8d  min:%8d  max:%8d  \n", trig_num[2],avg_num[2],min_num[2],max_num[2]);
-    printk("3) data CRC OK:%8d  avg:%8d  min:%8d  max:%8d  \n", trig_num[3],avg_num[3],min_num[3],max_num[3]);
+    pr_debug("phy statistic(dec): \n");
+    pr_debug("0) CP1   detect:%8d  avg:%8d  min:%8d  max:%8d  \n", trig_num[0],avg_num[0],min_num[0],max_num[0]);
+    pr_debug("1) L-SIG   SNR :%8d  avg:%8d  min:%8d  max:%8d  \n", trig_num[1],avg_num[1],min_num[1],max_num[1]);
+    pr_debug("2) data CRC err:%8d  avg:%8d  min:%8d  max:%8d  \n", trig_num[2],avg_num[2],min_num[2],max_num[2]);
+    pr_debug("3) data CRC OK:%8d  avg:%8d  min:%8d  max:%8d  \n", trig_num[3],avg_num[3],min_num[3],max_num[3]);
 
 }
 
@@ -167,7 +167,7 @@ unsigned int cca_busy_check(void)
     {
         v2 = hif->hif_ops.hi_read_word(RG_AGC_OB_CCA_COND01);
         v4 = hif->hif_ops.hi_read_word(RG_AGC_OB_CCA_COND23);
-        printk("cca: ts 0x%x, ts_num %d, cond0 %d cond1 %d cond2 %d cond3 %d \n",
+        pr_debug("cca: ts 0x%x, ts_num %d, cond0 %d cond1 %d cond2 %d cond3 %d \n",
                 data3->cca_cond_ts, data3->cca_cond_ts_num,
                 v2 & 0xffff,  (v2 >> 16) & 0xffff,  v4 & 0xffff, (v4 >> 16 ) & 0xffff);
     }
@@ -282,15 +282,15 @@ void phy_register_set(void)
         
         if (data != wifi_fpga_regtable[i].regdata)
         {
-            printk("%s(%d): --Error------write reg=0x%x failed dataori=0x%x, dataread=0x%x\n",
+            pr_err("%s(%d): --Error------write reg=0x%x failed dataori=0x%x, dataread=0x%x\n",
                 __func__, __LINE__,
                 wifi_fpga_regtable[i].regaddr, wifi_fpga_regtable[i].regdata, data);
         }else{
-            printk("wifi reg 0x%04x data 0x%08x, ori_data=0x%08x\n",
+            pr_debug("wifi reg 0x%04x data 0x%08x, ori_data=0x%08x\n",
                 wifi_fpga_regtable[i].regaddr, wifi_fpga_regtable[i].regdata, ori_data);
         }
     }
-    printk("%s(%d)-- \n",__func__,__LINE__);
+    pr_debug("%s(%d)-- \n",__func__,__LINE__);
 #endif //PHY_TEST_FUNC
 
 #ifdef HAL_FPGA_VER
@@ -319,7 +319,7 @@ void coexit_bt_thread_enable(void)
     bt_prd = 7500 * 10;//us
     bt_act = 1500 * 10;//us
     bt_offset = 3500;//us
-    printk("%s(%d)\n",__func__,__LINE__);
+    pr_debug("%s(%d)\n",__func__,__LINE__);
     
     /*bt wifi switch no channel conf*/
     hif->hif_ops.hi_write_word(RG_COEX_RF_STABLE_CTRL, 0x03002000 | (testbus_num << 26));
@@ -334,7 +334,7 @@ void coexit_bt_thread_enable(void)
     hif->hif_ops.hi_write_word(RG_COEX_BT_OWNER_CTRL, 0x1001003f);
     set_reg_fragment(RG_COEX_HS5W_MANUAL4,0,0,1);
     
-    printk("%s(%d) BT priority=%d (%dus %dus %dus)--\n",
+    pr_debug("%s(%d) BT priority=%d (%dus %dus %dus)--\n",
         __func__,__LINE__,hif->hif_ops.hi_read_word(RG_COEX_PRIORITY_M6),
         bt_prd,bt_act,bt_offset);
 }

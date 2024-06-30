@@ -18,6 +18,7 @@ namespace FW_NAME
 #endif
 #endif
 
+#include "wifi_hal_cmd.h"
 #include "wifi_hal_com.h"
 #include "wifi_hal.h"
 #include "wifi_hal_txdesc.h"
@@ -379,7 +380,7 @@ static inline unsigned char Hal_TxDescriptor_GetPreamble( unsigned char rate,uns
     return ( IS_OFMD_RATE(rate) ? 20: ((preambletype==PREAMBLE_SHORT)?96:192) );
 }
 
-unsigned char Hal_TxDescriptor_GetAckRate( unsigned char data_rate )
+static unsigned char Hal_TxDescriptor_GetAckRate( unsigned char data_rate )
 {
     if (IS_HT_RATE(data_rate) )
     {
@@ -400,7 +401,7 @@ unsigned char Hal_TxDescriptor_GetAckRate( unsigned char data_rate )
     }
 }
 
-unsigned char Hal_TxDescriptor_GetRtsRate( unsigned char data_rate )
+static unsigned char Hal_TxDescriptor_GetRtsRate( unsigned char data_rate )
 {
     if (IS_HT_RATE(data_rate) )
     {
@@ -489,7 +490,7 @@ static __inline unsigned short Hal_TxDescriptor_HT_GetBATime( unsigned char ackm
 }
 
 /*get ht frame tx time ,don't contain Signal Extension*/
-unsigned short hal_txdescriptor_ht_gettxTime(unsigned char mcs ,unsigned short pktlen,
+static unsigned short hal_txdescriptor_ht_gettxTime(unsigned char mcs ,unsigned short pktlen,
     unsigned char shortGI,unsigned char bw,unsigned char green)
 {
     unsigned int nbits = 0;
@@ -518,8 +519,8 @@ unsigned short hal_txdescriptor_ht_gettxTime(unsigned char mcs ,unsigned short p
 }
 
 /*get vht frame tx time ,don't contain Signal Extension*/
-unsigned short Hal_TxDescriptor_VHT_GetTxTime(unsigned char mcs ,unsigned short pktlen,
-    unsigned char shortGI, unsigned char bandwith, unsigned char green)
+static unsigned short Hal_TxDescriptor_VHT_GetTxTime(unsigned char mcs ,unsigned short pktlen,
+    unsigned char shortGI, unsigned char bandwidth, unsigned char green)
 {
     unsigned int nbits = 0;
     unsigned short duration,nsymbits,nsymbols;
@@ -529,10 +530,10 @@ unsigned short Hal_TxDescriptor_VHT_GetTxTime(unsigned char mcs ,unsigned short 
     * find number of symbols: PLCP + data
     */
     nbits = (pktlen << 3) + OFDM_PLCP_BITS;
-    nsymbits = vht_bits_per_symbol[mcs][bandwith];
+    nsymbits = vht_bits_per_symbol[mcs][bandwidth];
 
     if (nsymbits == 0) {
-        printk("Hal_TxDescriptor_VHT_GetTxTime warming nsymbits=%d, bw=%d, mcs=%d\n ", nsymbits, bandwith, mcs);
+        pr_debug("Hal_TxDescriptor_VHT_GetTxTime warming nsymbits=%d, bw=%d, mcs=%d\n ", nsymbits, bandwidth, mcs);
         nsymbols = 1;
 
     } else {
@@ -572,7 +573,7 @@ __INLINE static unsigned short Hal_TxDescriptor_HT_GetDataTime(unsigned char mcs
     return duration;
 }
 
-unsigned short Hal_TxDescriptor_GetDuration( unsigned char rate, unsigned short length )
+static unsigned short Hal_TxDescriptor_GetDuration( unsigned char rate, unsigned short length )
 {
     unsigned short duration =0;
     length *= 8;
@@ -592,7 +593,7 @@ unsigned short Hal_TxDescriptor_GetDuration( unsigned char rate, unsigned short 
     return duration;
 }
 /*get legacy  frame tx time*/
-unsigned short Hal_TxDescriptor_GetLegacyTxTime(unsigned char data_rate,
+static unsigned short Hal_TxDescriptor_GetLegacyTxTime(unsigned char data_rate,
     unsigned short pktlen,unsigned char preambletype )
 {
     return Hal_TxDescriptor_GetPreamble( data_rate,preambletype )// data frame
@@ -614,7 +615,7 @@ unsigned short hal_tx_desc_get_len(unsigned char rate ,unsigned short pktlen,
 
 }
 
-unsigned short Hal_TxDescriptor_GetAckTimeout( unsigned char data_rate,unsigned char preambletype)
+static unsigned short Hal_TxDescriptor_GetAckTimeout( unsigned char data_rate,unsigned char preambletype)
 {
     if (IS_HT_RATE(data_rate) || IS_VHT_RATE(data_rate)) {
         return 80 + PHY_TEST;
@@ -625,7 +626,7 @@ unsigned short Hal_TxDescriptor_GetAckTimeout( unsigned char data_rate,unsigned 
 
 
 /*+SIGNAL_EXTENSION_VALUE+TXTIME(pclp+data+signalextension)*/
-unsigned short Hal_TxDescriptor_GetAckTime(
+static unsigned short Hal_TxDescriptor_GetAckTime(
     unsigned char data_rate ,
     unsigned char preambletype,
     unsigned char b_shortGI,
@@ -654,7 +655,7 @@ unsigned short Hal_TxDescriptor_GetAckTime(
     }
 }
 
-unsigned short Hal_TxDescriptor_GetBATime(
+static unsigned short Hal_TxDescriptor_GetBATime(
         unsigned char data_rate,
         unsigned char preambletype,
         unsigned char b_shortGI,
@@ -688,7 +689,7 @@ unsigned short Hal_TxDescriptor_GetBATime(
     }
 }
 
-unsigned int Hal_TxDescriptor_GetTxTime(struct hi_agg_tx_desc* HiTxDesc)
+static unsigned int Hal_TxDescriptor_GetTxTime(struct hi_agg_tx_desc* HiTxDesc)
 {
         //fixme :need to add signal extern
         if (IS_HT_RATE(DESC_RATE)) {
@@ -712,13 +713,13 @@ unsigned int Hal_TxDescriptor_GetTxTime(struct hi_agg_tx_desc* HiTxDesc)
         }
 }
 
-__INLINE unsigned int Hal_TxDescriptor_GetTxTimeBA(struct hi_agg_tx_desc* HiTxDesc)
+static __INLINE unsigned int Hal_TxDescriptor_GetTxTimeBA(struct hi_agg_tx_desc* HiTxDesc)
 {
         return Hal_TxDescriptor_GetTxTime( HiTxDesc)
                +Hal_TxDescriptor_GetBATime(DESC_RATE,DESC_PREMBLETYPE,DESC_IS_SHORTGI,DESC_RIFS,  DESC_BANDWIDTH);
 }
 
-__INLINE unsigned int Hal_TxDescriptor_GetCtsTime(struct hi_agg_tx_desc* HiTxDesc)
+static __INLINE unsigned int Hal_TxDescriptor_GetCtsTime(struct hi_agg_tx_desc* HiTxDesc)
 {
         if (IS_HT_RATE(DESC_RATE)) {
                 return 16 // SIFS
@@ -773,7 +774,7 @@ void assign_tx_desc_pn(unsigned char is_bc, unsigned char vid,
     } else {
         PN = (unsigned long long *)hal_priv->uRepCnt[vid][sta_id].txPN[TX_UNICAST_REPCNT_ID];
     }
-    //printk("zy:pn=0x%x\n",*PN);
+    //pr_debug("zy:pn=0x%x\n",*PN);
     switch (encrypt_type) {
         case WIFI_TKIP:
             memcpy(&tx_page->TxOption.PN[0],(unsigned char *)PN, 8);
@@ -810,7 +811,7 @@ void hal_tx_desc_build(struct hi_agg_tx_desc* HiTxDesc,
     struct wifi_qos_frame *wh = NULL;
     unsigned char is_bc;
 
-    //printk("%s(%d) bw 0x%x\n", __func__, __LINE__, bw);
+    //pr_debug("%s(%d) bw 0x%x\n", __func__, __LINE__, bw);
 
     tmp_dot11_preamble_type = (DESC_RATE==WIFI_11B_1M) ? PREAMBLE_LONG:wifi_conf_mib.dot11PreambleType;
 
@@ -1062,7 +1063,7 @@ unsigned int max_send_packet_len(unsigned char rate,unsigned char bw, unsigned c
     }
 
      max_data_field_tx_time = 4095 -  preamble_time;
-    // printk("preamble_time =%d\n", preamble_time);
+    // pr_debug("preamble_time =%d\n", preamble_time);
      if( !short_gi )
      {
         max_symbol_number = max_data_field_tx_time>>2;   /*long gi every symbol time is 4 us*/
@@ -1072,7 +1073,7 @@ unsigned int max_send_packet_len(unsigned char rate,unsigned char bw, unsigned c
         max_symbol_number = max_data_field_tx_time*10/36; /*short gi  every ofdm symbol time is 3.6us*/
      }
 
-    //printk("max_symbol_number =%d\n", max_symbol_number);
+    //pr_debug("max_symbol_number =%d\n", max_symbol_number);
     mcs = GET_MCS(rate);
     if ((mcs > 9) || (bw > 2))
     {
@@ -1082,7 +1083,7 @@ unsigned int max_send_packet_len(unsigned char rate,unsigned char bw, unsigned c
 
     if ((mcs == 9)  && (bw == 0))
     {
-        /*vht 20M bandwith have not mcs9 rate*/
+        /*vht 20M bandwidth have not mcs9 rate*/
         mcs = 8;
     }
 
@@ -1096,12 +1097,12 @@ unsigned int max_send_packet_len(unsigned char rate,unsigned char bw, unsigned c
             mcs = 7;
         }
 
-        //printk("mcs =%d, bw=%d, NDBPS=%d\n", mcs, bw,ht_bits_per_symbol[mcs][bw]);
+        //pr_debug("mcs =%d, bw=%d, NDBPS=%d\n", mcs, bw,ht_bits_per_symbol[mcs][bw]);
         return ht_bits_per_symbol[mcs][bw]*max_symbol_number >> 3;
     }
     else
     {
-        //printk("mcs =%d, bw=%d, NDBPS=%d\n", mcs, bw,vht_bits_per_symbol[mcs][bw]);
+        //pr_debug("mcs =%d, bw=%d, NDBPS=%d\n", mcs, bw,vht_bits_per_symbol[mcs][bw]);
         return vht_bits_per_symbol[mcs][bw]*max_symbol_number>>3;
     }
 }

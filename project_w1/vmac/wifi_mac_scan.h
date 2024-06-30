@@ -108,6 +108,7 @@ struct wifi_mac_scan_state
     struct os_timer_ext ss_scan_abort_timer;
     struct hrtimer scan_hr_timer;
     ktime_t scan_kt;
+    struct work_struct timeout_work;
 };
 
 

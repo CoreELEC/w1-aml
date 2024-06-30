@@ -77,15 +77,15 @@ extern const char *wifi_mac_state_name[WIFINET_S_MAX];
 
 #define WIFINET_DPRINTF(_m, _fmt, ...) do {         \
                 if (wnet_vif->vm_debug & (_m))                    \
-                        printk("<%s> %s %d  "_fmt"\n", wnet_vif->vm_ndev->name ,__func__, __LINE__, __VA_ARGS__);       \
+                        pr_debug("<%s> %s %d  "_fmt"\n", wnet_vif->vm_ndev->name ,__func__, __LINE__, __VA_ARGS__);       \
         } while (0)
 #define WIFINET_DPRINTF_MACADDR( _m, _mac, _fmt, ...) do {      \
                 if (wnet_vif->vm_debug & (_m))                    \
-                        printk("<%s> %s %d mac[%s] "_fmt"\n",wnet_vif->vm_ndev->name ,  __func__, __LINE__,ether_sprintf(_mac),__VA_ARGS__);  \
+                        pr_debug("<%s> %s %d mac[%s] "_fmt"\n",wnet_vif->vm_ndev->name ,  __func__, __LINE__,ether_sprintf(_mac),__VA_ARGS__);  \
         } while (0)
 #define WIFINET_DPRINTF_STA( _m, _sta, _fmt, ...)do {           \
                 if ((_sta)->sta_wnet_vif->vm_debug & (_m))                    \
-                        printk("<%s> %s %d  mac[%s] "_fmt"\n", (_sta)->sta_wnet_vif->vm_ndev->name , __func__, __LINE__, ether_sprintf((_sta)->sta_macaddr),__VA_ARGS__);  \
+                        pr_debug("<%s> %s %d  mac[%s] "_fmt"\n", (_sta)->sta_wnet_vif->vm_ndev->name , __func__, __LINE__, ether_sprintf((_sta)->sta_macaddr),__VA_ARGS__);  \
         } while (0)
 
 #endif //_NET80211_COMMON_H_

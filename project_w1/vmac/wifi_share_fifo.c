@@ -43,7 +43,7 @@ void CO_SharedFifo_Dump(struct _CO_SHARED_FIFO* const  SharedFifoPtr, const unsi
 {
     struct _CO_SF_BLOCK_IDX *BlockOutIdxPtr;
     BlockOutIdxPtr = &SharedFifoPtr->IdxTab[ BlockID ];
-    printk("b%d I%d,O%d\n",BlockID,BlockOutIdxPtr->In,BlockOutIdxPtr->Out);
+    pr_debug("b%d I%d,O%d\n",BlockID,BlockOutIdxPtr->In,BlockOutIdxPtr->Out);
 }
 
 void qfifo_mng_info_dump(struct _CO_SHARED_FIFO* const  SharedFifoPtr)

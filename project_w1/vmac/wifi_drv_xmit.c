@@ -230,7 +230,7 @@ int aml_tx_hal_buffer_full(struct drv_private *drv_priv,
 
     } else {
         if (print_cnt++ == 200) {
-            printk("%s, queue_id:%d full\n", __func__, queue_id);
+            pr_debug("%s, queue_id:%d full\n", __func__, queue_id);
         }
     }
 
@@ -238,7 +238,7 @@ int aml_tx_hal_buffer_full(struct drv_private *drv_priv,
     return 1;
 }
 
-void aml_prepare_agg_tx_priv_param(struct drv_private *drv_priv,
+static void aml_prepare_agg_tx_priv_param(struct drv_private *drv_priv,
     struct hi_agg_tx_desc *agg_content, struct drv_txdesc *ptxdesc, struct wifi_station *sta)
 {
     struct wifi_mac *wifimac = drv_priv->wmac;
@@ -516,7 +516,7 @@ int drv_to_hal(struct drv_private *drv_priv, struct drv_txlist *txlist, struct l
     }
 
     if (hal_priv->bhaltxdrop || hal_priv->bhalPowerSave) {
-        printk("%s hal_priv->bhaltxdrop:%d\n", __func__, hal_priv->bhaltxdrop);
+        pr_debug("%s hal_priv->bhaltxdrop:%d\n", __func__, hal_priv->bhaltxdrop);
     }
     return 0;
 }
@@ -794,12 +794,12 @@ static int drv_tx_prepare(struct drv_private *drv_priv, struct sk_buff *skbbuf,s
 
     ptxdesc->rate_valid = 1;
     txinfo->seqnum = *(unsigned short *)wh->i_seq >> WIFINET_SEQ_SEQ_SHIFT;//seqnum
-    //printk("%s ptxdesc:%p, skbbuf:%p, vid:%d, sta:%p, tid:%d, sn:%04x, ampdu:%d, qos:%d, rate_code:%02x, frame_control:%04x, mcast:%d, data:%d, dhcp:%d, eap:%d\n",
+    //pr_debug("%s ptxdesc:%p, skbbuf:%p, vid:%d, sta:%p, tid:%d, sn:%04x, ampdu:%d, qos:%d, rate_code:%02x, frame_control:%04x, mcast:%d, data:%d, dhcp:%d, eap:%d\n",
     //    __func__, ptxdesc, skbbuf, wnet_vif->wnet_vif_id, sta, txinfo->tid_index, txinfo->seqnum, txinfo->b_Ampdu, txinfo->b_qosdata,
     //    ratectrl->vendor_rate_code, *((unsigned short *)&(wh->i_fc[0])), txinfo->b_mcast, txinfo->b_datapkt, mac_pkt_info->b_dhcp, mac_pkt_info->b_eap);
 
     if (txinfo->b_pmf) {
-        printk("%s vid:%d, sta:%p, sn:%04x, frame_control:%04x, mcast:%d\n",
+        pr_debug("%s vid:%d, sta:%p, sn:%04x, frame_control:%04x, mcast:%d\n",
             __func__, wnet_vif->wnet_vif_id, sta, txinfo->seqnum, *((unsigned short *)&(wh->i_fc[0])), txinfo->b_mcast);
     }
 
@@ -901,7 +901,7 @@ int drv_tx_start( struct drv_private *drv_priv, struct sk_buff *skbbuf)
             //for ap/go, if peer sta is in powersave, backup
             if (sta->sta_flags & WIFINET_NODE_PWR_MGT)
             {
-                //printk("ap buffer queue\n");
+                //pr_debug("ap buffer queue\n");
                 drv_priv->net_ops->wifi_mac_pwrsave_psqueue_enqueue(sta, skbbuf);
                 error = 0;
                 break;
@@ -1074,7 +1074,7 @@ int drv_send(struct sk_buff *skbbuf, struct drv_private *drv_priv)
     if (txinfo->b_uapsd && (wh->i_fc[0] & (FRAME_TYPE_MASK | FRAME_SUBTYPE_MASK)) == MAC_FCTRL_QOS_DATA) {
         drv_tx_queue_uapsd_nsta(drv_priv, &txdesc_list_head, drv_sta);
         DRV_TXQ_UNLOCK(txlist);
-        printk("%s uapsd\n", __func__);
+        pr_debug("%s uapsd\n", __func__);
         return 0;
     }
 
@@ -1093,7 +1093,7 @@ int drv_send(struct sk_buff *skbbuf, struct drv_private *drv_priv)
             //mcast backup also use txlist_backup_qcnt
             if (txinfo->ps) {
                 drv_tx_mcastq_addbuf(drv_priv, &txdesc_list_head);
-                printk("%s mcastq\n", __func__);
+                pr_debug("%s mcastq\n", __func__);
                 return 0;
             }
 #endif
@@ -1253,7 +1253,7 @@ static void drv_tx_complete_mgmt_handle(struct drv_private *drv_priv,struct drv_
         || (ptxdesc->txdesc_frame_flag == TX_P2P_GO_NEGO_REQ_GO_NEGO_CONF)
         || (ptxdesc->txdesc_frame_flag == TX_P2P_PRESENCE_REQ)) {
 
-        printk("%s, txdesc_frame_flag=%d, status=%d\n", __func__, ptxdesc->txdesc_frame_flag, status);
+        pr_debug("%s, txdesc_frame_flag=%d, status=%d\n", __func__, ptxdesc->txdesc_frame_flag, status);
         if (txok) {
             sta->sta_wnet_vif->vm_p2p->tx_status_flag = WIFINET_TX_STATUS_SUCC;
             sta->sta_wnet_vif->vm_p2p->send_tx_status_flag = 1;
@@ -1274,7 +1274,7 @@ static void drv_tx_complete_mgmt_handle(struct drv_private *drv_priv,struct drv_
 
 #ifdef CTS_VERIFIER_GAS
     if (ptxdesc->txdesc_frame_flag == TX_P2P_GAS) {
-        printk("%s, txdesc_frame_flag=%d, status=%d\n", __func__, ptxdesc->txdesc_frame_flag, status);
+        pr_debug("%s, txdesc_frame_flag=%d, status=%d\n", __func__, ptxdesc->txdesc_frame_flag, status);
 
         if ((sta->sta_wnet_vif->vm_p2p->action_code == WIFINET_ACT_PUBLIC_GAS_REQ && sta->sta_wnet_vif->vm_p2p->p2p_flag & P2P_GAS_RSP) ||
             (sta->sta_wnet_vif->vm_p2p->action_code == WIFINET_ACT_PUBLIC_GAS_RSP && txok) ||
@@ -1295,7 +1295,7 @@ static void drv_tx_complete_mgmt_handle(struct drv_private *drv_priv,struct drv_
 #endif
     if ((ptxdesc->txdesc_frame_flag >= TX_MGMT_PROBE_REQ) && !txok) {
         drv_priv->drv_ops.cca_busy_check();
-        printk("%s, txdesc_frame_flag:%d, status=%d, rate:%02x\n",
+        pr_debug("%s, txdesc_frame_flag:%d, status=%d, rate:%02x\n",
             __func__, ptxdesc->txdesc_frame_flag, status, ptxdesc->txdesc_rateinfo[0].vendor_rate_code);
 
     } else if (ptxdesc->txdesc_frame_flag == TX_MGMT_ADDBA_RSP) {
@@ -1584,7 +1584,7 @@ void drv_tx_irq_tasklet(void *drv_priv_s, struct txdonestatus *tx_done_status,
 #endif
 
     if (ptxdesc == NULL) {
-        //printk("%s: callback txds is null\n", __func__);
+        //pr_err("%s: callback txds is null\n", __func__);
         return;
     }
 
@@ -1594,7 +1594,7 @@ void drv_tx_irq_tasklet(void *drv_priv_s, struct txdonestatus *tx_done_status,
 
         DRV_TXQ_LOCK(txlist);
         if (ptxdesc->txdesc_sta == NULL) {
-            printk("%s pkt has already freed\n", __func__);
+            pr_warn("%s pkt has already freed\n", __func__);
             DRV_TXQ_UNLOCK(txlist);
             return;
         }
@@ -1701,7 +1701,7 @@ static void drv_txlist_free_all_by_drv_sta(struct drv_private *drv_priv, struct 
             txlist->txlist_qcnt--;
             ptxdesc->txdesc_sta = NULL;
 
-            printk("free qid:%d, drv_sta:%p\n", ptxdesc->txinfo->queue_id, drv_sta);
+            pr_debug("free qid:%d, drv_sta:%p\n", ptxdesc->txinfo->queue_id, drv_sta);
             DRV_TXQ_UNLOCK(txlist);
             drv_tx_complete(drv_priv, ptxdesc, 0);
             DRV_TXQ_LOCK(txlist);
@@ -1751,7 +1751,7 @@ void drv_set_pkt_drop(struct drv_private *drv_priv, unsigned char vid, unsigned 
 
 void drv_set_is_mother_channel(struct drv_private *drv_priv, unsigned char vid, unsigned char enable)
 {
-    //printk("vid:%d mother channel is:%d\n", vid, enable);
+    //pr_debug("vid:%d mother channel is:%d\n", vid, enable);
     drv_priv->is_mother_channel[vid] = enable;
 }
 
@@ -1765,7 +1765,7 @@ void drv_free_normal_buffer_queue(struct drv_private *drv_priv, unsigned char vi
         ptxdesc = list_first_entry(&drv_priv->drv_normal_buffer_queue[vid], struct drv_txdesc, txdesc_queue);
         list_del_init(&ptxdesc->txdesc_queue);
         drv_tx_complete(drv_priv, ptxdesc, 0);
-        //printk("%s\n", __func__);
+        //pr_debug("%s\n", __func__);
     }
 
     drv_priv->drv_normal_buffer_count[vid] = 0;
@@ -1924,7 +1924,7 @@ int drv_aggr_check( struct drv_private *drv_priv, void * nsta, unsigned char tid
     tid = DRV_GET_TIDTXINFO(drv_sta, tid_index);
 
     if (tid->cleanup_inprogress) {
-        printk("<running> %s %d \n", __func__, __LINE__);
+        pr_debug("<running> %s %d \n", __func__, __LINE__);
         return 0;
     }
 
@@ -2185,9 +2185,9 @@ static void drv_tx_add2baw(struct drv_private *drv_priv, struct drv_tx_scoreboar
     desc_id = (tid->baw_head + index) & (DRV_TID_MAX_BUFS - 1);
 
     if (tid->tx_desc[desc_id] != NULL) {
-        printk("desc_id:%d, sta:%p\n", desc_id, tid->drv_sta->net_nsta);
-        printk("new seqnum=%d new tid_index=%d\n",  ptxdesc->txinfo->seqnum,  ptxdesc->txinfo->tid_index);
-        printk("tid->seq_start=%d", tid->seq_start);
+        pr_debug("desc_id:%d, sta:%p\n", desc_id, tid->drv_sta->net_nsta);
+        pr_debug("new seqnum=%d new tid_index=%d\n",  ptxdesc->txinfo->seqnum,  ptxdesc->txinfo->tid_index);
+        pr_debug("tid->seq_start=%d", tid->seq_start);
     }
 
     tid->tx_desc[desc_id] = ptxdesc;
@@ -2434,7 +2434,7 @@ drv_tx_normal(struct drv_private *drv_priv, struct drv_txlist *txlist, struct li
     wh = (struct wifi_frame *)os_skb_data(ptxdesc->txdesc_mpdu);
 
     if (!drv_priv->is_mother_channel[vid] && !WIFINET_IS_PROBEREQ(wh)) {
-        printk("%s vid:%d not mother channel, buffer\n", __func__, vid);
+        pr_debug("%s vid:%d not mother channel, buffer\n", __func__, vid);
 
         DRV_TX_NORMAL_BUF_LOCK(drv_priv);
         list_add_tail(&ptxdesc->txdesc_queue, &drv_priv->drv_normal_buffer_queue[vid]);
@@ -2800,7 +2800,7 @@ static void drv_tx_sched_aggr(struct drv_private *drv_priv, struct drv_txlist *t
     unsigned char hal_co_get_cnt;
 
     if (!drv_priv->is_mother_channel[tid->vid]) {
-        //printk("%s not mother channel vid:%d\n", __func__, tid->vid);
+        //pr_debug("%s not mother channel vid:%d\n", __func__, tid->vid);
         return;
     }
 
@@ -2974,7 +2974,7 @@ drv_tid_drain(struct drv_private *drv_priv,
 
     tid->seq_next = tid->seq_start;
     tid->baw_tail = tid->baw_head;
-    printk("%s baw_head %x\n", __func__, tid->baw_head);
+    pr_warn("%s baw_head %x\n", __func__, tid->baw_head);
 }
 
 static void
@@ -3236,7 +3236,7 @@ int drv_tx_get_mgmt_frm_rate(struct drv_private *drv_priv,
             break;
 
         default:
-            printk("<running> %s %d  vm_mac_mode =%d ERROR\n",__func__,__LINE__, wnet_vif->vm_mac_mode);
+            pr_err("<running> %s %d  vm_mac_mode =%d ERROR\n",__func__,__LINE__, wnet_vif->vm_mac_mode);
             break;
     }
     return 0;

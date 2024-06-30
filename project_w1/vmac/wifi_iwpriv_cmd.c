@@ -9,7 +9,7 @@
 
 
 extern void print_driver_version(void);
-extern char **aml_cmd_char_prase(char sep, const char *str, int *size);
+extern char **aml_cmd_char_phrase(char sep, const char *str, int *size);
 extern struct udp_info aml_udp_info[];
 extern struct udp_timer aml_udp_timer;
 extern int udp_cnt;
@@ -29,7 +29,7 @@ extern int vm_cfg80211_set_bitrate_mask(struct wiphy *wiphy, struct net_device *
 
 void wifi_mac_pwrsave_set_inactime(struct wlan_net_vif *wnet_vif, unsigned int time);
 
-struct wlan_net_vif *aml_iwpriv_get_vif(char *name)
+static struct wlan_net_vif *aml_iwpriv_get_vif(char *name)
 {
     struct wlan_net_vif *wnet_vif = NULL;
     struct drv_private *drv_priv = NULL;
@@ -42,7 +42,7 @@ struct wlan_net_vif *aml_iwpriv_get_vif(char *name)
     for (idx = 0; idx < 2; idx++) {
         wnet_vif = drv_priv->drv_wnet_vif_table[idx];
         if (strncmp(wnet_vif->vm_ndev->name, name, sizeof(wnet_vif->vm_ndev->name)) == 0) {
-            printk("%s, %s, %s\n", __func__, wnet_vif->vm_ndev->name, name);
+            pr_debug("%s, %s, %s\n", __func__, wnet_vif->vm_ndev->name, name);
             return wnet_vif;
         }
     }
@@ -53,7 +53,7 @@ struct wlan_net_vif *aml_iwpriv_get_vif(char *name)
 static int aml_ap_set_amsdu_state(struct net_device *dev,
     struct iw_request_info *info, union iwreq_data *wrqu, char *extra)
 {
-    printk("%s, %s\n", __func__,extra);
+    pr_debug("%s, %s\n", __func__,extra);
     aml_set_mac_amsdu_switch_state(extra);
 
     return 0;
@@ -62,7 +62,7 @@ static int aml_ap_set_amsdu_state(struct net_device *dev,
 static int aml_ap_set_ampdu_state(struct net_device *dev,
     struct iw_request_info *info, union iwreq_data *wrqu, char *extra)
 {
-    printk("%s, %s\n", __func__,extra);
+    pr_debug("%s, %s\n", __func__,extra);
     aml_set_drv_ampdu_switch_state(extra);
 
     return 0;
@@ -71,14 +71,14 @@ static int aml_ap_set_ampdu_state(struct net_device *dev,
 
 static int aml_ap_get_amsdu_state(void)
 {
-    printk("%s\n", __func__);
+    pr_debug("%s\n", __func__);
     aml_set_mac_amsdu_switch_state(NULL);
     return 0;
 }
 
 static int aml_ap_get_ampdu_state(void)
 {
-    printk("%s\n", __func__);
+    pr_debug("%s\n", __func__);
     aml_set_drv_ampdu_switch_state(NULL);
     return 0;
 }
@@ -99,7 +99,7 @@ static int aml_ap_send_addba_req(struct net_device *dev,
     int val = 0;
     char addr[MAX_MAC_BUF_LEN]={0};
 
-    printk("%s(%d), %d, %d, %d, %d, %d, %d, %d\n", __func__, __LINE__,
+    pr_debug("%s(%d), %d, %d, %d, %d, %d, %d, %d\n", __func__, __LINE__,
             param[0], param[1], param[2],param[3],param[4],param[5],param[6]);
 
     snprintf(addr, MAX_MAC_BUF_LEN, "%02d:%02d:%02d:%02d:%02d:%02d",param[0],param[1],param[2],param[3],param[4],param[5]);
@@ -117,7 +117,7 @@ unsigned int get_reg(struct wlan_net_vif *wnet_vif, unsigned int set)
     unsigned int reg_val = 0;
 
     usr_data = set;
-    printk("%s: Reg addr: 0x%08x\n", __func__, usr_data);
+    pr_debug("%s: Reg addr: 0x%08x\n", __func__, usr_data);
 
     if (((usr_data >> 24) & 0xff) == 0xff ) {
 #ifdef USE_T902X_RF
@@ -131,7 +131,7 @@ unsigned int get_reg(struct wlan_net_vif *wnet_vif, unsigned int set)
         reg_val = wnet_vif->vif_ops.read_word(usr_data);
     }
 
-    printk("Drv info: Reg data=&0x%08x\n",reg_val);
+    pr_debug("Drv info: Reg data=&0x%08x\n",reg_val);
 
     return 0;
 }
@@ -145,7 +145,7 @@ unsigned int set_reg(struct wlan_net_vif *wnet_vif, unsigned int set1, unsigned 
     usr_data = set1;
     usr_data_ext = set2;
 
-    printk("Cfg80211: Reg addr: val:0x%08x,val:0x%08x\n",usr_data,usr_data_ext);
+    pr_debug("Cfg80211: Reg addr: val:0x%08x,val:0x%08x\n",usr_data,usr_data_ext);
     if (((usr_data >> 24) & 0xff) == 0xff) {
 #ifdef USE_T902X_RF
         rf_i2c_write( usr_data & 0x00ffffff,usr_data_ext );//access t902x rf reg
@@ -184,7 +184,7 @@ int aml_beacon_intvl_set(struct wlan_net_vif *wnet_vif, unsigned int set)
         if (bcn_intvl == 0) {
             bcn_intvl = WIFINET_BINTVAL_DEFAULT;
         }
-        printk("%s:%d, bcn intvl %d\n", __func__, __LINE__, bcn_intvl);
+        pr_debug("%s:%d, bcn intvl %d\n", __func__, __LINE__, bcn_intvl);
         wnet_vif->vm_wmac->drv_priv->drv_ops.Phy_beaconinit(wnet_vif->vm_wmac->drv_priv,
                 wnet_vif->wnet_vif_id, bcn_intvl);
 
@@ -201,7 +201,7 @@ int aml_beacon_intvl_set(struct wlan_net_vif *wnet_vif, unsigned int set)
 
 static void aml_iwpriv_enable_fw_log(struct wlan_net_vif *wnet_vif)
 {
-    printk("%s: fw log enabled from iwpriv cmd\n", __func__);
+    pr_debug("%s: fw log enabled from iwpriv cmd\n", __func__);
     set_reg(wnet_vif, 0x00f00004, 0x0ffbf0ff);
     msleep(100);
     set_reg(wnet_vif, 0x00f00008, 0x00040f00);
@@ -217,10 +217,10 @@ int aml_set_ldpc(struct wlan_net_vif *wnet_vif, unsigned int set)
     if (aml_wifi_is_enable_rf_test()) {
         if (1 == set) {
             gB2BTestCasePacket.ldpc_enable = 1;
-            printk("Enable tx LDPC\n");
+            pr_debug("Enable tx LDPC\n");
         } else if (0 == set){
             gB2BTestCasePacket.ldpc_enable = 0;
-            printk("Disable tx LDPC\n");
+            pr_debug("Disable tx LDPC\n");
         } else {
             ERROR_DEBUG_OUT("Invalid parameter\n");
         }
@@ -230,11 +230,11 @@ int aml_set_ldpc(struct wlan_net_vif *wnet_vif, unsigned int set)
     if (1 == set) {
         sta->sta_vhtcap |= WIFINET_VHTCAP_RX_LDPC;
         wifimac->wm_flags |=WIFINET_F_LDPC;
-        printk("Enable LDPC, if need to change, the action must be executed before connecting to ap or creating ap\n");
+        pr_debug("Enable LDPC, if need to change, the action must be executed before connecting to ap or creating ap\n");
     } else if (0 == set) {
         sta->sta_vhtcap &= ~WIFINET_VHTCAP_RX_LDPC;
         wifimac->wm_flags &=~WIFINET_F_LDPC;
-        printk("Disable LDPC, if need to change, the action must be executed before connecting to ap or creating ap\n");
+        pr_debug("Disable LDPC, if need to change, the action must be executed before connecting to ap or creating ap\n");
     } else {
         ERROR_DEBUG_OUT("Invalid parameter\n");
     }
@@ -252,31 +252,31 @@ int aml_set_beamforming(struct wlan_net_vif *wnet_vif, unsigned int set1,unsigne
     usr_data2 = set2;
 
     if (usr_data2 > 4) {
-        printk("support max spatial is 4 !\n");
+        pr_debug("support max spatial is 4 !\n");
         wifimac->max_spatial = 4;
     } else if (usr_data2 <= 0) {
-        printk("min spatial is 1 !\n");
+        pr_debug("min spatial is 1 !\n");
         wifimac->max_spatial = 1;
     } else {
         wifimac->max_spatial = usr_data2;
     }
-    printk("%s:%d, set spatial %d \n", __func__, __LINE__, wifimac->max_spatial);
+    pr_debug("%s:%d, set spatial %d \n", __func__, __LINE__, wifimac->max_spatial);
 
     if(usr_data1 < 4) {
         if (((usr_data1 & 0xF) & BIT(0)) == BIT(0)) {
             wifimac->wm_flags_ext2 |= WIFINET_VHTCAP_SU_BFMEE;
-            printk("%s:%d, enable su mimo\n", __func__, __LINE__);
+            pr_debug("%s:%d, enable su mimo\n", __func__, __LINE__);
         } else {
             wifimac->wm_flags_ext2 &= ~WIFINET_VHTCAP_SU_BFMEE;
-            printk("%s:%d, disable su mimo\n", __func__, __LINE__);
+            pr_debug("%s:%d, disable su mimo\n", __func__, __LINE__);
         }
 
         if (((usr_data1 & 0xF) & BIT(1)) == BIT(1)) {
             wifimac->wm_flags_ext2 |= WIFINET_VHTCAP_MU_BFMEE;
-                printk("%s:%d, enable mu mimo\n", __func__, __LINE__);
+                pr_debug("%s:%d, enable mu mimo\n", __func__, __LINE__);
         } else {
             wifimac->wm_flags_ext2 &= ~WIFINET_VHTCAP_MU_BFMEE;
-            printk("%s:%d, disable mu mimo\n", __func__, __LINE__);
+            pr_debug("%s:%d, disable mu mimo\n", __func__, __LINE__);
         }
     } else {
         ERROR_DEBUG_OUT("initial parameter!\n");
@@ -414,7 +414,7 @@ aml_iwpriv_set_lagecy_bitrate_mask(struct net_device *dev, unsigned int set)
     struct wlan_net_vif *wnet_vif = netdev_priv(dev);
     memset(&mask, 0, sizeof(struct cfg80211_bitrate_mask));
     mask.control[band].legacy = (1<<aml_iwpriv_legacy_2g_rate_to_bitmap(set));
-    printk("%s %d, opmode %d, band %d\n", __func__, __LINE__, wnet_vif->vm_opmode, band);
+    pr_debug("%s %d, opmode %d, band %d\n", __func__, __LINE__, wnet_vif->vm_opmode, band);
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0)
     vm_cfg80211_set_bitrate_mask(NULL, dev, NULL, &mask);
@@ -440,7 +440,7 @@ aml_iwpriv_set_ht_bitrate_mask(struct net_device *dev, unsigned int set)
         band = NL80211_BAND_2GHZ;
     }
 
-    printk("%s %d, opmode %d, band %d\n", __func__, __LINE__, wnet_vif->vm_opmode, band);
+    pr_debug("%s %d, opmode %d, band %d\n", __func__, __LINE__, wnet_vif->vm_opmode, band);
     mask.control[band].ht_mcs[0] = (1<<aml_iwpriv_ht_rate_to_bitmap(set));
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0)
     vm_cfg80211_set_bitrate_mask(NULL, dev, NULL, &mask);
@@ -466,7 +466,7 @@ aml_iwpriv_set_vht_bitrate_mask(struct net_device *dev, unsigned int set)
         band = NL80211_BAND_2GHZ;
     }
 
-    printk("%s %d, opmode %d, band %d\n", __func__, __LINE__, wnet_vif->vm_opmode, band);
+    pr_debug("%s %d, opmode %d, band %d\n", __func__, __LINE__, wnet_vif->vm_opmode, band);
     mask.control[band].vht_mcs[0] = (1<<aml_iwpriv_vm_vht_rate_to_bitmap(set));
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0)
     vm_cfg80211_set_bitrate_mask(NULL, dev, NULL, &mask);
@@ -483,18 +483,18 @@ void aml_iwpriv_set_rate_auto(struct wlan_net_vif *wnet_vif)
     wnet_vif->vm_fixed_rate.rateinfo = 0;
     wnet_vif->vm_fixed_rate.mode = WIFINET_FIXED_RATE_NONE;
     wnet_vif->vm_change_rate_enable = 1;
-    printk("%s %d, enable autorate\n", __func__,__LINE__);
+    pr_debug("%s %d, enable autorate\n", __func__,__LINE__);
 }
 
 void aml_iwpriv_set_uapsd(struct wlan_net_vif *wnet_vif, unsigned int set)
 {
     if ((unsigned char)set != 0) {
         WIFINET_VMAC_UAPSD_ENABLE(wnet_vif);
-        printk("%s(%d) enable ap uapsd\n ", __func__, __LINE__);
+        pr_debug("%s(%d) enable ap uapsd\n ", __func__, __LINE__);
 
     } else {
         WIFINET_VMAC_UAPSD_DISABLE(wnet_vif);
-        printk("%s(%d) disable ap uapsd\n ", __func__, __LINE__);
+        pr_debug("%s(%d) disable ap uapsd\n ", __func__, __LINE__);
     }
     wnet_vif->vm_flags |= WIFINET_F_WMEUPDATE;
 }
@@ -503,32 +503,32 @@ unsigned char aml_iwpriv_set_band(unsigned int set)
 {
     struct drv_private *drv_priv = drv_get_drv_priv();
     drv_priv->drv_config.cfg_band = set;
-    printk("%s(%d) band %d\n ", __func__, __LINE__, set);
+    pr_debug("%s(%d) band %d\n ", __func__, __LINE__, set);
     return 0;
 }
 
-unsigned char aml_iwpriv_set_initial_gain_change_hang(unsigned int set)
+static unsigned char aml_iwpriv_set_initial_gain_change_hang(unsigned int set)
 {
     g_initial_gain_change_disable = set;
 
     if (g_initial_gain_change_disable) {
-        printk("%s(%d) initial_gain_change invalid\n ", __func__, __LINE__);
+        pr_err("%s(%d) initial_gain_change invalid\n ", __func__, __LINE__);
 
     } else {
-        printk("%s(%d) initial_gain_change valid\n ", __func__, __LINE__);
+        pr_debug("%s(%d) initial_gain_change valid\n ", __func__, __LINE__);
     }
     return 0;
 }
 
-unsigned char aml_iwpriv_set_tx_power_change_hang(unsigned int set)
+static unsigned char aml_iwpriv_set_tx_power_change_hang(unsigned int set)
 {
     g_tx_power_change_disable = set;
 
     if (g_tx_power_change_disable) {
-        printk("%s(%d) tx_power_change invalid\n ", __func__, __LINE__);
+        pr_err("%s(%d) tx_power_change invalid\n ", __func__, __LINE__);
 
     } else {
-        printk("%s(%d) tx_power_change valid\n ", __func__, __LINE__);
+        pr_debug("%s(%d) tx_power_change valid\n ", __func__, __LINE__);
     }
     return 0;
 }
@@ -539,7 +539,7 @@ unsigned char aml_iwpriv_get_band(void)
     return drv_priv->drv_config.cfg_band;
 }
 
-unsigned char aml_iwpriv_set_mac_mode(unsigned int set)
+static unsigned char aml_iwpriv_set_mac_mode(unsigned int set)
 {
     struct drv_private *drv_priv = drv_get_drv_priv();
     drv_priv->drv_config.cfg_mac_mode = set;
@@ -561,7 +561,7 @@ static int aml_iwpriv_send_para1(struct net_device *dev,
     int len = 0;
 
 
-    printk("%s, sub_cmd %d, value %d\n", __func__,param[0], param[1]);
+    pr_debug("%s, sub_cmd %d, value %d\n", __func__,param[0], param[1]);
 
     wifimac = wifi_mac_get_mac_handle();
     wnet_vif = aml_iwpriv_get_vif(dev->name);
@@ -578,7 +578,7 @@ static int aml_iwpriv_send_para1(struct net_device *dev,
             /*e.g '-80' need 3 char in string, added '\0', so need + 4 */
             len = strlen("set_roam_thr_2g ") + 4;
             snprintf(buf, len, "set_roam_thr_2g %d", set);
-            printk("%s: buf %s\n", __func__, buf);
+            pr_debug("%s: buf %s\n", __func__, buf);
             aml_set_roaming_threshold_2g(wnet_vif, buf, len);
             break;
 
@@ -586,77 +586,77 @@ static int aml_iwpriv_send_para1(struct net_device *dev,
             /*e.g '-80' need 3 char in string, added '\0', so need + 4 */
             len = strlen("set_roam_thr_5g ") + 4;
             snprintf(buf, len, "set_roam_thr_5g %d", set);
-            printk("%s: buf %s\n", __func__, buf);
+            pr_debug("%s: buf %s\n", __func__, buf);
             aml_set_roaming_threshold_5g(wnet_vif, buf, len);
             break;
 
         case AML_IWP_ROAM_MODE:
             len = strlen("set_roam_mode ") + 4;
             snprintf(buf, len, "set_roam_mode %d", set);
-            printk("%s: buf %s\n", __func__, buf);
+            pr_debug("%s: buf %s\n", __func__, buf);
             aml_set_roaming_mode(wnet_vif, buf, len);
             break;
 
         case AML_IWP_MARK_DFS_CHAN:
             len = strlen("mark_dfs_chan ") + 4;
             snprintf(buf, len, "mark_dfs_chan %d", set);
-            printk("%s: buf %s\n", __func__, buf);
+            pr_debug("%s: buf %s\n", __func__, buf);
             aml_mark_dfs_channel(wnet_vif, buf, len);
             break;
 
         case AML_IWP_UNMARK_DFS_CHAN:
             len = strlen("unmark_dfs_chan ") + 4;
             snprintf(buf, len, "unmark_dfs_chan %d", set);
-            printk("%s: buf %s\n", __func__, buf);
+            pr_debug("%s: buf %s\n", __func__, buf);
             aml_unmark_dfs_channel(wnet_vif, buf, len);
             break;
 
         case AML_IWP_WEAK_THR_NARROW:
             len = strlen("set_weak_thr_nb ") + 4;
             snprintf(buf, len, "set_weak_thr_nb %d", set);
-            printk("%s: buf %s\n", __func__, buf);
+            pr_debug("%s: buf %s\n", __func__, buf);
             aml_set_signal_power_weak_thresh_for_narrow_bandwidth(wnet_vif, buf, len);
             break;
 
         case AML_IWP_WEAK_THR_WIDE:
             len = strlen("set_weak_thr_wb ") + 4;
             snprintf(buf, len, "set_weak_thr_wb %d", set);
-            printk("%s: buf %s\n", __func__, buf);
+            pr_debug("%s: buf %s\n", __func__, buf);
             aml_set_signal_power_weak_thresh_for_wide_bandwidth(wnet_vif, buf, len);
             break;
 
         case AML_IWP_EAT_COUNT:
             len = strlen("set_eat_count ") + 4;
             snprintf(buf, len, "set_eat_count %d", set);
-            printk("%s: buf %s\n", __func__, buf);
+            pr_debug("%s: buf %s\n", __func__, buf);
             aml_set_eat_count_max(wnet_vif, buf, len);
             break;
 
         case AML_IWP_AGGR_THRESH:
             len = strlen("set_aggr_thresh ") + 4;
             snprintf(buf, len, "set_aggr_thresh %d", set);
-            printk("%s: buf %s\n", __func__, buf);
+            pr_debug("%s: buf %s\n", __func__, buf);
             aml_set_aggr_thresh(wnet_vif, buf, len);
             break;
 
         case AML_IWP_HEART_INTERVAL:
             len = strlen("set_hrt_int ") + 4;
             snprintf(buf, len, "set_hrt_int %d", set);
-            printk("%s: buf %s\n", __func__, buf);
+            pr_debug("%s: buf %s\n", __func__, buf);
             aml_set_hrtimer_interval(wnet_vif, buf, len);
             break;
 
         case AML_IWP_BSS_COEX:
             len = strlen("send_bss_coex");
             snprintf(buf, len, "send_bss_coex");
-            printk("%s: buf %s\n", __func__, buf);
+            pr_debug("%s: buf %s\n", __func__, buf);
             aml_sta_send_coexist_mgmt(wnet_vif, buf, len);
             break;
 
         case AML_IWP_WMM_AC_DELTS:
             len = strlen("wmm_ac_delts ") + 4;
             snprintf(buf, len, "wmm_ac_delts %d", set);
-            printk("%s: buf %s\n", __func__, buf);
+            pr_debug("%s: buf %s\n", __func__, buf);
             aml_wmm_ac_delts(wnet_vif, buf, len);
             break;
 
@@ -665,7 +665,7 @@ static int aml_iwpriv_send_para1(struct net_device *dev,
             str[1] = "on";
             len = strlen("set_short_gi ") + strlen(str[set]) + 1;
             snprintf(buf, len, "set_short_gi %s", str[set]);
-            printk("%s: buf %s\n", __func__, buf);
+            pr_debug("%s: buf %s\n", __func__, buf);
             aml_set_short_gi(wnet_vif, buf, len);
             break;
 
@@ -674,7 +674,7 @@ static int aml_iwpriv_send_para1(struct net_device *dev,
             str[1] = "on";
             len = strlen("set_dynamic_bw ") + strlen(str[set]) + 1;
             snprintf(buf, len, "set_dynamic_bw %s", str[set]);
-            printk("%s: buf %s\n", __func__, buf);
+            pr_debug("%s: buf %s\n", __func__, buf);
             aml_set_dynamic_bw(wnet_vif, buf, len);
             break;
 
@@ -683,16 +683,16 @@ static int aml_iwpriv_send_para1(struct net_device *dev,
             str[1] = "reset";
             len = strlen("get_txaggr_sta ") + strlen(str[set]) + 1;
             snprintf(buf, len, "get_txaggr_sta %s", str[set]);
-            printk("%s: buf %s\n", __func__, buf);
+            pr_debug("%s: buf %s\n", __func__, buf);
             aml_get_drv_txaggr_status(wnet_vif, buf, len);
             break;
 
         case AML_IWP_GET_REG:
             if (set == 0x7fffffff) {
-                printk("******************************************************************************\n");
-                printk("You are using a legacy iwpriv tool, strongly suggest using a latest iwpriv one\n");
-                printk("You also can using the legacy tool as below:\n iwpriv wlan0 get_reg 0xff000c80 -> iwpriv wlan0 get_reg_legacy 0xff00 0x00c80\n");
-                printk("******************************************************************************\n");
+                pr_debug("******************************************************************************\n");
+                pr_debug("You are using a legacy iwpriv tool, strongly suggest using a latest iwpriv one\n");
+                pr_debug("You also can using the legacy tool as below:\n iwpriv wlan0 get_reg 0xff000c80 -> iwpriv wlan0 get_reg_legacy 0xff00 0x00c80\n");
+                pr_debug("******************************************************************************\n");
             }
             get_reg(wnet_vif, set);
             break;
@@ -710,7 +710,7 @@ static int aml_iwpriv_send_para1(struct net_device *dev,
                 wnet_vif->vm_scan_time_idle = (unsigned char)set;
                 wifi_mac_set_scan_time(wnet_vif);
             }
-            printk("%s, vid:%d set scan_time_idle = %d\n ", __func__, wnet_vif->wnet_vif_id, wnet_vif->vm_scan_time_idle);
+            pr_debug("%s, vid:%d set scan_time_idle = %d\n ", __func__, wnet_vif->wnet_vif_id, wnet_vif->vm_scan_time_idle);
             break;
 
         case AML_IWP_SET_SCAN_TIME_CONNECT:
@@ -718,16 +718,16 @@ static int aml_iwpriv_send_para1(struct net_device *dev,
                 wnet_vif->vm_scan_time_connect = (unsigned char)set;
                 wifi_mac_set_scan_time(wnet_vif);
             }
-            printk("%s, vid:%d set scan_time_connect = %d\n ", __func__, wnet_vif->wnet_vif_id, wnet_vif->vm_scan_time_connect);
+            pr_debug("%s, vid:%d set scan_time_connect = %d\n ", __func__, wnet_vif->wnet_vif_id, wnet_vif->vm_scan_time_connect);
             break;
 
         case AML_IWP_SET_SCAN_HANG:
             wnet_vif->vm_scan_hang = (unsigned char)set;
-            printk("%s, vid:%d vm_scan_hang:%d\n ", __func__, wnet_vif->wnet_vif_id, wnet_vif->vm_scan_hang);
+            pr_debug("%s, vid:%d vm_scan_hang:%d\n ", __func__, wnet_vif->wnet_vif_id, wnet_vif->vm_scan_hang);
             break;
 
         case AML_IWP_EN_BTWIFI_COEX:
-            printk("%s, coexist en= %d\n ", __func__, set);
+            pr_debug("%s, coexist en= %d\n ", __func__, set);
             wifimac->drv_priv->hal_priv->hal_ops.phy_set_coexist_en(set);
             break;
 
@@ -737,12 +737,12 @@ static int aml_iwpriv_send_para1(struct net_device *dev,
 
         case AML_IWP_SET_COEXIST_REQ_TIMEOUT:
             wifimac->drv_priv->hal_priv->hal_ops.phy_set_coexist_req_timeslice_timeout_value(set);
-            printk("%s, set req timeout value= %d\n ", __func__, set);
+            pr_debug("%s, set req timeout value= %d\n ", __func__, set);
             break;
 
         case AML_IWP_SET_COEXIST_NOT_GRANT_WEIGHT:
             wifimac->drv_priv->hal_priv->hal_ops.phy_set_coexist_not_grant_weight(set);
-            printk("%s, set coexist_not_grant_weight= %d\n ", __func__, set);
+            pr_debug("%s, set coexist_not_grant_weight= %d\n ", __func__, set);
             break;
 
         case AML_IWP_SET_RATE_LEGACY:
@@ -767,7 +767,7 @@ static int aml_iwpriv_send_para1(struct net_device *dev,
 
         case AML_IWP_SET_BURST:
             wifimac->drv_priv->drv_config.cfg_burst_ack = set;
-            printk("iwpriv set burst %d\n", set);
+            pr_debug("iwpriv set burst %d\n", set);
             break;
 
         case AML_IWP_SET_UAPSD:
@@ -792,19 +792,19 @@ static int aml_iwpriv_send_para1(struct net_device *dev,
 
         case AML_IWP_SET_FETCH_PKT_METHOD:
             wnet_vif->vm_mainsta->sta_fetch_pkt_method = (unsigned char)set;
-            printk("iwpriv set pkt method %d\n", set);
+            pr_debug("iwpriv set pkt method %d\n", set);
             break;
 
         case AML_IWP_SET_FRAG_THRESHOLD:
             if ((unsigned short)set > 0) {
                 wnet_vif->vm_fragthreshold = (unsigned short)set;
             }
-            printk("iwpriv set frag thr %d\n", wnet_vif->vm_fragthreshold);
+            pr_debug("iwpriv set frag thr %d\n", wnet_vif->vm_fragthreshold);
             break;
 
         case AML_IWP_SET_PREAMBLE_TYPE:
             phy_set_preamble_type((unsigned char)set);
-            printk("iwpriv set preamble type %d\n", set);
+            pr_debug("iwpriv set preamble type %d\n", set);
             break;
 
         case AML_IWP_SET_FIX_BAND:
@@ -845,7 +845,7 @@ static int aml_iwpriv_send_para2(struct net_device *dev,
     int legacy_set = 0;
 
 
-    printk("%s, sub_cmd %d, value %d %d\n", __func__,param[0], param[1], param[2]);
+    pr_debug("%s, sub_cmd %d, value %d %d\n", __func__,param[0], param[1], param[2]);
 
     wifimac = wifi_mac_get_mac_handle();
     wnet_vif = aml_iwpriv_get_vif(dev->name);
@@ -853,10 +853,10 @@ static int aml_iwpriv_send_para2(struct net_device *dev,
     switch (sub_cmd) {
         case AML_IWP_SET_REG:
             if ((set1 == 0x7fffffff) || (set2 == 0x7fffffff)) {
-                printk("********************************************************************************************************\n");
-                printk("You are using a legacy iwpriv tool, strongly suggest using a latest iwpriv tool\n");
-                printk("You also can using the legacy tool as below:\n iwpriv wlan0 set_reg 0xff000c80 0xff000c80 -> iwpriv wlan0 set_reg_legacy 0xff00 0x00c80 0xff0 0x00c80\n");
-                printk("********************************************************************************************************\n");
+                pr_debug("********************************************************************************************************\n");
+                pr_debug("You are using a legacy iwpriv tool, strongly suggest using a latest iwpriv tool\n");
+                pr_debug("You also can using the legacy tool as below:\n iwpriv wlan0 set_reg 0xff000c80 0xff000c80 -> iwpriv wlan0 set_reg_legacy 0xff00 0x00c80 0xff0 0x00c80\n");
+                pr_debug("********************************************************************************************************\n");
         }
         set_reg(wnet_vif, set1, set2);
         break;
@@ -893,7 +893,7 @@ static int aml_iwpriv_set_reg_legacy(struct net_device *dev,
     int legacy_set2 = 0;
 
 
-    printk("%s, sub_cmd %d, value1 %d, value2 %d, value3 %d\n", __func__,param[0], param[1], param[2], param[3]);
+    pr_debug("%s, sub_cmd %d, value1 %d, value2 %d, value3 %d\n", __func__,param[0], param[1], param[2], param[3]);
 
     wifimac = wifi_mac_get_mac_handle();
     wnet_vif = aml_iwpriv_get_vif(dev->name);
@@ -924,7 +924,7 @@ static int aml_iwpriv_get(struct net_device *dev,
     unsigned int efuse_data_l = 0;
     unsigned int efuse_data_h = 0;
 
-    printk("%s, sub cmd %d\n", __func__, param[0]);
+    pr_debug("%s, sub cmd %d\n", __func__, param[0]);
 
     wifimac = wifi_mac_get_mac_handle();
     wnet_vif = aml_iwpriv_get_vif(dev->name);
@@ -945,7 +945,7 @@ static int aml_iwpriv_get(struct net_device *dev,
 
         case AML_IWP_UDP_INFO:
             for (i = 0; i < udp_cnt; i++) {
-                printk("%s streamid=%d tx is %d, rx is %d\n", __func__, aml_udp_info[i].streamid, aml_udp_info[i].tx, aml_udp_info[i].rx);
+                pr_debug("%s streamid=%d tx is %d, rx is %d\n", __func__, aml_udp_info[i].streamid, aml_udp_info[i].tx, aml_udp_info[i].rx);
             }
             aml_udp_timer.udp_timer_stop = 1;
             aml_udp_timer.run_flag = 0;
@@ -954,17 +954,17 @@ static int aml_iwpriv_get(struct net_device *dev,
             break;
 
         case AML_IWP_COUNTRY:
-            printk("country code: %s\n", wifimac->wm_country.iso);
+            pr_debug("country code: %s\n", wifimac->wm_country.iso);
             break;
 
         case AML_IWP_GET_DEV_SN:
-            printk("aml module SN is:%04x \n", efuse_manual_read(0xf));
+            pr_debug("aml module SN is:%04x \n", efuse_manual_read(0xf));
             break;
 
         case AML_IWP_GET_WIFI_MAC:
             efuse_data_l = efuse_manual_read(0x1);
             efuse_data_h = efuse_manual_read(0x2);
-            printk("aml WIFI MAC addr is:  %02x:%02x:%02x:%02x:%02x:%02x\n",
+            pr_debug("aml WIFI MAC addr is:  %02x:%02x:%02x:%02x:%02x:%02x\n",
                     (efuse_data_h & 0xff00) >> 8,efuse_data_h & 0x00ff, (efuse_data_l & 0xff000000) >> 24,
                     (efuse_data_l & 0x00ff0000) >> 16,(efuse_data_l & 0xff00) >> 8,efuse_data_l & 0xff);
             break;
@@ -972,7 +972,7 @@ static int aml_iwpriv_get(struct net_device *dev,
         case AML_IWP_GET_BT_MAC:
             efuse_data_l = efuse_manual_read(0x2);
             efuse_data_h = efuse_manual_read(0x3);
-            printk("aml BT MAC addr is:  %02x:%02x:%02x:%02x:%02x:%02x\n",
+            pr_debug("aml BT MAC addr is:  %02x:%02x:%02x:%02x:%02x:%02x\n",
                     (efuse_data_h & 0xff000000) >> 24, (efuse_data_h & 0x00ff0000) >> 16,
                     (efuse_data_h & 0xff00) >> 8,efuse_data_h & 0xff,
                     (efuse_data_l & 0xff000000) >> 24,(efuse_data_l & 0x00ff0000) >> 16);
@@ -982,14 +982,14 @@ static int aml_iwpriv_get(struct net_device *dev,
             WIFI_CHANNEL_LOCK(wifimac);
             for (i = 0; i < wifimac->wm_nchans; i++) {
                 c = &wifimac->wm_channels[i];
-                printk("channel:%d\t frequency:%d \t bandwidth:%dMHz \n", c->chan_pri_num, c->chan_cfreq1, ((1 << c->chan_bw) * 20));
+                pr_debug("channel:%d\t frequency:%d \t bandwidth:%dMHz \n", c->chan_pri_num, c->chan_cfreq1, ((1 << c->chan_bw) * 20));
             }
             WIFI_CHANNEL_UNLOCK(wifimac);
             break;
 
         case AML_IWP_CHIP_ID:
             snprintf(buf, 21, "get_chip_id 0x%x 0x%x",0x8, 0x9);
-            printk("%s: buf %s\n", __func__, buf);
+            pr_debug("%s: buf %s\n", __func__, buf);
             aml_get_chip_id(NULL, buf, 0);
             break;
 
@@ -1023,7 +1023,7 @@ static int aml_iwpriv_get(struct net_device *dev,
 
         case AML_IWP_PRINT_VERSION:
             print_driver_version();
-            printk("driver version: %s\n", DRIVERVERSION);
+            pr_debug("driver version: %s\n", DRIVERVERSION);
             AML_OUTPUT("=============bus type:%s fw_chip:%s=============\n",aml_wifi_get_bus_type(),aml_wifi_get_fw_type());
             break;
 
@@ -1171,9 +1171,9 @@ static int aml_ap_set_udp_info(struct net_device *dev,
         return -EFAULT;
     }
     buf[40] = '\0';
-    printk("%s: %s\n", __func__, buf);
+    pr_debug("%s: %s\n", __func__, buf);
 
-    arg = aml_cmd_char_prase(sep, buf, &cmd_arg);
+    arg = aml_cmd_char_phrase(sep, buf, &cmd_arg);
     wifi_mac_set_udp_info(arg);
     kfree(arg);
 
@@ -1187,7 +1187,7 @@ static int aml_ap_get_udp_info(struct net_device *dev,
 
     int i = 0;
     for (i = 0; i < udp_cnt; i++) {
-        printk("%s streamid=%d tx is %d, rx is %d\n", __func__, aml_udp_info[i].streamid, aml_udp_info[i].tx, aml_udp_info[i].rx);
+        pr_debug("%s streamid=%d tx is %d, rx is %d\n", __func__, aml_udp_info[i].streamid, aml_udp_info[i].tx, aml_udp_info[i].rx);
     }
     aml_udp_timer.udp_timer_stop = 1;
     aml_udp_timer.run_flag = 0;
@@ -1200,21 +1200,21 @@ static int aml_ap_get_udp_info(struct net_device *dev,
 static int aml_set_country_code(struct net_device *dev,
     struct iw_request_info *info, union iwreq_data *wrqu, char *extra)
 {
-    printk("%s, %s\n", __func__,extra);
+    pr_debug("%s, %s\n", __func__,extra);
     wifi_mac_set_country_code(extra);
 
     return 0;
 
 }
 
-void aml_iwpriv_set_dev_sn(char* arg_iw)
+static void aml_iwpriv_set_dev_sn(char* arg_iw)
 {
     char **mac_cmd;
     int i,cmd_arg;
     char sep = ':';
     unsigned int efuse_data = 0;
 
-    mac_cmd = aml_cmd_char_prase(sep, arg_iw, &cmd_arg);
+    mac_cmd = aml_cmd_char_phrase(sep, arg_iw, &cmd_arg);
     if (mac_cmd) {
         efuse_data = (simple_strtoul(mac_cmd[0],NULL,16) << 8) | (simple_strtoul(mac_cmd[1],NULL,16));
         for (i = 0; i < 16; i++) {
@@ -1222,13 +1222,13 @@ void aml_iwpriv_set_dev_sn(char* arg_iw)
                 efuse_manual_write(i, 0xf);
             }
         }
-        printk("iwpriv write module SN is: %02x %02x\n", ((efuse_data & 0xff00) >> 8), (efuse_data & 0x00ff));
+        pr_debug("iwpriv write module SN is: %02x %02x\n", ((efuse_data & 0xff00) >> 8), (efuse_data & 0x00ff));
     }
     kfree(mac_cmd);
 
 }
 
-void aml_iwpriv_set_mac_addr(char* arg_iw)
+static void aml_iwpriv_set_mac_addr(char* arg_iw)
 {
     char **mac_cmd;
     int i,cmd_arg;
@@ -1236,7 +1236,7 @@ void aml_iwpriv_set_mac_addr(char* arg_iw)
     unsigned int efuse_data_l = 0;
     unsigned int efuse_data_h = 0;
 
-    mac_cmd = aml_cmd_char_prase(sep, arg_iw, &cmd_arg);
+    mac_cmd = aml_cmd_char_phrase(sep, arg_iw, &cmd_arg);
     if (mac_cmd) {
         efuse_data_l = (simple_strtoul(mac_cmd[2],NULL,16) << 24) | (simple_strtoul(mac_cmd[3],NULL,16) << 16)
                        | (simple_strtoul(mac_cmd[4],NULL,16) << 8) | simple_strtoul(mac_cmd[5],NULL,16);
@@ -1251,14 +1251,14 @@ void aml_iwpriv_set_mac_addr(char* arg_iw)
                 efuse_manual_write(i, 2);
             }
         }
-        printk("iwpriv write WIFI MAC addr is:  %02x:%02x:%02x:%02x:%02x:%02x\n",
+        pr_debug("iwpriv write WIFI MAC addr is:  %02x:%02x:%02x:%02x:%02x:%02x\n",
                 (efuse_data_h & 0xff00) >> 8,efuse_data_h & 0x00ff, (efuse_data_l & 0xff000000) >> 24,
                 (efuse_data_l & 0x00ff0000) >> 16,(efuse_data_l & 0xff00) >> 8,efuse_data_l & 0xff);
     }
     kfree(mac_cmd);
 }
 
-void aml_iwpriv_set_bt_dev_id(char* arg_iw)
+static void aml_iwpriv_set_bt_dev_id(char* arg_iw)
 {
     char **mac_cmd;
     int i,cmd_arg;
@@ -1266,7 +1266,7 @@ void aml_iwpriv_set_bt_dev_id(char* arg_iw)
     unsigned int efuse_data_l = 0;
     unsigned int efuse_data_h = 0;
 
-    mac_cmd = aml_cmd_char_prase(sep, arg_iw, &cmd_arg);
+    mac_cmd = aml_cmd_char_phrase(sep, arg_iw, &cmd_arg);
     if (mac_cmd) {
         efuse_data_h = (simple_strtoul(mac_cmd[0],NULL,16) << 24) | (simple_strtoul(mac_cmd[1],NULL,16) << 16)
                        | (simple_strtoul(mac_cmd[2],NULL,16) << 8) | simple_strtoul(mac_cmd[3],NULL,16);
@@ -1281,7 +1281,7 @@ void aml_iwpriv_set_bt_dev_id(char* arg_iw)
                 efuse_manual_write(i, 2);
             }
         }
-        printk("iwpriv write BT MAC addr is:  %02x:%02x:%02x:%02x:%02x:%02x\n",
+        pr_debug("iwpriv write BT MAC addr is:  %02x:%02x:%02x:%02x:%02x:%02x\n",
                 (efuse_data_h & 0xff000000) >> 24, (efuse_data_h & 0x00ff0000) >> 16,
                 (efuse_data_h & 0xff00) >> 8,efuse_data_h & 0xff,
                 (efuse_data_l & 0xff000000) >> 24,(efuse_data_l & 0x00ff0000) >> 16);
@@ -1292,7 +1292,7 @@ void aml_iwpriv_set_bt_dev_id(char* arg_iw)
 static int aml_set_dev_sn(struct net_device *dev,
     struct iw_request_info *info, union iwreq_data *wrqu, char *extra)
 {
-    printk("%s, %s\n", __func__,extra);
+    pr_debug("%s, %s\n", __func__,extra);
     aml_iwpriv_set_dev_sn(extra);
 
     return 0;
@@ -1306,7 +1306,7 @@ static int aml_set_wifi_mac_addr(struct net_device *dev,
         return -EFAULT;
     }
     buf[18] = '\0';
-    printk("%s: %s\n", __func__, buf);
+    pr_debug("%s: %s\n", __func__, buf);
     aml_iwpriv_set_mac_addr(buf);
 
     return 0;
@@ -1321,13 +1321,13 @@ static int aml_set_bt_dev_id(struct net_device *dev,
         return -EFAULT;
     }
     buf[18] = '\0';
-    printk("%s: %s\n", __func__, buf);
+    pr_debug("%s: %s\n", __func__, buf);
     aml_iwpriv_set_bt_dev_id(buf);
 
     return 0;
 }
 
-int aml_iwpriv_set_debug_switch(char *switch_str)
+static int aml_iwpriv_set_debug_switch(char *switch_str)
 {
     int debug_switch = 0;
     if(strstr(switch_str,"_off")!=NULL)
@@ -1391,7 +1391,7 @@ int aml_set_debug_modules(char *debug_str)
 static int aml_iwpriv_set_debug(struct net_device *dev,
     struct iw_request_info *info, union iwreq_data *wrqu, char *extra)
 {
-    printk("%s, %s\n", __func__,extra);
+    pr_debug("%s, %s\n", __func__,extra);
     aml_set_debug_modules(extra);
     return 0;
 
@@ -1401,7 +1401,7 @@ static int aml_get_country_code(struct net_device *dev,
     struct iw_request_info *info, union iwreq_data *wrqu, char *extra)
 {
     struct wifi_mac *wifimac = wifi_mac_get_mac_handle();
-    printk("country code: %s\n", wifimac->wm_country.iso);
+    pr_debug("country code: %s\n", wifimac->wm_country.iso);
 
     return 0;
 }
@@ -1415,7 +1415,7 @@ static int aml_get_channel_list(struct net_device *dev,
     WIFI_CHANNEL_LOCK(wifimac);
     for (i = 0; i < wifimac->wm_nchans; i++) {
         c = &wifimac->wm_channels[i];
-        printk("channel:%d\t frequency:%d \t bandwidth:%dMHz \n", c->chan_pri_num, c->chan_cfreq1, ((1 << c->chan_bw) * 20));
+        pr_debug("channel:%d\t frequency:%d \t bandwidth:%dMHz \n", c->chan_pri_num, c->chan_cfreq1, ((1 << c->chan_bw) * 20));
     }
     WIFI_CHANNEL_UNLOCK(wifimac);
 
@@ -1434,23 +1434,23 @@ static int aml_ap_set_arp_rx(struct net_device *dev,
         return -EFAULT;
     }
     buf[40] = '\0';
-    printk("%s: %s\n", __func__, buf);
+    pr_debug("%s: %s\n", __func__, buf);
 
-    arg = aml_cmd_char_prase(sep, buf, &cmd_arg);
+    arg = aml_cmd_char_phrase(sep, buf, &cmd_arg);
     wifi_mac_ap_set_arp_rx(arg);
     kfree(arg);
 
     return 0;
 }
 
-int iw_standard_get_stats(struct net_device *dev, struct iw_request_info *info,
+static int iw_standard_get_stats(struct net_device *dev, struct iw_request_info *info,
     union iwreq_data *wrqu, char *extra)
 {
     struct wlan_net_vif *wnet_vif = NULL;
     struct iw_statistics stats = {0};
     unsigned int arr[8] = {0};
 
-    printk("%s\n", __func__);
+    pr_debug("%s\n", __func__);
 
     wnet_vif = aml_iwpriv_get_vif(dev->name);
     if ((wnet_vif->vm_opmode != WIFINET_M_STA) && (wnet_vif->vm_state != WIFINET_S_CONNECTED)) {
@@ -1470,7 +1470,7 @@ int iw_standard_get_stats(struct net_device *dev, struct iw_request_info *info,
     return 0;
 }
 
-void sap_change_channel(struct wlan_net_vif *wnet_vif, unsigned int channel)
+static void sap_change_channel(struct wlan_net_vif *wnet_vif, unsigned int channel)
 {
     struct wifi_mac *wifimac = wnet_vif->vm_wmac;
     struct wifi_channel *c = NULL;
@@ -1501,7 +1501,7 @@ void sap_change_channel(struct wlan_net_vif *wnet_vif, unsigned int channel)
     wifi_mac_set_wnet_vif_channel(wnet_vif, channel, wnet_vif->vm_bandwidth, center_chan);
 }
 
-int iw_standard_sap_set_freq(struct net_device *dev, struct iw_request_info *info,
+static int iw_standard_sap_set_freq(struct net_device *dev, struct iw_request_info *info,
     union iwreq_data *wrqu, char *extra)
 {
     struct wlan_net_vif *wnet_vif = NULL;
@@ -1509,7 +1509,7 @@ int iw_standard_sap_set_freq(struct net_device *dev, struct iw_request_info *inf
     struct wifi_channel *c = NULL;
     unsigned int set_chl = 0;
 
-    printk("%s, freq.m:%d, freq.e:%d\n", __func__, wrqu->freq.m, wrqu->freq.e);
+    pr_debug("%s, freq.m:%d, freq.e:%d\n", __func__, wrqu->freq.m, wrqu->freq.e);
 
     wifimac = wifi_mac_get_mac_handle();
 
@@ -1540,7 +1540,7 @@ int iw_standard_sap_set_freq(struct net_device *dev, struct iw_request_info *inf
     set_chl = c->chan_pri_num;
     wnet_vif = aml_iwpriv_get_vif(dev->name);
 
-    printk("%s, opmode:%d, nrunning:%d\n", __func__, wnet_vif->vm_opmode, wifimac->wm_nrunning);
+    pr_debug("%s, opmode:%d, nrunning:%d\n", __func__, wnet_vif->vm_opmode, wifimac->wm_nrunning);
     if ((wnet_vif->vm_opmode == WIFINET_M_HOSTAP) && (wifimac->wm_nrunning == 1)) {
         sap_change_channel(wnet_vif, set_chl);
     }
@@ -1556,7 +1556,7 @@ void wifi_mac_pwrsave_set_inactime(struct wlan_net_vif *wnet_vif, unsigned int t
         return;
     }
 
-    printk("<running> %s %d, time %d\n",__func__,__LINE__, time);
+    pr_debug("<running> %s %d, time %d\n",__func__,__LINE__, time);
 
     if(time == 0) {
         wifi_mac_pwrsave_set_mode(wnet_vif, WIFINET_PWRSAVE_NONE);
@@ -1566,7 +1566,7 @@ void wifi_mac_pwrsave_set_inactime(struct wlan_net_vif *wnet_vif, unsigned int t
     wnet_vif->vm_pwrsave.ips_inactivitytime = time;
 
     if (wnet_vif->vm_state == WIFINET_S_CONNECTED && wifimac->wm_syncbeacon == 0) {
-        printk("<running> %s %d \n",__func__,__LINE__);
+        pr_debug("<running> %s %d \n",__func__,__LINE__);
         wifi_mac_beacon_sync(wifimac->drv_priv->wmac, wnet_vif->wnet_vif_id);
     }
 
@@ -1579,14 +1579,14 @@ void wifi_mac_pwrsave_set_inactime(struct wlan_net_vif *wnet_vif, unsigned int t
 }
 
 
-int iw_standard_set_pwr(struct net_device *dev, struct iw_request_info *info,
+static int iw_standard_set_pwr(struct net_device *dev, struct iw_request_info *info,
     union iwreq_data *wrqu, char *extra)
 {
     struct wlan_net_vif *wnet_vif = NULL;
     unsigned int time = 0;
     wnet_vif = aml_iwpriv_get_vif(dev->name);
 
-    printk("%s, disable:%d\n", __func__, wrqu->power.disabled);
+    pr_debug("%s, disable:%d\n", __func__, wrqu->power.disabled);
     if (wrqu->power.disabled) {
         wifi_mac_pwrsave_set_mode(wnet_vif, WIFINET_PWRSAVE_NONE);
         if (wnet_vif->vm_wdev) {
@@ -1596,14 +1596,14 @@ int iw_standard_set_pwr(struct net_device *dev, struct iw_request_info *info,
     } else {
         if (wrqu->power.flags & IW_POWER_PERIOD) {
             time = wrqu->power.value / 1000;
-            printk("%s, pwr perio value: %d\n", __func__, wrqu->power.value / 1000);
+            pr_debug("%s, pwr perio value: %d\n", __func__, wrqu->power.value / 1000);
         }
 
         switch (wrqu->power.flags & IW_POWER_MODE) {
             case IW_POWER_UNICAST_R:
             case IW_POWER_MULTICAST_R:
             case IW_POWER_ALL_R:
-                printk("%s, pwr mode value: %d\n", __func__, wrqu->power.value / 1000);
+                pr_debug("%s, pwr mode value: %d\n", __func__, wrqu->power.value / 1000);
                 break;
 
             case IW_POWER_ON:
@@ -1622,10 +1622,57 @@ int iw_standard_set_pwr(struct net_device *dev, struct iw_request_info *info,
     return 0;
 }
 
+static int iw_standard_get_essid(struct net_device *dev,
+                                 struct iw_request_info *info,
+                                 union iwreq_data *wrqu, char *extra)
+{
+    struct wifi_mac_ScanSSID *ssid;
+    struct wlan_net_vif *wnet_vif;
+    size_t ssid_len;
+
+    wnet_vif = aml_iwpriv_get_vif(dev->name);
+
+    if (!wnet_vif)
+        return -EFAULT;
+
+    ssid = &wnet_vif->vm_des_ssid[0];
+    ssid_len = min(ssid->len, IW_ESSID_MAX_SIZE);
+
+    /* Both 'extra' and 'wrqu' are kernel memory. */
+    memcpy(extra, ssid->ssid, ssid_len);
+    extra[ssid_len] = '\0';
+    wrqu->essid.length = ssid_len;
+
+    return 0;
+}
+
+static int iw_standard_get_ap_addr(struct net_device *dev,
+                                   struct iw_request_info *info,
+                                   union iwreq_data *wrqu, char *extra)
+{
+    struct wlan_net_vif *wnet_vif;
+
+    wnet_vif = aml_iwpriv_get_vif(dev->name);
+
+    if (!wnet_vif)
+        return -EFAULT;
+
+    BUILD_BUG_ON(sizeof(wnet_vif->vm_des_bssid) != ETH_ALEN);
+
+    /* 'wrqu->ap_addr.sa_data' is kernel memory. */
+    wrqu->ap_addr.sa_family = ARPHRD_ETHER;
+    memcpy(wrqu->ap_addr.sa_data, wnet_vif->vm_des_bssid,
+               sizeof(wnet_vif->vm_des_bssid));
+
+    return 0;
+}
+
 static const iw_handler standard_handler[] = {
     IW_HANDLER(SIOCGIWSTATS,    (iw_handler)iw_standard_get_stats),
     IW_HANDLER(SIOCSIWFREQ,     (iw_handler)iw_standard_sap_set_freq),
     IW_HANDLER(SIOCSIWPOWER,    (iw_handler)iw_standard_set_pwr),
+    IW_HANDLER(SIOCGIWESSID,    (iw_handler)iw_standard_get_essid),
+    IW_HANDLER(SIOCGIWAP,       (iw_handler)iw_standard_get_ap_addr),
 };
 
 

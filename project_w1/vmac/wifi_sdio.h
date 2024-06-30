@@ -86,7 +86,6 @@ struct amlw_hwif_sdio {
 #define SDIOH_API_RC_FAIL	               (0x01)
 #define SDIOH_API_SUCCESS(status)     (status == 0)
 
-struct sdio_func *aml_priv_to_func(int func_n);
 
 int aml_sdio_bottom_write8(unsigned char  func_num, int addr, unsigned char data);
 unsigned char aml_sdio_bottom_read8(unsigned char  func_num, int addr);
@@ -179,8 +178,6 @@ extern void sdio_read_write(int idx, int addr, svBitPackedArrRef buff, int len, 
     extern unsigned char (*host_wake_w1_req)(void);
     extern int (*host_suspend_req)(struct device* device);
     extern int (*host_resume_req)(struct device* device);
-    extern void aml_wifi_sdio_power_lock(void);
-    extern void aml_wifi_sdio_power_unlock(void);
     #define AML_W1_WIFI_POWER_ON 1
     #define AML_W1_WIFI_POWER_OFF 0
 
@@ -190,5 +187,7 @@ extern void sdio_read_write(int idx, int addr, svBitPackedArrRef buff, int len, 
     int aml_sdio_pm_suspend(struct device *device);
     int aml_sdio_pm_resume(struct device *device);
 #endif
+
+    struct sdio_func *aml_priv_to_func(int func_n);
 
 #endif //AML_SDIO_H

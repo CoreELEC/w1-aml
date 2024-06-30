@@ -416,7 +416,7 @@ typedef void wifi_mac_IterFunc(void *, struct wifi_station *);
 void wifi_mac_func_to_task(struct wifi_station_tbl *, wifi_mac_IterFunc *, void *,unsigned char btask);
 void wifi_mac_disassoc_all_sta(struct wlan_net_vif*, wifi_mac_IterFunc*, void*);
 void wifi_mac_dump_sta(struct wifi_station_tbl *, struct wifi_station *);
-struct wifi_station *wifi_mac_fake_adhos_sta(struct wlan_net_vif *wnet_vif, const unsigned char macaddr[]);
+struct wifi_station *wifi_mac_fake_adhos_sta(struct wlan_net_vif *wnet_vif, const unsigned char *macaddr);
 struct wifi_mac_scan_param;
 struct wifi_station *wifi_mac_add_neighbor(struct wlan_net_vif *, const struct wifi_frame *, const struct wifi_mac_scan_param *);
 
@@ -425,6 +425,7 @@ void wifi_mac_sta_disconnect(struct wifi_station *);
 void wifi_mac_sta_disconnect_from_ap(struct wifi_station *);
 void wifi_mac_sta_deauth(void *arg, struct wifi_station *sta);
 void wifi_mac_sta_disassoc(void *arg, struct wifi_station *sta);
+void wifi_mac_sta_disassoc_in_task(struct wlan_net_vif *wnet_vif);
 struct wifi_station *wifi_mac_find_mgmt_tx_sta(struct wlan_net_vif *wnet_vif, const unsigned char *mac);
 
 void wifi_mac_list_sta( struct wlan_net_vif *wnet_vif);
@@ -549,7 +550,7 @@ extern int my_mod_use;
 
 #define MY_MOD_INC_USE(_m, _err) do{\
                 if (my_mod_use>2) {\
-                        printk(KERN_WARNING "%s: try_module_get failed\n",__func__); \
+                        pr_warn("%s: try_module_get failed\n",__func__); \
                         _err;\
                 }\
                 my_mod_use= 1;\

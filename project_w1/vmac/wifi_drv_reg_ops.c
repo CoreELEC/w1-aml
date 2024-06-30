@@ -2,7 +2,7 @@
 
 #define  I2C_CLK_QTR   0x4  //old parameter 0x82
 
-void write_byte_8ba(unsigned char Bus, unsigned char SlaveAddr,
+static void write_byte_8ba(unsigned char Bus, unsigned char SlaveAddr,
     unsigned char RegAddr, unsigned char Data)
 {
     struct hw_interface* hif = hif_get_hw_interface();
@@ -38,14 +38,14 @@ void write_byte_8ba(unsigned char Bus, unsigned char SlaveAddr,
 
         cnt++;
         if (cnt == 1000) {
-            printk("-------[ERR]-----> i2c[W] err\n");
+            pr_err("-------[ERR]-----> i2c[W] err\n");
             break;
         }
     } while (tmp & (1 << 2));
 
 }
 
-unsigned char read_byte_8ba(unsigned char Bus, unsigned char SlaveAddr, unsigned char RegAddr)
+static unsigned char read_byte_8ba(unsigned char Bus, unsigned char SlaveAddr, unsigned char RegAddr)
 {
     struct hw_interface* hif = hif_get_hw_interface();
     unsigned int tmp,cnt = 0;
@@ -82,7 +82,7 @@ unsigned char read_byte_8ba(unsigned char Bus, unsigned char SlaveAddr, unsigned
 
         cnt++;
         if (cnt == 1000) {
-            printk("-------[ERR]-----> i2c[W] err\n");
+            pr_err("-------[ERR]-----> i2c[W] err\n");
             break;
         }
     } while (tmp & (1 << 2));
@@ -93,13 +93,13 @@ unsigned char read_byte_8ba(unsigned char Bus, unsigned char SlaveAddr, unsigned
 
 
 //void write_rdaddr_32ba(U8 Bus, U8 SlaveAddr, U32 TkData0, U32 TkData1)
-void write_word_32ba(unsigned char Bus, unsigned char SlaveAddr,
+static void write_word_32ba(unsigned char Bus, unsigned char SlaveAddr,
     unsigned int StartToken, unsigned int Data)
 {
     struct hw_interface* hif = hif_get_hw_interface();
     unsigned int tmp,cnt = 0;
 
-  // printk("%s(%d) token 0x%x data 0x%x\n", __func__, __LINE__, StartToken,Data);
+  // pr_debug("%s(%d) token 0x%x data 0x%x\n", __func__, __LINE__, StartToken,Data);
 
     // Set the I2C bus to 100khz
     tmp = hif->hif_ops.hi_read_word(I2C_CONTROL_REG);
@@ -142,7 +142,7 @@ void write_word_32ba(unsigned char Bus, unsigned char SlaveAddr,
     } while (tmp & (1 << 2));
 }
 
-unsigned int read_word_32ba(unsigned int SlaveAddr, unsigned int RegAddr)
+static unsigned int read_word_32ba(unsigned int SlaveAddr, unsigned int RegAddr)
 {
     struct hw_interface* hif = hif_get_hw_interface();
     unsigned int tmp,cnt = 0;
@@ -242,7 +242,7 @@ int new_set_reg(unsigned int address,unsigned int data)
     } else if (((address >> 24) & 0xf0) == 0xf0 ) {
 #ifdef USE_T902X_RF
         rf_i2c_write( address & 0xffffffff,data );//access t902x rf reg
-        printk("%s(%d) 0x%x\n", __func__, __LINE__, data);
+        pr_debug("%s(%d) 0x%x\n", __func__, __LINE__, data);
 #endif
     } else {
         HalPriv->hif->hif_ops.hi_write_word(address, data);
@@ -262,7 +262,7 @@ int new_get_reg(unsigned int address,unsigned int *data)
     } else if (((address >> 24) & 0xf0) == 0xf0 ) {
 #ifdef USE_T902X_RF
         *data = rf_i2c_read(address & 0xffffffff); //access t902x rf reg
-         printk("%s(%d) 0x%x\n", __func__, __LINE__, address);
+         pr_debug("%s(%d) 0x%x\n", __func__, __LINE__, address);
 #endif
     } else {
         *data = HalPriv->hif->hif_ops.hi_read_word(address);

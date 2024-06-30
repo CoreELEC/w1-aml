@@ -271,11 +271,11 @@ static inline int drv_hal_set_chan_support(struct hal_channel *chan)
 }
 
 //Channel_Set_Cmd
-static inline void drv_hal_setchannel(struct hal_channel *hchan, unsigned char flag, unsigned char vid)
+static inline void drv_hal_setchannel(struct hal_channel *hchan, unsigned char flag, unsigned char vid, unsigned char opmode)
 {
     struct hal_private* hal_priv = hal_get_priv();
 
-    hal_priv->hal_ops.phy_set_rf_chan(hchan, flag, vid);
+    hal_priv->hal_ops.phy_set_rf_chan(hchan, flag, vid, opmode);
 }
 //Channel_Set_Cmd
 static inline void drv_hal_scancmd(unsigned int start)
@@ -323,8 +323,8 @@ static inline int drv_hal_setdhcp(unsigned char wnet_vif_id, unsigned int ip)
     struct hal_private* hal_priv = hal_get_priv();
 
     if (hal_priv->dhcp_offload == 1) {
-        printk("NOTICE: DHCP OFFLOAD function is enabled, caller must ensure upper layer's dhcp module is closed.\n"); 
-        printk("Because under this situation, the FW will handle the dhcp pkts and never transmit to driver.\n");
+        pr_notice("NOTICE: DHCP OFFLOAD function is enabled, caller must ensure upper layer's dhcp module is closed.\n");
+        pr_notice("Because under this situation, the FW will handle the dhcp pkts and never transmit to driver.\n");
         DPRINTF(AML_DEBUG_HAL, "%s %d: ip %03d.%03d.%03d.%03d\n",__func__,__LINE__,
             (ip >> 24) & 0xff, (ip >> 16) & 0xff, (ip >> 8) & 0xff, ip & 0xff);
         hal_priv->hal_ops.phy_set_dhcp(wnet_vif_id, ip);

@@ -44,7 +44,7 @@ static void wifi_mac_pwrsave_presleep(struct work_struct *work)
 
     if (wnet_vif->vm_mainsta == NULL)
     {
-        printk("%s:%d, vm_mainsta is null, cancle sleep this time \n", __func__, __LINE__);
+        pr_err("%s:%d, vm_mainsta is null, cancel sleep this time \n", __func__, __LINE__);
         os_timer_ex_start(&wnet_vif->vm_pwrsave.ips_timer_presleep);
         return;
     }
@@ -374,7 +374,7 @@ void wifi_mac_pwrsave_set_mode(struct wlan_net_vif *wnet_vif, unsigned int mode)
 
         if (wnet_vif->vm_state == WIFINET_S_CONNECTED && wifimac->wm_syncbeacon == 0)
         {
-            printk("<running> %s %d \n",__func__,__LINE__);
+            pr_debug("<running> %s %d \n",__func__,__LINE__);
             wifi_mac_beacon_sync(wifimac->drv_priv->wmac, wnet_vif->wnet_vif_id);
         }
 
@@ -707,7 +707,7 @@ void wifi_mac_buffer_txq_flush(struct sk_buff_head *pstxqueue)
     unsigned int qlen_real = WIFINET_SAVEQ_QLEN(pstxqueue);
 
     if (qlen_real) {
-        printk("%s qlen_real:%d\n", __func__, qlen_real);
+        pr_debug("%s qlen_real:%d\n", __func__, qlen_real);
     }
 
     while (qlen_real)
@@ -889,7 +889,7 @@ int wifi_mac_pwrsave_sta_uapsd_trigger (void *arg)
 
     if (send_trigger == 1)
     {
-        printk("%s:%d, send uapsd trigger\n", __func__, __LINE__);
+        pr_debug("%s:%d, send uapsd trigger\n", __func__, __LINE__);
         wifi_mac_send_qosnulldata_as_trigger(sta, qosinfo);
     }
     return OS_TIMER_REARMED;
@@ -1317,7 +1317,7 @@ static int wifi_mac_pwrsave_psqueue_send (struct wifi_station *sta, int force)
             {
                 wifi_mac_send_nulldata_for_ap(sta, 0, 0, 0, 0);
                 wnet_vif->vif_sts.sts_tx_ps_no_data++;
-                printk("tx null for pspoll\n");
+                pr_debug("tx null for pspoll\n");
             }
             qlen = 0;
             break;
@@ -1438,7 +1438,7 @@ void wifi_mac_pwrsave_recv_pspoll(struct wifi_station *sta, struct sk_buff *skb0
             "ps-poll %s","unassociated station");
         wnet_vif->vif_sts.sts_rx_ps_uncnnt++;
         arg = WIFINET_REASON_NOT_ASSOCED;
-        printk("<running> %s %d \n",__func__,__LINE__);
+        pr_debug("<running> %s %d \n",__func__,__LINE__);
         wifi_mac_send_mgmt(sta, WIFINET_FC0_SUBTYPE_DEAUTH, (void *)&arg);
         return;
     }
@@ -1450,7 +1450,7 @@ void wifi_mac_pwrsave_recv_pspoll(struct wifi_station *sta, struct sk_buff *skb0
                         "ps-poll aid mismatch: sta aid 0x%x poll aid 0x%x", sta->sta_associd, aid);
         wnet_vif->vif_sts.sts_rx_ps_aid_err++;
         arg = WIFINET_REASON_NOT_ASSOCED;
-        printk("<running> %s %d \n",__func__,__LINE__);
+        pr_debug("<running> %s %d \n",__func__,__LINE__);
         wifi_mac_send_mgmt(sta, WIFINET_FC0_SUBTYPE_DEAUTH, (void *)&arg);
         return;
     }
@@ -1541,7 +1541,7 @@ void wifi_mac_pwrsave_chk_uapsd_trig(void * ieee,
             DPRINTF(AML_DEBUG_PWR_SAVE, "%s %d rx nsta trigger tid=%d ac=%d\n",
                 __func__,__LINE__, tid, ac);
             */
-            printk("rx uapsd trigger\n");
+            pr_debug("rx uapsd trigger\n");
 
             frame_seq = le16toh(*(unsigned short *)qwh->i_seq);
             if ((qwh->i_fc[1] & WIFINET_FC1_RETRY) &&
@@ -1666,7 +1666,7 @@ int wifi_mac_pwrsave_wow_suspend(SYS_TYPE param1,
     int listen_interval = 0, connect = 0;
     unsigned int filter = 0, cnt = 0;
 
-    printk("%s:%d\n", __func__, __LINE__);
+    pr_debug("%s:%d\n", __func__, __LINE__);
     WIFINET_PWRSAVE_MUTEX_LOCK(wnet_vif);
     if (wifimac->wm_suspend_mode == WIFI_SUSPEND_STATE_WOW)
     {
@@ -1782,7 +1782,7 @@ int wifi_mac_pwrsave_wow_resume(SYS_TYPE param1,
     int connect = 0;
     int ret = 0;
 
-    printk("%s:%d\n", __func__, __LINE__);
+    pr_debug("%s:%d\n", __func__, __LINE__);
     WIFINET_PWRSAVE_MUTEX_LOCK(wnet_vif);
     if (wifimac->wm_suspend_mode == WIFI_SUSPEND_STATE_NONE)
     {

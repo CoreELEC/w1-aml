@@ -62,8 +62,8 @@ enum
                             AML_DEBUG_CFG80211)
 
 
-#define DBG_HAL_THR_ENTER()          //printk("---xman debug---:%s ++ \n",__FUNCTION__);
-#define DBG_HAL_THR_EXIT()           //printk("---xman debug---:%s -- \n",__FUNCTION__);
+#define DBG_HAL_THR_ENTER()          //pr_debug("---xman debug---:%s ++ \n",__FUNCTION__);
+#define DBG_HAL_THR_EXIT()           //pr_debug("---xman debug---:%s -- \n",__FUNCTION__);
 
 
 extern int aml_debug;
@@ -72,7 +72,7 @@ extern unsigned long long g_dbg_modules;
 
 #define DPRINTF( _m,  ...) do {         \
                 if (aml_debug& (_m))                \
-                        printk(__VA_ARGS__);      \
+                        pr_debug(__VA_ARGS__);      \
         } while (0)
 
 enum
@@ -96,24 +96,24 @@ enum
                 if (g_dbg_modules & (_m)) \
                 { \
                     if(_m == AML_DBG_MODULES_P2P) \
-                        printk("[p2p] <%s> %d "format"",__FUNCTION__, __LINE__, ##__VA_ARGS__); \
+                        pr_debug("[p2p] <%s> %d "format"",__FUNCTION__, __LINE__, ##__VA_ARGS__); \
                     else if(_m == AML_DBG_MODULES_RATE_CTR) \
-                        printk("[mi_rate] <%s> %d "format"",__FUNCTION__, __LINE__, ##__VA_ARGS__); \
+                        pr_debug("[mi_rate] <%s> %d "format"",__FUNCTION__, __LINE__, ##__VA_ARGS__); \
                     else if(_m == AML_DBG_MODULES_TX) \
-                        printk("[TX] <%s> %d "format"",__FUNCTION__, __LINE__, ##__VA_ARGS__); \
+                        pr_debug("[TX] <%s> %d "format"",__FUNCTION__, __LINE__, ##__VA_ARGS__); \
                     else if(_m == AML_DBG_MODULES_TX_ERROR) \
-                        printk("[TX_ERROR] <%s> %d "format"",__FUNCTION__, __LINE__, ##__VA_ARGS__); \
+                        pr_debug("[TX_ERROR] <%s> %d "format"",__FUNCTION__, __LINE__, ##__VA_ARGS__); \
                     else if(_m == AML_DBG_MODULES_SCAN) \
-                        printk("[SCAN] <%s> %d "format"",__FUNCTION__, __LINE__, ##__VA_ARGS__); \
+                        pr_debug("[SCAN] <%s> %d "format"",__FUNCTION__, __LINE__, ##__VA_ARGS__); \
                 }    \
         } while (0)
 
 #define ERROR_DEBUG_OUT(format,...) do {    \
-                 printk("FUNCTION: %s LINE: %d:"format"",__FUNCTION__, __LINE__, ##__VA_ARGS__); \
+                 pr_err("FUNCTION: %s LINE: %d:"format"",__FUNCTION__, __LINE__, ##__VA_ARGS__); \
         } while (0)
 
 #define AML_OUTPUT(format,...) do {    \
-                 printk("<%s> %d:"format"",__FUNCTION__, __LINE__, ##__VA_ARGS__); \
+                 pr_debug("<%s> %d:"format"",__FUNCTION__, __LINE__, ##__VA_ARGS__); \
         } while (0)
 
 
@@ -124,29 +124,29 @@ extern struct _B2B_Platform_Conf gB2BPlatformConf;
 #define DEBUG_LOCK
 
 #ifdef DEBUG_LOCK
-#define OS_SPIN_LOCK_IRQ(a, b)        {if (aml_debug& (AML_DEBUG_LOCK))  printk("%s,%d,%p, #a ++\n",__func__,__LINE__,(a));spin_lock_irqsave((a), (b));}
-#define OS_SPIN_UNLOCK_IRQ(a, b)   {if (aml_debug& (AML_DEBUG_LOCK)) printk("%s,%d,%p,#a --\n",__func__,__LINE__,(a));spin_unlock_irqrestore((a), (b));}
+#define OS_SPIN_LOCK_IRQ(a, b)        {if (aml_debug& (AML_DEBUG_LOCK))  pr_debug("%s,%d,%p, #a ++\n",__func__,__LINE__,(a));spin_lock_irqsave((a), (b));}
+#define OS_SPIN_UNLOCK_IRQ(a, b)   {if (aml_debug& (AML_DEBUG_LOCK)) pr_debug("%s,%d,%p,#a --\n",__func__,__LINE__,(a));spin_unlock_irqrestore((a), (b));}
 
 
-#define OS_SPIN_LOCK_BH(a)        {if (aml_debug& (AML_DEBUG_LOCK)) printk("%s,%d,%p,#a ++\n",__func__,__LINE__,(a));spin_lock_bh((a));}
-#define OS_SPIN_UNLOCK_BH(a)   {if (aml_debug& (AML_DEBUG_LOCK))  printk("%s,%d,%p,#a --\n",__func__,__LINE__,(a));spin_unlock_bh((a));}
+#define OS_SPIN_LOCK_BH(a)        {if (aml_debug& (AML_DEBUG_LOCK)) pr_debug("%s,%d,%p,#a ++\n",__func__,__LINE__,(a));spin_lock_bh((a));}
+#define OS_SPIN_UNLOCK_BH(a)   {if (aml_debug& (AML_DEBUG_LOCK))  pr_debug("%s,%d,%p,#a --\n",__func__,__LINE__,(a));spin_unlock_bh((a));}
 
 
-#define OS_SPIN_LOCK(a)        {if (aml_debug& (AML_DEBUG_LOCK))  printk("%s,%d,%p,#a ++\n",__func__,__LINE__,(a));spin_lock((a));}
-#define OS_SPIN_UNLOCK(a)   {if (aml_debug& (AML_DEBUG_LOCK))  printk("%s,%d,%p,#a --\n",__func__,__LINE__,(a));spin_unlock((a));}
+#define OS_SPIN_LOCK(a)        {if (aml_debug& (AML_DEBUG_LOCK))  pr_debug("%s,%d,%p,#a ++\n",__func__,__LINE__,(a));spin_lock((a));}
+#define OS_SPIN_UNLOCK(a)   {if (aml_debug& (AML_DEBUG_LOCK))  pr_debug("%s,%d,%p,#a --\n",__func__,__LINE__,(a));spin_unlock((a));}
 
 
-#define OS_WRITE_LOCK(a)        {if (aml_debug& (AML_DEBUG_LOCK))  printk("%s,%d,%p,#a ++\n",__func__,__LINE__,(a));write_lock((a));}
-#define OS_WRITE_UNLOCK(a)   {if (aml_debug& (AML_DEBUG_LOCK))  printk("%s,%d,%p,#a --\n",__func__,__LINE__,(a));write_unlock((a));}
+#define OS_WRITE_LOCK(a)        {if (aml_debug& (AML_DEBUG_LOCK))  pr_debug("%s,%d,%p,#a ++\n",__func__,__LINE__,(a));write_lock((a));}
+#define OS_WRITE_UNLOCK(a)   {if (aml_debug& (AML_DEBUG_LOCK))  pr_debug("%s,%d,%p,#a --\n",__func__,__LINE__,(a));write_unlock((a));}
 
-#define OS_WRITE_LOCK_BH(a)        {if (aml_debug& (AML_DEBUG_LOCK)) printk("%s,%d,%p,#a ++\n",__func__,__LINE__,(a));write_lock_bh((a));}
-#define OS_WRITE_UNLOCK_BH(a)   {if (aml_debug& (AML_DEBUG_LOCK))  printk("%s,%d,%p,#a --\n",__func__,__LINE__,(a));write_unlock_bh((a));}
+#define OS_WRITE_LOCK_BH(a)        {if (aml_debug& (AML_DEBUG_LOCK)) pr_debug("%s,%d,%p,#a ++\n",__func__,__LINE__,(a));write_lock_bh((a));}
+#define OS_WRITE_UNLOCK_BH(a)   {if (aml_debug& (AML_DEBUG_LOCK))  pr_debug("%s,%d,%p,#a --\n",__func__,__LINE__,(a));write_unlock_bh((a));}
 
-#define OS_WRITE_LOCK_IRQ(a, b)        {if (aml_debug& (AML_DEBUG_LOCK))  printk("%s,%d,%p,#a ++\n",__func__,__LINE__,(a));write_lock_irqsave((a), (b));}
-#define OS_WRITE_UNLOCK_IRQ(a, b)   {if (aml_debug& (AML_DEBUG_LOCK)) printk("%s,%d,%p,#a --\n",__func__,__LINE__,(a));write_unlock_irqrestore((a), (b));}
+#define OS_WRITE_LOCK_IRQ(a, b)        {if (aml_debug& (AML_DEBUG_LOCK))  pr_debug("%s,%d,%p,#a ++\n",__func__,__LINE__,(a));write_lock_irqsave((a), (b));}
+#define OS_WRITE_UNLOCK_IRQ(a, b)   {if (aml_debug& (AML_DEBUG_LOCK)) pr_debug("%s,%d,%p,#a --\n",__func__,__LINE__,(a));write_unlock_irqrestore((a), (b));}
 
-#define OS_MUTEX_LOCK(a)        {/*printk("%s,%d,%p, #a ++\n",__func__,__LINE__,(a));*/mutex_lock(a);}
-#define OS_MUTEX_UNLOCK(a)        {/*printk("%s,%d,%p, #a --\n",__func__,__LINE__,(a));*/mutex_unlock(a);}
+#define OS_MUTEX_LOCK(a)        {/*pr_debug("%s,%d,%p, #a ++\n",__func__,__LINE__,(a));*/mutex_lock(a);}
+#define OS_MUTEX_UNLOCK(a)        {/*pr_debug("%s,%d,%p, #a --\n",__func__,__LINE__,(a));*/mutex_unlock(a);}
 
 #else
 #define OS_SPIN_LOCK_IRQ(a, b)        {spin_lock_irqsave((a), (b));}
@@ -177,22 +177,22 @@ extern struct _B2B_Platform_Conf gB2BPlatformConf;
 #endif
 
 #if defined (FPGA) ||defined (CHIP)
-#define PRINT(...)      do {printk( __VA_ARGS__ );}while(0)
-#define PRINT_ERR(...)      do {printk( __VA_ARGS__ );}while(0)
-#define PUTC( character )   printk("%c" ,character )
-#define PUTX8(size, value)    printk("%02x", value);
-#define PUTU8(value)            printk("%u", value);
-#define PUTS( ... )    printk(__VA_ARGS__)
-#define PUTU( number)   printk("%d\n",number)
-#define DBG_ENTER()           //printk("--->%s ++ \n",__FUNCTION__);
-#define DBG_EXIT()              //printk("--->%s -- \n",__FUNCTION__);
+#define PRINT(...)      do {pr_debug( __VA_ARGS__ );}while(0)
+#define PRINT_ERR(...)      do {pr_err( __VA_ARGS__ );}while(0)
+#define PUTC( character )   pr_debug("%c" ,character )
+#define PUTX8(size, value)    pr_debug("%02x", value);
+#define PUTU8(value)            pr_debug("%u", value);
+#define PUTS( ... )    pr_debug(__VA_ARGS__)
+#define PUTU( number)   pr_debug("%d\n",number)
+#define DBG_ENTER()           //pr_debug("--->%s ++ \n",__FUNCTION__);
+#define DBG_EXIT()              //pr_debug("--->%s -- \n",__FUNCTION__);
 #endif
 
 
 #ifndef ASSERT
 #define ASSERT(exp) do{    \
                 if (!(exp)) {   \
-                        printk("=>=>=>=>=>assert %s,%d\n",__func__,__LINE__);   \
+                        pr_err("=>=>=>=>=>assert %s,%d\n",__func__,__LINE__);   \
                         /*BUG();        while(1);   */  \
                 }                       \
         } while (0);
@@ -203,7 +203,7 @@ extern struct _B2B_Platform_Conf gB2BPlatformConf;
 
 #define KASSERT(exp, msg) do {          \
                 if (unlikely(!(exp))) {         \
-                        printk msg;         \
+                        pr_err msg ;         \
                         BUG();              \
                 }                   \
         } while (0)
@@ -212,7 +212,7 @@ extern struct _B2B_Platform_Conf gB2BPlatformConf;
 
 void address_print( unsigned char* address );
 void IPv4_address_print( unsigned char* address );
-void dump_memory_internel(unsigned char *data,int len);
+void dump_memory_internal(unsigned char *data,int len);
 void address_read( unsigned char* cursor, unsigned char* address );
 
  unsigned short READ_16L( const unsigned char* address );

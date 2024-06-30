@@ -14,7 +14,6 @@
 #ifndef _NET80211_IEEE80211_H_
 #define _NET80211_IEEE80211_H_
 
-
 enum wifi_mac_phytype
 {
     WIFINET_T_DS=0,
@@ -23,14 +22,14 @@ enum wifi_mac_phytype
     WIFINET_T_VHT,
     WIFINET_T_MAX
 };
-#define WIFINET_T_CCK   WIFINET_T_DS
+#define WIFINET_T_CCK	WIFINET_T_DS
 /* XXX not really a mode; there are really multiple PHY's */
 
 /* shorthands to compact tables for readability */
-#define WOFDM   WIFINET_T_OFDM
-#define CCK     WIFINET_T_CCK
-#define   HT      WIFINET_T_HT
-#define   VHT_PHY    WIFINET_T_VHT
+#define WOFDM	WIFINET_T_OFDM
+#define CCK	WIFINET_T_CCK
+#define HT	WIFINET_T_HT
+#define VHT_PHY	WIFINET_T_VHT
 
 enum wifi_mac_macmode
 {
@@ -180,13 +179,13 @@ enum wifi_mac_ht_prot_update_flag
 
 struct wifi_channel
 {
-    unsigned short chan_cfreq1;  /* center frequency1 for 20/40/80/160, in Mhz */
+    unsigned short chan_cfreq1;		/* center frequency1 for 20/40/80/160, in Mhz */
     //unsigned short     chan_cfreq2;   /* center frequency2 for 80P80, in Mhz */
     unsigned short chan_flags;
-    unsigned short chan_pri_num;   /* primary channel number */
-    int8_t chan_maxpower;  /* maximum tx power in dBm */
-    int8_t chan_minpower;  /* minimum tx power in dBm */
-    enum wifi_mac_bwc_width chan_bw; /* bandwidth */
+    unsigned short chan_pri_num;	/* primary channel number */
+    int8_t chan_maxpower;		/* maximum tx power in dBm */
+    int8_t chan_minpower;		/* minimum tx power in dBm */
+    enum wifi_mac_bwc_width chan_bw;	/* bandwidth */
     unsigned char global_operating_class;
 };
 
@@ -231,21 +230,21 @@ struct country_na_freq_set
     struct country_na_freq_info na_freq_info[10];
 };
 
-#define MAX_P2PIE_NUM         4
+#define MAX_P2PIE_NUM		4
 
-#define WIFINET_CHAN_MAX            256
-#define WIFINET_CHAN_MAX_NUM            165
-#define WIFINET_CHAN_BYTES  32
-#define WIFINET_CHAN_INVALUE    0
-#define WIFINET_CHAN_ERR  NULL
-#define WIFINET_MAX_SCAN_CHAN 64
+#define WIFINET_CHAN_MAX	256
+#define WIFINET_CHAN_MAX_NUM	165
+#define WIFINET_CHAN_BYTES	32
+#define WIFINET_CHAN_INVALUE	0
+#define WIFINET_CHAN_ERR	NULL
+#define WIFINET_MAX_SCAN_CHAN	64
 
-#define WIFINET_CHAN_2GHZ 0x4000  /* 2.4 GHz  channel. */
-#define WIFINET_CHAN_5GHZ 0x8000  /* 5 GHz  channel */
-#define WIFINET_CHAN_DFS  0x2000  /* DFS */
-#define WIFINET_CHAN_AWARE  0x1000  /* chan aware */
+#define WIFINET_CHAN_2GHZ	0x4000  /* 2.4 GHz  channel. */
+#define WIFINET_CHAN_5GHZ	0x8000  /* 5 GHz  channel */
+#define WIFINET_CHAN_DFS	0x2000  /* DFS */
+#define WIFINET_CHAN_AWARE	0x1000  /* chan aware */
 
-#define  WIFINET_CHAN_MODE_MASK             0xff
+#define  WIFINET_CHAN_MODE_MASK	0xff
 
 #define WIFINET_IS_CHAN_2GHZ(_c) \
         (((_c)->chan_flags & WIFINET_CHAN_2GHZ) != 0)
@@ -255,20 +254,20 @@ struct country_na_freq_set
 #define WIFINET_IS_CHAN_11N_HT40(_c) \
         (((_c)->chan_bw == WIFINET_BWC_WIDTH40))
 
-#define WIFINET_RATE_SIZE   8
-#define WIFINET_RATE_MAXSIZE    57
-#define WIFINET_HT_RATE_SIZE    77
-#define WIFINET_RATE_BASIC      0x80
-#define WIFINET_RATE_VAL        0x7f
-#define WIFINET_GET_RATE_VAL(_rate)  ((_rate)&WIFINET_RATE_VAL)
-#define WIFINET_RATE_MCS    0x80
-#define WIFINET_RATE_VHT_MCS    0xC0
-#define WIFINET_AMPDU_LIMIT_MAX          (32768)// (16 * 1024 - 1)
+#define WIFINET_RATE_SIZE	8
+#define WIFINET_RATE_MAXSIZE	57
+#define WIFINET_HT_RATE_SIZE	77
+#define WIFINET_RATE_BASIC	0x80
+#define WIFINET_RATE_VAL	0x7f
+#define WIFINET_GET_RATE_VAL(_rate)	((_rate)&WIFINET_RATE_VAL)
+#define WIFINET_RATE_MCS	0x80
+#define WIFINET_RATE_VHT_MCS	0xC0
+#define WIFINET_AMPDU_LIMIT_MAX	(32768) /* (16 * 1024 - 1) */
 
 struct wifi_mac_rateset
 {
     unsigned char dot11_rate_num;
-    unsigned char  dot11_rate[WIFINET_HT_RATE_SIZE];
+    unsigned char dot11_rate[WIFINET_HT_RATE_SIZE];
 };
 
 enum wifi_mac_state
@@ -311,11 +310,10 @@ enum wifi_mac_pub_act_state
     WIFINET_PUB_MAX,
 };
 
-
-#define PHASE_CONNECTING 1
-#define PHASE_DISCONNECTING 2
-#define PHASE_TX_BUFF_QUEUE 4
-#define PHASE_DISCONNECT_DELAY 8
+#define PHASE_CONNECTING	1
+#define PHASE_DISCONNECTING	2
+#define PHASE_TX_BUFF_QUEUE	4
+#define PHASE_DISCONNECT_DELAY	8
 
 enum wifi_mac_recovery_state
 {
@@ -326,10 +324,10 @@ enum wifi_mac_recovery_state
     WIFINET_RECOVERY_END,
 };
 
-#define WIFINET_F_DOSORT 0x00000001
-#define WIFINET_F_DOFRATE 0x00000002
-#define WIFINET_F_DOXSECT 0x00000004
-#define WIFINET_F_DOBRS 0x00000008
+#define WIFINET_F_DOSORT	0x00000001
+#define WIFINET_F_DOFRATE	0x00000002
+#define WIFINET_F_DOXSECT	0x00000004
+#define WIFINET_F_DOBRS		0x00000008
 
 struct wmeParams
 {
@@ -341,9 +339,8 @@ struct wmeParams
     unsigned char wmep_noackPolicy;
 };
 
-#define WME_NUM_AC      4
-#define VENDOR_IE_MAX   3
-
+#define WME_NUM_AC	4
+#define VENDOR_IE_MAX	3
 
 struct chanAccParams
 {
@@ -364,7 +361,7 @@ struct wifi_mac_wme_state
     struct chanAccParams    wme_wmeBssChanParams;
     struct chanAccParams    wme_chanParams; /*this param is set to self chip*/
     struct chanAccParams    wme_bssChanParams;  /*this param is set beacon use to let sta set to it's chip*/
-    unsigned char                wme_nonAggressiveMode;
+    unsigned char           wme_nonAggressiveMode;
 
     //int   (*wme_update)(struct WIFINET_MAC *,struct WIFINET_VMAC *);
 };

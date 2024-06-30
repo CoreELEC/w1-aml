@@ -30,11 +30,11 @@ namespace FW_NAME
 #include <linux/mmc/host.h>
 #include <linux/kthread.h>
 #include <linux/mmc/sdio.h>
- #endif
+#endif
 #include "wifi_common.h"
 
 static struct hw_interface g_hw_interface;
-struct  hw_interface* hif_get_hw_interface(void)
+struct hw_interface* hif_get_hw_interface(void)
 {
     return &g_hw_interface;
 }
@@ -43,7 +43,8 @@ void hif_init_ops(void)
 {
     struct amlw_hif_ops* ops = &g_hw_interface.hif_ops;
 #ifdef SDIO_BUILD_IN
-    memcpy(&g_hw_interface.hif_ops, &g_w1_hif_ops, sizeof(struct amlw_hif_ops));
+    memcpy(&g_hw_interface.hif_ops, &g_w1_hif_ops,
+           sizeof(struct amlw_hif_ops));
 #endif
 
 #ifndef SDIO_BUILD_IN
@@ -94,23 +95,20 @@ extern void do_gettimeofday(struct timeval *tv);
 #endif
 void b2b_rx_throughput_calc(HW_RxDescripter_bit *RxPrivHdr)
 {
-    static int rx_count=0;
-    static unsigned long length_start=0;
-    static unsigned long length_end=0;
-    unsigned int throughput = 0;
+    static int rx_count = 0;
+    static unsigned long length_start = 0;
+    static unsigned long length_end = 0;
     static long start = 0;
-    long end = 0;
-    long time_cost = 0;
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 20, 0))
     struct timeval t_start;
-    struct timeval  t_end;
+    struct timeval t_end;
 #endif
 
    /*
     * Update with the dst mac address later to void broadcast or multicast,
     * get from RxPrivHdr->data
     */
-    if ( RxPrivHdr->RxLength > DATA_PACKET_LENGTH_MIN )
+    if (RxPrivHdr->RxLength > DATA_PACKET_LENGTH_MIN)
     {
         rx_count++;
         if (rx_count == 1)
@@ -119,39 +117,42 @@ void b2b_rx_throughput_calc(HW_RxDescripter_bit *RxPrivHdr)
             start = ktime_to_ms(ktime_get_boottime());
 #else
             do_gettimeofday(&t_start);
-            start = ((long)t_start.tv_sec)*1000+(long)t_start.tv_usec/1000;
+            start = ((long)t_start.tv_sec) * 1000 + (long)t_start.tv_usec / 1000;
 #endif
-            printk("Rx side:Got the first packet and the start time is :%ld ms.\n",start);
+            pr_debug("Rx side:Got the first packet and the start time is :%ld ms.\n",start);
             length_start += RxPrivHdr->RxLength;
             length_end += RxPrivHdr->RxLength;
         }
         else
         {
+            long time_cost;
+            long end;
+
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 20, 0))
             end = ktime_to_ms(ktime_get_boottime());
 #else
             do_gettimeofday(&t_end);
-            end = ((long)t_end.tv_sec)*1000+(long)t_end.tv_usec/1000;
+            end = ((long)t_end.tv_sec) * 1000+(long)t_end.tv_usec / 1000;
 #endif
             time_cost = end - start;
             length_end += RxPrivHdr->RxLength;
-            if ( time_cost >= THROUGHPUT_GET_INTERVAL )
+            if (time_cost >= THROUGHPUT_GET_INTERVAL)
             {
-                throughput = (length_end-length_start)*8/time_cost;
+                unsigned int throughput;
+
+                throughput = (length_end - length_start) * 8 / time_cost;
                 start = end;
                 length_start = length_end;
-                printk("---B2B debug---Rx side: Current throughput: %d kbps.\n\n",throughput);
+                pr_debug("---B2B debug---Rx side: Current throughput: %d kbps.\n\n",throughput);
             }
         }
     }
 }
 
-
-
 unsigned int hi_get_device_id(void)
 {
     struct hw_interface* hif = hif_get_hw_interface();
-    unsigned int regdata = 0;
+    unsigned int regdata;
 
     regdata = hif->hif_ops.hi_read_word(PRODUCT_AMLOGIC_ADDR);
 
@@ -160,8 +161,8 @@ unsigned int hi_get_device_id(void)
 
 unsigned int hi_get_vendor_id(void)
 {
-    unsigned int regdata = 0;
     struct hw_interface* hif = hif_get_hw_interface();
+    unsigned int regdata;
 
     regdata = hif->hif_ops.hi_read_word(VENDOR_AMLOGIC_ADDR);
 
@@ -170,8 +171,8 @@ unsigned int hi_get_vendor_id(void)
 
 unsigned int hi_get_fw_version(void)
 {
-    unsigned int regdata = 0;
     struct hw_interface* hif = hif_get_hw_interface();
+    unsigned int regdata;
 
     regdata =  hif->hif_ops.hi_read_word(FIRMWARE_VERSION_ADDR);
 
@@ -180,10 +181,10 @@ unsigned int hi_get_fw_version(void)
 
 unsigned int hi_get_irq_status(void)
 {
-    unsigned int regdata = 0;
     struct hw_interface* hif = hif_get_hw_interface();
+    unsigned int regdata;
 
-    regdata = hif->hif_ops.hi_read_word(RG_WIFI_IF_HOST_IRQ_ST );
+    regdata = hif->hif_ops.hi_read_word(RG_WIFI_IF_HOST_IRQ_ST);
 
     return regdata;
 }
@@ -197,9 +198,10 @@ void hi_clear_irq_status(unsigned int data)
 #ifdef HAL_FPGA_VER
 #ifdef PROJECT_W1
     /*
-    * just sometimes, clearing host req by clearing irq status operation after sending ps
-    * cmd to firmware. add host req to avoid firmware can't power off.
-    */
+     * Just sometimes, clearing host req by clearing irq status operation
+     * after sending ps cmd to firmware. add host req to avoid firmware
+     * can't power off.
+     */
     if (0)
     {
         struct hal_private * halpriv = hal_get_priv();
@@ -210,11 +212,11 @@ void hi_clear_irq_status(unsigned int data)
         POWER_BEGIN_LOCK();
         if (halpriv->hal_fw_ps_status == HAL_FW_IN_SLEEP)
         {
-            unsigned int tmpreg = 0;
+            unsigned int tmpreg;
 
             POWER_END_LOCK();
             tmpreg = hif->hif_ops.hi_bottom_read8(SDIO_FUNC1, RG_SDIO_PMU_HOST_REQ);
-            // set host sleep req
+            /* set host sleep req */
             tmpreg |= HOST_SLEEP_REQ;
             hif->hif_ops.hi_bottom_write8(SDIO_FUNC1, RG_SDIO_PMU_HOST_REQ, tmpreg);
             POWER_BEGIN_LOCK();
@@ -225,36 +227,30 @@ void hi_clear_irq_status(unsigned int data)
 #endif
 }
 
-static SYS_TYPE hi_get_next_up_fifo(FIFO_SHARE_CTRL * pFifiShare)
+static SYS_TYPE hi_get_next_up_fifo(FIFO_SHARE_CTRL *pFifiShare)
 {
-    return (pFifiShare->FDB + pFifiShare->FDT*pFifiShare->FDL);
+    return (pFifiShare->FDB + pFifiShare->FDT * pFifiShare->FDL);
 }
 
-static unsigned char bFifoFull(FIFO_SHARE_CTRL * pFifiShare)
+static unsigned char bFifoFull(FIFO_SHARE_CTRL *pFifiShare)
 {
     unsigned int FDH = pFifiShare->FDH;
 
     CIRCLE_Add_One(FDH,pFifiShare->FDN);
-    if (FDH == pFifiShare->FDT)
-    {
-        return true;
-    }
-    return false;
+
+    return (FDH == pFifiShare->FDT);
 }
 
-static unsigned char bDownFifo_Up(FIFO_SHARE_CTRL * pFifiShare)
+static unsigned char bDownFifo_Up(FIFO_SHARE_CTRL *pFifiShare)
 {
     unsigned int FDH = pFifiShare->FDH;
-    if (FDH == pFifiShare->FDT)
-    {
-        return true;
-    }
-    return false;
+
+    return (FDH == pFifiShare->FDT);
 }
 
-static unsigned char hi_down_fifo_full_up(FIFO_SHARE_CTRL * pFifiShare)
+static unsigned char hi_down_fifo_full_up(FIFO_SHARE_CTRL *pFifiShare)
 {
-    //updata cmd down fifo fdt
+    /* updata cmd down fifo fdt */
     struct hw_interface* hif = hif_get_hw_interface();
 
     pFifiShare->FDT = hif->hif_ops.hi_read_word(pFifiShare->FCB + 12);
@@ -263,9 +259,9 @@ static unsigned char hi_down_fifo_full_up(FIFO_SHARE_CTRL * pFifiShare)
 }
 
 /*if full return true,else false*/
-static unsigned char hi_down_fifo_pull(FIFO_SHARE_CTRL * pFifiShare)
+static unsigned char hi_down_fifo_pull(FIFO_SHARE_CTRL *pFifiShare)
 {
-    //updata cmd down fifo fdt
+    /* updata cmd down fifo fdt */
     struct hw_interface* hif = hif_get_hw_interface();
 
     pFifiShare->FDT =  hif->hif_ops.hi_read_word(pFifiShare->FCB + 12);
@@ -273,54 +269,56 @@ static unsigned char hi_down_fifo_pull(FIFO_SHARE_CTRL * pFifiShare)
     return bFifoFull(pFifiShare);
 }
 
-/*return next cmd down fifo address*/
-static SYS_TYPE hi_get_next_down_fifo(FIFO_SHARE_CTRL * pFifiShare)
+/* return next cmd down fifo address */
+static SYS_TYPE hi_get_next_down_fifo(FIFO_SHARE_CTRL *pFifiShare)
 {
     return (pFifiShare->FDB + pFifiShare->FDH*pFifiShare->FDL);
 }
 
-static  unsigned char hi_push_down_fifo(FIFO_SHARE_CTRL *pDownFifo,
-        unsigned char *pdata,unsigned int len)
+static unsigned char hi_push_down_fifo(FIFO_SHARE_CTRL *pDownFifo,
+                                       unsigned char *pdata, unsigned int len)
 {
     struct hw_interface* hif = hif_get_hw_interface();
 
     if (!hi_down_fifo_pull(pDownFifo))
     {
         hif->hif_ops.hi_write_sram((unsigned char *)pdata,
-            (unsigned char*)hi_get_next_down_fifo(pDownFifo),len);
-        CIRCLE_Add_One( pDownFifo->FDH ,pDownFifo->FDN);
-        //trigger host cmd irq for firmware
-        hif->hif_ops.hi_write_sram((unsigned char*)(&(pDownFifo->FDH)),
-            (unsigned char *)(SYS_TYPE)((pDownFifo)->FCB + 8), 4);
+                                   (unsigned char *)hi_get_next_down_fifo(pDownFifo),
+                                   len);
+        CIRCLE_Add_One( pDownFifo->FDH, pDownFifo->FDN);
+        /* trigger host cmd irq for firmware */
+        hif->hif_ops.hi_write_sram((unsigned char *)(&(pDownFifo->FDH)),
+                                   (unsigned char *)(SYS_TYPE)((pDownFifo)->FCB + 8),
+                                   4);
         return true;
     }
+
     return false;
 }
 
 static unsigned char hi_push_down_fifo_up(FIFO_SHARE_CTRL *pUpFifo,
-        unsigned char *pdata,unsigned int len)
+                                          unsigned char *pdata, unsigned int len)
 {
-    //insert data
+    /* insert data */
     struct hw_interface* hif = hif_get_hw_interface();
 
-    if (hi_down_fifo_full_up(pUpFifo))  //insert data
+    if (hi_down_fifo_full_up(pUpFifo)) /* insert data */
     {
-        CIRCLE_Sub_One(pUpFifo->FDT ,pUpFifo->FDN); //here back to the filled again
+        CIRCLE_Sub_One(pUpFifo->FDT ,pUpFifo->FDN); /* here back to the filled again */
         hif->hif_ops.hi_read_sram((unsigned char *)pdata,
-			(unsigned char *)hi_get_next_up_fifo(pUpFifo),len);
-        //updata cmd down fifo fdh
-        CIRCLE_Add_One( pUpFifo->FDT ,pUpFifo->FDN);
+                                 (unsigned char *)hi_get_next_up_fifo(pUpFifo),
+                                  len);
+        /* updata cmd down fifo fdh */
+        CIRCLE_Add_One(pUpFifo->FDT, pUpFifo->FDN);
         return true;
     }
 
     return false;
 }
 
-
-
 #if defined (HAL_FPGA_VER)
 
-static struct tx_status_node tx_status[WIFI_MAX_TXFRAME*2];
+static struct tx_status_node tx_status[WIFI_MAX_TXFRAME * 2];
 int tx_status_list_init(struct tx_status_list *tx_status_list, int num)
 {
     int i = 0;
@@ -330,50 +328,59 @@ int tx_status_list_init(struct tx_status_list *tx_status_list, int num)
     INIT_LIST_HEAD(&(tx_status_list->free_list));
     spin_lock_init(&(tx_status_list->status_list_lock));
 
-    if (node_num > WIFI_MAX_TXFRAME*2)
+    if (node_num > WIFI_MAX_TXFRAME * 2)
     {
-        node_num = WIFI_MAX_TXFRAME*2;
+        node_num = WIFI_MAX_TXFRAME * 2;
     }
+
     while (i < node_num)
     {
         INIT_LIST_HEAD(&(tx_status[i].list_node));
         list_add_tail(&(tx_status[i].list_node), &(tx_status_list->free_list));
         i++;
     }
+
     return node_num;
 }
 
-struct tx_status_node * tx_status_node_alloc(struct tx_status_list *tx_status_list)
+struct tx_status_node *tx_status_node_alloc(struct tx_status_list *tx_status_list)
 {
     struct tx_status_node *txok_status_node = NULL;
 
     if (tx_status_list == NULL)
         return NULL;
+
     spin_lock_bh(&tx_status_list->status_list_lock);
+
     if (!list_empty(&tx_status_list->free_list))
     {
-        txok_status_node = list_first_entry(&tx_status_list->free_list, struct tx_status_node, list_node);
+        txok_status_node = list_first_entry(&tx_status_list->free_list,
+                                            struct tx_status_node,
+                                            list_node);
         list_del(&txok_status_node->list_node);
     }
     spin_unlock_bh(&tx_status_list->status_list_lock);
+
     return txok_status_node;
 }
 
 void tx_status_node_enqueue(struct tx_status_node *txok_status_node,
-                                        struct tx_status_list *tx_status_list)
+                            struct tx_status_list *tx_status_list)
 {
     if (txok_status_node == NULL || tx_status_list == NULL)
         return;
+
     spin_lock_bh(&tx_status_list->status_list_lock);
     list_add_tail(&txok_status_node->list_node, &tx_status_list->status_list);
     spin_unlock_bh(&tx_status_list->status_list_lock);
 }
 
 void tx_status_node_free(struct tx_status_node *txok_status_node,
-                                        struct tx_status_list *tx_status_list)
+                         struct tx_status_list *tx_status_list)
 {
     if (txok_status_node == NULL || tx_status_list == NULL)
         return;
+
     spin_lock_bh(&tx_status_list->status_list_lock);
     list_add_tail(&txok_status_node->list_node, &tx_status_list->free_list);
     spin_unlock_bh(&tx_status_list->status_list_lock);
@@ -385,27 +392,31 @@ struct tx_status_node * tx_status_node_dequeue(struct tx_status_list *tx_status_
 
     if (tx_status_list == NULL)
         return NULL;
+
     spin_lock_bh(&(tx_status_list->status_list_lock));
     if (!list_empty(&(tx_status_list->status_list)))
     {
-        txok_status_node = list_first_entry(&(tx_status_list->status_list), struct tx_status_node, list_node);
+        txok_status_node = list_first_entry(&(tx_status_list->status_list),
+                                            struct tx_status_node,
+                                            list_node);
         list_del(&(txok_status_node->list_node));
     }
     spin_unlock_bh(&(tx_status_list->status_list_lock));
+
     return txok_status_node;
 }
 
-
-//static unsigned char g_rx_fifo[RX_FIFO_SIZE + 2 * FUNC6_BLKSIZE];
+/* static unsigned char g_rx_fifo[RX_FIFO_SIZE + 2 * FUNC6_BLKSIZE]; */
 unsigned char *g_rx_fifo = NULL;
 void hi_rx_fifo_init(void)
 {
-    struct  hw_interface* hif = hif_get_hw_interface();
+    struct hw_interface* hif = hif_get_hw_interface();
 
 #ifdef CONFIG_AML_USE_STATIC_BUF
     g_rx_fifo = wifi_mem_prealloc(AML_RX_FIFO, RX_FIFO_SIZE + 2 * FUNC6_BLKSIZE);
 #else
-    g_rx_fifo = (unsigned char *)ZMALLOC(RX_FIFO_SIZE + 2 * FUNC6_BLKSIZE, "hi_rx_fifo_init", GFP_KERNEL);
+    g_rx_fifo = (unsigned char *)ZMALLOC(RX_FIFO_SIZE + 2 * FUNC6_BLKSIZE,
+                                         "hi_rx_fifo_init", GFP_KERNEL);
 #endif
     if (g_rx_fifo == NULL)
         ERROR_DEBUG_OUT("rx fifo alloc failed\n");
@@ -421,12 +432,12 @@ static unsigned int remain_mpdu_num = 0;
 /* page num after initializing sg list */
 static unsigned int send_page_num = 0;
 int hi_sdio_setup_scat_data(struct scatterlist *sg_list, struct hi_tx_desc **pTxDPape,
-        unsigned int sg_num, unsigned char func_num)
+                            unsigned int sg_num, unsigned char func_num)
 {
-    int i = 0;
+    int i;
     struct sdio_func *func = aml_priv_to_func(func_num);
     struct mmc_host *host = func->card->host;
-    unsigned int sg_data_size = 0, blkcnt = 0, sg_total_len = 0, page_tmp = 0;
+    unsigned int blkcnt, sg_total_len;
 
     /* we still check if total len in a mmc request is greater than max req len. */
     unsigned int max_sg_size = min(func->cur_blksize * SDIO_MAX_BLK_CNT, host->max_req_size);
@@ -440,9 +451,13 @@ int hi_sdio_setup_scat_data(struct scatterlist *sg_list, struct hi_tx_desc **pTx
     /*Init sg table with specific num. */
     sg_init_table(sg_list, sg_num);
     remain_mpdu_num = sg_num;
+    blkcnt = 0;
+    sg_total_len = 0;
 
     for (i = 0; i < sg_num; i++)
     {
+        unsigned int sg_data_size, page_tmp;
+
         /*every mpdu length.*/
         sg_data_size = HW_MPDU_LEN_GET(pTxDPape[i]->MPDUBufFlag) + HI_TXDESC_DATAOFFSET;
         page_tmp = pTxDPape[i]->TxPriv.PageNum;
@@ -462,15 +477,17 @@ int hi_sdio_setup_scat_data(struct scatterlist *sg_list, struct hi_tx_desc **pTx
         sg_total_len += sg_data_size;
         send_page_num += page_tmp;
 
-        /*Init every sg with specific mpdu.  */
+        /* Init every sg with specific mpdu. */
         sg_set_buf(&sg_list[i], pTxDPape[i], sg_data_size);
         remain_mpdu_num--;
     }
+
     return blkcnt;
 }
 
-/* for fpga ver*/
-int hi_tx_frame(struct hi_tx_desc **pTxDPape, unsigned int mpdu_num,  unsigned int page_num)
+/* for fpga ver */
+int hi_tx_frame(struct hi_tx_desc **pTxDPape, unsigned int mpdu_num,
+                unsigned int page_num)
 {
     struct scatterlist sg_list[SG_NUM_MAX] = {{0}};
     unsigned int sg_remain = 0, sg_num = 0, offset = 0, blkcnt = 0;
@@ -482,7 +499,7 @@ int hi_tx_frame(struct hi_tx_desc **pTxDPape, unsigned int mpdu_num,  unsigned i
     
     do
     {
-        /*Support wifi host fill many mpdus in sg_list. */
+        /* Support wifi host fill many mpdus in sg_list. */
         if (sg_num > SG_NUM_MAX)
         {
             sg_remain = sg_num - SG_NUM_MAX;
@@ -493,9 +510,12 @@ int hi_tx_frame(struct hi_tx_desc **pTxDPape, unsigned int mpdu_num,  unsigned i
             sg_remain = 0;
         }
 
-        /* one mpdu will fill in sg item, so mpdu_num is sg_num. But when mpdu len is greater than 'max_seg_size',
-              * there are many mpdus will be remained*/
-        blkcnt = hi_sdio_setup_scat_data(sg_list, &pTxDPape[offset], sg_num, SDIO_FUNC4);
+        /* One mpdu will fill in sg item, so mpdu_num is sg_num. But when
+         * mpdu len is greater than 'max_seg_size', there are many mpdus
+         * will be remained.
+         */
+        blkcnt = hi_sdio_setup_scat_data(sg_list, &pTxDPape[offset], sg_num,
+                                         SDIO_FUNC4);
         if (remain_mpdu_num > 0)
         {
             sg_remain += remain_mpdu_num;
@@ -507,8 +527,11 @@ int hi_tx_frame(struct hi_tx_desc **pTxDPape, unsigned int mpdu_num,  unsigned i
             ret = -1;
             break;
         }
-        /* addr (0x0) is flag for FUNC4 and addr is not a actual phy or virtual address. */
-        while ((ret = hif->hif_ops.hi_scat_rw(sg_list, sg_num, blkcnt, SDIO_FUNC4, 0x0, SG_WRITE)) != 0)
+        /* addr (0x0) is flag for FUNC4 and addr is not a actual
+         * phy or virtual address.
+         */
+        while ((ret = hif->hif_ops.hi_scat_rw(sg_list, sg_num, blkcnt,
+                                              SDIO_FUNC4, 0x0, SG_WRITE)) != 0)
         {
             if (loop > 4)
             {
@@ -516,25 +539,32 @@ int hi_tx_frame(struct hi_tx_desc **pTxDPape, unsigned int mpdu_num,  unsigned i
                 break;
             }
             loop++;
-         }
+        }
 
         if (ret == 0)
         {
-#if (SDIO_UPDATE_HOST_WRPTR == 0) //if enable host update sdio write pointer, we need set bit9 in SDIO MISC CTRL
+#if (SDIO_UPDATE_HOST_WRPTR == 0)
+            /* If enable host update sdio write pointer, we need set
+             * bit9 in SDIO MISC CTRL.
+             */
             unsigned int page_tmp = 0;
-            unsigned int reg_tmp = 0;
+            unsigned int reg_tmp;
             struct hal_private * hal_priv = hal_get_priv();
 
-            /*sdio process success, update SDIO write pointer and interrupt FW to read data. */
+            /* sdio process success, update SDIO write pointer and
+             * interrupt FW to read data.
+             */
             page_tmp += send_page_num;
             if (page_tmp > page_num)
             {
-                printk("%s:%d, update host wr ptr failed. page_tmp :%d, all page num%d\n",
-                            __func__, __LINE__,page_tmp, page_num);
+                pr_err("%s:%d, update host wr ptr failed. page_tmp :%d, all page num%d\n",
+                       __func__, __LINE__,page_tmp, page_num);
             }
-            hal_priv->tx_page_offset = CIRCLE_Addition2(send_page_num, hal_priv->tx_page_offset, TX_ADDRESSTABLE_NUM);
+            hal_priv->tx_page_offset = CIRCLE_Addition2(send_page_num,
+                                                        hal_priv->tx_page_offset,
+                                                        TX_ADDRESSTABLE_NUM);
             send_page_num = 0;
-            /*Bit30 enable TXPAGE TABLE REG flag. */
+            /* Bit30 enable TXPAGE TABLE REG flag. */
             reg_tmp = hal_priv->tx_page_offset;
 
             hif->hif_ops.hi_write_word(RG_WIFI_IF_MAC_TXTABLE_RD_ID, reg_tmp);
@@ -543,43 +573,42 @@ int hi_tx_frame(struct hi_tx_desc **pTxDPape, unsigned int mpdu_num,  unsigned i
         else
         {
             /* theoretically,  sdio shall not transmit failed, if fail and fix it. */
-            printk("%s(%d):SDIO try re-transmit %d times, but fail\n",__func__, __LINE__, loop);
+            pr_err("%s(%d):SDIO try re-transmit %d times, but fail\n",__func__, __LINE__, loop);
         }
-        /*offset for mpdu in pTxDPape list and continue. */
+        /* offset for mpdu in pTxDPape list and continue. */
         offset += sg_num;
         sg_num = sg_remain;
     }
     while(sg_remain > 0);
+
     return ret;
 }
 
 #elif defined (HAL_SIM_VER)
 
-unsigned int print_cnt = 0;
+static unsigned int print_cnt = 0;
 static unsigned int tx_page_offset = 0;
 
-/* for simulation ver . */
-int hi_tx_frame( struct hi_tx_desc * pTxDPape, unsigned int blk_num, unsigned int page_num)
+/* for simulation ver. */
+int hi_tx_frame(struct hi_tx_desc *pTxDPape, unsigned int blk_num, unsigned int page_num)
 {
-    unsigned int tmpreg = 0;
-
-    struct hw_interface* hif = hif_get_hw_interface();
+    unsigned int tmpreg;
+    struct hw_interface *hif = hif_get_hw_interface();
 
     if (0)
     {
         hal_show_txframe(pTxDPape);
     }
     print_cnt++;
-    if( print_cnt == 2000)
+    if (print_cnt == 2000)
     {
-        PRINT("tv_tx_rate=0x%x \n",     pTxDPape->TxVector.tv_ht.htbit.tv_tx_rate);
+        PRINT("tv_tx_rate=0x%x \n", pTxDPape->TxVector.tv_ht.htbit.tv_tx_rate);
         PRINT("tv_Channel_BW=%d\n", pTxDPape->TxVector.tv_ht.htbit.tv_Channel_BW);
         print_cnt = 0;
     }
     hif->hif_ops.hi_send_frame((unsigned char *)pTxDPape, 0, blk_num);
 #if (SDIO_UPDATE_HOST_WRPTR == 0)
-    tmpreg = 0;
-    /*Update tx page table ptr. */
+    /* Update tx page table ptr. */
     tx_page_offset = CIRCLE_Addition2(tx_page_offset, page_num, TX_ADDRESSTABLE_NUM);
     tmpreg = tx_page_offset;
 
@@ -592,30 +621,32 @@ int hi_tx_frame( struct hi_tx_desc * pTxDPape, unsigned int blk_num, unsigned in
 
 void hi_cfg_firmware(void)
 {
-    struct  hw_interface* hif = hif_get_hw_interface();
+    struct hw_interface *hif = hif_get_hw_interface();
+
     hif->hw_config.txpagenum = DEFAULT_TXPAGENUM;
     hif->hw_config.rxpagenum = DEFAULT_RXPAGENUM;
-    hif->hw_config.bcn_page_num   = DEFAULT_BCN_NUM;
+    hif->hw_config.bcn_page_num = DEFAULT_BCN_NUM;
 
     if (aml_wifi_is_enable_rf_test())
         hif->hw_config.flags = PT_MODE;
 
 #if defined (HAL_SIM_VER)
-    if( STA1_VMAC0_SEND_RATE <= WIFI_11B_11M)
+    if (STA1_VMAC0_SEND_RATE <= WIFI_11B_11M)
     {
         hif->hw_config.txpagenum = 16;
     }
 #endif
-     hif->hif_ops.hi_write_sram((unsigned char *)&hif->hw_config,
-        (unsigned char *)HW_CONFIG_ADDR,sizeof(HW_CONFIG));
+    hif->hif_ops.hi_write_sram((unsigned char *)&hif->hw_config,
+                               (unsigned char *)HW_CONFIG_ADDR,
+                               sizeof(HW_CONFIG));
 }
 
-//asynchronous
-extern unsigned char  wifi_sdio_access;
-unsigned char hi_set_cmd(unsigned char *pdata,unsigned int len)
+/* asynchronous */
+extern unsigned char wifi_sdio_access;
+unsigned char hi_set_cmd(unsigned char *pdata, unsigned int len)
 {
-    struct hal_private * hal_priv = hal_get_priv();
-    struct hw_interface* hif = hif_get_hw_interface();
+    struct hal_private *hal_priv = hal_get_priv();
+    struct hw_interface *hif = hif_get_hw_interface();
     FIFO_SHARE_CTRL *pCmdDownFifo = &hif->CmdDownFifo;
     unsigned int loop = 0;
     PowerSaveCmd pscmd = *(PowerSaveCmd *)pdata;
@@ -632,8 +663,8 @@ unsigned char hi_set_cmd(unsigned char *pdata,unsigned int len)
     }
 
     POWER_BEGIN_LOCK();
-    if (((hal_priv->hal_drv_ps_status & HAL_DRV_IN_SLEEPING) != 0)
-            && (pdata[0] != Power_Save_Cmd) && (pdata[0] != WoW_Enable_Cmd))
+    if (((hal_priv->hal_drv_ps_status & HAL_DRV_IN_SLEEPING) != 0) &&
+        (pdata[0] != Power_Save_Cmd) && (pdata[0] != WoW_Enable_Cmd))
     {
         POWER_END_LOCK();
         return false;
@@ -652,7 +683,8 @@ unsigned char hi_set_cmd(unsigned char *pdata,unsigned int len)
     {
         if (loop++>10000)
         {
-            printk("err-> f_fdh: %d, f_fdt: %d, d_fdh %d \n", hif->hif_ops.hi_read_word(0x00a10038),
+            pr_err("err-> f_fdh: %d, f_fdt: %d, d_fdh %d \n",
+                   hif->hif_ops.hi_read_word(0x00a10038),
             hif->hif_ops.hi_read_word(0x00a1003c), pCmdDownFifo->FDH);
             PRINT("hi_set_cmd err, cmd=0x%x, vid=0x%x\n", pdata[0], pdata[3]);
 
@@ -661,17 +693,20 @@ unsigned char hi_set_cmd(unsigned char *pdata,unsigned int len)
             POWER_END_LOCK();
             return false;
         }
+
         OS_UDELAY(20);
     }
     aml_wifi_sdio_power_lock();
     POWER_BEGIN_LOCK();
-    if (((hal_priv->powersave_init_flag == 0) && (pscmd.Cmd == Power_Save_Cmd) && (pscmd.psmode == PS_DOZE))
-        || ((hal_priv->powersave_init_flag == 0) && (suspend_cmd.Cmd == WoW_Enable_Cmd) && (suspend_cmd.enable == 1)))
+    if (((hal_priv->powersave_init_flag == 0) && (pscmd.Cmd == Power_Save_Cmd) &&
+        (pscmd.psmode == PS_DOZE)) ||
+        ((hal_priv->powersave_init_flag == 0) &&
+        (suspend_cmd.Cmd == WoW_Enable_Cmd) && (suspend_cmd.enable == 1)))
     {
-        unsigned int tmpreg = 0;
+        unsigned int tmpreg;
 
         tmpreg = hif->hif_ops.hi_bottom_read8(SDIO_FUNC1, RG_SDIO_PMU_HOST_REQ);
-        // set host sleep req
+        /* set host sleep req */
         tmpreg |= HOST_SLEEP_REQ;
         hif->hif_ops.hi_bottom_write8(SDIO_FUNC1, RG_SDIO_PMU_HOST_REQ, tmpreg);
     }
@@ -683,12 +718,12 @@ unsigned char hi_set_cmd(unsigned char *pdata,unsigned int len)
     return true;
 }
 
-//synchronous
+/* synchronous */
 unsigned char hi_get_cmd(unsigned char *pdata,unsigned int len)
 {
-    struct hw_interface* hif = hif_get_hw_interface();
+    struct hw_interface *hif = hif_get_hw_interface();
     FIFO_SHARE_CTRL *pCmdDownFifo = &hif->CmdDownFifo;
-    unsigned int Cmd = pdata[0] ;
+    unsigned int Cmd = pdata[0];
 
     if (!hi_set_cmd(pdata,len))
     {
@@ -696,8 +731,8 @@ unsigned char hi_get_cmd(unsigned char *pdata,unsigned int len)
         ASSERT(0);
         return false;
     }
-    //get return data
-    while (!hi_push_down_fifo_up(pCmdDownFifo,pdata,len))
+    /* get return data */
+    while (!hi_push_down_fifo_up(pCmdDownFifo, pdata, len))
     {
         OS_UDELAY(20);
     }
@@ -710,12 +745,12 @@ unsigned char hi_get_cmd(unsigned char *pdata,unsigned int len)
 
 void hi_soft_tx_irq(void)
 {
-    struct hal_private * hal_priv = hal_get_priv();
-    struct hw_interface* hif = hif_get_hw_interface();
-    struct txdonestatus * txstatus = NULL;
-    unsigned int hw_txc_addr = 0;
-    struct tx_complete_status *txcompletestatus = NULL;
-    struct tx_nulldata_status* tx_null_status = NULL;
+    struct hal_private *hal_priv = hal_get_priv();
+    struct hw_interface *hif = hif_get_hw_interface();
+    struct txdonestatus *txstatus = NULL;
+    unsigned int hw_txc_addr;
+    struct tx_complete_status *txcompletestatus;
+    struct tx_nulldata_status *tx_null_status = NULL;
 
 #if defined (HAL_FPGA_VER)
     struct tx_status_node *txok_status_node = NULL;
@@ -729,28 +764,33 @@ void hi_soft_tx_irq(void)
     txcompletestatus = hal_priv->txcompletestatus;
 
     hif->hif_ops.hi_read_sram((unsigned char *)txcompletestatus,
-        (unsigned char *)(SYS_TYPE)hw_txc_addr, (SYS_TYPE)sizeof(struct tx_complete_status));
+                              (unsigned char *)(SYS_TYPE)hw_txc_addr,
+                              (SYS_TYPE)sizeof(struct tx_complete_status));
 
-    ASSERT(((hal_priv->txcompletestatus->txdoneframecounter - hal_priv->HalTxFrameDoneCounter)&0xff)
+    ASSERT(((hal_priv->txcompletestatus->txdoneframecounter - hal_priv->HalTxFrameDoneCounter) & 0xff)
             <= WIFI_MAX_TXFRAME);
+
     AML_TXLOCK_LOCK();
     hal_priv->txPageFreeNum +=
         (hal_priv->txcompletestatus->txpagecounter - hal_priv->HalTxPageDoneCounter) & 0xff;
     AML_TXLOCK_UNLOCK();
+
     hal_priv->HalTxPageDoneCounter = hal_priv->txcompletestatus->txpagecounter;
 
     if (hal_priv->bhaltxdrop) {
-        printk("page:%d, txdoneframecounter:%d, HalTxFrameDoneCounter:%d\n",
-            hal_priv->txPageFreeNum, hal_priv->txcompletestatus->txdoneframecounter, hal_priv->HalTxFrameDoneCounter);
+        pr_debug("page:%d, txdoneframecounter:%d, HalTxFrameDoneCounter:%d\n",
+               hal_priv->txPageFreeNum, hal_priv->txcompletestatus->txdoneframecounter,
+               hal_priv->HalTxFrameDoneCounter);
     }
 
 #if defined (HAL_FPGA_VER)
-    AML_PRINT(AML_DBG_MODULES_TX, "txPageFreeNum:%d, HalTxPageDoneCounter:%d\n", hal_priv->txPageFreeNum, hal_priv->HalTxPageDoneCounter);
+    AML_PRINT(AML_DBG_MODULES_TX, "txPageFreeNum:%d, HalTxPageDoneCounter:%d\n",
+              hal_priv->txPageFreeNum, hal_priv->HalTxPageDoneCounter);
 #endif
 
-    while (hal_priv->txcompletestatus->txdoneframecounter !=  hal_priv->HalTxFrameDoneCounter)
+    while (hal_priv->txcompletestatus->txdoneframecounter != hal_priv->HalTxFrameDoneCounter)
     {
-        txstatus = &hal_priv->txcompletestatus->tx_status[hal_priv->HalTxFrameDoneCounter%WIFI_MAX_TXFRAME].txstatus;
+        txstatus = &hal_priv->txcompletestatus->tx_status[hal_priv->HalTxFrameDoneCounter % WIFI_MAX_TXFRAME].txstatus;
         hal_priv->HalTxFrameDoneCounter++;
 
 #if defined (HAL_FPGA_VER)
@@ -758,39 +798,43 @@ void hi_soft_tx_irq(void)
         if (txok_status_node != NULL)
         {
             memcpy(&(txok_status_node->tx_status.txstatus), txstatus, sizeof(struct txdonestatus));
-            /*enqueue status list to wait for txok analyse */
+            /* enqueue status list to wait for txok analyse */
             tx_status_node_enqueue(txok_status_node, txok_status_list);
 
             tx_null_status = &(txok_status_node->tx_status.tx_null_status);
-            if (!((tx_null_status->txstatus == TX_DESCRIPTOR_STATUS_NULL_DATA_OK)
-                || (tx_null_status->txstatus == TX_DESCRIPTOR_STATUS_NULL_DATA_FAIL)
-                || (tx_null_status->txstatus == TX_DESCRIPTOR_STATUS_NEW)))
+
+            if (!((tx_null_status->txstatus == TX_DESCRIPTOR_STATUS_NULL_DATA_OK) ||
+                  (tx_null_status->txstatus == TX_DESCRIPTOR_STATUS_NULL_DATA_FAIL) ||
+                  (tx_null_status->txstatus == TX_DESCRIPTOR_STATUS_NEW)))
             {
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
-                __sync_fetch_and_add(&hif->HiStatus.Tx_Free_num,1);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0)) && !defined (LINUX_PLATFORM)
+                __sync_fetch_and_add(&hif->HiStatus.Tx_Free_num, 1);
 #else
                 atomic_add(1, &hif->HiStatus.Tx_Free_num);
 #endif
             }
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
-            if ((tx_null_status->txstatus == TX_DESCRIPTOR_STATUS_NEW) && (hif->HiStatus.Tx_Free_num < hif->HiStatus.Tx_Done_num)) {
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0)) && !defined (LINUX_PLATFORM)
+            if ((tx_null_status->txstatus == TX_DESCRIPTOR_STATUS_NEW) &&
+                (hif->HiStatus.Tx_Free_num < hif->HiStatus.Tx_Done_num)) {
                 __sync_fetch_and_add(&hif->HiStatus.Tx_Free_num,1);
 #else
-            if ((tx_null_status->txstatus == TX_DESCRIPTOR_STATUS_NEW) && (atomic_read(&hif->HiStatus.Tx_Free_num) < atomic_read(&hif->HiStatus.Tx_Done_num))) {
+            if ((tx_null_status->txstatus == TX_DESCRIPTOR_STATUS_NEW) &&
+                (atomic_read(&hif->HiStatus.Tx_Free_num) < atomic_read(&hif->HiStatus.Tx_Done_num))) {
                 atomic_add(1, &hif->HiStatus.Tx_Free_num);
 #endif
             }
         }
 #elif defined (HAL_SIM_VER)
-       // free skb allocated by hal
+        /* free skb allocated by hal */
         if (hal_free_tx_id(hal_priv,txstatus,&callback, &queue_id) < 0)
         {
             continue;
         }
 
-        /*to processes drv_Intr_Txok*/
-        hal_priv->hal_call_back->intr_tx_handle(hal_priv->drv_priv, txstatus, callback, queue_id);
+        /* to processes drv_Intr_Txok */
+        hal_priv->hal_call_back->intr_tx_handle(hal_priv->drv_priv, txstatus,
+                                                callback, queue_id);
 #endif
     }
 
@@ -800,31 +844,32 @@ void hi_soft_tx_irq(void)
     return;
 }
 
-void hi_soft_fw_event(void)
+static void hi_soft_fw_event(void)
 {
     struct hal_private *hal_priv = hal_get_priv();
     struct hw_interface *hif = hif_get_hw_interface();
-    struct fw_event_to_driver *event = NULL;
-    unsigned int hw_event_addr = 0;
+    struct fw_event_to_driver *event;
+    unsigned int hw_event_addr;
 
     hw_event_addr = hif->hw_config.fweventaddress;
     event = hal_priv->fw_event;
 
-    hif->hif_ops.hi_read_sram((unsigned char *)event,
-        (unsigned char *)(SYS_TYPE)hw_event_addr, (SYS_TYPE)sizeof(struct fw_event_to_driver));
+    hif->hif_ops.hi_read_sram((unsigned char *)event, (unsigned char *)(SYS_TYPE)hw_event_addr,
+                              (SYS_TYPE)sizeof(struct fw_event_to_driver));
 
     if (aml_wifi_is_enable_rf_test())
         return;
 
-    while (hal_priv->fw_event->event_counter !=  hal_priv->hal_fw_event_counter)
+    while (hal_priv->fw_event->event_counter != hal_priv->hal_fw_event_counter)
     {
-        struct fw_event_no_data *normal_event = NULL;
+        struct fw_event_no_data *normal_event;
 
         normal_event = &hal_priv->fw_event->event_data[hal_priv->hal_fw_event_counter % WIFI_MAX_FW_EVENT].normal_event;
         hal_priv->hal_call_back->intr_fw_event(hal_priv->drv_priv, normal_event);
         event->event_data[0].data[28] = hal_priv->hal_fw_event_counter;
         hif->hif_ops.hi_write_sram((unsigned char *)&event->event_data[0].data[28],
-            (unsigned char *)(SYS_TYPE)(hw_event_addr+32), (SYS_TYPE)(sizeof(unsigned char)*4));
+                                   (unsigned char *)(SYS_TYPE)(hw_event_addr + 32),
+                                   (SYS_TYPE)(sizeof(unsigned char) * 4));
         hal_priv->hal_fw_event_counter++;
     }
 
@@ -833,76 +878,79 @@ void hi_soft_fw_event(void)
 
 void hi_soft_rx_bcn(struct hal_private *hal_priv, unsigned char vid)
 {
-	struct sk_buff *skb = NULL;
-	struct hw_interface *hif = hif_get_hw_interface();
-	unsigned char bcnpage = hif->hw_config.bcn_page_num;
-	/*beacon buffer address in sram */
-	unsigned int bcnaddr = hif->hw_config.beaconframeaddress
-            + (vid * (bcnpage/WIFI_MAX_VID) * PAGE_LEN);
-	unsigned int buflen = bcnpage / WIFI_MAX_VID * PAGE_LEN;
-	unsigned long bcnctl_reg = 0;
-	unsigned int rx_bcn_page = 0;
-	HW_RxDescripter_bit *RxDesc = NULL;
+    struct sk_buff *skb;
+    struct hw_interface *hif = hif_get_hw_interface();
+    unsigned char bcnpage = hif->hw_config.bcn_page_num;
+    /* beacon buffer address in sram */
+    unsigned int bcnaddr = hif->hw_config.beaconframeaddress +
+                           (vid * (bcnpage / WIFI_MAX_VID) * PAGE_LEN);
+    unsigned int buflen = bcnpage / WIFI_MAX_VID * PAGE_LEN;
+    unsigned long bcnctl_reg;
+    unsigned int rx_bcn_page;
+    HW_RxDescripter_bit *RxDesc;
 
-	/*Protect operation for receiving beacon by check bit31 is 1 in bcn ctrl register.*/
+    /* Protect operation for receiving beacon by check bit31 is 1 in
+     * bcn ctrl register.
+     */
+    bcnctl_reg = hif->hif_ops.hi_read_word(RG_MAC_BCN_CTRL_REG);
 
-	bcnctl_reg = hif->hif_ops.hi_read_word(RG_MAC_BCN_CTRL_REG);
+    if ((bcnctl_reg & BCN_READABLE) == 0)
+    {
+        PRINT("RecvBcn: bcnctrl_reg = %lx\n", (SYS_TYPE)bcnctl_reg);
+        return;
+    }
 
-	if ((bcnctl_reg & BCN_READABLE) == 0)
-	{
-		PRINT("RecvBcn: bcnctrl_reg = %lx\n", (SYS_TYPE)bcnctl_reg);
-		return;
-	}
+    skb = os_skb_alloc(buflen);
+    if (skb == NULL)
+    {
+        PRINT("RecvBcn: alloc skb failed\n");
+        return;
+    }
+    /* Get received beacon page number. If beacon page number is 0
+     * indicates to read whole beacon buffer.
+     */
+    rx_bcn_page = (bcnctl_reg & BCN_LEN_MASK) >> 17;
+    if (rx_bcn_page != 0)
+        buflen = rx_bcn_page * PAGE_LEN;
 
-	skb = os_skb_alloc(buflen);
-	if (skb == NULL)
-	{
-		PRINT("RecvBcn: alloc skb failed\n");
-		return;
-	}
-	/*Get received beacon page number. If beacon page number is 0
-	* indicates to read whole beacon buffer. */
-	rx_bcn_page = (bcnctl_reg & BCN_LEN_MASK) >> 17;
-	if (rx_bcn_page != 0)
-		buflen = rx_bcn_page * PAGE_LEN;
+    hif->hif_ops.hi_read_sram((unsigned char *)os_skb_data(skb),
+                              (unsigned char *)(SYS_TYPE)bcnaddr,
+                              (SYS_TYPE)buflen);
 
-	hif->hif_ops.hi_read_sram((unsigned char *)os_skb_data(skb),
-            (unsigned char *)(SYS_TYPE)bcnaddr, (SYS_TYPE)buflen);
+    RxDesc = (HW_RxDescripter_bit *)skb->data;
 
-	RxDesc = (HW_RxDescripter_bit *)skb->data;
-
-	/*Discarding beacon frames when RxLength is greater than buflen.*/
-	if ((RxDesc->RxLength + RX_PRIV_HDR_LEN) >= buflen)
-	{
-		PRINT("RecvBcn: RxLength =%lu\n", (SYS_TYPE)RxDesc->RxLength);
-		os_skb_free(skb);
-		return;
-	}
-	os_skb_put(skb, (RxDesc->RxLength + RX_PRIV_HDR_LEN)); /*beacon len and RXVector len */
+    /* Discarding beacon frames when RxLength is greater than buflen. */
+    if ((RxDesc->RxLength + RX_PRIV_HDR_LEN) >= buflen)
+    {
+        PRINT("RecvBcn: RxLength =%lu\n", (SYS_TYPE)RxDesc->RxLength);
+        os_skb_free(skb);
+        return;
+    }
+    os_skb_put(skb, (RxDesc->RxLength + RX_PRIV_HDR_LEN)); /* beacon len and RXVector len */
 
 #if defined (HAL_FPGA_VER)
-	skb_queue_tail(&hif->bcn_list_head, skb);
-	up(&hal_priv->rx_thread_sem);
+    skb_queue_tail(&hif->bcn_list_head, skb);
+    up(&hal_priv->rx_thread_sem);
 #elif defined (HAL_SIM_VER)
-	hal_soft_rx_cs(hal_priv, skb);
+    hal_soft_rx_cs(hal_priv, skb);
 #endif
 }
 
-/*Rx packets to static FiFo */
+/* Rx packets to static FiFo. */
 void hi_soft_rx_irq(struct hal_private *hal_priv, unsigned int rx_fw_ptr)
 #if defined (HAL_FPGA_VER)
 {
-    unsigned int rx_total_len = 0, rxmax_offset = 0;
-    struct hw_interface* hif = NULL;
-    unsigned char hal_open = 0;
-    unsigned int rx_fifo_fw = 0;
-    int remain_len  = 0, read_len = 0;
+    unsigned int rx_total_len, rxmax_offset;
+    struct hw_interface* hif;
+    unsigned char hal_open;
+    unsigned int rx_fifo_fw;
+    int remain_len, read_len;
     int host_remain_len = 0;
-    unsigned int fifo_empty_size = 0;
-    unsigned int rx_fifo_fdt = 0;
-    unsigned int rx_fifo_fdh = 0;
+    unsigned int fifo_empty_size;
+    unsigned int rx_fifo_fdt;
+    unsigned int rx_fifo_fdh;
 #if (SDIO_UPDATE_HOST_RDPTR != 0)
-    int host_wrapper_len = 0;
+    int host_wrapper_len;
 #endif
     static unsigned char print_cnt = 0;
 
@@ -911,36 +959,43 @@ void hi_soft_rx_irq(struct hal_private *hal_priv, unsigned int rx_fw_ptr)
     rxmax_offset = hif->hw_config.rxpagenum * PAGE_LEN;
     rx_fifo_fw = rx_fw_ptr * 4;
 
-    /*if slave rx fifo is empty or hal not open*/
+    /* if slave rx fifo is empty or hal not open */
     if ((hal_priv->rx_host_offset == rx_fifo_fw) || !hal_open)
     {
         if (print_cnt++ == 200) {
-            AML_OUTPUT("rx_host_offset:%d, rx_fifo_fw:%d, hal_open:%d\n", hal_priv->rx_host_offset, rx_fifo_fw, hal_open);
+            AML_OUTPUT("rx_host_offset:%d, rx_fifo_fw:%d, hal_open:%d\n",
+                       hal_priv->rx_host_offset, rx_fifo_fw, hal_open);
         }
         return;
     }
 
-    rx_fifo_fdt =  hif->rx_fifo.FDT;
+    rx_fifo_fdt = hif->rx_fifo.FDT;
     rx_fifo_fdh = hif->rx_fifo.FDH;
 
-    /* write packets to FDT, and rx process get mpdus from FDH. The buffer space from FDT to FDH is empty.*/
-    fifo_empty_size = CIRCLE_Subtract2(rx_fifo_fdh, rx_fifo_fdt, hif->rx_fifo.FDN);
-    rx_total_len = CIRCLE_Subtract2(rx_fifo_fw, hal_priv->rx_host_offset, rxmax_offset);
-    /*pulse FUNC6_BLKSIZE is preventable_sdio_bottom_read over write rx fifo data that not handle*/
+    /* Write packets to FDT, and rx process get mpdus from FDH.
+     * The buffer space from FDT to FDH is empty.
+     */
+    fifo_empty_size = CIRCLE_Subtract2(rx_fifo_fdh, rx_fifo_fdt,
+                                       hif->rx_fifo.FDN);
+    rx_total_len = CIRCLE_Subtract2(rx_fifo_fw, hal_priv->rx_host_offset,
+                                    rxmax_offset);
+    /* pulse FUNC6_BLKSIZE is preventable_sdio_bottom_read over
+     * write rx fifo data that not handle.
+     */
 
     if (fifo_empty_size <= rx_total_len + FUNC6_BLKSIZE)
     {
-        //printk("host rx buf full\n");
+        /* pr_debug("host rx buf full\n"); */
         up(&hal_priv->rx_thread_sem);
         return ;
     }
     remain_len = rx_total_len;
-    /*HalPriv->rx_host_offset is host maintain pointer of sram and point to next frame. */
+    /* HalPriv->rx_host_offset is host maintain pointer of sram and point to next frame. */
     do
     {
         read_len = (remain_len > (READ_LEN_PER_ONCE + READ_BUFFERABLE_LEN)) ?
-            READ_LEN_PER_ONCE : remain_len;
-        /*check if host rx_fifo wrapper around. if yes, just read remain of host rx fifo. */
+                    READ_LEN_PER_ONCE : remain_len;
+        /* check if host rx_fifo wrapper around. if yes, just read remain of host rx fifo. */
         host_remain_len = hif->rx_fifo.FDN - rx_fifo_fdt;
         if (read_len >= host_remain_len)
         {
@@ -953,9 +1008,10 @@ void hi_soft_rx_irq(struct hal_private *hal_priv, unsigned int rx_fw_ptr)
             read_len = host_remain_len;
 #endif
         }
-        /*Read rx packets. but during suspend, we can't get packets by this function, ATTENTION */
+        /* Read rx packets. but during suspend, we can't get packets by this function, ATTENTION */
         hif->hif_ops.hi_rcv_frame((hif->rx_fifo.FDB + rx_fifo_fdt),
-            (unsigned char *)(SYS_TYPE)hal_priv->rx_host_offset, read_len);
+                                  (unsigned char *)(SYS_TYPE)hal_priv->rx_host_offset,
+                                  read_len);
 
 #if (SDIO_UPDATE_HOST_RDPTR != 0)
         if (host_wrapper_len > 0)
@@ -969,7 +1025,8 @@ void hi_soft_rx_irq(struct hal_private *hal_priv, unsigned int rx_fw_ptr)
             if (host_wrapper_len > remain_len - read_len)
                 host_wrapper_len = remain_len - read_len;
 
-            memcpy(hif->rx_fifo.FDB, (hif->rx_fifo.FDB + hif->rx_fifo.FDN), host_wrapper_len);
+            memcpy(hif->rx_fifo.FDB, (hif->rx_fifo.FDB + hif->rx_fifo.FDN),
+                   host_wrapper_len);
             read_len += host_wrapper_len;
 
             host_wrapper_len = 0;
@@ -978,17 +1035,18 @@ void hi_soft_rx_irq(struct hal_private *hal_priv, unsigned int rx_fw_ptr)
 
         rx_fifo_fdt = CIRCLE_Addition2(rx_fifo_fdt, read_len, hif->rx_fifo.FDN);
 
-        /*Update host read pointer*/
-        hal_priv->rx_host_offset = CIRCLE_Addition2(hal_priv->rx_host_offset, read_len, rxmax_offset);
+        /* Update host read pointer. */
+        hal_priv->rx_host_offset = CIRCLE_Addition2(hal_priv->rx_host_offset,
+                                                    read_len, rxmax_offset);
 
         remain_len -= read_len;
     }
     while (remain_len > 0);
 
 #if (SDIO_UPDATE_HOST_RDPTR == 0)
-    /*if 1, update host read pointer by sdio instead of host.*/
+    /* if 1, update host read pointer by sdio instead of host. */
     {
-        unsigned int write_data = 0;
+        unsigned int write_data;
 
         write_data = BIT(31) | (hal_priv->rx_host_offset >> 2);
         hif->hif_ops.hi_write_word(RG_WIFI_IF_RXPAGE_BUF_RDPTR, write_data);
@@ -997,14 +1055,15 @@ void hi_soft_rx_irq(struct hal_private *hal_priv, unsigned int rx_fw_ptr)
     /* during suspend, we can't get pkt by sdio and just skip update rx_fifo.FDT */
     if (atomic_read(&hal_priv->drv_suspend_cnt) == 0)
     {
-        hif->rx_fifo.FDT = CIRCLE_Addition2(hif->rx_fifo.FDT, rx_total_len, hif->rx_fifo.FDN);
+        hif->rx_fifo.FDT = CIRCLE_Addition2(hif->rx_fifo.FDT, rx_total_len,
+                                            hif->rx_fifo.FDN);
     }
     up(&hal_priv->rx_thread_sem);
 }
-#elif defined (HAL_SIM_VER)/*End HAL_FPGA_VER*/
+#elif defined (HAL_SIM_VER)/* End HAL_FPGA_VER */
 {
-        static unsigned char rx_buffer[DEFAULT_RXPAGENUM * PAGE_LEN] = {0};
-        /*shijie.chen add, test host recv block data via function2 one time. */
+        static unsigned char rx_buffer[DEFAULT_RXPAGENUM * PAGE_LEN] = { 0 };
+        /* shijie.chen add, test host recv block data via function2 one time. */
         HW_RxDescripter_bit *RxPrivHdr = NULL;
         struct  hw_interface *hif = NULL;
         unsigned char hal_open = false;
@@ -1024,36 +1083,45 @@ void hi_soft_rx_irq(struct hal_private *hal_priv, unsigned int rx_fw_ptr)
                 return;
         }
 
-        rx_total_len = CIRCLE_Subtract2(rx_fifo_fw, hal_priv->rx_host_offset, rxmax_offset);
+        rx_total_len = CIRCLE_Subtract2(rx_fifo_fw, hal_priv->rx_host_offset,
+                                        rxmax_offset);
         remain_len = rx_total_len;
-        /*HalPriv->rx_host_offset is host maintain pointer of sram and point to next frame. */
+        /* HalPriv->rx_host_offset is host maintain pointer of sram and
+         * point to next frame.
+         */
         do
         {
-                read_len = (remain_len > READ_LEN_PER_ONCE) ? READ_LEN_PER_ONCE : remain_len;
-                /*check if wrapper around. if yes, just read remain of rx fifo. */
+                read_len = (remain_len > READ_LEN_PER_ONCE) ? READ_LEN_PER_ONCE :
+                           remain_len;
+                /* Check if wrapper around. if yes, just read remain of rx fifo. */
                 if (hal_priv->rx_host_offset + read_len > rxmax_offset)
                 {
-                        /*for stimulus, we may read X without initializing. And when rtl support wrapper around addr,
-                         * we shall read by block mode to avoid sending cmd53 with a address beyond the rx buffer.Sdio
-                         * rtl can't do wrapper around with this address automatically*/
+                        /* For stimulus, we may read X without initializing. And when
+                         * rtl support wrapper around addr, we shall read by block mode
+                         * to avoid sending cmd53 with a address beyond the rx buffer. Sdio
+                         * rtl can't do wrapper around with this address automatically.
+                         */
 #if (RTL_WRAPPER_AROUND_ADDR == 0)
                         read_len = rxmax_offset - hal_priv->rx_host_offset;
 #endif
                         hif->hif_ops.hi_rcv_frame((unsigned char *)rx_buffer_tmp,
-                            (unsigned char *)(SYS_TYPE)hal_priv->rx_host_offset, ALIGN(read_len, PAGE_LEN));
-                        /*herer, HalPriv->rx_host_offset will equal to 0 after CIRCLE_Addition*/
+                                                  (unsigned char *)(SYS_TYPE)hal_priv->rx_host_offset,
+                                                  ALIGN(read_len, PAGE_LEN));
+                        /* Here, HalPriv->rx_host_offset will equal to 0 after CIRCLE_Addition. */
                 }
                 else
                 {
                         hif->hif_ops.hi_rcv_frame((unsigned char *)rx_buffer_tmp,
-                            (unsigned char *)(SYS_TYPE)hal_priv->rx_host_offset, read_len);
+                                                  (unsigned char *)(SYS_TYPE)hal_priv->rx_host_offset,
+                                                  read_len);
                 }
-                /*Update host read pointer*/
-                hal_priv->rx_host_offset = CIRCLE_Addition2(hal_priv->rx_host_offset, read_len, rxmax_offset);
+                /* Update host read pointer. */
+                hal_priv->rx_host_offset = CIRCLE_Addition2(hal_priv->rx_host_offset,
+                                                            read_len, rxmax_offset);
 #if (SDIO_UPDATE_HOST_RDPTR == 0)
-                /*if 1, update host read pointer by sdio instead of host.*/
+                /* if 1, update host read pointer by sdio instead of host. */
                 {
-                    unsigned int write_data = 0;
+                    unsigned int write_data;
 
                     write_data = BIT(31) | (hal_priv->rx_host_offset >> 2);
                     hif->hif_ops.hi_write_word(RG_WIFI_IF_RXPAGE_BUF_RDPTR, write_data);
@@ -1064,18 +1132,20 @@ void hi_soft_rx_irq(struct hal_private *hal_priv, unsigned int rx_fw_ptr)
         }
         while (remain_len > 0);
 
-        /*Update host read pointer*/
+        /* Update host read pointer. */
         while ((rx_buffer_tmp != rx_buffer) && (frame_offset != rx_total_len))
         {
                 RxPrivHdr = (HW_RxDescripter_bit *)&rx_buffer[frame_offset];
                 framelen = RxPrivHdr->RxLength + sizeof(HW_RxDescripter_bit);
+                OS_SKBBUF * skb;
 
                 if (RxPrivHdr->upload2host_flag != 1)
                 {
                         frame_offset += ALIGN(framelen, 4);
                         continue;
                 }
-                OS_SKBBUF * skb = OS_SKBBUF_ALLOC(framelen);
+
+                skb = OS_SKBBUF_ALLOC(framelen);
                 if (skb == NULL)
                 {
                         PRINT("Couldn't allocate RX frame");
@@ -1086,11 +1156,11 @@ void hi_soft_rx_irq(struct hal_private *hal_priv, unsigned int rx_fw_ptr)
                 if (aml_wifi_is_enable_rf_test())
                     b2b_rx_throughput_calc(RxPrivHdr);
 
-                /*SKB PUT one by one */
+                /* SKB PUT one by one. */
                 OS_SKBBUF_PUT(skb, framelen);
                 hal_soft_rx_cs(hal_priv, skb);
 
-                /*cursor for rx_buffer*/
+                /* cursor for rx_buffer. */
                 frame_offset += ALIGN(framelen, 4);
         }
         memset(rx_buffer, 0, frame_offset);
@@ -1100,13 +1170,12 @@ void hi_soft_rx_irq(struct hal_private *hal_priv, unsigned int rx_fw_ptr)
 void hi_irq_task(struct hal_private *hal_priv)
 #if defined (HAL_FPGA_VER)
 {
-    unsigned int intr_status =0;
+    unsigned int intr_status;
     unsigned char loop_count = 0;
     unsigned char int_loop_num = 0;
-    unsigned int gpio_en = 0;
-//    unsigned char i;
-//    unsigned char rx_loop_num = 0;
-//    unsigned int intr_status_tmp = 0;
+    //unsigned char i;
+    //unsigned char rx_loop_num = 0;
+    //unsigned int intr_status_tmp = 0;
 #ifdef POWER_SAVE_NO_SDIO
     unsigned int ptr = 0;
 #endif
@@ -1143,7 +1212,7 @@ void hi_irq_task(struct hal_private *hal_priv)
         if (hal_priv->hal_fw_ps_status == HAL_FW_IN_SLEEP)
             hal_priv->hal_fw_ps_status = HAL_FW_IN_AWAKE;
         POWER_END_LOCK();
-        hal_priv->hal_call_back->intr_gotowakeup(hal_priv->drv_priv,1);
+        hal_priv->hal_call_back->intr_gotowakeup(hal_priv->drv_priv, 1);
     }
 
     if (intr_status & GOTO_WAKEUP_VID0)
@@ -1157,13 +1226,14 @@ void hi_irq_task(struct hal_private *hal_priv)
         if (hal_priv->hal_fw_ps_status == HAL_FW_IN_SLEEP)
             hal_priv->hal_fw_ps_status = HAL_FW_IN_AWAKE;
         POWER_END_LOCK();
-        hal_priv->hal_call_back->intr_gotowakeup(hal_priv->drv_priv,0);
+        hal_priv->hal_call_back->intr_gotowakeup(hal_priv->drv_priv, 0);
     }
 
 
     if (intr_status & RX_OK)
     {
-        unsigned int rx_fw_ptr = (intr_status & FW_RX_PTR_MASK) >> FW_RX_PTR_OFFSET;
+        unsigned int rx_fw_ptr = (intr_status & FW_RX_PTR_MASK) >>
+                                 FW_RX_PTR_OFFSET;
 
         hal_priv->sts_hirq[hirq_rx_ok_idx]++;
         hi_soft_rx_irq(hal_priv, rx_fw_ptr);
@@ -1197,12 +1267,12 @@ void hi_irq_task(struct hal_private *hal_priv)
     if (intr_status & BEACON_SEND_OK_VID1)
     {
         hal_priv->sts_hirq[hirq_bcn_send_ok_vid1_idx]++;
-        hal_priv->hal_call_back->intr_bcn_send(hal_priv->drv_priv,1);
+        hal_priv->hal_call_back->intr_bcn_send(hal_priv->drv_priv, 1);
     }
     else if (intr_status & BEACON_SEND_OK_VID0)
     {
         hal_priv->sts_hirq[hirq_bcn_send_ok_vid0_idx]++;
-        hal_priv->hal_call_back->intr_bcn_send(hal_priv->drv_priv,0);
+        hal_priv->hal_call_back->intr_bcn_send(hal_priv->drv_priv, 0);
     }
 
     if (intr_status & P2P_OPPPS_CWEND_VID1)
@@ -1213,7 +1283,7 @@ void hi_irq_task(struct hal_private *hal_priv)
         hal_priv->hal_fw_ps_status = HAL_FW_IN_SLEEP;
         POWER_END_LOCK();
 #endif
-        hal_priv->hal_call_back->intr_p2p_opps_cwend(hal_priv->drv_priv,1);
+        hal_priv->hal_call_back->intr_p2p_opps_cwend(hal_priv->drv_priv, 1);
     }
 
     if (intr_status & P2P_NoA_START_VID1)
@@ -1224,7 +1294,7 @@ void hi_irq_task(struct hal_private *hal_priv)
         hal_priv->hal_fw_ps_status = HAL_FW_IN_SLEEP;
         POWER_END_LOCK();
 #endif
-        hal_priv->hal_call_back->intr_p2p_noa_start(hal_priv->drv_priv,1);
+        hal_priv->hal_call_back->intr_p2p_noa_start(hal_priv->drv_priv, 1);
     }
 
     if (intr_status & FW_EVENT)
@@ -1261,7 +1331,7 @@ void hi_irq_task(struct hal_private *hal_priv)
      if (intr_status & COEX_INFO_BT_LK_INFO)
     {
         PRINT("--->BT link status change\n");
-        hal_priv->hal_call_back->drv_intr_bt_info_change(hal_priv->drv_priv, 0,  1);
+        hal_priv->hal_call_back->drv_intr_bt_info_change(hal_priv->drv_priv, 0, 1);
     }
 
 
@@ -1281,28 +1351,35 @@ void hi_irq_task(struct hal_private *hal_priv)
 
     if (loop_count > int_loop_num)
     {
-        /*Enable Interrupt. */
+        unsigned int gpio_en;
+
+        /* Enable Interrupt. */
         gpio_en = SDIO_FW2HOST_GPIO_EN;
         hi_clear_irq_status(SDIO_FW2HOST_EN);
         return;
     }
-//    goto int_loop;
+    /* goto int_loop; */
 }
 #elif defined (HAL_SIM_VER)
 {
-        unsigned int intr_status = 0;
+        struct hw_interface *hif;
+        unsigned int intr_status;
+
         intr_status = hi_get_irq_status();
-        struct hw_interface* hif = hif_get_hw_interface();
         if (intr_status == 0)
     	{
 		 return;
     	}
 
+        hif = hif_get_hw_interface();
+
 #ifdef STA1_VMAC0_PARAM2
-        if(STA1_VMAC0_PARAM2 == 1){
-                int loop=5;
-                while(loop-->0){
+        if (STA1_VMAC0_PARAM2 == 1) {
+                int loop = 5;
+
+                while (loop-- > 0) {
                         unsigned int data1, data2, data3;
+
                         intr_status = hi_get_irq_status();
 
                         data1 = hif->hif_ops.hi_read_word(RG_MAC_RX_WPTR);
@@ -1310,11 +1387,13 @@ void hi_irq_task(struct hal_private *hal_priv)
                         data3 = hif->hif_ops.hi_read_word(RG_MAC_RX_HRPTR);
                         data2 = (intr_status & FW_RX_PTR_MASK) >> FW_RX_PTR_OFFSET;
                         hi_soft_rx_irq(hal_priv, data2);
-                        PRINT("===1============>intr_status %x,%x,%x,%x\n",intr_status,data1,data2,data3);
+                        PRINT("===1============>intr_status %x,%x,%x,%x\n",
+                              intr_status, data1, data2, data3);
                 }
-                hi_clear_irq_status(SDIO_FW2HOST_EN|intr_status);
+
+                hi_clear_irq_status(SDIO_FW2HOST_EN | intr_status);
                 intr_status = hi_get_irq_status();
-                PRINT("===========********===>intr_status %x\n",intr_status);
+                PRINT("===========********===>intr_status %x\n", intr_status);
                 if(intr_status & BIT(1)){
                     Test_Done(1);
                 }
@@ -1328,16 +1407,16 @@ void hi_irq_task(struct hal_private *hal_priv)
                 static int resettest = 0;
                 unsigned int to_sdio = 0;
 
-                 if (intr_status&RX_OK){
-                     if(resettest <1){
+                 if (intr_status & RX_OK) {
+                     if (resettest < 1) {
                          resettest++;
                      }
-                     else if(resettest == 100){
+                     else if (resettest == 100) {
                      }
                      else {
                         resettest = 100;
-                        int loop=1;
-                        unsigned int data1,data2,data3 ;
+                        int loop = 1;
+                        unsigned int data1, data2, data3 ;
                         struct hw_interface* hif = hif_get_hw_interface();
                         /* while(loop-->0)*/
                         {
@@ -1487,73 +1566,72 @@ void hi_top_task( unsigned long data)
 static void hif_get_mac_sts(void)
 {
 #if defined (HAL_FPGA_VER)
-    unsigned int rd_data = 0;
-    int i = 0;
+    int i;
     struct hw_interface* hif = hif_get_hw_interface();
     struct hif_reg_info rd_info[HIF_RD_MAC_REG_MAX];
 /*
-	char* irq_prt_info[IDX_TXSTART_IT] = "TXSTART";
-	char* irq_prt_info[IDX_TXEND_IT] = "TXEND";
-	char* irq_prt_info[IDX_TXENDERR] = "TXENDERR";
-	char* irq_prt_info[IDX_ACKTO_IT] = "ACKTO_IT";
-	char* irq_prt_info[IDX_TXCOL_FLAG] = "TXCOL";
-	char* irq_prt_info[IDX_RXSTART_IT] = "RXSTART";
-	char* irq_prt_info[IDX_RXEND_IT] = "RXEND";
-	char* irq_prt_info[IDX_RXMPDU_OK] = "RXMPDU_OK";
-	char* irq_prt_info[IDX_UNICAST] = "UNICAST";
-	char* irq_prt_info[IDX_SRAMBUF_FULL] = "SRAMBUF_FULL";
-	char* irq_prt_info[IDX_SWIRQ] = "SWIRQ";
-	char* irq_prt_info[IDX_TX_FRAME_TYPE] = "TX_FRAME_TYPE";
-	char* irq_prt_info[IDX_ABSCOUNT_INTR] = "ABSCOUNT_INTR";
-	char* irq_prt_info[IDX_FIQ_ENABLE] = "FIQ_ENABLE";
-	char* irq_prt_info[IDX_FIAC_FW_TIMEOUT_ERR] = "FIAC_FW_TIMEOUT_ERR";
-	char* irq_prt_info[IDX_HW_TIMEOUT_ERR] = "HW_TIMEOUT_ERR";
-	char* irq_prt_info[IDX_TX_WD_TIMEOUT_ERR] = "TX_WD_TIMEOUT_ERR";
-	char* irq_prt_info[IDX_TXINVALIDLEN_ERR] = "TXINVALIDLEN_ERR";
-	char* irq_prt_info[IDX_TX_KEYMISS] = "TX_KEYMISS";
-	char* irq_prt_info[IDX_TXIMSTOP_ERR] = "TXIMSTOP_ERR";
-	char* irq_prt_info[IDX_TX_PHYERROR] = "TX_PHYERROR";
-	char* irq_prt_info[IDX_TXCOL_QUEUE] = "TXCOL_QUEUE";
-	char* irq_prt_info[IDX_TX_NOT_GRANT] = "TX_NOT_GRANT";
-	char* irq_prt_info[IDX_SRAMBUF_FULL_ERR] = "SRAMBUF_FULL_ERR";
-	char* irq_prt_info[IDX_FCSERR] = "FCSERR";
-	char* irq_prt_info[IDX_RXFIFOOV] = "RXFIFOOV";
-	char* irq_prt_info[IDX_RX_WD_TIMEOUT_ERR] = "RX_WD_TIMEOUT_ERR";
-	char* irq_prt_info[IDX_SHORT_LENGTH] = "SHORT_LENGTH ";
-	char* irq_prt_info[IDX_LENGTH_ERROR] = "LENGTH_ERROR";
-	char* irq_prt_info[IDX_RX_PHYERROR] = "RX_PHYERROR";
+    char* irq_prt_info[IDX_TXSTART_IT] = "TXSTART";
+    char* irq_prt_info[IDX_TXEND_IT] = "TXEND";
+    char* irq_prt_info[IDX_TXENDERR] = "TXENDERR";
+    char* irq_prt_info[IDX_ACKTO_IT] = "ACKTO_IT";
+    char* irq_prt_info[IDX_TXCOL_FLAG] = "TXCOL";
+    char* irq_prt_info[IDX_RXSTART_IT] = "RXSTART";
+    char* irq_prt_info[IDX_RXEND_IT] = "RXEND";
+    char* irq_prt_info[IDX_RXMPDU_OK] = "RXMPDU_OK";
+    char* irq_prt_info[IDX_UNICAST] = "UNICAST";
+    char* irq_prt_info[IDX_SRAMBUF_FULL] = "SRAMBUF_FULL";
+    char* irq_prt_info[IDX_SWIRQ] = "SWIRQ";
+    char* irq_prt_info[IDX_TX_FRAME_TYPE] = "TX_FRAME_TYPE";
+    char* irq_prt_info[IDX_ABSCOUNT_INTR] = "ABSCOUNT_INTR";
+    char* irq_prt_info[IDX_FIQ_ENABLE] = "FIQ_ENABLE";
+    char* irq_prt_info[IDX_FIAC_FW_TIMEOUT_ERR] = "FIAC_FW_TIMEOUT_ERR";
+    char* irq_prt_info[IDX_HW_TIMEOUT_ERR] = "HW_TIMEOUT_ERR";
+    char* irq_prt_info[IDX_TX_WD_TIMEOUT_ERR] = "TX_WD_TIMEOUT_ERR";
+    char* irq_prt_info[IDX_TXINVALIDLEN_ERR] = "TXINVALIDLEN_ERR";
+    char* irq_prt_info[IDX_TX_KEYMISS] = "TX_KEYMISS";
+    char* irq_prt_info[IDX_TXIMSTOP_ERR] = "TXIMSTOP_ERR";
+    char* irq_prt_info[IDX_TX_PHYERROR] = "TX_PHYERROR";
+    char* irq_prt_info[IDX_TXCOL_QUEUE] = "TXCOL_QUEUE";
+    char* irq_prt_info[IDX_TX_NOT_GRANT] = "TX_NOT_GRANT";
+    char* irq_prt_info[IDX_SRAMBUF_FULL_ERR] = "SRAMBUF_FULL_ERR";
+    char* irq_prt_info[IDX_FCSERR] = "FCSERR";
+    char* irq_prt_info[IDX_RXFIFOOV] = "RXFIFOOV";
+    char* irq_prt_info[IDX_RX_WD_TIMEOUT_ERR] = "RX_WD_TIMEOUT_ERR";
+    char* irq_prt_info[IDX_SHORT_LENGTH] = "SHORT_LENGTH ";
+    char* irq_prt_info[IDX_LENGTH_ERROR] = "LENGTH_ERROR";
+    char* irq_prt_info[IDX_RX_PHYERROR] = "RX_PHYERROR";
 */
-    rd_info[0].addr= RG_MAC_IRQ_STATUS_CNT0;
-    rd_info[1].addr= RG_MAC_IRQ_STATUS_CNT1;
-    rd_info[2].addr= RG_MAC_IRQ_STATUS_CNT2;
-    rd_info[3].addr= RG_MAC_IRQ_STATUS_CNT3;
+    rd_info[0].addr = RG_MAC_IRQ_STATUS_CNT0;
+    rd_info[1].addr = RG_MAC_IRQ_STATUS_CNT1;
+    rd_info[2].addr = RG_MAC_IRQ_STATUS_CNT2;
+    rd_info[3].addr = RG_MAC_IRQ_STATUS_CNT3;
 
-    rd_info[4].addr= RG_MAC_FRM_TYPE_CNT0;
-    rd_info[5].addr= RG_MAC_FRM_TYPE_CNT1;
-    rd_info[6].addr= RG_MAC_FRM_TYPE_CNT2;
-    rd_info[7].addr= RG_MAC_FRM_TYPE_CNT3;
+    rd_info[4].addr = RG_MAC_FRM_TYPE_CNT0;
+    rd_info[5].addr = RG_MAC_FRM_TYPE_CNT1;
+    rd_info[6].addr = RG_MAC_FRM_TYPE_CNT2;
+    rd_info[7].addr = RG_MAC_FRM_TYPE_CNT3;
 
-    rd_info[8].addr= RG_MAC_TX_STT_CHK;
-    rd_info[9].addr= RG_MAC_TX_END_CHK;
-    rd_info[10].addr= RG_MAC_TX_EN_CHK;
-    rd_info[11].addr= RG_MAC_TX_ENWR_CHK;
+    rd_info[8].addr = RG_MAC_TX_STT_CHK;
+    rd_info[9].addr = RG_MAC_TX_END_CHK;
+    rd_info[10].addr = RG_MAC_TX_EN_CHK;
+    rd_info[11].addr = RG_MAC_TX_ENWR_CHK;
 
-    rd_info[12].addr= RG_MAC_RX_DATA_LOCAL_CNT;
-    rd_info[13].addr= RG_MAC_RX_DATA_OTHER_CNT;
-    rd_info[14].addr= RG_MAC_RX_DATA_MUTIL_CNT;
+    rd_info[12].addr = RG_MAC_RX_DATA_LOCAL_CNT;
+    rd_info[13].addr = RG_MAC_RX_DATA_OTHER_CNT;
+    rd_info[14].addr = RG_MAC_RX_DATA_MUTIL_CNT;
 
-    rd_info[0].prt= "irq_cnt_0"; 
-    rd_info[1].prt= "irq_cnt_1"; 
-    rd_info[2].prt= "irq_cnt_2"; 
-    rd_info[3].prt= "irq_cnt_3"; 
+    rd_info[0].prt = "irq_cnt_0";
+    rd_info[1].prt = "irq_cnt_1";
+    rd_info[2].prt = "irq_cnt_2";
+    rd_info[3].prt = "irq_cnt_3";
 
-    rd_info[4].prt= "rx_rts"; 
-    rd_info[5].prt= "rx_cts"; 
-    rd_info[6].prt= "rx_ack"; 
-    rd_info[7].prt= "rx_qos_data";   
+    rd_info[4].prt = "rx_rts";
+    rd_info[5].prt = "rx_cts";
+    rd_info[6].prt = "rx_ack";
+    rd_info[7].prt = "rx_qos_data";
 
-    rd_info[8].prt= "tx_stt_chk";
-    rd_info[9].prt= "tx_end_chk";
+    rd_info[8].prt = "tx_stt_chk";
+    rd_info[9].prt = "tx_end_chk";
     rd_info[10].prt = "tx_en_chk";
     rd_info[11].prt = "tx_enwr_chk";
 
@@ -1563,26 +1641,28 @@ static void hif_get_mac_sts(void)
 
     for (i = 0; i < HIF_RD_MAC_REG_MAX; i++)
     {
+        unsigned int rd_data;
+
         rd_data = hif->hif_ops.hi_read_word(rd_info[i].addr);
 
         if(rd_info[i].addr == RG_MAC_RX_DATA_LOCAL_CNT)
         {
             rd_data = (rd_data << 3 ) >> 3;
         }
-        else  if(rd_info[i].addr == RG_MAC_RX_DATA_OTHER_CNT ||
+        else if(rd_info[i].addr == RG_MAC_RX_DATA_OTHER_CNT ||
                 rd_info[i].addr == RG_MAC_RX_DATA_MUTIL_CNT )
         {
             rd_data = (rd_data << 2 ) >> 2;
         }
         else if (rd_info[i].addr == RG_MAC_TX_STT_CHK ||
-            rd_info[i].addr == RG_MAC_TX_END_CHK||
-            rd_info[i].addr == RG_MAC_TX_EN_CHK||
-            rd_info[i].addr == RG_MAC_TX_ENWR_CHK)
+                 rd_info[i].addr == RG_MAC_TX_END_CHK ||
+                 rd_info[i].addr == RG_MAC_TX_EN_CHK ||
+                 rd_info[i].addr == RG_MAC_TX_ENWR_CHK)
         {
             rd_data = (rd_data << 6 ) >> 6;
         }
 
-        printk("%s, %d\n", rd_info[i].prt, rd_data);
+        pr_debug("%s, %d\n", rd_info[i].prt, rd_data);
     }
 #endif
 }
@@ -1591,91 +1671,95 @@ static void hif_get_phy_sts(void)
 {
 #if defined (HAL_FPGA_VER)
     struct hif_reg_info rd_info[HIF_RD_PHY_REG_MAX];
-    int i = 0;
-    unsigned int rd_data = 0;
-    struct hw_interface* hif = hif_get_hw_interface();
-  
-    rd_info[0].addr= RG_AGC_STATE;
-    rd_info[1].addr= RG_AGC_OB_IC_GAIN;
-    rd_info[2].addr= RG_AGC_WATCH1;
-    rd_info[3].addr= RG_AGC_WATCH2;
+    int i;
+    struct hw_interface *hif = hif_get_hw_interface();
 
-    rd_info[4].addr= RG_AGC_WATCH3;
-    rd_info[5].addr= RG_AGC_WATCH4;
-    rd_info[6].addr= RG_AGC_OB_ANT_NFLOOR;
-    rd_info[7].addr= RG_AGC_OB_CCA_RES;
+    rd_info[0].addr = RG_AGC_STATE;
+    rd_info[1].addr = RG_AGC_OB_IC_GAIN;
+    rd_info[2].addr = RG_AGC_WATCH1;
+    rd_info[3].addr = RG_AGC_WATCH2;
 
-    rd_info[8].addr= RG_AGC_OB_CCA_COND01;
-    rd_info[9].addr= RG_AGC_OB_CCA_COND23;
+    rd_info[4].addr = RG_AGC_WATCH3;
+    rd_info[5].addr = RG_AGC_WATCH4;
+    rd_info[6].addr = RG_AGC_OB_ANT_NFLOOR;
+    rd_info[7].addr = RG_AGC_OB_CCA_RES;
+
+    rd_info[8].addr = RG_AGC_OB_CCA_COND01;
+    rd_info[9].addr = RG_AGC_OB_CCA_COND23;
 
     for (i = 0; i < HIF_RD_PHY_REG_MAX; i++)
     {
+        unsigned int rd_data;
+
         rd_data = hif->hif_ops.hi_read_word(rd_info[i].addr);
-        if(rd_info[i].addr ==  RG_AGC_STATE)
+        if (rd_info[i].addr == RG_AGC_STATE)
         {
-            struct sts_agc_state* agc_state = (struct sts_agc_state*) &rd_data;
-            printk("agc-state=0x%x,\n", agc_state->state);
+            struct sts_agc_state *agc_state = (struct sts_agc_state *)&rd_data;
+            pr_debug("agc-state=0x%x,\n", agc_state->state);
         }
 
-        if(rd_info[i].addr ==  RG_AGC_OB_IC_GAIN)
+        if (rd_info[i].addr == RG_AGC_OB_IC_GAIN)
         {
-            struct sts_agc_ob_ic_gain* agc_ob_ic_gain =(struct sts_agc_ob_ic_gain*)&rd_data;
-            printk("r_agc_fine_db=0x%x, r_rx_ic_gain=0x%x,\n",
+            struct sts_agc_ob_ic_gain *agc_ob_ic_gain = (struct sts_agc_ob_ic_gain *)&rd_data;
+            pr_debug("r_agc_fine_db=0x%x, r_rx_ic_gain=0x%x,\n",
                 agc_ob_ic_gain->r_agc_fine_db, agc_ob_ic_gain->r_rx_ic_gain);
         }
 
-        if(rd_info[i].addr ==  RG_AGC_WATCH1)
+        if (rd_info[i].addr == RG_AGC_WATCH1)
         {
-            struct sts_agc_watch1* agc_watch1 = (struct sts_agc_watch1*)&rd_data;
-            printk("r_pow_sat_db=0x%x, r_primary20_db=0x%x,\n",
-                agc_watch1->r_pow_sat_db, agc_watch1->r_primary20_db);
+            struct sts_agc_watch1 *agc_watch1 = (struct sts_agc_watch1 *)&rd_data;
+            pr_debug("r_pow_sat_db=0x%x, r_primary20_db=0x%x,\n",
+                   agc_watch1->r_pow_sat_db, agc_watch1->r_primary20_db);
         }
 
-        if(rd_info[i].addr ==  RG_AGC_WATCH2)
+        if (rd_info[i].addr == RG_AGC_WATCH2)
         {
-            struct sts_agc_watch2* agc_watch2 = (struct sts_agc_watch2*)&rd_data;
-            printk("r_primary40_db=0x%x, r_primary80_db=0x%x,\n",
+            struct sts_agc_watch2 *agc_watch2 = (struct sts_agc_watch2 *)&rd_data;
+            pr_debug("r_primary40_db=0x%x, r_primary80_db=0x%x,\n",
                     agc_watch2->r_primary40_db, agc_watch2->r_primary80_db);
         }
 
-        if(rd_info[i].addr ==  RG_AGC_WATCH3)
+        if (rd_info[i].addr == RG_AGC_WATCH3)
         {
-            struct sts_agc_watch3*agc_watch3 = (struct sts_agc_watch3*)&rd_data;
-            printk("r_rssi0_db=0x%x, r_rssi1_db=0x%x,\n",
+            struct sts_agc_watch3 *agc_watch3 = (struct sts_agc_watch3 *)&rd_data;
+            pr_debug("r_rssi0_db=0x%x, r_rssi1_db=0x%x,\n",
                     agc_watch3->r_rssi0_db, agc_watch3->r_rssi1_db);
         }
 
-        if(rd_info[i].addr ==  RG_AGC_WATCH4)
+        if (rd_info[i].addr == RG_AGC_WATCH4)
         {
-            struct sts_agc_watch4* agc_watch4 = (struct sts_agc_watch4*)&rd_data;
+            struct sts_agc_watch4 *agc_watch4 = (struct sts_agc_watch4 *)&rd_data;
 
-            printk("r_rssi2_db=0x%x, r_rssi3_db=0x%x,\n",
-                        agc_watch4->r_rssi2_db, agc_watch4->r_rssi3_db);
+            pr_debug("r_rssi2_db=0x%x, r_rssi3_db=0x%x,\n",
+                   agc_watch4->r_rssi2_db, agc_watch4->r_rssi3_db);
         }
 
-        if(rd_info[i].addr ==  RG_AGC_OB_ANT_NFLOOR)
+        if (rd_info[i].addr == RG_AGC_OB_ANT_NFLOOR)
         {
-            struct sts_ob_ant_nfloor* ob_ant_nfloor = (struct  sts_ob_ant_nfloor*)&rd_data;
-            printk("r_ant_nfloor_qdb=0x%x, r_snr_qdb=0x%x,\n", ob_ant_nfloor->r_ant_nfloor_qdb, ob_ant_nfloor->r_snr_qdb);
+            struct sts_ob_ant_nfloor *ob_ant_nfloor = (struct sts_ob_ant_nfloor *)&rd_data;
+            pr_debug("r_ant_nfloor_qdb=0x%x, r_snr_qdb=0x%x,\n",
+                   ob_ant_nfloor->r_ant_nfloor_qdb, ob_ant_nfloor->r_snr_qdb);
         }
 
-        if(rd_info[i].addr ==  RG_AGC_OB_CCA_RES)
+        if (rd_info[i].addr == RG_AGC_OB_CCA_RES)
         {
-            struct sts_ob_cca_res* ob_cca_res = (struct sts_ob_cca_res*)&rd_data;
-            printk("cca_cond8=0x%x, cca_cond_rdy=0x%x,\n", ob_cca_res->cca_cond8, ob_cca_res->cca_cond_rdy);
+            struct sts_ob_cca_res *ob_cca_res = (struct sts_ob_cca_res *)&rd_data;
+            pr_debug("cca_cond8=0x%x, cca_cond_rdy=0x%x,\n",
+                   ob_cca_res->cca_cond8, ob_cca_res->cca_cond_rdy);
         }
 
-        if(rd_info[i].addr ==  RG_AGC_OB_CCA_COND01)
+        if (rd_info[i].addr == RG_AGC_OB_CCA_COND01)
         {
-            struct sts_ob_cca_cond01* ob_cca_cond01 =  (struct sts_ob_cca_cond01*)&rd_data;
-            printk("cca_cond0=0x%x, cca_cond1=0x%x,\n",
+            struct sts_ob_cca_cond01 *ob_cca_cond01 =  (struct sts_ob_cca_cond01 *)&rd_data;
+            pr_debug("cca_cond0=0x%x, cca_cond1=0x%x,\n",
                         ob_cca_cond01->cca_cond0, ob_cca_cond01->cca_cond1);
         }
 
-        if(rd_info[i].addr ==  RG_AGC_OB_CCA_COND23)
+        if (rd_info[i].addr == RG_AGC_OB_CCA_COND23)
         {
-            struct sts_ob_cca_cond23* ob_cca_cond23 = (struct sts_ob_cca_cond23*)&rd_data;
-            printk("cca_cond2=0x%x, cca_cond3=0x%x,\n",ob_cca_cond23->cca_cond2, ob_cca_cond23->cca_cond3);
+            struct sts_ob_cca_cond23 *ob_cca_cond23 = (struct sts_ob_cca_cond23 *)&rd_data;
+            pr_debug("cca_cond2=0x%x, cca_cond3=0x%x,\n",
+                   ob_cca_cond23->cca_cond2, ob_cca_cond23->cca_cond3);
         }
     }
 #endif
@@ -1686,27 +1770,29 @@ static void hif_get_phy_sts(void)
 #define RG_MAC_RX_FRPTR (WIFI_MAC + 0x200)
 #define RG_MAC_RX_HRPTR (WIFI_MAC + 0x204)
 
-void hif_get_hst_int_status(void)
+static void hif_get_hst_int_status(void)
 {
        struct hal_private *hal_prv = hal_get_priv();
 
-       printk("fw2hst_int_status 0x%x  rx_dbuf_fw_rptr 0x%x\n", 
-                    (hal_prv->int_status_copy>> 16) & 0xffff, 
-                    hal_prv->int_status_copy & 0xffff);
+       pr_debug("fw2hst_int_status 0x%x  rx_dbuf_fw_rptr 0x%x\n",
+              (hal_prv->int_status_copy>> 16) & 0xffff,
+              hal_prv->int_status_copy & 0xffff);
 
 }
+
 void hif_get_sts(unsigned int op_code, unsigned int ctrl_code)
 {
 #if defined (HAL_FPGA_VER)
-    struct  hw_interface* hif = hif_get_hw_interface();
-    unsigned int buf_rd = 0;
-    unsigned int mac_wt = 0;
-    unsigned int fw_rd = 0;
-    unsigned int sdio_rd = 0;
 
-    if((ctrl_code & STS_MOD_HIF) == STS_MOD_HIF)
+    if ((ctrl_code & STS_MOD_HIF) == STS_MOD_HIF)
     {
-        printk("\n--------hif statistic--------\n");
+        struct  hw_interface *hif = hif_get_hw_interface();
+        unsigned int buf_rd;
+        unsigned int mac_wt;
+        unsigned int fw_rd;
+        unsigned int sdio_rd;
+
+        pr_debug("\n--------hif statistic--------\n");
         buf_rd = hif->hif_ops.hi_read_word(RG_WIFI_IF_RXPAGE_BUF_RDPTR) ;
         mac_wt = hif->hif_ops.hi_read_word(RG_MAC_RX_WPTR);
         fw_rd = hif->hif_ops.hi_read_word(RG_MAC_RX_FRPTR);
@@ -1714,28 +1800,26 @@ void hif_get_sts(unsigned int op_code, unsigned int ctrl_code)
 
         if ((ctrl_code & STS_TYP_RX) == STS_TYP_RX)
         {
-            printk("rx_fifo: head %ld, tail %ld, total %ld\n",
-                hif->rx_fifo.FDH, hif->rx_fifo.FDT, hif->rx_fifo.FDN);
+            pr_debug("rx_fifo: head %ld, tail %ld, total %ld\n",
+                   hif->rx_fifo.FDH, hif->rx_fifo.FDT, hif->rx_fifo.FDN);
 
-            printk("rx by word: free %d, fw_to_do %d, sdio_to_mv %d, buf_rd_ptr 0x%x, mac_wt_ptr 0x%x, fw_rd_ptr 0x%x, sdio_rd_ptr 0x%x \n",
-            CIRCLE_Subtract2(sdio_rd, mac_wt, DEFAULT_RXPAGENUM*PAGE_LEN/4),
-            CIRCLE_Subtract2(mac_wt, fw_rd, DEFAULT_RXPAGENUM*PAGE_LEN/4),
-            CIRCLE_Subtract2( fw_rd, sdio_rd,DEFAULT_RXPAGENUM*PAGE_LEN/4),
-            buf_rd,mac_wt,fw_rd,sdio_rd);
+            pr_debug("rx by word: free %d, fw_to_do %d, sdio_to_mv %d, buf_rd_ptr 0x%x, mac_wt_ptr 0x%x, fw_rd_ptr 0x%x, sdio_rd_ptr 0x%x \n",
+            CIRCLE_Subtract2(sdio_rd, mac_wt, DEFAULT_RXPAGENUM * PAGE_LEN / 4),
+            CIRCLE_Subtract2(mac_wt, fw_rd, DEFAULT_RXPAGENUM * PAGE_LEN / 4),
+            CIRCLE_Subtract2( fw_rd, sdio_rd,DEFAULT_RXPAGENUM * PAGE_LEN / 4),
+            buf_rd, mac_wt, fw_rd, sdio_rd);
 
         }
 
-          hif_get_hst_int_status();
-          hif_get_mac_sts();
-          hif_get_phy_sts();
+        hif_get_hst_int_status();
+        hif_get_mac_sts();
+        hif_get_phy_sts();
     }
 #endif
 }
 
-
 void hif_pt_rx_start(unsigned int qos)
 {
-
 #if defined (HAL_FPGA_VER)
     unsigned int chg_data = 0;
     struct data_rx_local_cnt_bits*  data_rx_local_cnt =NULL;
@@ -1820,7 +1904,7 @@ void hif_pt_rx_stop(void)
     //hif->sts_snr.snr_run = 0;
     //hif->sts_snr.snr_avr /=hif->sts_snr.snr_num;
 
-    printk("rx_ucast=0x%x,rx_other=0x%x,rx_mcast=0x%x,rx_fcserr=0x%x,\n", 
+    pr_debug("rx_ucast=0x%x,rx_other=0x%x,rx_mcast=0x%x,rx_fcserr=0x%x,\n",
                     (rx_ucast<<3)>>3, (rx_other<<2)>>2, (rx_mcast<<2)>>2,rx_fcserr);
 
     chg_data = hif->hif_ops.hi_read_word(RG_MAC_RX_DATA_LOCAL_CNT);

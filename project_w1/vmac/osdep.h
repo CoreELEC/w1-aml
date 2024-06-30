@@ -113,9 +113,9 @@ static __inline void  *ZMALLOC(int a, char *name, unsigned gfp)
         m_pn_buf[i].count++;
     }
 
-    printk("Zmalloc %p:%s\n", tmp, name);
+    pr_debug("Zmalloc %p:%s\n", tmp, name);
     if (kmalloc_count >= 64) {
-        printk("amlogic WIFI:<ERROR>Array Overflow, please make sure array "
+        pr_err("amlogic WIFI:<ERROR>Array Overflow, please make sure array "
             "length big enough in debug malloc process\n");
     }
     return tmp;
@@ -135,7 +135,7 @@ static __inline void FREE(void *a, char *name)
         f_pn_buf[i].count++;
     }
 
-    printk("kfree %p:%s\n", a, name);
+    pr_debug("kfree %p:%s\n", a, name);
     if (kfree_count >= 64) {
         ERROR_DEBUG_OUT("amlogic WIFI:<ERROR>Array Overflow, please make sure array "
             "length big enough in debug malloc process\n");
@@ -160,7 +160,7 @@ static __inline void FREE(void *a, char *name)
 #endif
 
 #define NET_MALLOC(_size, _gfp, _str) ZMALLOC(ALIGN(_size + 1, 128), _str, _gfp)
-#define NET_FREE(_p, name) do { if ((_p) != NULL) FREE(_p, name); /* printk("<running> %s %d kfree %p \n",__func__,__LINE__,_p); */(_p) = NULL;} while(0)
+#define NET_FREE(_p, name) do { if ((_p) != NULL) FREE(_p, name); /* pr_debug("<running> %s %d kfree %p \n",__func__,__LINE__,_p); */(_p) = NULL;} while(0)
 
 #define CIRCLE_Add_One(_data,_total) do {\
                 if((_data)== (_total)-1)        \
@@ -288,5 +288,13 @@ enum ieee80211_band {
 
 #define strnicmp  strncasecmp
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 251)
+static inline void
+dev_addr_mod(struct net_device *dev, unsigned int offset,
+	     const u8 *addr, size_t len)
+{
+       memcpy(&dev->dev_addr[offset], addr, len);
+}
+#endif
 #endif
 #endif

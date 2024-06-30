@@ -354,7 +354,7 @@ struct driver_ops
     int         (*reset)(void *);
 
     /* set channel */
-    void        (*set_channel)(struct drv_private *, struct hal_channel *, unsigned char flag, unsigned char vid);
+    void        (*set_channel)(struct drv_private *, struct hal_channel *, unsigned char flag, unsigned char vid, unsigned char opmode);
     void        (*rf_channel_restore)(struct drv_private *,  unsigned short channel, int bw);
 
     /* scan notifications */
@@ -612,5 +612,11 @@ void aml_driv_detach(struct drv_private * );
 struct drv_private* drv_get_drv_priv(void);
 struct aml_hal_call_backs * get_hal_call_back_table(void);
 int drv_dev_remove(void);
+
+int drv_rate_setup(struct drv_private *drv_priv, enum wifi_mac_macmode mode);
+int drv_channel_init(struct drv_private *drv_priv, unsigned int cc);
+int drv_add_wnet_vif(struct drv_private *drv_priv,
+    int wnet_vif_id, void * if_data, enum hal_op_mode vm_opmode, unsigned char *myaddr, unsigned int ip);
+void aml_set_mac_control_register(void);
 
 #endif /* _DRIV_MAIN_H_ */

@@ -71,10 +71,12 @@ extern unsigned int HZ;
 /* convert mac80211 rate index to local array index */
 static inline int rix_to_ndx(struct minstrel_sta_info *mi, int rix)
 {
-    int i = rix;
+    int i;
+
     for (i = rix; i >= 0; i--)
         if (mi->r[i].rix == rix)
             break;
+
     return i;
 }
 
@@ -101,10 +103,11 @@ int minstrel_get_tp_avg(struct minstrel_rate *mr, int prob_ewma)
 static inline void minstrel_sort_best_tp_rates(struct minstrel_sta_info *mi, int i, u8 *tp_list)
 {
     int j;
-    struct minstrel_rate_stats *tmp_mrs;
     struct minstrel_rate_stats *cur_mrs = &mi->r[i].stats;
 
     for (j = MAX_THR_RATES; j > 0; --j) {
+        struct minstrel_rate_stats *tmp_mrs;
+
         tmp_mrs = &mi->r[tp_list[j - 1]].stats;
 
         mi->r[i].stats.tp_avg = minstrel_get_tp_avg(&mi->r[i], cur_mrs->prob_ewma);
@@ -161,13 +164,14 @@ static void minstrel_update_rates(struct minstrel_priv *mp, struct minstrel_sta_
 }
 
 /*
-* Recalculate statistics and counters of a given rate
-*/
+ * Recalculate statistics and counters of a given rate
+ */
 void minstrel_calc_rate_stats(struct minstrel_rate_stats *mrs)
 {
-    unsigned int cur_prob;
 
     if (unlikely(mrs->attempts > 0)) {
+        unsigned int cur_prob;
+
         cur_prob = MINSTREL_FRAC(mrs->success, mrs->attempts);
 
         if (unlikely(!mrs->att_hist)) {
@@ -190,7 +194,7 @@ void minstrel_calc_rate_stats(struct minstrel_rate_stats *mrs)
     mrs->attempts = 0;
 }
 
-unsigned int minstrel_legacy_rate_convert_to_ordinary(unsigned int rate)
+static unsigned int minstrel_legacy_rate_convert_to_ordinary(unsigned int rate)
 {
     unsigned int ret = 0;
 
@@ -348,12 +352,14 @@ static void minstrel_tx_status(void *priv, struct ieee80211_supported_band *sban
     struct minstrel_priv *mp = priv;
     struct minstrel_sta_info *mi = priv_sta;
     struct ieee80211_tx_rate *ar = info->status.rates;
-    int i, ndx;
+    int i;
     int success;
 
     success = !!(info->flags & IEEE80211_TX_STAT_ACK);
 
     for (i = 0; i < IEEE80211_TX_MAX_RATES; i++) {
+        int ndx;
+
         if (ar[i].idx < 0)
             break;
 
@@ -389,7 +395,7 @@ minstrel_get_retry_count(struct minstrel_rate *mr, struct ieee80211_tx_info *inf
     else if (info->control.use_cts_prot)
         retry = MAX( 2, MIN(mr->retry_count_cts, retry));
 
-    //printk("%s retry_count_rtscts:%d, retry_count_cts:%d, retry:%d\n",
+    //pr_debug("%s retry_count_rtscts:%d, retry_count_cts:%d, retry:%d\n",
         //__func__, mr->stats.retry_count_rtscts, mr->retry_count_cts, retry);
     return retry;
 }
@@ -510,10 +516,10 @@ static void calc_rate_durations(enum nl80211_band band, struct minstrel_rate *d,
     //int shift = ieee80211_chandef_get_shift(chandef);
     int shift = 0;
 
-    d->perfect_tx_time = ieee80211_frame_duration(band, 1200,
+    d->perfect_tx_time = ieee80211_frame_duration((enum ieee80211_band)band, 1200,
         DIV_ROUND_UP(rate->bitrate, 1 << shift), erp, 1, shift);
 
-    d->ack_time = ieee80211_frame_duration(band, 10,
+    d->ack_time = ieee80211_frame_duration((enum ieee80211_band)band, 10,
         DIV_ROUND_UP(rate->bitrate, 1 << shift), erp, 1, shift);
 }
 
@@ -528,7 +534,7 @@ init_sample_table(struct minstrel_sta_info *mi)
 	memset(mi->sample_table, 0xff, SAMPLE_COLUMNS * mi->n_rates);
 
 	for (col = 0; col < SAMPLE_COLUMNS; col++) {
-		prandom_bytes(rnd, sizeof(rnd));
+		get_random_bytes(rnd, sizeof(rnd));
 		for (i = 0; i < mi->n_rates; i++) {
 			new_idx = (i + rnd[i & 7]) % mi->n_rates;
 			while (SAMPLE_TBL(mi, new_idx, col) != 0xff)
@@ -560,7 +566,7 @@ static void minstrel_rate_init(void *priv, struct ieee80211_supported_band *sban
 	mi->sta = sta;
 	mi->lowest_rix = rate_lowest_index_aml(sband, sta);
 	ctl_rate = &sband->bitrates[mi->lowest_rix];
-	mi->sp_ack_dur = ieee80211_frame_duration(sband->band, 10,
+	mi->sp_ack_dur = ieee80211_frame_duration((enum ieee80211_band)sband->band, 10,
 		ctl_rate->bitrate, !!(ctl_rate->flags & IEEE80211_RATE_ERP_G), 1, 0);
 
 	//rate_flags = ieee80211_chandef_rate_flags(&mp->hw->conf.chandef);
@@ -571,7 +577,6 @@ static void minstrel_rate_init(void *priv, struct ieee80211_supported_band *sban
 		struct minstrel_rate *mr = &mi->r[n];
 		struct minstrel_rate_stats *mrs = &mi->r[n].stats;
 		unsigned int tx_time = 0, tx_time_cts = 0, tx_time_rtscts = 0;
-		unsigned int tx_time_single;
 		unsigned int cw = mp->cw_min;
 		int shift;
 
@@ -597,6 +602,8 @@ static void minstrel_rate_init(void *priv, struct ieee80211_supported_band *sban
 		tx_time = mr->perfect_tx_time + mi->sp_ack_dur;
 
 		do {
+			unsigned int tx_time_single;
+
 			/* add one retransmission */
 			tx_time_single = mr->ack_time + mr->perfect_tx_time;
 
@@ -630,7 +637,7 @@ static void minstrel_rate_init(void *priv, struct ieee80211_supported_band *sban
 
 	init_sample_table(mi);
 	minstrel_update_rates(mp, mi);
-	printk("%s(%d) n:%d\n",  __func__, __LINE__, n);
+	pr_debug("%s(%d) n:%d\n",  __func__, __LINE__, n);
 }
 
 static void *minstrel_alloc_sta(void *priv, struct ieee80211_sta_aml *sta, gfp_t gfp)

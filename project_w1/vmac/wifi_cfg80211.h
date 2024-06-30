@@ -246,7 +246,7 @@ union vendor_if
  }
 
 #define CHAN2G(_channel, _freq, _flags) {           \
-                .band           = IEEE80211_BAND_2GHZ,      \
+                .band           = (enum nl80211_band)IEEE80211_BAND_2GHZ,      \
                 .center_freq        = (_freq),          \
                 .hw_value       = (_channel),           \
                 .flags          = (_flags),         \
@@ -255,7 +255,7 @@ union vendor_if
 }
 
 #define CHAN5G(_channel, _flags) {              \
-                .band           = IEEE80211_BAND_5GHZ,      \
+                .band           = (enum nl80211_band)IEEE80211_BAND_5GHZ,      \
                 .center_freq        = 5000 + (5 * (_channel)),  \
                 .hw_value       = (_channel),           \
                 .flags          = (_flags),         \
@@ -376,6 +376,19 @@ int cipher2cap(int cipher);
 void batch_dump_reg(struct wiphy *wiphy,unsigned int addr[], unsigned int addr_num);
 void wifi_softap_allsta_stopping(struct wlan_net_vif *wnet_vif, unsigned char is_disconnecting);
 int softap_get_sta_num(struct wlan_net_vif *wnet_vif);
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0)
+int vm_cfg80211_set_bitrate_mask(struct wiphy *wiphy,
+    struct net_device *dev,
+    const unsigned char *peer,
+    const struct cfg80211_bitrate_mask *mask);
+#else
+int vm_cfg80211_set_bitrate_mask(struct wiphy *wiphy,
+    struct net_device *dev,
+    unsigned int link_id,
+    const unsigned char *peer,
+    const struct cfg80211_bitrate_mask *mask);
+#endif
 
 #endif
 

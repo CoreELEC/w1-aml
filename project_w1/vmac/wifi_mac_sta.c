@@ -118,7 +118,7 @@ wifi_mac_start_bss_ex(unsigned long arg)
 
         wifi_mac_rm_sta_from_wds_by_sta(&wnet_vif->vm_sta_tbl, obss);
 
-        printk("%s, obss:%p\n", __func__, obss);
+        pr_debug("%s, obss:%p\n", __func__, obss);
         WIFINET_VMACS_UNLOCK(wifimac);
         wifi_mac_free_sta_from_list(obss);
         WIFINET_VMACS_LOCK(wifimac);
@@ -137,7 +137,7 @@ wifi_mac_start_bss_ex(unsigned long arg)
         }
         DPRINTF(AML_DEBUG_CONNECT,"%s bhalPowerSave %d, cnt %d\n",__func__, hal_priv->bhalPowerSave, cnt);
 
-        wifi_mac_ChangeChannel(wifimac, wnet_vif->vm_curchan, 3, wnet_vif->wnet_vif_id);
+        wifi_mac_ChangeChannel(wifimac, wnet_vif->vm_curchan, 3, wnet_vif->wnet_vif_id, wnet_vif->vm_opmode);
 
         is_connect_need_set_gain(wnet_vif);
         if (wnet_vif->vm_opmode == WIFINET_M_STA) {
@@ -235,7 +235,7 @@ int wifi_mac_is_ht_forbidden(struct wifi_scan_info *se) {
                 is_forbidden = 0;
             }
         }
-        //printk("chris wpa count:%d, id:%02x, len:%02x, version:%04x\n", count, ap_wpa_ie->wpa_id, ap_wpa_ie->wpa_len, ap_wpa_ie->wpa_version);
+        //pr_debug("chris wpa count:%d, id:%02x, len:%02x, version:%04x\n", count, ap_wpa_ie->wpa_id, ap_wpa_ie->wpa_len, ap_wpa_ie->wpa_version);
     }
 
     if (ap_rsn_ie != NULL) {
@@ -249,7 +249,7 @@ int wifi_mac_is_ht_forbidden(struct wifi_scan_info *se) {
                 is_forbidden = 0;
             }
         }
-        //printk("chris rsn count:%d, id:%02x, len:%02x, version:%02x\n", count, ap_rsn_ie->rsn_id, ap_rsn_ie->rsn_len, ap_rsn_ie->rsn_version);
+        //pr_debug("chris rsn count:%d, id:%02x, len:%02x, version:%02x\n", count, ap_rsn_ie->rsn_id, ap_rsn_ie->rsn_len, ap_rsn_ie->rsn_version);
     }
 
     if ((ap_wpa_ie == NULL) && (ap_rsn_ie == NULL)) {
@@ -296,9 +296,9 @@ int wifi_mac_connect(struct wlan_net_vif *wnet_vif, struct wifi_scan_info *se)
     wifi_mac_connect_start(wifimac);
 
     if(aml_wifi_get_platform_verid() == 2) {
-        /*this is for gva_mrt version, fix 2.4G on 20M bandwith*/
+        /*this is for gva_mrt version, fix 2.4G on 20M bandwidth*/
         if (WIFINET_IS_CHAN_2GHZ(se->SI_chan)) {
-                printk("%s %d set bw 20M\n", __func__, __LINE__);
+                pr_debug("%s %d set bw 20M\n", __func__, __LINE__);
                 work_channel = wifi_mac_find_chan(wifimac, se->SI_chan->chan_pri_num,
                     WIFINET_BWC_WIDTH20, se->SI_chan->chan_pri_num);
         } else {
@@ -320,9 +320,9 @@ int wifi_mac_connect(struct wlan_net_vif *wnet_vif, struct wifi_scan_info *se)
 
     /*then,  sta != vm_mainsta */
     if(aml_wifi_get_platform_verid() == 2) {
-        /*this is for gva_mrt version, fix 2.4G on 20M bandwith*/
+        /*this is for gva_mrt version, fix 2.4G on 20M bandwidth*/
         if (WIFINET_IS_CHAN_2GHZ(se->SI_chan)) {
-            printk("%s %d set bw 20M\n", __func__, __LINE__);
+            pr_debug("%s %d set bw 20M\n", __func__, __LINE__);
             sta->sta_chbw = WIFINET_BWC_WIDTH20;
         } else {
             sta->sta_chbw = se->SI_chan->chan_bw;
@@ -346,10 +346,10 @@ int wifi_mac_connect(struct wlan_net_vif *wnet_vif, struct wifi_scan_info *se)
 
 #ifdef AML_WPA3
     if (wnet_vif->vm_mainsta->sta_flags_ext & WIFINET_NODE_MFP) {
-        printk("ap pmf:%04x, before set rsn_caps:%04x ", se->si_rsn_capa, wnet_vif->vm_opt_ie[sta->sta_rsn.rsn_caps_offset]);
+        pr_debug("ap pmf:%04x, before set rsn_caps:%04x ", se->si_rsn_capa, wnet_vif->vm_opt_ie[sta->sta_rsn.rsn_caps_offset]);
         wnet_vif->vm_opt_ie[sta->sta_rsn.rsn_caps_offset] |= (unsigned char)(se->si_rsn_capa & 0xc0);
 
-        printk("after set rsn_caps:%04x\n", wnet_vif->vm_opt_ie[sta->sta_rsn.rsn_caps_offset]);
+        pr_debug("after set rsn_caps:%04x\n", wnet_vif->vm_opt_ie[sta->sta_rsn.rsn_caps_offset]);
         if ((se->si_rsn_capa & 0xc0) != 0) {
             sta->sta_flags_ext = (wnet_vif->vm_mainsta->sta_flags_ext & WIFINET_NODE_MFP);
             if (sta->sta_flags_ext & WIFINET_NODE_MFP) {
@@ -426,7 +426,7 @@ int wifi_mac_connect(struct wlan_net_vif *wnet_vif, struct wifi_scan_info *se)
     else
         wifimac->wm_11dinfo = NULL;
 
-    printk("%s start connect to ssid:%s, pri_channel:%d, center_chan:%d, bw:%d, BSSID:%02x:%02x:%02x:%02x:%02x:%02x, mode:%d\n",
+    pr_debug("%s start connect to ssid:%s, pri_channel:%d, center_chan:%d, bw:%d, BSSID:%02x:%02x:%02x:%02x:%02x:%02x, mode:%d\n",
         __func__, se->SI_ssid+2, se->SI_chan->chan_pri_num, se->SI_chan->chan_cfreq1, se->SI_chan->chan_bw, sta->sta_bssid[0],
         sta->sta_bssid[1], sta->sta_bssid[2], sta->sta_bssid[3], sta->sta_bssid[4], sta->sta_bssid[5], sta->sta_bssmode);
     wnet_vif->vm_phase_flags |= PHASE_CONNECTING;
@@ -470,7 +470,7 @@ void wifi_mac_create_wifi(struct wlan_net_vif* wnet_vif, struct wifi_channel *ch
     wnet_vif->vm_curchan = work_channel;
     sta->sta_chbw = chan->chan_bw;
 
-    printk("%s(%d): pri_chan %d, bw %d, chan_cfreq1 %d\n",  __func__, __LINE__,
+    pr_debug("%s(%d): pri_chan %d, bw %d, chan_cfreq1 %d\n",  __func__, __LINE__,
         chan->chan_pri_num, chan->chan_bw, wifi_mac_Mhz2ieee(chan->chan_cfreq1, 0));
 
     WIFINET_ADDR_COPY(sta->sta_bssid, wnet_vif->vm_myaddr);
@@ -514,7 +514,7 @@ void wifi_mac_create_wifi(struct wlan_net_vif* wnet_vif, struct wifi_channel *ch
     }
     wifi_mac_build_country_ie(wnet_vif);
     wifi_mac_start_bss(sta);
-    printk("<%s>  L:%d, mac mode %d dot11_rate_num %d\n",
+    pr_debug("<%s>  L:%d, mac mode %d dot11_rate_num %d\n",
             __func__,__LINE__,sta->sta_bssmode,sta->sta_htrates.dot11_rate_num);
 }
 
@@ -547,7 +547,7 @@ static void nsta_cleanup(struct wifi_station *sta)
     if (wifi_mac_pwrsave_psqueue_clean(sta) != 0 && wnet_vif->vif_ops.vm_set_tim != NULL)
         wnet_vif->vif_ops.vm_set_tim(sta, 0);
 
-    printk("----------%d assoc id \n",sta->sta_associd);
+    pr_debug("----------%d assoc id \n",sta->sta_associd);
     if (sta->sta_challenge != NULL)
     {
         FREE(sta->sta_challenge,"sta->sta_challenge");
@@ -568,7 +568,7 @@ static void nsta_cleanup(struct wifi_station *sta)
     if (!(sta->sta_ucastkey.wk_flags & WIFINET_KEY_NOFREE))
     {
         while (total_delay < 1000 && !drv_priv->hal_priv->hal_ops.hal_tx_empty()) {
-            msleep(10);
+            mdelay(10);
             total_delay += 10;
         }
         DPRINTF(AML_DEBUG_WARNING, "<running>disconnect %d %s sta:%p total_delay %d empty %d\n",sta->is_disconnecting, __func__, sta,
@@ -595,7 +595,7 @@ void wifi_mac_sta_leave(struct wifi_station *sta, int reassoc)
     wnet_vif->vm_change_rate_enable = 1;
     wnet_vif->vm_scanchan_rssi = MAC_MIN_GAIN;
 
-    printk("wifi_mac_sta_leave:%d, sta:%p, main_sta:%p\n", wnet_vif->wnet_vif_id, sta, wnet_vif->vm_mainsta);
+    pr_debug("wifi_mac_sta_leave:%d, sta:%p, main_sta:%p\n", wnet_vif->wnet_vif_id, sta, wnet_vif->vm_mainsta);
     if (wnet_vif->vm_opmode == WIFINET_M_STA)
     {
         wifimac->drv_priv->drv_ops.drv_set_pkt_drop(wifimac->drv_priv, wnet_vif->wnet_vif_id, 1);
@@ -682,7 +682,7 @@ nsta_free(struct wifi_station *sta)
         wnet_vif = sta->sta_wnet_vif;
 
         if (sta == wnet_vif->vm_mainsta) {
-            printk("free vm_mainsta:%p\n", sta);
+            pr_debug("free vm_mainsta:%p\n", sta);
             wnet_vif->vm_mainsta = NULL;
         }
     } else {
@@ -721,7 +721,7 @@ nsta_free(struct wifi_station *sta)
 #endif /*CONFIG_WAPI*/
 
     WIFINET_SAVEQ_DESTROY(&(sta->sta_pstxqueue));
-    printk("%s free %p\n", __func__, sta);
+    pr_debug("%s free %p\n", __func__, sta);
     FREE(sta,"alloc_sta_node.sta");
 }
 
@@ -755,7 +755,7 @@ alloc_sta_node(struct wifi_station_tbl *nt,struct wlan_net_vif *wnet_vif)
     }
 
     wifi_mac_alloc_amsdu_node(wifimac, wnet_vif->wnet_vif_id, sta);
-    printk("%s vid:%d, sta:%p\n", __func__, wnet_vif->wnet_vif_id, sta);
+    pr_debug("%s vid:%d, sta:%p\n", __func__, wnet_vif->wnet_vif_id, sta);
     return sta;
 }
 
@@ -777,7 +777,7 @@ struct wifi_station *wifi_mac_get_new_sta_node(struct wifi_station_tbl *nt,
     sta->sta_tmp_nsta = 0;
 
     WIFINET_ADDR_COPY(sta->sta_macaddr, macaddr);
-    //dump_memory_internel(macaddr, 6);
+    //dump_memory_internal(macaddr, 6);
     hash = WIFINET_NODE_HASH(macaddr);
     sta->sta_authmode = WIFINET_AUTH_OPEN;
     sta->sta_txpower = wifimac->wm_txpowlimit;
@@ -949,7 +949,7 @@ wifi_mac_tmp_nsta(struct wlan_net_vif *wnet_vif, const unsigned char *macaddr)
 {
     struct wifi_station *sta;
 
-    printk("%s\n", __func__);
+    pr_debug("%s\n", __func__);
 
     sta = alloc_sta_node(NULL ,wnet_vif);
     if (sta != NULL) {
@@ -1029,14 +1029,14 @@ wifi_mac_get_sta(struct wifi_station_tbl *nt, const unsigned char *macaddr,int w
 
 struct wifi_station *
 wifi_mac_fake_adhos_sta(struct wlan_net_vif *wnet_vif,
-                        const unsigned char macaddr[WIFINET_ADDR_LEN])
+                        const unsigned char *macaddr)
 {
     struct wifi_station *sta;
-    printk("<running> %s %d \n",__func__,__LINE__);
+    pr_debug("<running> %s %d \n",__func__,__LINE__);
     sta = wifi_mac_bup_bss(wnet_vif, macaddr);
     if (sta != NULL)
     {
-        printk("<running> %s %d NI_RATE....................\n",__func__,__LINE__);
+        pr_debug("<running> %s %d NI_RATE....................\n",__func__,__LINE__);
         sta->sta_rates = wnet_vif->vm_mainsta->sta_rates;
         wifi_mac_new_assoc(sta, 1);
         wifi_mac_sta_auth(sta);
@@ -1082,7 +1082,7 @@ wifi_mac_add_neighbor(struct wlan_net_vif *wnet_vif,
         }
         else if (vhtop->vht_op_chwidth > VHT_OPT_CHN_WD_80M)
         {
-            printk("%s:%d, not support bandwidth %d yet \n", __func__, __LINE__, vhtop->vht_op_chwidth);
+            pr_debug("%s:%d, not support bandwidth %d yet \n", __func__, __LINE__, vhtop->vht_op_chwidth);
         }
     }
 
@@ -1329,10 +1329,10 @@ void wifi_mac_free_sta(struct wifi_station *sta)
         }
         WIFINET_NODE_FREE_UNLOCK(wifimac);
 
-        printk("%s sta:%p, new:%d\n", __func__, sta, new_delete);
+        pr_debug("%s sta:%p, new:%d\n", __func__, sta, new_delete);
         if (new_delete) {
         if (sta == wnet_vif->vm_mainsta) {
-            printk("free vm_mainsta:%p\n", sta);
+            pr_debug("free vm_mainsta:%p\n", sta);
             wnet_vif->vm_mainsta = NULL;
         }
 
@@ -1355,7 +1355,8 @@ void wifi_mac_free_sta_from_list(struct wifi_station *sta)
     wifi_mac_free_sta(sta);
 }
 
-static void wifi_mac_sta_table_rst(struct wifi_station_tbl *nt, struct wlan_net_vif *match)
+static void wifi_mac_sta_table_rst(struct wifi_station_tbl *nt, struct wlan_net_vif *match,
+                                   bool rst_mainsta)
 {
     struct wifi_station *sta = NULL, *next = NULL;
 
@@ -1370,7 +1371,7 @@ static void wifi_mac_sta_table_rst(struct wifi_station_tbl *nt, struct wlan_net_
             vm_StaClearAid(wnet_vif, sta->sta_associd);
         }
 
-        if (sta != wnet_vif->vm_mainsta) {
+        if (sta != wnet_vif->vm_mainsta || rst_mainsta) {
             wifi_mac_rm_sta_from_wds_by_addr(nt,sta->sta_macaddr);
             list_del_init(&sta->sta_list);
 
@@ -1408,7 +1409,7 @@ void wifi_mac_list_sta( struct wlan_net_vif *wnet_vif)
     struct wifi_station *sta = NULL;
     struct wifi_station *next = NULL;
 
-    printk("station list==========>: \n");
+    pr_debug("station list==========>: \n");
     WIFINET_NODE_LOCK(nt);
     list_for_each_entry_safe(sta, next, &nt->nt_nsta, sta_list) {
         if (wnet_vif != sta->sta_wnet_vif) {
@@ -1416,13 +1417,13 @@ void wifi_mac_list_sta( struct wlan_net_vif *wnet_vif)
         }
 
         if(sta->sta_associd != 0) {
-            printk("station staid %d, ",sta->sta_associd&0xff);
-            printk("mac addr %s \n",ether_sprintf(sta->sta_macaddr));
+            pr_debug("station staid %d, ",sta->sta_associd&0xff);
+            pr_debug("mac addr %s \n",ether_sprintf(sta->sta_macaddr));
             wifi_mac_dump_sta(nt,sta);
         }
     }
     WIFINET_NODE_UNLOCK(nt);
-    printk("=========end================\n");
+    pr_debug("=========end================\n");
 }
 
 static void wifi_mac_TimeoutStations(struct wifi_station_tbl *nt)
@@ -1702,7 +1703,7 @@ void wifi_mac_sta_disassoc(void *arg, struct wifi_station *sta)
 
     if ((sta->sta_wnet_vif == wnet_vif) && (sta->sta_associd != 0)) {
         wifi_mac_send_mgmt(sta, WIFINET_FC0_SUBTYPE_DISASSOC, (void *)&mgmt_arg);
-        printk("<running> %s %d \n",__func__,__LINE__);
+        pr_debug("<running> %s %d \n",__func__,__LINE__);
 
         wifi_mac_sta_disconnect(sta);
         wifi_mac_rm_sta_from_wds_by_addr(nt, sta->sta_macaddr);
@@ -1718,9 +1719,50 @@ void wifi_mac_sta_deauth(void *arg, struct wifi_station *sta)
 
     if (sta->sta_wnet_vif == wnet_vif)
     {
-        printk("<running> %s %d \n",__func__,__LINE__);
+        pr_debug("<running> %s %d \n",__func__,__LINE__);
         wifi_mac_send_mgmt(sta, WIFINET_FC0_SUBTYPE_DEAUTH, (void *)&mgmt_arg);
     }
+}
+
+static void wifi_mac_disassoc_cb(SYS_TYPE param1, SYS_TYPE param2, SYS_TYPE param3,
+                                 SYS_TYPE param4, SYS_TYPE param5)
+{
+    struct wlan_net_vif *wnet_vif = (struct wlan_net_vif *)param1;
+    struct wifi_station *sta = (struct wifi_station *)param2;
+    struct wifi_station_tbl *nt = &(wnet_vif->vm_sta_tbl);
+    int mgmt_arg = WIFINET_REASON_ASSOC_LEAVE;
+
+    wifi_mac_send_mgmt(sta, WIFINET_FC0_SUBTYPE_DISASSOC, (void *)&mgmt_arg);
+    pr_debug("<running> %s %d \n",__func__,__LINE__);
+
+    wifi_mac_sta_disconnect(sta);
+    wifi_mac_rm_sta_from_wds_by_addr(nt, sta->sta_macaddr);
+
+    wifi_mac_free_sta(sta);
+}
+
+void wifi_mac_sta_disassoc_in_task(struct wlan_net_vif *wnet_vif)
+{
+    struct wifi_station *sta = NULL, *sta_next = NULL;
+    struct wifi_station_tbl *nt = &(wnet_vif->vm_sta_tbl);
+
+    WIFINET_NODE_LOCK(nt);
+
+    list_for_each_entry_safe(sta, sta_next, &nt->nt_nsta, sta_list) {
+        if ((sta->sta_wnet_vif == wnet_vif) && sta->sta_associd) {
+            /* Remove 'sta' with lock from global list here. So
+             * nobody can access it later. 'wifi_mac_disassoc_cb()'
+             * will free it later.
+             */
+            list_del_init(&sta->sta_list);
+
+            wifi_mac_add_work_task(nt->nt_wmac, wifi_mac_disassoc_cb, NULL,
+                                   (SYS_TYPE)wnet_vif, (SYS_TYPE)sta, NULL,
+                                   NULL, NULL);
+        }
+    }
+
+    WIFINET_NODE_UNLOCK(nt);
 }
 
 void wifi_mac_func_to_task(struct wifi_station_tbl *nt, wifi_mac_IterFunc *f, void *arg,unsigned char btask)
@@ -1990,7 +2032,7 @@ void wifi_mac_sta_connect(struct wifi_station *sta, int resp)
         wnet_vif->vm_curchan->chan_pri_num, sta->sta_chbw, sta->sta_essid,
         sta->sta_macaddr[0], sta->sta_macaddr[1], sta->sta_macaddr[2],
         sta->sta_macaddr[3], sta->sta_macaddr[4], sta->sta_macaddr[5]);
-    printk("****************************************************\n");
+    pr_debug("****************************************************\n");
 }
 
 void
@@ -2059,16 +2101,16 @@ void wifi_mac_rst_bss(struct wlan_net_vif *wnet_vif)
 {
     struct wifi_mac *wifimac = wnet_vif->vm_wmac;
 
-    printk("%s, wnet_vif->wnet_vif_id= %d\n", __func__, wnet_vif->wnet_vif_id);
+    pr_debug("%s, wnet_vif->wnet_vif_id= %d\n", __func__, wnet_vif->wnet_vif_id);
 
-    wifi_mac_sta_table_rst(&wnet_vif->vm_sta_tbl, wnet_vif);
+    wifi_mac_sta_table_rst(&wnet_vif->vm_sta_tbl, wnet_vif, false);
     wifi_mac_reset_erp(wifimac, wnet_vif->vm_mac_mode);
     wifi_mac_reset_ht(wifimac);
 
     if (!wnet_vif->vm_mainsta) {
         wnet_vif->vm_mainsta = wifi_mac_get_sta_node(&wnet_vif->vm_sta_tbl, wnet_vif, wnet_vif->vm_myaddr);
         KASSERT(wnet_vif->vm_mainsta != NULL, ("unable to create vm_mainsta"));
-        printk("%s add vm_mainsta:%p\n", __func__, wnet_vif->vm_mainsta);
+        pr_debug("%s add vm_mainsta:%p\n", __func__, wnet_vif->vm_mainsta);
     }
 
     wnet_vif->vm_ps_sta = 0;
@@ -2078,7 +2120,7 @@ void wifi_mac_rst_main_sta(struct wlan_net_vif *wnet_vif)
 {
     struct wifi_station *sta = wnet_vif->vm_mainsta;
 
-    printk("%s, wnet_vif_id= %d, main_sta:%p\n", __func__, wnet_vif->wnet_vif_id, sta);
+    pr_debug("%s, wnet_vif_id= %d, main_sta:%p\n", __func__, wnet_vif->wnet_vif_id, sta);
 
     if (sta) {
         sta->sta_associd = 0;
@@ -2119,8 +2161,8 @@ void wifi_mac_sta_vattach(struct wlan_net_vif *wnet_vif)
 
 void wifi_mac_sta_vdetach(struct wlan_net_vif *wnet_vif)
 {
-    printk("%s, vm_mainsta:%p\n", __func__, wnet_vif->vm_mainsta);
-    wifi_mac_sta_table_rst(&wnet_vif->vm_sta_tbl, wnet_vif);
+    pr_debug("%s, vm_mainsta:%p\n", __func__, wnet_vif->vm_mainsta);
+    wifi_mac_sta_table_rst(&wnet_vif->vm_sta_tbl, wnet_vif, true);
 }
 
 void wifi_mac_sta_attach(struct wifi_mac *wifimac)

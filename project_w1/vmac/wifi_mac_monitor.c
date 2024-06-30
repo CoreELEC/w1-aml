@@ -127,7 +127,7 @@ static int vm_cfg80211_go_if_xmit_entry(struct sk_buff *skb, struct net_device *
 
     DPRINTF(AML_DEBUG_ANY,"<%s>:<%s>:%s\n", wnet_vif->vm_ndev->name,ndev->name,__func__);
 
-    dump_memory_internel(skb->data,32);
+    dump_memory_internal(skb->data,32);
     return wifi_mac_hardstart(skb, wnet_vif->vm_ndev);
 }
 
@@ -176,7 +176,7 @@ const char *name)
     ndev->type = ARPHRD_IEEE80211_RADIOTAP;
     strncpy(ndev->name, name, IFNAMSIZ);
     ndev->name[IFNAMSIZ - 1] = 0;
-    WIFINET_ADDR_COPY(ndev->dev_addr, wnet_vif->vm_myaddr);
+    dev_addr_mod(ndev, 0, wnet_vif->vm_myaddr, WIFINET_ADDR_LEN);
     ndev->hard_header_len = DEFAULT_HARD_HDR_LEN;
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
@@ -367,7 +367,7 @@ const char *name, enum nl80211_iftype type)
     pnpi = netdev_priv(ndev);
     pnpi->priv = wnet_vif;
     pnpi->sizeof_priv = sizeof(wnet_vif);
-    WIFINET_ADDR_COPY(ndev->dev_addr, wnet_vif->vm_myaddr);
+    dev_addr_mod(ndev, 0, wnet_vif->vm_myaddr, WIFINET_ADDR_LEN);
 
     AML_PRINT(AML_DBG_MODULES_P2P,"%s,type %d\n",name,type);
 
@@ -398,7 +398,11 @@ const char *name, enum nl80211_iftype type)
         //wifi_mac_stop(vmac->vm_dev);
         wnet_vif->vm_state = WIFINET_S_INIT;
         wifi_mac_scan_vdetach(wnet_vif);
-        if (wifimac->drv_priv->drv_ops.change_interface(wifimac->drv_priv, wnet_vif->wnet_vif_id, wnet_vif, networkType, wnet_vif->vm_myaddr, 0))
+        if (wifimac->drv_priv->drv_ops.change_interface(wifimac->drv_priv,
+                                                        wnet_vif->wnet_vif_id,
+                                                        wnet_vif,
+                                                        (enum hal_op_mode)networkType,
+                                                        wnet_vif->vm_myaddr, 0))
         {
             ERROR_DEBUG_OUT("Unable to add an interface for driver.\n");
             wifi_mac_free_vmac(wnet_vif);

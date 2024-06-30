@@ -70,6 +70,8 @@ CONFIG_WIFI_CAPTURE=y
 TARGET = vlsicomm
 
 EXTRA_CFLAGS += -Wno-enum-conversion -Wno-strict-prototypes
+EXTRA_CFLAGS += -Wno-implicit-function-declaration -Wno-int-conversion
+EXTRA_CFLAGS += -Wno-misleading-indentation
 EXTRA_CFLAGS += ${INCS}  -DCONFIG_WAPI
 EXTRA_CFLAGS += -Wall -Wno-unused-function #show all warning
 EXTRA_CFLAGS += -Werror -Wno-format -Wno-error #convert warning into error
@@ -94,7 +96,6 @@ EXTRA_CFLAGS += -DSDIO_BUILD_IN
 EXTRA_CFLAGS += -DFW_RF_CALIBRATION
 #EXTRA_CFLAGS += -DPOWER_SAVE_NO_SDIO
 EXTRA_CFLAGS += -DAML_WPA3
-#EXTRA_CFLAGS += -DWPA3_PATCH
 EXTRA_CFLAGS += -DDYNAMIC_BW
 #EXTRA_CFLAGS += -DWFA_P2P_TEST
 
@@ -132,9 +133,15 @@ EXTRA_CFLAGS += -DCONFIG_SDIO_IF
 EXTRA_CFLAGS += -DFPGA
 #EXTRA_CFLAGS += -DCONFIG_GPIO_WAKEUP
 
-#EXTRA_CFLAGS += -DNOT_AMLOGIC_PLATFORM
+ifeq ($(CONFIG_NOT_AMLOGIC_PLATFORM),y)
+EXTRA_CFLAGS += -DNOT_AMLOGIC_PLATFORM
+endif
+
 ifeq ($(CONFIG_PT_SUPPORT),y)
+$(warning Building PT image)
 EXTRA_CFLAGS += -DDRV_PT_SUPPORT
+KBUILD_CFLAGS_MODULE += -Wframe-larger-than=200000000
+KBUILD_CFLAGS_MODULE += -Wlarger-than=20000000
 else
 KBUILD_CFLAGS_MODULE += -Wframe-larger-than=200000000
 KBUILD_CFLAGS_MODULE += -Wlarger-than=20000000
@@ -147,7 +154,13 @@ endif
 
 ifeq ($(CONFIG_MAC_SUPPORT),y)
 EXTRA_CFLAGS += -DCONFIG_MAC_SUPPORT
+ifeq ($(CONFIG_BUILDROOT),y)
+EXTRA_CFLAGS += -DWIFIMAC_PATH=\"/etc/wifi/wifimac.txt\"
+EXTRA_CFLAGS += -DLINUX_PLATFORM
+EXTRA_CFLAGS += -DWPA3_PATCH
+else
 EXTRA_CFLAGS += -DWIFIMAC_PATH=\"/data/vendor/wifi/wifimac.txt\"
+endif
 endif
 
 ifeq ($(CONFIG_BT_RF_SUPPORT),y)

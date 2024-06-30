@@ -90,6 +90,10 @@ static __inline void prefetch(const void *x)
 {
         ;
 }
+static __inline void prefetchw(const void *x)
+{
+        ;
+}
 
 #define LIST_POISON1  ((void *) 0x00100100)
 #define LIST_POISON2  ((void *) 0x00200200)
@@ -458,7 +462,7 @@ void drv_intr_bt_info_change(void * dpriv, unsigned char wnet_vif_id,unsigned ch
 void Driver_intr_tx_handle(void *  drv_priv,struct txdonestatus* tx_done_status,SYS_TYPE callback, unsigned char queue_id);
 void Driver_ListInit(struct _HI_AGG_TxDescripter_chain  *HI_AGG_TxDp );
 struct _HI_TxPrivDescripter_chain *  Driver_GetTxPriv(void);
-int Do_HI_AGG_TxPriv_TYPE_AMSDU(struct _HI_TxPrivDescripter_chain* HI_TxPriv[],unsigned char* buffer[],int length[],int packetNum);
+int Do_HI_AGG_TxPriv_TYPE_AMSDU(struct _HI_TxPrivDescripter_chain* HI_TxPriv[],unsigned char* skbptr[],int length[],int packetNum);
 void Do_HI_AGG_TxPriv_TYPE_AMPDU(struct _HI_TxPrivDescripter_chain* HI_TxPriv[],unsigned char* buffer[],int length[],int packetNum);
 void Do_HI_AGG_TxPriv_TYPE_COMMO(struct _HI_TxPrivDescripter_chain* HI_TxPriv,unsigned char* buffer,int length,int packetNum);
 void Driver_CreatTxPriv(void);

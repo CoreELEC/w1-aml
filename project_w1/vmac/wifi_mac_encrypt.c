@@ -52,7 +52,7 @@ int wifi_mac_security_req(struct wlan_net_vif *wnet_vif, int cipher, int flags, 
 
     if (cipher >= WIFINET_CIPHER_MAX) {
         wnet_vif->vif_sts.sts_key_type_err++;
-        printk("<running> %s cipher:%d\n",__func__, cipher);
+        pr_debug("<running> %s cipher:%d\n",__func__, cipher);
         return 0;
     }
 
@@ -135,13 +135,13 @@ int wifi_mac_security_setkey(struct wlan_net_vif *wnet_vif, struct wifi_mac_key 
 
     if (!cip->wm_setkey(key)) {
         wnet_vif->vif_sts.sts_key_drop++;
-        printk("<running> %s %d \n",__func__,__LINE__);
+        pr_debug("<running> %s %d \n",__func__,__LINE__);
         return 0;
     }
 
     if (key->wk_keyix == WIFINET_KEYIX_NONE) {
         wnet_vif->vif_sts.sts_key_id_err++;
-        printk("<running> %s %d \n",__func__,__LINE__);
+        pr_debug("<running> %s %d \n",__func__,__LINE__);
         return 0;
     }
 
@@ -491,7 +491,7 @@ tkip_enmic(struct wifi_mac_key *k, struct sk_buff *skb0, int force)
         int hdrlen;
         struct sk_buff *skb;
         size_t data_len;
-        uint8_t mic[WIFINET_WEP_MICLEN];
+        uint8_t mic[WIFINET_WEP_MICLEN] = { 0 };
 
         wnet_vif->vif_sts.sts_tx_tkip_sw_mic_err++;
 
@@ -562,8 +562,8 @@ tkip_demic(struct wifi_mac_key *k, struct sk_buff *skb0, int hdrlen, int force)
         wh = (struct wifi_frame *) skb0->data;
 
         wnet_vif->vif_sts.sts_rx_tkip_sw_mic_err++;
-        // printk("<running> %s %d \n",__func__,__LINE__);
-        //dump_memory_internel(k->wk_key, WIFINET_KEYBUF_SIZE+WIFINET_MICBUF_SIZE);
+        // pr_debug("<running> %s %d \n",__func__,__LINE__);
+        //dump_memory_internal(k->wk_key, WIFINET_KEYBUF_SIZE+WIFINET_MICBUF_SIZE);
         michael_mic(k->wk_rxmic,
                     skb0, hdrlen, pktlen - (hdrlen + k->wk_cipher->wm_miclen),
                     mic);

@@ -88,6 +88,12 @@ extern struct hal_private g_hal_priv;
 #endif
 /*End of HAL_FPGA_VER*/
 
+#ifndef defined(NOT_AMLOGIC_PLATFORM)
+#define pr_debug(fmt, ...) pr_info(fmt, ##__VA_ARGS__)
+#else
+#define pr_debug(fmt, ...)
+#endif
+
 /*Start of HAL_SIM_VER*/
 #if defined (HAL_SIM_VER)
 
@@ -96,8 +102,12 @@ extern struct hal_private g_hal_priv;
 #define  BIT(n) (1UL<<(n))
 #define ALIGN(x,a) 		(((x)+(a)-1)&~((a)-1))
 
-
-#define printk(...)  	do{if(FW_ID==1)io_printf("<STA_0>");else io_printf("<STA_1>");sv_time();io_printf(__VA_ARGS__);}while(0)
+#define pr_debug(...)  	do{if(FW_ID==1)io_printf("<STA_0>");else io_printf("<STA_1>");sv_time();io_printf(__VA_ARGS__);}while(0)
+#define pr_crit(...) pr_debug(__VA_ARGS__)
+#define pr_err(...) pr_debug(__VA_ARGS__)
+#define pr_warn(...) pr_debug(__VA_ARGS__)
+#define pr_info(...) pr_debug(__VA_ARGS__)
+#define pr_notice(...) pr_debug(__VA_ARGS__)
 #define  MODULE_LICENSE(a);
 #define  module_init(a);
 #define  module_exit(a);
@@ -193,7 +203,6 @@ static struct sk_buff  * OS_SKBBUF_ALLOC(int size) {
 
 static void * OS_SKBBUF_FREE(struct sk_buff * skb)
 {
-        int i = 0;
         skb->valid = 0;
         return NULL;
 }

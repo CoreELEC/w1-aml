@@ -12,7 +12,7 @@
  ****************************************************************************************
  */
 
-
+#include "wifi_drv_uapsd.h"
 #include "wifi_mac_com.h"
 #include "wifi_drv_xmit.h"
 #include "wifi_pkt_desc.h"
@@ -303,12 +303,12 @@ int drv_process_uapsd_nsta_trigger( struct drv_private *drv_priv, void * nsta, u
             txn_real = maxsp;
     }
 
-    printk("before tx uapsd\n");
+    pr_debug("before tx uapsd\n");
     DPRINTF(AML_DEBUG_PWR_SAVE, "%s %d flush=%d uapsd_qqcnt=%d\n", __func__,__LINE__, flush, uapsd_qqcnt);
     for (count = txn_real; ((count > 0) && (eosp_flag==0)); count--)
     {
 
-        printk("tx=%d\n", count);
+        pr_debug("tx=%d\n", count);
 
 #ifdef DRV_SUPPORT_TX_WITHDRAW
         if (drv_sta->sta_txwd_uapsd_qqcnt)
@@ -445,22 +445,29 @@ int drv_tx_mcastq_send (struct drv_private *drv_priv)
     struct wifi_station *sta = NULL;
     DPRINTF(AML_DEBUG_PWR_SAVE, "%s %d txlist->txlist_backup_qcnt=%d\n", __func__,__LINE__, txlist->txlist_backup_qcnt);
 
-    if (*qcnt == 0)
-        return 0;
+    DRV_TX_QUEUE_LOCK(drv_priv);
 
+    if (*qcnt == 0) {
+        DRV_TX_QUEUE_UNLOCK(drv_priv);
+        return 0;
+    }
+
+    if (list_empty(wnet_vif_mcast_q))
+    {
+        DRV_TX_QUEUE_UNLOCK(drv_priv);
+        DPRINTF(AML_DEBUG_ERROR|AML_DEBUG_PWR_SAVE, "%s %d\n",__func__,__LINE__);
+        return 0;
+    }
+
+    bf_qnode = wnet_vif_mcast_q->next;
     INIT_LIST_HEAD(&tx_queue);
 
     do
     {
-        DRV_TX_QUEUE_LOCK(drv_priv);
-        if (list_empty(wnet_vif_mcast_q)) {
-            DRV_TX_QUEUE_UNLOCK(drv_priv);
-            break;
-        }
-        bf_qnode = wnet_vif_mcast_q->next;
+        struct list_head *curr_next = NULL;
+
         ptxdesc = list_entry(bf_qnode, struct drv_txdesc, txdesc_queue);
         skbbuf = ptxdesc->txdesc_mpdu;
-        bf_qnode = bf_qnode->next;
         cb = (struct wifi_skb_callback *)skbbuf->cb;
         sta = cb->sta;
         if (sta)
@@ -470,7 +477,6 @@ int drv_tx_mcastq_send (struct drv_private *drv_priv)
             {
 #ifdef CONFIG_P2P
                 if (drv_if_noa_started(ptxdesc) >= 0) {
-                    DRV_TX_QUEUE_UNLOCK(drv_priv);
                     break;
                 }
 #endif
@@ -480,10 +486,10 @@ int drv_tx_mcastq_send (struct drv_private *drv_priv)
                 if (aml_tx_hal_buffer_full(drv_priv, txlist->txlist_qnum, 1, 1)==1)
                 {
                     DRV_TXQ_UNLOCK(txlist);
-                    DRV_TX_QUEUE_UNLOCK(drv_priv);
                     break;
                 }
 
+                curr_next = ptxdesc->txdesc_queue.next;
                 list_del_init(&ptxdesc->txdesc_queue);
                 list_add_tail(&ptxdesc->txdesc_queue,&tx_queue);
                 (*qcnt) --;
@@ -492,14 +498,19 @@ int drv_tx_mcastq_send (struct drv_private *drv_priv)
                 DRV_TXQ_UNLOCK(txlist);
             }
         }
-        if (bf_qnode == wnet_vif_mcast_q) {
-            DRV_TX_QUEUE_UNLOCK(drv_priv);
-            break;
-        }
-        DRV_TX_QUEUE_UNLOCK(drv_priv);
 
+        /* If element is still in list, go to next. */
+        if (!curr_next)
+            bf_qnode = bf_qnode->next;
+        else
+            bf_qnode = curr_next;
+
+        if (bf_qnode == wnet_vif_mcast_q)
+            break;
     }
     while ((*qcnt > 0) && !list_empty(wnet_vif_mcast_q));
+
+    DRV_TX_QUEUE_UNLOCK(drv_priv);
 
     return 0;
 }

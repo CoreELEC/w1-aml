@@ -38,8 +38,8 @@ open OUTPUT, ">", "$output" or die "open $output fail";
 
 print OUTPUT "#include \"wifi_hal_com.h\"\n\n";
 print OUTPUT "void print_driver_version(void) {\n";
-print OUTPUT "    printk(\"driver compile date: $date,driver hash: $drv_hash\\n\");\n";
-print OUTPUT "    printk(\"fw compile date: $fw_date,fw hash: $fw_hash,fw size: $fw_size\\n\");\n";
+print OUTPUT "    pr_info(\"driver compile date: $date,driver hash: $drv_hash\\n\");\n";
+print OUTPUT "    pr_info(\"fw compile date: $fw_date,fw hash: $fw_hash,fw size: $fw_size\\n\");\n";
 print OUTPUT "}\n";
 
 close OUTPUT;

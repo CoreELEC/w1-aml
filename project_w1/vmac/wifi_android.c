@@ -72,14 +72,14 @@ static int aml_android_get_rssi(struct wlan_net_vif *wnet_vif, char *command, in
             bytes_written += snprintf(&command[bytes_written], total_len, "%s rssi %d\n",
                 wnet_vif->vm_mainsta->sta_essid, rssi);
 
-            printk("sta_avg_rssi:%d, sta_avg_bcn_rssi:%d\n",
+            pr_debug("sta_avg_rssi:%d, sta_avg_bcn_rssi:%d\n",
                 (wnet_vif->vm_mainsta->sta_avg_rssi - 255), wnet_vif->vm_mainsta->sta_avg_bcn_rssi);
         }
     }
 
     return bytes_written;
 }
-unsigned int aml_atoi(unsigned char* s)
+static unsigned int aml_atoi(unsigned char* s)
 {
 
     int num=0,flag=0;
@@ -153,7 +153,7 @@ static int wl_android_wifi_on(struct net_device *dev)
 {
     int ret = 0;
 
-    printk("%s in\n", __FUNCTION__);
+    pr_debug("%s in\n", __FUNCTION__);
     if (!dev)
     {
         ERROR_DEBUG_OUT("dev is null\n");
@@ -168,7 +168,7 @@ static int wl_android_wifi_off(struct net_device *dev)
 {
     int ret = 0;
 
-    printk("%s in\n", __FUNCTION__);
+    pr_debug("%s in\n", __FUNCTION__);
     if (!dev)
     {
         ERROR_DEBUG_OUT("dev is null\n");

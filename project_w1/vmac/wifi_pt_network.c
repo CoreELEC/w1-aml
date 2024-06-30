@@ -80,7 +80,7 @@ static unsigned char IsManageFrame(unsigned char* buffer)
     return MacFrame_IsType(frame_control,FRAME_TYPE_MANAGEMENT);
 }
 
-void B2B_Net_RequestTransmit(struct sk_buff *skb,
+static void B2B_Net_RequestTransmit(struct sk_buff *skb,
     unsigned short len,unsigned short Tid)
 {
     struct _TxDescriptor *descriptor = TxDescriptor_Create();
@@ -202,12 +202,12 @@ B2b_Net_WriteSimcheck(unsigned char* start,
 }
 
 
-void RcvFrameTestSeq(unsigned char *packet,unsigned char tid)
+static void RcvFrameTestSeq(unsigned char *packet,unsigned char tid)
 {
         return;
 }
 
-void RcvFrame(unsigned char *packet,int length,unsigned char tid)
+static void RcvFrame(unsigned char *packet,int length,unsigned char tid)
 {
     int i;
     static unsigned char sendPacketseq[MAX_TID]= {0};//256 is one test peri.
@@ -221,7 +221,7 @@ void RcvFrame(unsigned char *packet,int length,unsigned char tid)
     sendPacketseq[tid] ++;
     return;
 }
-void Net_Send( unsigned char type, unsigned char* input)
+static void Net_Send( unsigned char type, unsigned char* input)
 {
     unsigned int header_length;
     struct sk_buff *skb = TxBuffer_Alloc();
@@ -297,8 +297,8 @@ void Net_Send( unsigned char type, unsigned char* input)
         B2b_Net_WriteSimcheck( cursor,gB2BTestCasePacket.pkt_length,TrcConfMib.tid );
         cursor = buffer + gB2BTestCasePacket.pkt_length;
 
-        //printk( "---aml debug--: pkt len: %d.\n",pkt_len);
-        //dump_memory_internel(buffer,48);
+        //pr_debug( "---aml debug--: pkt len: %d.\n",pkt_len);
+        //dump_memory_internal(buffer,48);
         B2B_Net_RequestTransmit(skb,cursor-buffer,TrcConfMib.tid);
         //Net_RequestTransmit(buffer,pkt_len,TrcConfMib.tid);
 
@@ -306,7 +306,7 @@ void Net_Send( unsigned char type, unsigned char* input)
     else {
         my_network.tx_pool_error_count++;
         ASSERT(0);
-        printk( "NULL TxBuffer_Create\n" );
+        pr_debug( "NULL TxBuffer_Create\n" );
     }
     DBG_HAL_THR_EXIT();
 }
@@ -322,7 +322,7 @@ void Net_Receive(unsigned char *packet,unsigned short len,unsigned char rssi)
         //DBG_ENTER();
         //
        // if(STA2_VMAC1_RX_FRAME_DUMP)
-        // dump_memory_internel(packet,len);
+        // dump_memory_internal(packet,len);
 
         frame_control = *(unsigned int*)packet;
         headerlength = MacFrame_GetHeaderSize( frame_control );
@@ -495,11 +495,11 @@ void prepare_test_hal_layer_thr_init(int usrtesttype)
     DBG_HAL_THR_ENTER();
     if ( usrtesttype > 11 || usrtesttype < 1 )
     {
-        printk("Warning: Not supported testing type.\n");
+        pr_warn("Warning: Not supported testing type.\n");
         return;
     }
 
-    printk("b2b_init: test type 0x%08x\n", usrtesttype);
+    pr_debug("b2b_init: test type 0x%08x\n", usrtesttype);
 
     Task_Schedule(usrtesttype);
 

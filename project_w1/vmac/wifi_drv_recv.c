@@ -376,9 +376,11 @@ int drv_rx_input( struct drv_private *drv_priv, void *nsta,
     return WIFINET_FC0_TYPE_DATA;
 }
 
-static int drv_rx_sort_timer(void *context)
+static void drv_rx_sort_timer_ex(SYS_TYPE param1, SYS_TYPE param2,
+                                 SYS_TYPE param3, SYS_TYPE param4,
+                                 SYS_TYPE param5)
 {
-    struct drv_rx_scoreboard *RxTidState = (struct drv_rx_scoreboard *) context;
+    struct drv_rx_scoreboard *RxTidState = (struct drv_rx_scoreboard *) param1;
     struct aml_driver_nsta *drv_sta = RxTidState->drv_sta;
     struct drv_private *drv_priv = drv_sta->sta_drv_priv;
     int nosched = OS_TIMER_NOT_REARMED;
@@ -426,18 +428,18 @@ static int drv_rx_sort_timer(void *context)
     }
 
     if (RxTidState->baw_head != RxTidState->baw_tail)
-    {
-        nosched = OS_TIMER_REARMED;
-    }
-    else
-    {
-        nosched = OS_TIMER_NOT_REARMED;
-    }
-    DRV_RXTID_UNLOCK_IRQ(RxTidState,lockflags);;
-
-    return nosched;
+        os_timer_ex_start(&RxTidState->timer);
+    DRV_RXTID_UNLOCK_IRQ(RxTidState,lockflags);
 }
 
+static int drv_rx_sort_timer(void *context)
+{
+    drv_hal_add_workitem((WorkHandler)drv_rx_sort_timer_ex, NULL,
+                         (SYS_TYPE)context, (SYS_TYPE)0, (SYS_TYPE)0,
+                         (SYS_TYPE)0,(SYS_TYPE)0);
+
+    return OS_TIMER_NOT_REARMED;
+}
 
 static void
 drv_rx_flush_tid(struct drv_private *drv_priv, struct drv_rx_scoreboard *RxTidState, int drop)

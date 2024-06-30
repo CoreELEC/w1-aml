@@ -30,7 +30,7 @@ struct sk_buff g_skbuffer[MAX_SKB_NUM];
 static struct ieee80211_supported_band aml_band_24ghz = {
 	.n_channels = AML_2G_CHANNELS_NUM,
 	.channels = aml_2ghz_channels,
-	.band = IEEE80211_BAND_2GHZ,
+	.band = (enum nl80211_band)IEEE80211_BAND_2GHZ,
 	.n_bitrates = AML_G_RATES_NUM,
 	.bitrates = aml_g_rates,
 	.ht_cap.cap = 0,/*Need to be initialized later*/
@@ -40,7 +40,7 @@ static struct ieee80211_supported_band aml_band_24ghz = {
 static struct ieee80211_supported_band aml_band_5ghz = {
 	.n_channels = AML_5G_CHANNELS_NUM,
 	.channels = aml_5ghz_channels,
-	.band = IEEE80211_BAND_5GHZ,
+	.band = (enum nl80211_band)IEEE80211_BAND_5GHZ,
 	.n_bitrates = AML_A_RATES_NUM,/*Eliminate 11b rate*/
 	.bitrates = aml_a_rates,/*Eliminate 11b rate*/
 	.ht_cap.cap = 0,  /*Need to be initialized later*/
@@ -189,14 +189,14 @@ void aml_minstrel_detach(void)
 {
     struct minstrel_rate_control_ops *p_rate_control_ops = NULL;
 
-    printk("%s\n", __func__);
+    pr_debug("%s\n", __func__);
     g_aml_rate_adaptation_dev.ht_cap_info = 0;
     p_rate_control_ops = get_rate_control_ops();
     p_rate_control_ops->free(g_minstel_pri);
     g_minstel_pri = NULL;
 }
 
-unsigned int support_legacy_rate_init( struct wifi_station *sta ,  struct ieee80211_sta_aml *p_ieee_sta,unsigned int channel_band)
+static unsigned int support_legacy_rate_init( struct wifi_station *sta ,  struct ieee80211_sta_aml *p_ieee_sta,unsigned int channel_band)
 {
     int i = 0;
     unsigned int bit_val = 0;
@@ -270,7 +270,7 @@ unsigned int support_legacy_rate_init( struct wifi_station *sta ,  struct ieee80
     return 0;
 }
 
-void aml_rate_adaptation_dev_init(struct wifi_station *sta, int rate_mode, unsigned int channel_band, struct ieee80211_sta_aml *p_ieee_sta)
+static void aml_rate_adaptation_dev_init(struct wifi_station *sta, int rate_mode, unsigned int channel_band, struct ieee80211_sta_aml *p_ieee_sta)
 {
     g_aml_rate_adaptation_dev.num_rf_chains = 1;
 
@@ -297,19 +297,19 @@ void aml_rate_adaptation_dev_init(struct wifi_station *sta, int rate_mode, unsig
         int i = 0;
         g_aml_rate_adaptation_dev.sband = &aml_band_24ghz;
 
-        printk("support rate start\n");
+        pr_debug("support rate start\n");
         for (i = 0; i < sta->sta_rates.dot11_rate_num; i++)
         {
-            printk("%02x  ",sta->sta_rates.dot11_rate[i]);
+            pr_debug("%02x  ",sta->sta_rates.dot11_rate[i]);
         }
-        printk("\n");
+        pr_debug("\n");
     } else {
         g_aml_rate_adaptation_dev.sband = &aml_band_5ghz;
         g_aml_rate_adaptation_dev.sband->vht_cap = aml_create_vht_cap(&g_aml_rate_adaptation_dev, rate_mode);
     }
 }
 
-unsigned char get_fitable_bw(struct wifi_station *sta) {
+static unsigned char get_fitable_bw(struct wifi_station *sta) {
     unsigned char bw;
 
     if (sta->sta_avg_bcn_rssi < sta->sta_wmac->wm_signal_power_bw_change_thresh_narrow) {
@@ -329,7 +329,7 @@ unsigned char get_fitable_bw(struct wifi_station *sta) {
     return sta->sta_chbw;
 }
 
-unsigned char get_fitable_mcs_rate(struct wifi_station *sta, unsigned char bw) {
+static unsigned char get_fitable_mcs_rate(struct wifi_station *sta, unsigned char bw) {
     int avg_rssi = 0;
     unsigned char max_rate_rssi = 0;
     unsigned char max_rate_snr = 0;
@@ -446,7 +446,7 @@ void aml_minstrel_init(
     p_ieee_sta = &(sta->ieee_sta);
     p_ieee_sta->smps_mode = IEEE80211_SMPS_OFF;
     p_ieee_sta->rates = &(sta->sta_ieee_rates);
-    p_ieee_sta->bandwidth = sta->sta_chbw;
+    p_ieee_sta->bandwidth = (enum ieee80211_sta_rx_bandwidth)sta->sta_chbw;
     AML_OUTPUT("bw=%d, sta:%p,p_ieee_sta=%p\n", p_ieee_sta->bandwidth, sta,p_ieee_sta);
     if (sta->sta_wnet_vif->vm_curchan == NULL) {
         ERROR_DEBUG_OUT("vm_curchan is NULL, just return\n");
@@ -522,17 +522,17 @@ void aml_minstrel_deinit(void *p_sta)
     struct wifi_station *sta = (struct wifi_station *)p_sta;
     struct minstrel_rate_control_ops* p_rate_control_ops = NULL;
     struct minstrel_rate_control_ops *p_rate_control_ops_ht = NULL;
-    printk("%s:%04x ", __func__, sta->sta_flags);
+    pr_debug("%s:%04x ", __func__, sta->sta_flags);
 
     if ((sta->sta_flags & WIFINET_NODE_VHT) || (sta->sta_flags & WIFINET_NODE_HT)) {
         p_rate_control_ops_ht = get_rate_control_ops_ht();
-        printk("ht free:%p\n", sta->sta_minstrel_ht_priv);
+        pr_debug("ht free:%p\n", sta->sta_minstrel_ht_priv);
         p_rate_control_ops_ht->free_sta(sta->sta_minstrel_ht_priv);
         sta->sta_minstrel_ht_priv = NULL;
 
     } else {
         p_rate_control_ops = get_rate_control_ops();
-        printk("free:%p\n", sta->sta_minstrel_info);
+        pr_debug("free:%p\n", sta->sta_minstrel_info);
         p_rate_control_ops->free_sta(sta->sta_minstrel_info);
         sta->sta_minstrel_info = NULL;
     }
@@ -573,7 +573,7 @@ static void rate_control_fill_sta_table(struct ieee80211_sta_aml *sta,
     rates[3].flags  = 0;
 }
 
-int check_is_rate_fitable(struct wifi_station *sta, struct ieee80211_tx_info *info, void *priv_sta) {
+static int check_is_rate_fitable(struct wifi_station *sta, struct ieee80211_tx_info *info, void *priv_sta) {
     struct minstrel_ht_sta_priv *msp = priv_sta;
     struct minstrel_ht_sta *mi = &msp->ht;
     int max_rate = 0;
@@ -614,9 +614,9 @@ int check_is_rate_fitable(struct wifi_station *sta, struct ieee80211_tx_info *in
     }
 }
 
-int minstrel_rate_index_to_vendor_rate_code(int minstrel_rate_idx, struct ieee80211_sta_aml *p_ieee80211_sta)
+static int minstrel_rate_index_to_vendor_rate_code(int minstrel_rate_idx, struct ieee80211_sta_aml *p_ieee80211_sta)
 {
-    enum ieee80211_band band = g_aml_rate_adaptation_dev.sband->band;
+    enum ieee80211_band band = (enum ieee80211_band)g_aml_rate_adaptation_dev.sband->band;
 
     if (p_ieee80211_sta->vht_cap.vht_supported && ((minstrel_rate_idx >= 0) && (minstrel_rate_idx <= 9))) {
         return WIFINET_RATE_VHT_MCS + minstrel_rate_idx;
@@ -638,7 +638,7 @@ int minstrel_rate_index_to_vendor_rate_code(int minstrel_rate_idx, struct ieee80
     return 0;
 }
 
-unsigned int protocol_rate_to_vendor_rate(unsigned int protocol_rate)
+static unsigned int protocol_rate_to_vendor_rate(unsigned int protocol_rate)
 {
 
     //For 11b: (0x82 -0x80) * 500K =  1M
@@ -900,7 +900,7 @@ void minstrel_tx_complete(
     p_rate_control_ops->tx_status(g_minstel_pri, g_aml_rate_adaptation_dev.sband,  priv_sta, &info);
 }
 
-void  minstrel_set_sta_bandwidth( int bw )
+static void  minstrel_set_sta_bandwidth( int bw )
 {
 	g_sta.bandwidth = bw;
 }

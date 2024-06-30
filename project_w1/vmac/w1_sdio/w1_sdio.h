@@ -18,7 +18,7 @@
 #include <linux/errno.h>
 #include <linux/irq.h>
 #include <linux/interrupt.h>
-#include <linux/kernel.h> /* printk() */
+#include <linux/kernel.h> /* pr_debug() */
 #include <linux/list.h>
 #include <linux/netdevice.h>
 #include <linux/version.h>
@@ -32,18 +32,18 @@ extern void sdio_reinit(void);
 extern void amlwifi_set_sdio_host_clk(int clk);
 extern void set_usb_bt_power(int is_on);
 
-#define PRINT(...)      do {printk("w1_sdio->");printk( __VA_ARGS__ );}while(0)
+#define PRINT(...)      do {pr_debug("w1_sdio->");pr_debug( __VA_ARGS__ );}while(0)
 #ifndef ASSERT
 #define ASSERT(exp) do{    \
                 if (!(exp)) {   \
-                        printk("=>=>=>=>=>assert %s,%d\n",__func__,__LINE__);   \
+                        pr_err("=>=>=>=>=>assert %s,%d\n",__func__,__LINE__);   \
                         /*BUG();        while(1);   */  \
                 }                       \
         } while (0);
 #endif
 
 #define ERROR_DEBUG_OUT(format,...) do {    \
-                 printk("FUNCTION: %s LINE: %d:"format"",__FUNCTION__, __LINE__, ##__VA_ARGS__); \
+                 pr_err("FUNCTION: %s LINE: %d:"format"",__FUNCTION__, __LINE__, ##__VA_ARGS__); \
         } while (0)
 
 
@@ -183,3 +183,6 @@ struct amlw1_hif_ops {
     int (*hif_suspend)(unsigned int suspend_enable);
 };
 
+void aml_wifi_sdio_power_lock(void);
+void aml_wifi_sdio_power_unlock(void);
+void *aml_mem_prealloc(int section, unsigned long size);

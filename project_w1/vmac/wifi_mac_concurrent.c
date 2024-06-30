@@ -178,7 +178,7 @@ void concurrent_vsdb_prepare_change_channel(struct wifi_mac *wifimac)
         return;
     }
 
-    //printk("%s\n", __func__);
+    //pr_debug("%s\n", __func__);
     if ((wifimac->wm_nrunning > 1)
         && (time_after(jiffies, wifimac->wm_vsdb_switch_time + (WIFINET_SCAN_DEFAULT_INTERVAL * HZ / 1000))
         || (wifimac->wm_vsdb_switch_time == 0))) {
@@ -188,7 +188,7 @@ void concurrent_vsdb_prepare_change_channel(struct wifi_mac *wifimac)
             wifimac->wm_vsdb_switch_time = jiffies;
 
         } else {
-            //printk("not right time\n");
+            //pr_debug("not right time\n");
         }
 
         if ((wifimac->wm_vsdb_slot == CONCURRENT_SLOT_P2P)

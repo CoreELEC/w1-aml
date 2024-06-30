@@ -16,33 +16,30 @@ int g_test_gain = 0;
 unsigned int dut_get_reg_frag(int address, int high_bit, int low_bit)
 {
     unsigned int tmp = 0;
-    unsigned char error;
     struct hw_interface* hif = hif_get_hw_interface();
-
     int bitwidth = high_bit - low_bit + 1;
     int mask = (bitwidth == 32) ? -1 : ((1 << (bitwidth)) - 1);
+
     if ((bitwidth < 1) || (low_bit > 31) || (high_bit > 31)) {
-        error = 1;
-        printk("get reg frag error!addr 0x%x high_bit %d low_bit %d\n", address, high_bit, low_bit);
+        pr_err("get reg frag error!addr 0x%x high_bit %d low_bit %d\n",
+               address, high_bit, low_bit);
     } else {
         tmp = hif->hif_ops.hi_read_word(address);
         tmp >>= low_bit;
         tmp &= mask;
-       error = 0;
     }
+
     return (tmp);
 }
 
 #define BASE_AHB_TESTBUS_CAPTURE 0x00b00000
 int dut_v32_tx(unsigned int *outbuffer, unsigned int *inbufer, const unsigned long long bitnum)
 {
-    int inoffset = 0;
+    int inoffset;
     unsigned long long indata = inbufer[0];
     unsigned long long indatabitnum = 32;
-    int remainbitnum = 0;
-    int len = 0;
-    int outoffset = 0;
-    unsigned long long tmp = 0;
+    int len;
+    int outoffset;
     uint64_t inbuffer_len_valid_bit = INBUFFER_LEN_VALID_BIT;
     uint64_t inbuffer_len = INBUFFER_LEN;
 
@@ -51,15 +48,22 @@ int dut_v32_tx(unsigned int *outbuffer, unsigned int *inbufer, const unsigned lo
     outoffset = len - 1;
     do_div(inbuffer_len, 4);
 
-    //printk("bitnum111=%016llx\n", bitnum);
+    /* pr_debug("bitnum111=%016llx\n", bitnum); */
     for (inoffset = 0; inoffset < inbuffer_len; inoffset++) {
+        unsigned long long tmp;
+        int remainbitnum;
+
         for (;;) {
-            //printk("bit = %08x, indata=%016llx, ((1<<bitnum)-1)=%016llx\n",  (long unsigned int )indata&((1<<bitnum)-1), indata, (long unsigned int )((1<<bitnum)-1) );
+            /* pr_debug("bit = %08x, indata=%016llx, ((1<<bitnum)-1)=%016llx\n",
+             *        (long unsigned int )indata&((1<<bitnum)-1), indata,
+             *        (long unsigned int )((1<<bitnum)-1) );
+             */
             outbuffer[outoffset] = indata & (((unsigned long long)1 <<  bitnum) - (unsigned long long)1);
             outoffset--;
             if (outoffset < 0) {
                 return len * 4;
             }
+
             indata = (indata >> bitnum);
             indatabitnum -= bitnum;
             if (indatabitnum < bitnum) {
@@ -71,6 +75,7 @@ int dut_v32_tx(unsigned int *outbuffer, unsigned int *inbufer, const unsigned lo
         indata = indata | (tmp << remainbitnum);
         indatabitnum = 32 + remainbitnum;
     }
+
     return len * 4;
 }
 
@@ -89,12 +94,12 @@ int dut_dump_data(unsigned int addr, unsigned char *data, int len)
     ASSERT(len > 0);
 
     for (;;) {
-        //printk("%s(%d) read addr=0x%4x, data_len=%d\n", __func__, __LINE__,BASE_AHB_TESTBUS_CAPTURE+addr+ a_cnt, MAX_SDIO_ACCESS_LEN);
+        //pr_debug("%s(%d) read addr=0x%4x, data_len=%d\n", __func__, __LINE__,BASE_AHB_TESTBUS_CAPTURE+addr+ a_cnt, MAX_SDIO_ACCESS_LEN);
         if (sdio_base !=  ((BASE_AHB_TESTBUS_CAPTURE +  addr + a_cnt) & 0xffff0000)) {
             sdio_base = (BASE_AHB_TESTBUS_CAPTURE + addr + a_cnt) & 0xffff0000;
             hif->hif_ops.hi_write_reg32(RG_SCFG_FUNC5_BADDR_A,
                 (unsigned long)(BASE_AHB_TESTBUS_CAPTURE + addr + a_cnt) & 0xffff0000);
-            printk("sdio base addr change ,sdio base addr=0x%08x\n", sdio_base);
+            pr_debug("sdio base addr change ,sdio base addr=0x%08x\n", sdio_base);
         }
 
         if (remain <= MAX_SDIO_ACCESS_LEN) {
@@ -113,19 +118,19 @@ int dut_dump_data(unsigned int addr, unsigned char *data, int len)
         }
     }
 #if 0
-    printk("print data start\n");
+    pr_debug("print data start\n");
     for ( i = 0; i < len ; i++) {
-        printk("0x%02x  ", data[i]);
+        pr_debug("0x%02x  ", data[i]);
         if ( i %16 == 0 ) {
-            printk("\n");
+            pr_debug("\n");
         }
     }
-    printk("\n");
+    pr_debug("\n");
 #endif
     return 0;
 }
 
-void dut_set_tbus(int trigger)
+static void dut_set_tbus(int trigger)
 {
     unsigned int read_tmp = 0;
     struct hw_interface* hif = hif_get_hw_interface();
@@ -157,15 +162,15 @@ void dut_set_tbus(int trigger)
         stopaddr =  hw_if->hif_ops.hi_read_word(TBC_OFFSET_120);
         if ( tmp == stopaddr ) {
             do_gettimeofday(&t_end);
-            printk("used time %dus stopaddr=0x%08x, =%d\n",
+            pr_debug("used time %dus stopaddr=0x%08x, =%d\n",
                 _get_tv_us(&t_end, &t_start),  stopaddr, i );
             break;
         }
         tmp = stopaddr;
-        //printk("stopaddr=0x%0x\n", stopaddr);
+        //pr_debug("stopaddr=0x%0x\n", stopaddr);
         //msleep(5);
     }
-    printk("stopaddr=0x%0x\n", stopaddr);
+    pr_debug("stopaddr=0x%0x\n", stopaddr);
 #endif
 }
 
@@ -175,7 +180,7 @@ void dut_set_tbus(int trigger)
 comand:
 bit31:bit28  is stop_mode for rsv
 bit27:bit16  is delay time
-bit15:bit8    is testbus capture data bandwith
+bit15:bit8    is testbus capture data bandwidth
 bit7:bit4      is trigger ,tbc_stop_sel
 bit3:bit0      is test mode,   1, test mode,  0,capture adc data
 
@@ -200,7 +205,7 @@ void dut_set_gain(unsigned int value)
     g_test_gain = value & 0x3ff;
 
     new_get_reg(0x00a0810c, &chk_value);
-    printk("check gain 0x%x\n", chk_value);
+    pr_debug("check gain 0x%x\n", chk_value);
 }
 
 int dut_start_capture(unsigned int value)
@@ -238,7 +243,7 @@ int dut_start_capture(unsigned int value)
     dut_set_reg_frag(TBC_OFFSET_114 , 16, 12, trigger);
     dut_set_reg_frag(TBC_OFFSET_114 , 8, 8, 1);// enable
 
-    printk("start_capture: \ntmode 0x%08x, trg 0x%08x, trigger_delay_time=%d, test_bus=0x%08x\nphy100=0x%08x, phy114=0x%08x\n",
+    pr_debug("start_capture: \ntmode 0x%08x, trg 0x%08x, trigger_delay_time=%d, test_bus=0x%08x\nphy100=0x%08x, phy114=0x%08x\n",
         test_mode, trigger, trigger_delay_time, test_bus,
         hif->hif_ops.hi_read_word(TBC_OFFSET_100),
         hif->hif_ops.hi_read_word(TBC_OFFSET_114));
@@ -264,11 +269,11 @@ int dut_stop_capture(void)
     }
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
-    printk("cap_log file %s\n", fp_path);
+    pr_debug("cap_log file %s\n", fp_path);
     fp = filp_open(fp_path, O_RDWR | O_CREAT | O_APPEND | O_TRUNC, 0777);
 
     if (IS_ERR(fp)) {
-        printk("create file error/n");
+        pr_err("create file error/n");
         return -1;
     }
 #endif
@@ -279,7 +284,7 @@ int dut_stop_capture(void)
 
     if (fp) {
         filp_close(fp, NULL);
-        printk("close file and exit\n");
+        pr_debug("close file and exit\n");
     }
 
     // return the capture buf to mac
@@ -325,16 +330,16 @@ static void str_2_ascii_32bits(char* str_in, char* str_out)
 }
 
 
-//0:use sw stop   1:use hw stop
+/* 0:use sw stop   1:use hw stop */
 int  dut_stop_tbus_to_get_sram(struct file *filep, int stop_ctrl, int save_file)
 {
     #define HARDWARE_CONTROL 1
-    unsigned int read_tmp = 0;
-    unsigned int stopaddr = 0;
-    unsigned int *pdata = 0;
+    unsigned int read_tmp;
+    unsigned int stopaddr;
+    unsigned int *pdata;
     int len = 0;
-    unsigned int i = 0;
-    int cap_len = 0;
+    unsigned int i;
+    int cap_len;
     int temp_addr = 0;
     unsigned int stop_flag = 0;
     int testbitwidth = 0;
@@ -350,7 +355,7 @@ int  dut_stop_tbus_to_get_sram(struct file *filep, int stop_ctrl, int save_file)
     set_fs(KERNEL_DS);
 #endif
 
-    //cap_len = hif->hif_ops.hi_read_word(TBC_OFFSET_110);
+    /* cap_len = hif->hif_ops.hi_read_word(TBC_OFFSET_110); */
     cap_len = TBC_ADDR_END_OFFSET-TBC_ADDR_BEGIN_OFFSET;
     read_tmp = hif->hif_ops.hi_read_word(TBC_OFFSET_114);
 
@@ -393,8 +398,6 @@ int  dut_stop_tbus_to_get_sram(struct file *filep, int stop_ctrl, int save_file)
     AML_OUTPUT("cap_len=0x%08x, stopaddr=0x%08x\n", cap_len, stopaddr);
     dut_dump_data(TBC_ADDR_BEGIN_OFFSET, &readbuf[TBC_ADDR_END_OFFSET-stopaddr], stopaddr - TBC_ADDR_BEGIN_OFFSET);
 
-    pdata = (unsigned int *)&readbuf[0];
-
     AML_OUTPUT("testbitwidth=0x%08x\n", testbitwidth);
     for (i = 0; i < (TBC_ADDR_END_OFFSET-TBC_ADDR_BEGIN_OFFSET); i += INBUFFER_LEN) {
         len += dut_v32_tx((unsigned int *)&testbuf[len], (unsigned int *)&readbuf[i], testbitwidth);
@@ -408,11 +411,15 @@ int  dut_stop_tbus_to_get_sram(struct file *filep, int stop_ctrl, int save_file)
             for (j = 0 ; j < 8; j++) {
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
                 vfs_write(filep, &wt_file[j], sizeof(unsigned char), &file_pos);
+#elif defined(LINUX_PLATFORM)
+                kernel_write(filep, &wt_file[j], sizeof(unsigned char), &file_pos);
 #endif
             }
             pdata++;
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
             vfs_write(filep, (char*)&enter, sizeof(unsigned char), &file_pos);
+#elif defined(LINUX_PLATFORM)
+            kernel_write(filep, (char*)&enter, sizeof(unsigned char), &file_pos);
 #endif
         }
     }
@@ -425,18 +432,17 @@ int  dut_stop_tbus_to_get_sram(struct file *filep, int stop_ctrl, int save_file)
     return 1;
 }
 
-//0:use sw stop   1:use hw stop
+/* 0:use sw stop   1:use hw stop */
 int iwp_stop_tbus_to_get_sram(unsigned char *buf)
 {
-    unsigned int read_tmp = 0;
-    unsigned int stopaddr = 0;
-    unsigned int *pdata = 0;
+    unsigned int read_tmp;
+    unsigned int stopaddr;
+    unsigned int *pdata;
     int len = 0;
-    unsigned int i = 0;
-    int cap_len = 0;
+    unsigned int i;
+    int cap_len;
     int temp_addr = 0;
-    int testbitwidth = 0;
-
+    int testbitwidth;
     struct hw_interface* hif = hif_get_hw_interface();
 
     cap_len = TBC_ADDR_END_OFFSET-TBC_ADDR_BEGIN_OFFSET;
@@ -445,7 +451,7 @@ int iwp_stop_tbus_to_get_sram(unsigned char *buf)
     testbitwidth = (read_tmp & 0x1f) + 1;
 
     read_tmp = hif->hif_ops.hi_read_word(TBC_OFFSET_114);
-    read_tmp = (read_tmp | (1 << 10) );  // tbc_stop
+    read_tmp = (read_tmp | (1 << 10) );  /* tbc_stop */
     hif->hif_ops.hi_write_word(TBC_OFFSET_114, read_tmp);
 
     stopaddr = hif->hif_ops.hi_read_word(TBC_OFFSET_120);
@@ -462,12 +468,11 @@ int iwp_stop_tbus_to_get_sram(unsigned char *buf)
         return 0;
     }
 
-    hif->hif_ops.hi_write_word(TBC_RAM_SHARE, TBC_RAM_SHARE_MASK); //ram share enable
-    dut_dump_data(stopaddr, &readbuf[0], TBC_ADDR_END_OFFSET-stopaddr);
+    hif->hif_ops.hi_write_word(TBC_RAM_SHARE, TBC_RAM_SHARE_MASK); /* ram share enable */
+    dut_dump_data(stopaddr, &readbuf[0], TBC_ADDR_END_OFFSET - stopaddr);
     AML_OUTPUT("cap_len=0x%08x, stopaddr=0x%08x\n", cap_len, stopaddr);
-    dut_dump_data(TBC_ADDR_BEGIN_OFFSET, &readbuf[TBC_ADDR_END_OFFSET-stopaddr], stopaddr - TBC_ADDR_BEGIN_OFFSET);
-
-    pdata = (unsigned int *)&readbuf[0];
+    dut_dump_data(TBC_ADDR_BEGIN_OFFSET, &readbuf[TBC_ADDR_END_OFFSET - stopaddr],
+                  stopaddr - TBC_ADDR_BEGIN_OFFSET);
 
     AML_OUTPUT("testbitwidth=0x%08x\n", testbitwidth);
     for (i = 0; i < (TBC_ADDR_END_OFFSET-TBC_ADDR_BEGIN_OFFSET); i += INBUFFER_LEN) {
@@ -475,39 +480,39 @@ int iwp_stop_tbus_to_get_sram(unsigned char *buf)
     }
 
     pdata = (unsigned int *)&testbuf[0];
-     for (i = 0; i < 4096; i += 4) {
-        /*bit6:1 is csi data, 4096 can be changed as uplay buffer*/
+    for (i = 0; i < 4096; i += 4) {
+        /* bit6:1 is csi data, 4096 can be changed as uplay buffer */
         *pdata = *pdata & 0x0000007e;
         *buf = *pdata >> 1;
         buf++;
         pdata++;
     }
+
     AML_OUTPUT("handle capture data complete\n");
     return 1;
 }
 
-
 unsigned char dut_set_reg_frag(int address, int bit_end, int bit_start, int value)
 {
-    unsigned int tmp = 0;
+    unsigned int tmp;
     unsigned char error;
-    int bitwidth = bit_end-bit_start + 1;
+    int bitwidth = bit_end - bit_start + 1;
     int max_value = (bitwidth == 32) ? -1 : ((1 << (bitwidth)) - 1);
 
     struct hw_interface* hif = hif_get_hw_interface();
     tmp = hif->hif_ops.hi_read_word(address);
-    //printk("tmp is 0x%x\n", tmp);
+    /* pr_debug("tmp is 0x%x\n", tmp); */
 
     if ((bitwidth < 1) || (bit_start > 31) || (bit_end > 31)) {
         while (1) {
-           printk("----------------->Set_RegFragment is halt.\n");
+           pr_debug("----------------->Set_RegFragment is halt.\n");
         }
         error = 1;
     } else {
         error = 0;
-        tmp &= ~(max_value << bit_start); // clear [bit_end: bit_start]
+        tmp &= ~(max_value << bit_start); /* clear [bit_end: bit_start] */
         tmp |= ((value&max_value) << bit_start);
-        //printk("addr 0x%x tmp2 is 0x%x\n", address, tmp);
+        /* pr_debug("addr 0x%x tmp2 is 0x%x\n", address, tmp); */
         hif->hif_ops.hi_write_word(address, tmp);
     }
 
@@ -516,32 +521,30 @@ unsigned char dut_set_reg_frag(int address, int bit_end, int bit_start, int valu
 
 int dut_bt_start_capture(unsigned int value)
 {
-
-    unsigned int wf_bt_mode = 0;
-    struct hw_interface* hif = NULL;
-
+    unsigned int wf_bt_mode;
+    struct hw_interface *hif;
     int test_mode = value & 0x1;
     int trigger = (value >> 4) & 0x1;
     int test_bus = (value >> 8) & 0xff;
 
     wf_bt_mode = (value >> 31) & 0x1;
     hif = hif_get_hw_interface();
-    g_test_bus = test_bus; // for log file name
+    g_test_bus = test_bus; /* for log file name */
 
-    hif->hif_ops.hi_write_word(0x00a0b000, 0xffffffff); //phy clock mask
+    hif->hif_ops.hi_write_word(0x00a0b000, 0xffffffff); /* phy clock mask */
     test_bus = (0x01 << 24) | (test_bus << 16) | 0x0008;
-    hif->hif_ops.hi_write_word(TBC_OFFSET_100, test_bus);//test bus enable
-    hif->hif_ops.hi_write_word(TBC_OFFSET_108, 0x00000000);//valid
-    hif->hif_ops.hi_write_word(TBC_OFFSET_10C, 0x00020000);//config testbus capture address begin
-    hif->hif_ops.hi_write_word(TBC_OFFSET_110, TBC_ADDR_END_OFFSET);//config testbus capture address end
-    hif->hif_ops.hi_write_word(TBC_RAM_SHARE, 0xf000007f); //ram share enable
+    hif->hif_ops.hi_write_word(TBC_OFFSET_100, test_bus); /* test bus enable */
+    hif->hif_ops.hi_write_word(TBC_OFFSET_108, 0x00000000); /* valid */
+    hif->hif_ops.hi_write_word(TBC_OFFSET_10C, 0x00020000); /*config testbus capture address begin */
+    hif->hif_ops.hi_write_word(TBC_OFFSET_110, TBC_ADDR_END_OFFSET); /* config testbus capture address end */
+    hif->hif_ops.hi_write_word(TBC_RAM_SHARE, 0xf000007f); /* ram share enable */
 
-    hif->hif_ops.hi_write_word(TBC_OFFSET_114, 0x0000051c); //ram share enable
+    hif->hif_ops.hi_write_word(TBC_OFFSET_114, 0x0000051c); /* ram share enable */
 
-    printk("start_capture: \ntmode 0x%08x, trg 0x%08x,  test_bus=0x%08x\nphy100=0x%08x, phy114=0x%08x\n",
-        test_mode, trigger, test_bus,
-        hif->hif_ops.hi_read_word(TBC_OFFSET_100),
-        hif->hif_ops.hi_read_word(TBC_OFFSET_114));
+    pr_debug("start_capture: \ntmode 0x%08x, trg 0x%08x,  test_bus=0x%08x\nphy100=0x%08x, phy114=0x%08x\n",
+           test_mode, trigger, test_bus,
+           hif->hif_ops.hi_read_word(TBC_OFFSET_100),
+           hif->hif_ops.hi_read_word(TBC_OFFSET_114));
 
    return 0;
 }
@@ -562,7 +565,7 @@ int dut_bt_stop_capture(void)
     }
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
-    printk("cap_log file %s\n", fp_path);
+    pr_debug("cap_log file %s\n", fp_path);
     fp = filp_open(fp_path,O_RDWR | O_CREAT | O_APPEND | O_TRUNC, 0777);
 
     if (IS_ERR(fp)) {
@@ -571,12 +574,11 @@ int dut_bt_stop_capture(void)
     }
 #endif
 
-
     dut_stop_tbus_to_get_sram(fp, 0, 1);
 
     if (fp) {
         filp_close(fp, NULL);
-        printk("close file and exit\n");
+        pr_debug("close file and exit\n");
     }
 
     g_test_bus = 0;

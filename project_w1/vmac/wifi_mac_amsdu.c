@@ -20,7 +20,7 @@ struct tasklet_struct amsdu_tasklet;
 /*avoid use kalloc to allocate mem. */
 static struct wifi_mac_msdu_node  g_msdu_node [(MAX_MSDU_CNT + 4) * WME_NUM_TID];
 
-int wifi_mac_msdu_list_init(struct msdu_list * msdu_list, int num)
+static int wifi_mac_msdu_list_init(struct msdu_list * msdu_list, int num)
 {
     int i = 0;
     int node_num = num;
@@ -44,7 +44,7 @@ int wifi_mac_msdu_list_init(struct msdu_list * msdu_list, int num)
     return node_num;
 }
 
-struct wifi_mac_msdu_node *wifi_mac_msdu_node_alloc(struct msdu_list *msdu_list)
+static struct wifi_mac_msdu_node *wifi_mac_msdu_node_alloc(struct msdu_list *msdu_list)
 {
     struct wifi_mac_msdu_node *msdu_node = NULL;
 
@@ -60,7 +60,7 @@ struct wifi_mac_msdu_node *wifi_mac_msdu_node_alloc(struct msdu_list *msdu_list)
     return msdu_node;
 }
 
-void wifi_mac_msdu_node_free(struct wifi_mac_msdu_node *msdu_node, struct msdu_list *msdu_list)
+static void wifi_mac_msdu_node_free(struct wifi_mac_msdu_node *msdu_node, struct msdu_list *msdu_list)
 {
     if (msdu_node == NULL || msdu_list == NULL)
         return;
@@ -671,7 +671,7 @@ int wifi_mac_alloc_amsdu_node(struct wifi_mac *wifimac, unsigned char vid, struc
         sta->sta_amsdu->amsdu_max_length = MIN(sta->sta_amsdu->amsdu_max_length, AMSDU_SIZE_3839);
     }
 
-    printk("<running> %s (%d) amsdu_max_length=%d\n", __func__,__LINE__, sta->sta_amsdu->amsdu_max_length );
+    pr_debug("<running> %s (%d) amsdu_max_length=%d\n", __func__,__LINE__, sta->sta_amsdu->amsdu_max_length );
 
     for (tid = 0; tid < WME_NUM_TID; tid++)
     {

@@ -28,7 +28,7 @@ void drv_hal_attach( void *   drv_priv,void *cbptr)
     hal_priv->dhcp_offload = dhcp_offload;
     hal_priv->hal_ops.hal_init(drv_priv);
     drv_hal_workitem_inital();
-    return ;
+    return;
 }
 
 int drv_hal_detach(void)
@@ -37,7 +37,7 @@ int drv_hal_detach(void)
 
     hal_priv->hal_ops.hal_exit();
     drv_hal_workitem_free();
-    printk("<running> %s %d \n",__func__,__LINE__);
+    pr_debug("<running> %s %d \n",__func__,__LINE__);
     return 0;
 }
 
@@ -55,7 +55,7 @@ int drv_hal_detach(void)
 void drv_hal_setupratetable(struct drv_rate_table *rt)
 {
     int i;
-    unsigned char code,  cix;
+    unsigned char code;
 
     if (rt->dot11rate_to_idx[0] != 0)
     {
@@ -66,6 +66,8 @@ void drv_hal_setupratetable(struct drv_rate_table *rt)
     memset( rt->dot11rate_to_idx, 0xff, sizeof(rt->dot11rate_to_idx));
     for (i = 0; i < rt->rateCount; i++)
     {
+        unsigned char cix;
+
         if ((rt->info[i].phy == CCK) || (rt->info[i].phy == WOFDM))
         {
             code = WIFINET_GET_RATE_VAL (rt->info[i].dot11Rate);
@@ -277,7 +279,7 @@ drv_hal_calc_txtime(const struct drv_rate_table *rates,
                       unsigned short rateix,
                       int shortPreamble)
 {
-    unsigned int bitsPerSymbol, numBits, numSymbols, phyTime, txTime;
+    unsigned int numBits, phyTime, txTime;
     unsigned int kbps;
 
     kbps = rates->info[rateix].rateKbps;
@@ -299,6 +301,8 @@ drv_hal_calc_txtime(const struct drv_rate_table *rates,
 
         case WIFINET_T_OFDM:
         {
+            unsigned int bitsPerSymbol, numSymbols;
+
             /* full rate channel */
             bitsPerSymbol = (kbps * OFDM_SYMBOL_TIME) / 1000;
 
@@ -332,13 +336,14 @@ static void
 drv_hal_workitem_task(SYS_TYPE iparam)
 {
     struct hal_private *hal_priv = hal_get_priv();
-    unsigned short STATUS;
     unsigned char *EltPtr =NULL;
     struct _CO_SHARED_FIFO* pWorkFifo = &hal_priv->WorkFifo;
     struct hal_work_task *pWorkTask = NULL;
 
     while (CO_SharedFifoEmpty(pWorkFifo, CO_WORK_FREE))
     {
+        unsigned short STATUS;
+
         STATUS = CO_SharedFifoGet(pWorkFifo, CO_WORK_FREE, 1, &EltPtr);
         ASSERT(STATUS == CO_STATUS_OK);
         pWorkTask = (struct hal_work_task *)EltPtr;
@@ -391,7 +396,7 @@ int drv_hal_add_workitem(WorkHandler task, WorkHandler taskcallback, SYS_TYPE pa
         task_repeat++;
 
         if ((task_repeat % 10) == 0) {
-            printk("task is %p\n", task);
+            pr_debug("task is %p\n", task);
             task_repeat = 0;
         }
 
@@ -432,12 +437,12 @@ int drv_hal_workitem_inital(void)
     CO_SharedFifoInit(&hal_priv->WorkFifo, (SYS_TYPE)hal_priv->WorkFifoBuf, (void *)hal_priv->WorkFifoBuf,
         WORK_ITEM_NUM, sizeof(struct  hal_work_task), CO_SF_WORK_NBR);
 
-    printk("%s hal_priv->WorkFifo:%p\n", __func__, &hal_priv->WorkFifo);
+    pr_debug("%s hal_priv->WorkFifo:%p\n", __func__, &hal_priv->WorkFifo);
     res = (SYS_TYPE)hal_priv->hal_ops.hal_reg_task(drv_hal_workitem_task);
 
     if (res < 0) {
         ASSERT(0);
-        printk("WorkFifo_task_id error !\n");
+        pr_err("WorkFifo_task_id error !\n");
     } else {
         hal_priv->WorkFifo_task_id = res;
     }

@@ -10,7 +10,7 @@ extern void fi_ahb_write(unsigned int addr,unsigned int data);
 void wifi_mac_disable_hw_mgmt_decrypt(void) {
     unsigned int reg_val;
 
-    printk("%s\n", __func__);
+    pr_debug("%s\n", __func__);
     reg_val = fi_ahb_read(0x0a000308);
     fi_ahb_write(0x0a000308, reg_val | BIT(28));
 
@@ -33,7 +33,7 @@ void wifi_mac_disable_hw_mgmt_decrypt(void) {
     fi_ahb_write(0x0a000354, reg_val | BIT(28));
 }
 
-unsigned char _bip_ccmp_protect(const unsigned char *key, size_t key_len,
+static unsigned char _bip_ccmp_protect(const unsigned char *key, size_t key_len,
     const unsigned char *data, size_t data_len, unsigned char *mic)
 {
     unsigned char res = 1;
@@ -41,24 +41,24 @@ unsigned char _bip_ccmp_protect(const unsigned char *key, size_t key_len,
     if (key_len == 16) {
         if (omac1_aes_128(key, data, data_len, mic)) {
             res = 0;
-            printk("%s : omac1_aes_128 fail!", __func__);
+            pr_err("%s : omac1_aes_128 fail!", __func__);
         }
 
     } else if (key_len == 32) {
         if (omac1_aes_256(key, data, data_len, mic)) {
             res = 0;
-            printk("%s : omac1_aes_256 fail!", __func__);
+            pr_err("%s : omac1_aes_256 fail!", __func__);
         }
 
     } else {
-        printk("%s : key_len not match!", __func__);
+        pr_warn("%s : key_len not match!", __func__);
         res = 0;
     }
 
     return  res;
 }
 
-unsigned char aml_calculate_bip_mic(unsigned char gmcs, unsigned char *whdr_pos, int len,
+static unsigned char aml_calculate_bip_mic(unsigned char gmcs, unsigned char *whdr_pos, int len,
     const unsigned char *key, const unsigned char *data, size_t data_len, unsigned char *mic)
 {
     unsigned char res = 1;
@@ -66,40 +66,40 @@ unsigned char aml_calculate_bip_mic(unsigned char gmcs, unsigned char *whdr_pos,
     if (gmcs == WIFINET_CIPHER_AES_CMAC) {
         if (_bip_ccmp_protect(key, 16, data, data_len, mic) == 0) {
             res = 0;
-            printk("%s : _bip_ccmp_protect(128) fail!", __func__);
+            pr_err("%s : _bip_ccmp_protect(128) fail!", __func__);
         }
 
     } else {
         res = 0;
-        printk("%s : unsupport dot11wCipher !\n", __func__);
+        pr_err("%s : unsupport dot11wCipher !\n", __func__);
     }
 
     return res;
 }
 
-void wifi_mac_dump_pkt(void *pkt, unsigned short pkt_len) {
+static void wifi_mac_dump_pkt(void *pkt, unsigned short pkt_len) {
     int pp;
     int len = pkt_len;
     unsigned char *frm = (unsigned char *)pkt;
 
-    printk("pktlen = %d\n", pkt_len);
+    pr_debug("pktlen = %d\n", pkt_len);
     for (pp = 0; pp < pkt_len; pp++) {
         if ((len > 6) && (pp < 4)) {
-            printk("%02x:%02x:%02x:%02x", frm[pp], frm[pp + 1], frm[pp + 2], frm[pp + 3]);
+            pr_debug("%02x:%02x:%02x:%02x", frm[pp], frm[pp + 1], frm[pp + 2], frm[pp + 3]);
             len -= 4;
             pp += 3;
 
         } else if (len > 6) {
-            printk("%02x:%02x:%02x:%02x:%02x:%02x",
+            pr_debug("%02x:%02x:%02x:%02x:%02x:%02x",
                 frm[pp], frm[pp + 1], frm[pp + 2], frm[pp + 3], frm[pp + 4], frm[pp + 5]);
             len -= 6;
             pp += 5;
 
         } else {
-            printk("%02x ", frm[pp]);
+            pr_debug("%02x ", frm[pp]);
         }
     }
-    printk("\n");
+    pr_debug("\n");
 }
 
 int wifi_mac_parse_mmie(struct wifi_station *sta, struct sk_buff *skb, unsigned char subtype)
@@ -132,7 +132,7 @@ int wifi_mac_parse_mmie(struct wifi_station *sta, struct sk_buff *skb, unsigned 
 
     #ifdef PMF_PKT_PRINT
         /* dump the packet content before decrypt */
-        printk("before parse:%d\n", skb->len);
+        pr_debug("before parse:%d\n", skb->len);
         wifi_mac_dump_pkt(frm, skb->len);
     #endif
 
@@ -188,11 +188,11 @@ int wifi_mac_parse_mmie(struct wifi_station *sta, struct sk_buff *skb, unsigned 
     memcpy(bip_aad + 8, wh->i_addr2, 6);
     memcpy(bip_aad + 14, wh->i_addr3, 6);
 
-    printk("%s bip_add before\n", __func__);
+    pr_debug("%s bip_add before\n", __func__);
     for (i = 0; i < ori_len; ++i) {
-        printk("%02x", bip_aad[i]);
+        pr_debug("%02x", bip_aad[i]);
     }
-    printk("\n");
+    pr_debug("\n");
 
     if (aml_calculate_bip_mic(sta->pmf_key.wk_key_type, frm,
         pkt_len, sta->pmf_key.wk_key, bip_aad, ori_len, mic) == 0)
@@ -208,7 +208,7 @@ int wifi_mac_parse_mmie(struct wifi_station *sta, struct sk_buff *skb, unsigned 
 
     #ifdef PMF_PKT_PRINT
         /* dump the packet content before decrypt */
-        printk("after parse:%d\n", skb->len);
+        pr_debug("after parse:%d\n", skb->len);
         wifi_mac_dump_pkt(frm, skb->len);
     #endif
 
@@ -218,7 +218,7 @@ bip_exit:
     return res;
 }
 
-int aml_aes_decrypt(struct wifi_station *sta, struct sk_buff *skb, unsigned char key_index)
+static int aml_aes_decrypt(struct wifi_station *sta, struct sk_buff *skb, unsigned char key_index)
 {
     unsigned char *frm;
     unsigned char *key;
@@ -255,7 +255,7 @@ int aml_aes_decrypt(struct wifi_station *sta, struct sk_buff *skb, unsigned char
     return 0;
 }
 
-int aml_pkt_decrypt(struct wifi_station *sta, struct sk_buff *skb)
+static int aml_pkt_decrypt(struct wifi_station *sta, struct sk_buff *skb)
 {
     int res = 0;
     unsigned char hdr_len = sizeof(struct wifi_frame);
@@ -317,7 +317,7 @@ int wifi_mac_unprotected_mgmt_pkt_handle(struct wifi_station *sta, struct sk_buf
     frm = (unsigned char *)&wh[1];
     is_bmc = (WIFINET_IS_MULTICAST(wh->i_addr1));
 
-    //printk("%s recv :%d\n", __func__, subtype);
+    //pr_debug("%s recv :%d\n", __func__, subtype);
     switch (wnet_vif->vm_opmode) {
         case WIFINET_M_STA:
             if ((is_bmc) && (subtype != WIFINET_FC0_SUBTYPE_BEACON)) {
@@ -327,7 +327,7 @@ int wifi_mac_unprotected_mgmt_pkt_handle(struct wifi_station *sta, struct sk_buf
             if ((subtype == WIFINET_FC0_SUBTYPE_DEAUTH) || (subtype == WIFINET_FC0_SUBTYPE_DISASSOC)) {
                 if (!(sta->sta_flags_ext & WIFINET_NODE_MFP_CONFIRM_DEAUTH)) {
                     reason = le16toh(*(unsigned short *)frm);
-                    printk("%s recv deauthenticate (reason %d)\n", __func__, reason);
+                    pr_debug("%s recv deauthenticate (reason %d)\n", __func__, reason);
 
                     wifi_mac_send_sa_query(sta, WIFINET_ACTION_SA_QUERY_REQ, sta->sa_query_seq++);
                     os_timer_ex_start_period(&wnet_vif->vm_actsend, 100);
@@ -418,7 +418,7 @@ int wifi_mac_mgmt_validate(struct wifi_station *sta, struct sk_buff *skb, unsign
 
     #ifdef PMF_PKT_PRINT
         /* dump the packet content before decrypt */
-        printk("rsn_ucastcipher:%d\n", sta->sta_rsn.rsn_ucastcipher);
+        pr_debug("rsn_ucastcipher:%d\n", sta->sta_rsn.rsn_ucastcipher);
         wifi_mac_dump_pkt(frm, skb->len);
     #endif
 
@@ -438,12 +438,12 @@ int wifi_mac_mgmt_validate(struct wifi_station *sta, struct sk_buff *skb, unsign
 
     #ifdef PMF_PKT_PRINT
         /* print packet content after decryption */
-        printk("after decrypt\n");
+        pr_debug("after decrypt\n");
         wifi_mac_dump_pkt(frm, skb->len);
     #endif
 
     if (is_bmc) {
-        printk("parse mmie for broadcast mgmt pkt\n");
+        pr_debug("parse mmie for broadcast mgmt pkt\n");
         if (wifi_mac_parse_mmie(sta, skb, subtype) != 1) {
             goto fail;
         }
@@ -477,7 +477,7 @@ int wifi_mac_add_mmie(struct wifi_station *sta, struct sk_buff *skb) {
         ERROR_DEBUG_OUT("bip alloc fail\n");
         return 1;
     }
-    printk("%s len:%d, frame_body_len:%d\n", __func__, skb->len, frame_body_len);
+    pr_debug("%s len:%d, frame_body_len:%d\n", __func__, skb->len, frame_body_len);
 
     {
         /* broadcast robust mgmt frame, using BIP */
@@ -501,7 +501,7 @@ int wifi_mac_add_mmie(struct wifi_station *sta, struct sk_buff *skb) {
 
         #ifdef PMF_PKT_PRINT
             /* dump the packet content before decrypt */
-            printk("before add aad:%d\n", skb->len);
+            pr_debug("before add aad:%d\n", skb->len);
             wifi_mac_dump_pkt(frm, skb->len);
         #endif
 
@@ -531,7 +531,7 @@ int wifi_mac_add_mmie(struct wifi_station *sta, struct sk_buff *skb) {
 
         /* dump total packet include MME with zero MIC */
         #if 0
-            printk("bip_aad:%d\n", ori_len);
+            pr_debug("bip_aad:%d\n", ori_len);
             wifi_mac_dump_pkt(bip_add, ori_len);
         #endif
 
@@ -543,10 +543,10 @@ int wifi_mac_add_mmie(struct wifi_station *sta, struct sk_buff *skb) {
         /* dump calculated mic result */
         if (0) {
             int i;
-            printk("Calculated mic result: ");
+            pr_debug("Calculated mic result: ");
             for (i = 0; i < 16; i++)
-                printk(" %02x ", mic[i]);
-            printk("\n");
+                pr_debug(" %02x ", mic[i]);
+            pr_debug("\n");
         }
 
         frm_end = frm + skb->len;
@@ -557,7 +557,7 @@ int wifi_mac_add_mmie(struct wifi_station *sta, struct sk_buff *skb) {
             memcpy(frm_end - 16, mic, 16);
 
         #ifdef PMF_PKT_PRINT
-            printk("after add mic:%d\n", skb->len);
+            pr_debug("after add mic:%d\n", skb->len);
             wifi_mac_dump_pkt(frm, skb->len);
         #endif
     }
@@ -570,7 +570,7 @@ add_fail:
     return 1;
 }
 
-int _aml_ccmp_encrypt(struct wifi_mac_key *key, unsigned char *pn, unsigned int hdrlen, unsigned char *frame, uint plen)
+static int _aml_ccmp_encrypt(struct wifi_mac_key *key, unsigned char *pn, unsigned int hdrlen, unsigned char *frame, uint plen)
 {
     unsigned char *enc = NULL;
     size_t enc_len = 0;
@@ -630,7 +630,7 @@ int wifi_mac_sw_encrypt(struct wifi_station *sta, struct sk_buff *skb) {
 
     #ifdef PMF_PKT_PRINT
         /* dump the packet content before decrypt */
-        printk("before encrypt rsn_ucastcipher:%d\n", sta->sta_rsn.rsn_ucastcipher);
+        pr_debug("before encrypt rsn_ucastcipher:%d\n", sta->sta_rsn.rsn_ucastcipher);
         wifi_mac_dump_pkt(frm, skb->len);
     #endif
 
@@ -650,11 +650,11 @@ int wifi_mac_sw_encrypt(struct wifi_station *sta, struct sk_buff *skb) {
 
     PN = (unsigned long long *)pn;
     (*PN)++;
-    //printk("PN is %016x, pn[0]:%02x, pn[7]:%02x\n", *PN, pn[0], pn[7]);
+    //pr_debug("PN is %016x, pn[0]:%02x, pn[7]:%02x\n", *PN, pn[0], pn[7]);
 
     #ifdef PMF_PKT_PRINT
         /* dump the packet content before decrypt */
-        printk("after encrypt:\n");
+        pr_debug("after encrypt:\n");
         wifi_mac_dump_pkt(frm, skb->len);
     #endif
 
@@ -668,7 +668,7 @@ int wifi_mac_send_sa_query(struct wifi_station *sta, unsigned char action, unsig
     arg.action = action;
     arg.arg1 = seq;
 
-    printk("%s sta:%p, action:%d\n", __func__, sta, action);
+    pr_debug("%s sta:%p, action:%d\n", __func__, sta, action);
     wifi_mac_send_actionframe(sta->sta_wnet_vif, sta, &arg);
     return 0;
 }

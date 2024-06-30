@@ -54,7 +54,7 @@ void wpa_printf(int level, const char *fmt, ...)
     err = vsnprintf(buf, MSG_LEN, fmt, args);
     va_end(args);
 
-    printk("%s", buf);
+    pr_info("%s", buf);
 #undef MSG_LEN
 }
 

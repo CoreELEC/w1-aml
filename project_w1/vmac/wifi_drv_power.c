@@ -16,7 +16,7 @@
 #include "wifi_mac_com.h"
 #include "wifi_drv_power.h"
 
-char drv_pwrsave_cmd_arbitration(struct drv_private *drv_priv,
+static char drv_pwrsave_cmd_arbitration(struct drv_private *drv_priv,
     enum drv_ps_state newstate, int wnet_vif_id)
 {
     unsigned char vid = 0;

@@ -355,7 +355,7 @@ int wifi_mac_setup_rates(struct wifi_station *sta, const unsigned char *rates, c
     return 1;
 }
 
-int wifi_mac_mcs_to_numstreams(int mcs)
+static int wifi_mac_mcs_to_numstreams(int mcs)
 {
     int numstreams = 0;
 

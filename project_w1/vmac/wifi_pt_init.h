@@ -31,7 +31,7 @@
 #include <linux/errno.h>
 #include <linux/irq.h>
 #include <linux/interrupt.h>
-#include <linux/kernel.h> /* printk() */
+#include <linux/kernel.h> /* pr_debug() */
 #include <linux/list.h>
 #include <linux/netdevice.h>
 #include <linux/version.h>

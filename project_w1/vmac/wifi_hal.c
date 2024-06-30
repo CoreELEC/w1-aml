@@ -48,12 +48,13 @@ struct hal_private *  hal_get_priv(void)
 
 unsigned char hal_set_pn_win(unsigned long long *pn_win)
 {
-    unsigned char i = 0, offset = 0;
+    unsigned char i, offset = 0;
     unsigned long long win;
     unsigned long long tmp;
 
     for (i = 0; i < 2; i++) {
         win = *(pn_win + i);
+
         while(win > 0) {
             if ((win & 1) == 0) {
                 break;
@@ -61,52 +62,51 @@ unsigned char hal_set_pn_win(unsigned long long *pn_win)
             win >>= 1;
             offset++;
         }
-        if (offset < MAX_PN_WINDOW/2) {
+
+        if (offset < MAX_PN_WINDOW / 2) {
             break;
         }
     }
+
     if (offset == 0) {
         offset = 1;
     }
 
-    if (offset > 0 && offset < MAX_PN_WINDOW/2) {
+    if (offset > 0 && offset < MAX_PN_WINDOW / 2) {
         pn_win[0] >>= offset;
         tmp = pn_win[1] & ((1 << offset) - 1);
-        pn_win[0] |= (tmp << (MAX_PN_WINDOW/2 - offset));
+        pn_win[0] |= (tmp << (MAX_PN_WINDOW / 2 - offset));
         pn_win[1] >>= offset;
-
-    } else if (offset >= MAX_PN_WINDOW/2 && offset < MAX_PN_WINDOW) {
-        pn_win[0] = pn_win[1] >> (offset - MAX_PN_WINDOW/2);
+    } else if (offset >= MAX_PN_WINDOW / 2 && offset < MAX_PN_WINDOW) {
+        pn_win[0] = pn_win[1] >> (offset - MAX_PN_WINDOW / 2);
         pn_win[1] = 0;
-
     } else {
         pn_win[0] = 0;
         pn_win[1] = 0;
     }
-  return offset;
-}
 
+    return offset;
+}
 
 unsigned long long hal_check_dup_pn(unsigned long long *pn_win, unsigned int repcnt_diff)
 {
-    if (repcnt_diff > 0 && repcnt_diff <= MAX_PN_WINDOW/2) {
+    if (repcnt_diff > 0 && repcnt_diff <= MAX_PN_WINDOW / 2) {
         return pn_win[0] & (1 << (repcnt_diff - 1));
-    } else if (repcnt_diff > MAX_PN_WINDOW/2 && repcnt_diff <= MAX_PN_WINDOW) {
-        return pn_win[1] & (1 << (repcnt_diff - MAX_PN_WINDOW/2 - 1));
+    } else if (repcnt_diff > MAX_PN_WINDOW / 2 && repcnt_diff <= MAX_PN_WINDOW) {
+        return pn_win[1] & (1 << (repcnt_diff - MAX_PN_WINDOW / 2 - 1));
     } else {
         return 0;
     }
 }
 
-
-unsigned char hal_chk_replay_cnt(struct hal_private *hal_priv,HW_RxDescripter_bit  *RxPrivHdr)
+unsigned char hal_chk_replay_cnt(struct hal_private *hal_priv, HW_RxDescripter_bit *RxPrivHdr)
 {
     int staid = 0;
     unsigned char wnet_vif_id = 0;
     unsigned char *PN = NULL;
     unsigned long long *repcnt_my[2];
     unsigned long long *repcnt_rx ;
-    int ret =0;
+    int ret = 0;
     struct aml_hal_call_backs *AmlmS_opt = hal_get_drv_func();
     HW_RxDescripter_bit *RxPrivHdr_bit = (HW_RxDescripter_bit *)RxPrivHdr;
     struct drv_private *drv_priv = (struct drv_private *)hal_priv->drv_priv;
@@ -128,14 +128,15 @@ unsigned char hal_chk_replay_cnt(struct hal_private *hal_priv,HW_RxDescripter_bi
             return 1;
 
         ASSERT(AmlmS_opt->get_stationid != NULL);
-        wnet_vif_id = RxPrivHdr_bit->RxA1match_id;//address 1 always be rx_end's mac address.
+        wnet_vif_id = RxPrivHdr_bit->RxA1match_id; /* address 1 always be rx_end's mac address. */
         ret = AmlmS_opt->get_stationid(hal_priv->drv_priv, &RxPrivHdr->data[10], wnet_vif_id, &staid);
 
         if (ret < 0)
         {
-            //dump_memory_internel(&RxPrivHdr->data[10],6);
-            //PRINT("staid  %x error !\n", staid);
-            //if we are sta, we should disconnect from the counterpart.
+            /* dump_memory_internal(&RxPrivHdr->data[10],6);
+             * PRINT("staid  %x error !\n", staid);
+             * if we are sta, we should disconnect from the counterpart.
+             */
             return false;
         }
         wnet_vif = drv_priv->drv_wnet_vif_table[wnet_vif_id];
@@ -148,7 +149,7 @@ unsigned char hal_chk_replay_cnt(struct hal_private *hal_priv,HW_RxDescripter_bi
         case RX_PHY_CCMP:
             repcnt_my[is_group] = (unsigned long long *)PN;
             repcnt_rx = (unsigned long long *)RxPrivHdr->PN;
-            //not require "+1", just require increase
+            /* not require "+1", just require increase */
             if (*repcnt_my[is_group] < *repcnt_rx) {
                 if (*repcnt_my[is_group] == 0 && *repcnt_rx > 0) {
                     *repcnt_my[is_group] = *repcnt_rx - 1;
@@ -171,14 +172,14 @@ unsigned char hal_chk_replay_cnt(struct hal_private *hal_priv,HW_RxDescripter_bi
                         repcnt_diff = (int)(*repcnt_rx - *repcnt_my[is_group]);
                     }
 
-                    if (repcnt_diff > 0 && repcnt_diff <= MAX_PN_WINDOW/2) {
+                    if (repcnt_diff > 0 && repcnt_diff <= MAX_PN_WINDOW / 2) {
                         wnet_vif->pn_window[is_group][0] |= (1 << (repcnt_diff - 1));
                         if (repcnt_diff == 1) {
                             offset = hal_set_pn_win(wnet_vif->pn_window[is_group]);
                             *repcnt_my[is_group] += offset;
                         }
-                    } else if (repcnt_diff > MAX_PN_WINDOW/2 && repcnt_diff <= MAX_PN_WINDOW){
-                        wnet_vif->pn_window[is_group][1] |= (1 << (repcnt_diff - MAX_PN_WINDOW/2 - 1));
+                    } else if (repcnt_diff > MAX_PN_WINDOW / 2 && repcnt_diff <= MAX_PN_WINDOW){
+                        wnet_vif->pn_window[is_group][1] |= (1 << (repcnt_diff - MAX_PN_WINDOW / 2 - 1));
                     }
                 }
 
@@ -189,10 +190,11 @@ unsigned char hal_chk_replay_cnt(struct hal_private *hal_priv,HW_RxDescripter_bi
             }
             break;
         case RX_PHY_WAPI:
-            if (hal_wpi_chk_pn_increase(RxPrivHdr->PN,PN) ==  true) {
-                memcpy(PN,RxPrivHdr->PN,MAX_PN_LEN);
+            if (hal_wpi_chk_pn_increase(RxPrivHdr->PN, PN) == true) {
+                memcpy(PN, RxPrivHdr->PN, MAX_PN_LEN);
                 return true;
             }
+
             return false;
             break;
         case RX_PHY_WEP64:
@@ -200,6 +202,7 @@ unsigned char hal_chk_replay_cnt(struct hal_private *hal_priv,HW_RxDescripter_bi
         default:
             break;
     }
+
     return true;
 }
 
@@ -207,7 +210,7 @@ void hal_soft_rx_cs(struct hal_private *hal_priv, struct sk_buff *skb)
 #if defined (HAL_FPGA_VER)
 {
     HW_RxDescripter_bit *RxPrivHdr_bit;
-    unsigned char wnet_vif_id = 0;
+    unsigned char wnet_vif_id;
     static unsigned char print_count = 0;
     unsigned char pkt_drop = 0;
 
@@ -222,23 +225,31 @@ void hal_soft_rx_cs(struct hal_private *hal_priv, struct sk_buff *skb)
     if (wnet_vif_id >= WIFI_MAX_VID)
     {
         PRINT("hal_soft_rx_cs wnet_vif_id %d \n", wnet_vif_id);
-        //dump_memory_internel(RxPrivHdr_bit->data, 32);
+        /* dump_memory_internal(RxPrivHdr_bit->data, 32); */
         os_skb_free(skb);
         return;
     }
 
-    if ((RxPrivHdr_bit->mic_err) || (RxPrivHdr_bit->keymiss_err) || (RxPrivHdr_bit->icv_err)
-        || (hal_priv->hal_call_back->intr_rx_handle == NULL))
+    if ((RxPrivHdr_bit->mic_err) || (RxPrivHdr_bit->keymiss_err) ||
+        (RxPrivHdr_bit->icv_err) || (hal_priv->hal_call_back->intr_rx_handle == NULL))
     {
         if (!(print_count++ % 100))
-            PRINT("mic_err = %d, keymiss_err %d wnet_vif_id %d\n",RxPrivHdr_bit->mic_err, RxPrivHdr_bit->keymiss_err,wnet_vif_id);
+            PRINT("mic_err = %d, keymiss_err %d wnet_vif_id %d\n",
+                  RxPrivHdr_bit->mic_err, RxPrivHdr_bit->keymiss_err,
+                  wnet_vif_id);
 
         if (RxPrivHdr_bit->mic_err) {
-            pkt_drop = hal_priv->hal_call_back->pmf_encrypt_pkt_handle(hal_priv->drv_priv, skb, RxPrivHdr_bit->RxRSSI_ant0,
-                RxPrivHdr_bit->RxRate, RxPrivHdr_bit->RxChannel, RxPrivHdr_bit->aggregation, wnet_vif_id,RxPrivHdr_bit->key_id);
+            pkt_drop = hal_priv->hal_call_back->pmf_encrypt_pkt_handle(hal_priv->drv_priv,
+                                                                       skb, RxPrivHdr_bit->RxRSSI_ant0,
+                                                                       RxPrivHdr_bit->RxRate,
+                                                                       RxPrivHdr_bit->RxChannel,
+                                                                       RxPrivHdr_bit->aggregation,
+                                                                       wnet_vif_id,RxPrivHdr_bit->key_id);
 
-            hal_priv->hal_call_back->mic_error_event(hal_priv->drv_priv,RxPrivHdr_bit->data,
-                WIFI_ADDR2(RxPrivHdr_bit->data),wnet_vif_id);
+            hal_priv->hal_call_back->mic_error_event(hal_priv->drv_priv,
+                                                     RxPrivHdr_bit->data,
+                                                     WIFI_ADDR2(RxPrivHdr_bit->data),
+                                                     wnet_vif_id);
         } else {
             pkt_drop = 1;
         }
@@ -261,8 +272,8 @@ void hal_soft_rx_cs(struct hal_private *hal_priv, struct sk_buff *skb)
 #endif
         }
 
-        if (RxPrivHdr_bit->RxTcpCSUM_err && RxPrivHdr_bit->RxTcpCSUMCalculated
-             && RxPrivHdr_bit->RxIPCSUM_err &&  RxPrivHdr_bit->RxIPCSUMCalculated)
+        if (RxPrivHdr_bit->RxTcpCSUM_err && RxPrivHdr_bit->RxTcpCSUMCalculated &&
+            RxPrivHdr_bit->RxIPCSUM_err &&  RxPrivHdr_bit->RxIPCSUMCalculated)
         {
             skb->ip_summed = CHECKSUM_UNNECESSARY;
         }
@@ -271,50 +282,58 @@ void hal_soft_rx_cs(struct hal_private *hal_priv, struct sk_buff *skb)
             skb->ip_summed = CHECKSUM_NONE;
         }
 
-        // push to upper layer
-        hal_priv->hal_call_back->intr_rx_handle(hal_priv->drv_priv, skb, RxPrivHdr_bit->RxRSSI_ant0,
-            RxPrivHdr_bit->RxRate, RxPrivHdr_bit->Channel_BW, RxPrivHdr_bit->RxChannel, RxPrivHdr_bit->aggregation, wnet_vif_id,RxPrivHdr_bit->key_id);
+        /* push to upper layer */
+        hal_priv->hal_call_back->intr_rx_handle(hal_priv->drv_priv, skb,
+                                                RxPrivHdr_bit->RxRSSI_ant0,
+                                                RxPrivHdr_bit->RxRate,
+                                                RxPrivHdr_bit->Channel_BW,
+                                                RxPrivHdr_bit->RxChannel,
+                                                RxPrivHdr_bit->aggregation,
+                                                wnet_vif_id,RxPrivHdr_bit->key_id);
     }
 }
 #elif defined (HAL_SIM_VER)
 {
         HW_RxDescripter_bit  *RxPrivHdr_bit;
         RxPrivHdr_bit = (HW_RxDescripter_bit *)OS_SKBBUF_DATA(skb);
+
         if (STA2_VMAC1_RX_FRAME_DUMP) {
                 hal_show_rxframe(RxPrivHdr_bit);
         }
+
         OS_SKBBUF_PULL(skb,sizeof(HW_RxDescripter_bit));
-        if ((RxPrivHdr_bit->mic_err)
-            ||(RxPrivHdr_bit->keymiss_err)
-            ||(RxPrivHdr_bit->icv_err)
-            ||(hal_priv->hal_call_back->intr_rx_handle == NULL)) {
+
+        if ((RxPrivHdr_bit->mic_err) ||
+            (RxPrivHdr_bit->keymiss_err) ||
+            (RxPrivHdr_bit->icv_err) ||
+            (hal_priv->hal_call_back->intr_rx_handle == NULL)) {
                 Test_Done(0);
 
                 if (RxPrivHdr_bit->mic_err) {
-                        PRINT("%s RxLength= 0x%x, mic_err, dump\n",__FUNCTION__,RxPrivHdr_bit->RxLength);
-                        dump_memory_internel(RxPrivHdr_bit->data, RxPrivHdr_bit->RxLength);
+                        PRINT("%s RxLength= 0x%x, mic_err, dump\n",
+                              __FUNCTION__, RxPrivHdr_bit->RxLength);
+                        dump_memory_internal(RxPrivHdr_bit->data, RxPrivHdr_bit->RxLength);
                 }
                 OS_SKBBUF_FREE(skb);
                 return;
-        }
-        else {
+        } else {
         unsigned short frame_control = READ_16L((unsigned char *)RxPrivHdr_bit->data);
 #ifdef BEACON_TX_TEST
         if ((frame_control & 0xfc) == MAC_FCTRL_BEACON)
         {
-            /*counter frames without beacon frame*/
+            /* counter frames without beacon frame */
             PRINT("Host receive beacon!\n");
         }
         else
 #endif
 #if (STA1_VMAC0_SEND_TYPE == TYPE_PS_NULLDATA_TX || STA1_VMAC0_SEND_TYPE == TYPE_PS_PSPOLL_TX)
-        /*STA1 acts as STA, so only STA1 can send ps-poll. */
+        /* STA1 acts as STA, so only STA1 can send ps-poll. */
         if (hal_mac_frame_type(frame_control, MAC_FCTRL_PSPOLL))
         {
             PRINT("Host receive ps poll++++\n");
         }
-        else if (hal_mac_frame_type(frame_control, MAC_FCTRL_NULL_FUNCTION)
-                || hal_mac_frame_type(frame_control, MAC_FCTRL_QOS_NULL))
+        else if (hal_mac_frame_type(frame_control, MAC_FCTRL_NULL_FUNCTION) ||
+                 hal_mac_frame_type(frame_control, MAC_FCTRL_QOS_NULL))
         {
 #ifdef DOT11_PS_TEST
             if (frame_control & FRAME_CONTROL_POWER_MANAGEMENT)
@@ -335,16 +354,16 @@ void hal_soft_rx_cs(struct hal_private *hal_priv, struct sk_buff *skb)
         }
 
 #if (STA1_VMAC1_PARAM2 == 1)
-        if (((rxframenum == STA2_VMAC1_SEND_FRAME_NUM))
-            &&(STA2_VMAC1_SEND_FRAME_NUM != 99999))
+        if ((rxframenum == STA2_VMAC1_SEND_FRAME_NUM) &&
+            (STA2_VMAC1_SEND_FRAME_NUM != 99999))
 
 #else
         if (STA2_VMAC1_SEND_FRAME_NUM < STA1_VMAC0_AGG_NUM) {
             PRINT("frame num < agg frame num : frame num is not enough for agg frame num\n");
             Test_Done(0);
         }
-        if (((rxframenum == STA2_VMAC1_SEND_FRAME_NUM))
-        &&(STA2_VMAC1_SEND_FRAME_NUM != 99999))
+        if ((rxframenum == STA2_VMAC1_SEND_FRAME_NUM) &&
+            (STA2_VMAC1_SEND_FRAME_NUM != 99999))
 #endif
         {
             Test_Done(1);
@@ -355,55 +374,56 @@ void hal_soft_rx_cs(struct hal_private *hal_priv, struct sk_buff *skb)
         }
 #endif
         if (RxPrivHdr_bit->data[1]&IEEE80211_FC1_WEP) {
-            //dump_memory_internel(RxPrivHdr_bit->data, RxPrivHdr_bit->RxLength);
+            /* dump_memory_internal(RxPrivHdr_bit->data, RxPrivHdr_bit->RxLength); */
             RxPrivHdr_bit->data[1] &= ~IEEE80211_FC1_WEP;
         }
         if (RxPrivHdr_bit->RxDecryptType != RX_PHY_NOWEP) {
         }
-        if (STA2_TCPIP_CHECKSUM ) {
+        if (STA2_TCPIP_CHECKSUM) {
             if (RxPrivHdr_bit->RxTcpCSUM_err && RxPrivHdr_bit->RxTcpCSUMCalculated) {
-                             PRINT(">RxStatus =    TCPCHSUM ERROR !\n");
-                             Test_Done(0);
-            }
-            else {
-                             PRINT(">RxStatus = 0x%x TCPCHSUM ok \n");
+                PRINT(">RxStatus = TCPCHSUM ERROR !\n");
+                Test_Done(0);
+            } else {
+                PRINT(">RxStatus = 0x%x TCPCHSUM ok \n");
             }
 
-            if (RxPrivHdr_bit->RxIPCSUM_err &&  RxPrivHdr_bit->RxIPCSUMCalculated) {
-                             PRINT(">RxStatus = 0x%x IPCHSUM ERROR \n");
-                             Test_Done(0);
-            }
-            else {
-                             PRINT(">RxStatus = 0x%x IPCHSUM ok \n");
+            if (RxPrivHdr_bit->RxIPCSUM_err && RxPrivHdr_bit->RxIPCSUMCalculated) {
+                PRINT(">RxStatus = 0x%x IPCHSUM ERROR \n");
+                Test_Done(0);
+            } else {
+                PRINT(">RxStatus = 0x%x IPCHSUM ok \n");
             }
         }
-        hal_priv->hal_call_back->intr_rx_handle( hal_priv->drv_priv,
-                                        skb,RxPrivHdr_bit->RxRSSI_ant0,
-                                        RxPrivHdr_bit->RxRate,
-                                        RxPrivHdr_bit->Channel_BW,
-                                        RxPrivHdr_bit->RxChannel, RxPrivHdr_bit->aggregation,
-                                        RxPrivHdr_bit->RxA1match_id,RxPrivHdr_bit->key_id );
+        hal_priv->hal_call_back->intr_rx_handle(hal_priv->drv_priv, skb,
+                                                RxPrivHdr_bit->RxRSSI_ant0,
+                                                RxPrivHdr_bit->RxRate,
+                                                RxPrivHdr_bit->Channel_BW,
+                                                RxPrivHdr_bit->RxChannel,
+                                                RxPrivHdr_bit->aggregation,
+                                                RxPrivHdr_bit->RxA1match_id,
+                                                RxPrivHdr_bit->key_id );
         }
 }
 #endif
 
-void hal_write_word(unsigned int addr,unsigned int data)
+static void hal_write_word(unsigned int addr,unsigned int data)
 {
-    struct  hw_interface* hif = hif_get_hw_interface();
+    struct  hw_interface *hif = hif_get_hw_interface();
 
 #if 1
     /* just for power save debug */
     if ((addr & 0xff000000) == 0x11000000)
-        hif->hif_ops.hi_bottom_write8(SDIO_FUNC1, (addr & ~0xff000000), (unsigned char)data);
+        hif->hif_ops.hi_bottom_write8(SDIO_FUNC1, (addr & ~0xff000000),
+                                      (unsigned char)data);
     else
 #endif
         hif->hif_ops.hi_write_word(addr, data);
 }
 
-unsigned int hal_read_word(unsigned int addr)
+static unsigned int hal_read_word(unsigned int addr)
 {
-    struct  hw_interface* hif = hif_get_hw_interface();
-    unsigned int regdata = 0;
+    struct  hw_interface *hif = hif_get_hw_interface();
+    unsigned int regdata;
 
 #if 1
     /* just for power save debug */
@@ -412,43 +432,45 @@ unsigned int hal_read_word(unsigned int addr)
     else
 #endif
         regdata = hif->hif_ops.hi_read_word(addr);
+
     return regdata;
 }
 
-void hal_bt_write_word(unsigned int addr,unsigned int data)
+static void hal_bt_write_word(unsigned int addr,unsigned int data)
 {
-    struct hw_interface* hif = hif_get_hw_interface();
+    struct hw_interface *hif = hif_get_hw_interface();
+
     hif->hif_ops.bt_hi_write_word(addr, data);
 }
 
-unsigned int hal_bt_read_word(unsigned int addr)
+static unsigned int hal_bt_read_word(unsigned int addr)
 {
-    struct  hw_interface* hif = hif_get_hw_interface();
+    struct hw_interface *hif = hif_get_hw_interface();
+
     return hif->hif_ops.bt_hi_read_word(addr);
 }
 
-
-void hal_pt_rx_start(unsigned int qos)
+static void hal_pt_rx_start(unsigned int qos)
 {
-    struct  hw_interface* hif = hif_get_hw_interface();
+    struct hw_interface *hif = hif_get_hw_interface();
+
     hif->hif_ops.hif_pt_rx_start(qos);
 }
 
-void hal_pt_rx_stop(void)
+static void hal_pt_rx_stop(void)
 {
-     struct  hw_interface* hif = hif_get_hw_interface();
-      hif->hif_ops.hif_pt_rx_stop();
+     struct  hw_interface *hif = hif_get_hw_interface();
+
+     hif->hif_ops.hif_pt_rx_stop();
 }
 
 unsigned char hal_wake_fw_req(void)
 {
     struct hal_private * halpriv = hal_get_priv();
-    unsigned char fw_ps_st = PMU_PWR_OFF;
-    unsigned char fw_sleep = 0, host_sleep_req = 0;
+    unsigned char host_sleep_req = 0;
     unsigned int loop = 0, wake_flag = 0;
 #ifdef PROJECT_W1
     struct hw_interface* hif = hif_get_hw_interface();
-    unsigned char  host_req_status = 0;
 #endif
 
     POWER_BEGIN_LOCK();
@@ -461,7 +483,7 @@ unsigned char hal_wake_fw_req(void)
     if (atomic_read(&halpriv->drv_suspend_cnt) != 0)
     {
         POWER_END_LOCK();
-        printk("%s:%d, suspending, does not wake, fw st %d\n", __func__, __LINE__,
+        pr_debug("%s:%d, suspending, does not wake, fw st %d\n", __func__, __LINE__,
             halpriv->hal_fw_ps_status);
         return 0;
     }
@@ -469,12 +491,17 @@ unsigned char hal_wake_fw_req(void)
     // check fw power save status
     while (halpriv->hal_fw_ps_status != HAL_FW_IN_ACTIVE)
     {
+        unsigned char host_req_status;
+        unsigned char host_sleep_req;
+        unsigned char fw_ps_st;
+        unsigned char fw_sleep;
+
         fw_ps_st = halpriv->hal_ops.hal_get_fw_ps_status();
         fw_sleep = ((fw_ps_st & FW_SLEEP) != 0) ? 1 : 0;
         host_req_status = hif->hif_ops.hi_bottom_read8(SDIO_FUNC1, RG_SDIO_PMU_HOST_REQ);
         host_sleep_req = ((host_req_status & HOST_SLEEP_REQ) != 0) ? 1 : 0;
 
-        //printk("fw ps st 0x%x, fw_sleep 0x%x, host_sleep_req 0x%x\n", fw_ps_st, fw_sleep, host_sleep_req);
+        //pr_debug("fw ps st 0x%x, fw_sleep 0x%x, host_sleep_req 0x%x\n", fw_ps_st, fw_sleep, host_sleep_req);
         // fw/pmu st
         fw_ps_st = fw_ps_st & 0xF;
         if (fw_ps_st != PMU_ACT_MODE)
@@ -523,7 +550,7 @@ unsigned char hal_wake_fw_req(void)
         {
             POWER_END_LOCK();
             host_wake_w1_fail_cnt++;
-            printk("fw ps st 0x%x, fw_sleep 0x%x, host_sleep_req 0x%x\n", fw_ps_st, fw_sleep, host_sleep_req);
+            pr_debug("fw ps st 0x%x, fw_sleep 0x%x, host_sleep_req 0x%x\n", fw_ps_st, fw_sleep, host_sleep_req);
             return 0;
         }
     }
@@ -536,13 +563,15 @@ unsigned char hal_check_fw_wake(void)
 {
     struct hal_private * halpriv = hal_get_priv();
     int loop_count = 0;
-    unsigned int fw_ps_st = 0;
-    unsigned int host_sleep_req = 0;
-    unsigned int fw_sleep = 0;
 
     POWER_BEGIN_LOCK();
+
     while (halpriv->hal_fw_ps_status == HAL_FW_IN_SLEEP)
     {
+        unsigned int fw_ps_st;
+        unsigned int fw_sleep;
+        unsigned int host_sleep_req;
+
         POWER_END_LOCK();
         fw_ps_st =  halpriv->hal_ops.hal_get_fw_ps_status();
         fw_sleep = ((fw_ps_st & FW_SLEEP) != 0) ? 1 : 0;
@@ -557,7 +586,7 @@ unsigned char hal_check_fw_wake(void)
 #endif
             )
         {
-            //printk("%s:%d, fw is not active mode, st = 0x%x\n", __func__, __LINE__, fw_ps_st);
+            /* pr_debug("%s:%d, fw is not active mode, st = 0x%x\n", __func__, __LINE__, fw_ps_st); */
         }
         else
         {
@@ -569,6 +598,7 @@ unsigned char hal_check_fw_wake(void)
         }
         POWER_BEGIN_LOCK();
     }
+
     POWER_END_LOCK();
     return 1;
 }
@@ -576,7 +606,7 @@ unsigned char hal_check_fw_wake(void)
 unsigned char hal_get_fw_ps_status(void)
 {
     struct hw_interface* hif = hif_get_hw_interface();
-    unsigned char fw_ps_st = 0;
+    unsigned char fw_ps_st;
 
     fw_ps_st = hif->hif_ops.hi_bottom_read8(SDIO_FUNC1, RG_SDIO_PMU_STATUS) & 0xFF;
     return fw_ps_st;
@@ -595,7 +625,7 @@ unsigned char hal_clear_fw_wake(void)
     struct hw_interface* hif = hif_get_hw_interface();
     unsigned char tmp = 0;
 
-    // clear
+    /* clear */
     tmp = hif->hif_ops.hi_bottom_read8(SDIO_FUNC1, RG_SDIO_PMU_WAKE);
     hif->hif_ops.hi_bottom_write8(SDIO_FUNC1, RG_SDIO_PMU_WAKE, (tmp & ~BIT(0)));
     return 0;
@@ -688,10 +718,10 @@ void hal_ops_attach(void)
     hal_priv->hal_ops.phy_get_rw_ptr = phy_get_rw_ptr;
     hal_priv->hal_ops.phy_get_tsf = phy_get_tsf;
 
-    // beamforming
+    /* beamforming */
     hal_priv->hal_ops.phy_set_bmfm_info = phy_set_bmfm_info;
     /*enable or disable WIFI/BT coexist*/
-    hal_priv->hal_ops.phy_set_coexist_en  = phy_set_coexist_en;
+    hal_priv->hal_ops.phy_set_coexist_en = phy_set_coexist_en;
 
     hal_priv->hal_ops.phy_set_coexist_max_miss_bcn = phy_set_coexist_max_miss_bcn;
     hal_priv->hal_ops.phy_set_coexist_req_timeslice_timeout_value = phy_set_coexist_req_timeslice_timeout_value;
@@ -787,12 +817,11 @@ void hal_ops_detach(void)
     host_suspend_req = NULL;
     host_resume_req = NULL;
 #endif
-
 }
 
 int hal_set_suspend(unsigned char enable)
 {
-    struct hw_interface* hif = hif_get_hw_interface();
+    struct hw_interface *hif = hif_get_hw_interface();
 
     if (hif->hif_ops.hif_suspend != NULL)
         return hif->hif_ops.hif_suspend(enable);
@@ -800,9 +829,10 @@ int hal_set_suspend(unsigned char enable)
         return -1;
 }
 
-struct aml_hal_call_backs  *hal_get_drv_func(void)
+struct aml_hal_call_backs *hal_get_drv_func(void)
 {
     struct hal_private *hal_priv = hal_get_priv();
+
     return hal_priv->hal_call_back;
 }
 
@@ -828,93 +858,105 @@ exit:
 void hal_pn_win_init(enum aml_key_type type, unsigned char wnet_vif_id)
 {
     unsigned int LoopCnt;
-    struct hal_private * hal_priv =hal_get_priv();
+    struct hal_private *hal_priv = hal_get_priv();
     struct drv_private *drv_priv = (struct drv_private *)hal_priv->drv_priv;
     struct wlan_net_vif *wnet_vif = drv_priv->drv_wnet_vif_table[wnet_vif_id];
+
     for (LoopCnt = 0; LoopCnt < 2; LoopCnt++) {
         wnet_vif->pn_window[type][LoopCnt] = 0;
     }
 }
 
-void hal_urep_cnt_init(struct unicastReplayCnt  *RepCnt,unsigned char encryType)
+void hal_urep_cnt_init(struct unicastReplayCnt *RepCnt, unsigned char encryType)
 {
     unsigned int LoopCnt;
+
     if (encryType == WIFI_WPI)
     {
-        unsigned char AP_upn[MAX_PN_LEN]   =  {0x37, 0x5c, 0x36, 0x5c, 0x36, 0x5c, 0x36, 0x5c, 0x36,0x5c, 0x36, 0x5c, 0x36, 0x5c, 0x36, 0x5c };
-        unsigned char STA_upn[MAX_PN_LEN]  =  {0x36, 0x5c, 0x36, 0x5c, 0x36, 0x5c, 0x36, 0x5c, 0x36,0x5c, 0x36, 0x5c, 0x36, 0x5c, 0x36, 0x5c };
+        unsigned char AP_upn[MAX_PN_LEN] = {0x37, 0x5c, 0x36, 0x5c, 0x36,
+                                            0x5c, 0x36, 0x5c, 0x36, 0x5c,
+                                            0x36, 0x5c, 0x36, 0x5c, 0x36,
+                                            0x5c};
+        unsigned char STA_upn[MAX_PN_LEN] = {0x36, 0x5c, 0x36, 0x5c, 0x36,
+                                             0x5c, 0x36, 0x5c, 0x36, 0x5c,
+                                             0x36, 0x5c, 0x36, 0x5c, 0x36,
+                                             0x5c};
 
         /* Tx replay counter init value = 1*/
         if (wifi_conf_mib.dot11CamMode == MODE_STA)
         {
-            memcpy(&RepCnt->txPN[TX_UNICAST_REPCNT_ID][0],STA_upn,MAX_PN_LEN);
+            memcpy(&RepCnt->txPN[TX_UNICAST_REPCNT_ID][0], STA_upn, MAX_PN_LEN);
         }
         else
         {
-            memcpy(&RepCnt->txPN[TX_UNICAST_REPCNT_ID][0],AP_upn,MAX_PN_LEN);
+            memcpy(&RepCnt->txPN[TX_UNICAST_REPCNT_ID][0], AP_upn, MAX_PN_LEN);
         }
     }
     else
     {
-        /* Tx replay counter init value = 1*/
+        /* Tx replay counter init value = 1 */
         for (LoopCnt = 0; LoopCnt < MAX_TX_QUEUE; LoopCnt++)
         {
-            memset(&RepCnt->txPN[LoopCnt][0],0,MAX_PN_LEN);
-            RepCnt->txPN[LoopCnt][0] =1;
+            memset(&RepCnt->txPN[LoopCnt][0], 0, MAX_PN_LEN);
+            RepCnt->txPN[LoopCnt][0] = 1;
         }
     }
     for (LoopCnt = 0; LoopCnt < MAX_RX_QUEUE; LoopCnt++)
     {
-        /* Rx replay counter init value = 0*/
+        /* Rx replay counter init value = 0 */
         memset(&RepCnt->rxPN[LoopCnt][0], 0, MAX_PN_LEN);
     }
 
 }
 
-void hal_mrep_cnt_init(struct hal_private *halpriv,unsigned char wnet_vif_id,unsigned char encryType)
+void hal_mrep_cnt_init(struct hal_private *halpriv, unsigned char wnet_vif_id,
+                       unsigned char encryType)
 {
-    struct multicastReplayCnt   *mRepCnt = &halpriv->mRepCnt[wnet_vif_id];
+    struct multicastReplayCnt *mRepCnt = &halpriv->mRepCnt[wnet_vif_id];
+
     if (encryType == WIFI_WPI)
     {
-        unsigned char gpn[16]= {0x36, 0x5c, 0x36, 0x5c, 0x36, 0x5c, 0x36, 0x5c, 0x36, 0x5c, 0x36, 0x5c, 0x36, 0x5c, 0x36, 0x5c};
+        unsigned char gpn[16]= {0x36, 0x5c, 0x36, 0x5c, 0x36, 0x5c,
+                                0x36, 0x5c, 0x36, 0x5c, 0x36, 0x5c,
+                                0x36, 0x5c, 0x36, 0x5c};
         /* Tx replay counter init value = 1 */
-        memcpy(&mRepCnt->txPN[0],gpn,MAX_PN_LEN);
+        memcpy(&mRepCnt->txPN[0], gpn, MAX_PN_LEN);
     }
     else
     {
-        /* Tx replay counter init value = 1*/
-        memset(&mRepCnt->txPN[0],0,MAX_PN_LEN);
-        mRepCnt->txPN[0] =1;
+        /* Tx replay counter init value = 1 */
+        memset(&mRepCnt->txPN[0], 0, MAX_PN_LEN);
+        mRepCnt->txPN[0] = 1;
     }
-    /* Rx replay counter init value = 0*/
+    /* Rx replay counter init value = 0 */
     memset(&mRepCnt->rxPN[0], 0, MAX_PN_LEN);
 }
 
-void hal_wpi_pn_self_plus(  unsigned long long *WpiPN )
+void hal_wpi_pn_self_plus(unsigned long long *WpiPN)
 {
-    if ( WpiPN[0] == 0xFFFFFFFFFFFFFFFFull )
+    if (WpiPN[0] == 0xFFFFFFFFFFFFFFFFull)
     {
-        WpiPN[0] =0x0ull;
-        WpiPN[1] +=0x1ull;
+        WpiPN[0] = 0x0ull;
+        WpiPN[1] += 0x1ull;
     }
     else
     {
-        WpiPN[0] +=0x1ull;
+        WpiPN[0] += 0x1ull;
     }
 }
 
-void hal_wpi_pn_self_plus_plus(  unsigned long long *WpiPN )
+void hal_wpi_pn_self_plus_plus(unsigned long long *WpiPN)
 {
 
-    if (  WpiPN[0] == 0xFFFFFFFFFFFFFFFFull )
+    if (WpiPN[0] == 0xFFFFFFFFFFFFFFFFull)
     {
-        WpiPN[0] =0x1ull;
-        WpiPN[1] +=0x1ull;
+        WpiPN[0] = 0x1ull;
+        WpiPN[1] += 0x1ull;
     }
-    else if ( WpiPN[0] == 0xFFFFFFFFFFFFFFFEull )
+    else if (WpiPN[0] == 0xFFFFFFFFFFFFFFFEull)
     {
-        WpiPN[0] =0x0ull;
-        WpiPN[1] +=0x1ull;
+        WpiPN[0] = 0x0ull;
+        WpiPN[1] += 0x1ull;
     }
     else
     {
@@ -922,10 +964,11 @@ void hal_wpi_pn_self_plus_plus(  unsigned long long *WpiPN )
     }
 }
 
-unsigned char hal_wpi_chk_pn_increase(  unsigned char *RcvPN,  unsigned char *SavedPn )
+unsigned char hal_wpi_chk_pn_increase(unsigned char *RcvPN, unsigned char *SavedPn)
 {
-    int i=0;
-    for (i=(MAX_PN_LEN-1); i>=0; i--)
+    int i;
+
+    for (i= (MAX_PN_LEN - 1); i >= 0; i--)
     {
         if (RcvPN[i]>SavedPn[i])
         {
@@ -935,28 +978,27 @@ unsigned char hal_wpi_chk_pn_increase(  unsigned char *RcvPN,  unsigned char *Sa
         {
             return false;
         }
-        else
-        {
-
-        }
     }
+
     return false;
 }
 
 void hal_free_txcmp_buf(struct hal_private *hal_priv)
 {
-
 #if defined (HAL_FPGA_VER)
-    FREE(hal_priv->txcompletestatus,"hal_priv->txcompletestatus");
+    FREE(hal_priv->txcompletestatus, "hal_priv->txcompletestatus");
 #elif defined (HAL_SIM_VER)
     FREE(hal_priv->txcompletestatus);
 #endif
 }
+
 unsigned char hal_alloc_txcmp_buf( struct hal_private *hal_priv)
 {
-    //alloc tx agg descriptor
+    /* alloc tx agg descriptor */
 #if defined (HAL_FPGA_VER)
-    hal_priv->txcompletestatus = (struct tx_complete_status  *)ZMALLOC(sizeof(struct tx_complete_status), "hal_priv->txcompletestatus", GFP_KERNEL);
+    hal_priv->txcompletestatus = (struct tx_complete_status *)ZMALLOC(sizeof(struct tx_complete_status),
+                                                                      "hal_priv->txcompletestatus",
+                                                                      GFP_KERNEL);
     if (hal_priv->txcompletestatus == NULL)
     {
         ERROR_DEBUG_OUT("alloc_err\n");
@@ -1010,7 +1052,7 @@ unsigned char hal_alloc_fw_event_buf( struct hal_private *hal_priv)
 unsigned char hal_tx_empty()
 {
     struct hw_interface* hif = hif_get_hw_interface();
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0) && !defined (LINUX_PLATFORM)
     if ((hif->HiStatus.Tx_Send_num == hif->HiStatus.Tx_Free_num)
         &&(hif->HiStatus.Tx_Send_num ==hif->HiStatus.Tx_Done_num))
 #else
@@ -1040,7 +1082,7 @@ int hal_is_empty_tx_id(struct hal_private * hal_priv)
     return 0;
 }
 
-unsigned char hal_get_free_tx_id_num(struct hal_private * hal_priv)
+static unsigned char hal_get_free_tx_id_num(struct hal_private * hal_priv)
 {
     unsigned char bit_num = 0;
     unsigned char i;
@@ -1091,7 +1133,7 @@ int hal_free_tx_id(struct hal_private * hal_priv, struct txdonestatus *txstatus,
     }
     else
     {
-        printk("free id:%d, %lx, %lx\n", id, hal_priv->tx_frames_map[0], hal_priv->tx_frames_map[1]);
+        pr_debug("free id:%d, %lx, %lx\n", id, hal_priv->tx_frames_map[0], hal_priv->tx_frames_map[1]);
         ret = -1;
     }
     COMMON_UNLOCK();
@@ -1124,7 +1166,7 @@ __alloc_fail:
     COMMON_UNLOCK();
 
     //if (id == TXID_INVALID)
-        //printk("%s alloc fail\n", __func__);
+        //pr_err("%s alloc fail\n", __func__);
     return id;
 }
 
@@ -1167,7 +1209,7 @@ void hal_txframe_pre(void)
             if (CO_SharedFifoEmpty(pTxShareFifo, CO_TX_BUFFER_MAKE))
             {
                 if ((txqueueid == HAL_WME_NOQOS)
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0) && !defined (LINUX_PLATFORM)
                     && (hif->HiStatus.Tx_Done_num - hif->HiStatus.Tx_Free_num > 32)) {
 #else
                 && (atomic_read(&hif->HiStatus.Tx_Done_num) - atomic_read(&hif->HiStatus.Tx_Free_num) > 32)) {
@@ -1180,7 +1222,7 @@ void hal_txframe_pre(void)
                 id = hal_alloc_tx_id(hal_priv,pTxDescFiFo);
                 if (id == TXID_INVALID)
                 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0) && !defined (LINUX_PLATFORM)
                     if (hif->HiStatus.Tx_Done_num == hif->HiStatus.Tx_Free_num) {
 #else
                     if (atomic_read(&hif->HiStatus.Tx_Done_num) == atomic_read(&hif->HiStatus.Tx_Free_num)) {
@@ -1209,7 +1251,7 @@ void hal_txframe_pre(void)
             id = hal_alloc_tx_id(hal_priv,pTxDescFiFo);
             if (id == TXID_INVALID)
             {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0) && !defined (LINUX_PLATFORM)
                 if (hif->HiStatus.Tx_Done_num == hif->HiStatus.Tx_Free_num) {
 #else
                 if (atomic_read(&hif->HiStatus.Tx_Done_num) == atomic_read(&hif->HiStatus.Tx_Free_num)) {
@@ -1227,7 +1269,7 @@ void hal_txframe_pre(void)
     }
 }
 
-void hal_tx_complete(struct sk_buff * skb_buf)
+static void hal_tx_complete(struct sk_buff * skb_buf)
 {
     if (aml_wifi_is_enable_rf_test() && (skb_buf != NULL)) {
         os_skb_free(skb_buf);
@@ -1252,7 +1294,7 @@ void  hal_tx_frame(void)
 
     if (hal_priv->bhaltxdrop || hal_priv->bhalPowerSave) {
         if (print_cnt++ == 200) {
-            printk("%s bhaltxdrop:%d, bhalPowerSave:%d\n", __func__, hal_priv->bhaltxdrop, hal_priv->bhalPowerSave);
+            pr_debug("%s bhaltxdrop:%d, bhalPowerSave:%d\n", __func__, hal_priv->bhaltxdrop, hal_priv->bhalPowerSave);
         }
         return;
     }
@@ -1264,7 +1306,7 @@ void  hal_tx_frame(void)
         POWER_END_LOCK();
         AML_TXLOCK_LOCK();
         if (print_cnt++ == 200) {
-            printk("%s %d hal_drv_ps_status:%02x\n", __func__, __LINE__, hal_priv->hal_drv_ps_status);
+            pr_debug("%s %d hal_drv_ps_status:%02x\n", __func__, __LINE__, hal_priv->hal_drv_ps_status);
         }
         return;
     }
@@ -1279,7 +1321,7 @@ void  hal_tx_frame(void)
         AML_TXLOCK_LOCK();
 
         if (print_cnt++ == 200) {
-            printk("%s %d hal_drv_ps_status:%02x\n", __func__, __LINE__, hal_priv->hal_drv_ps_status);
+            pr_debug("%s %d hal_drv_ps_status:%02x\n", __func__, __LINE__, hal_priv->hal_drv_ps_status);
         }
         return;
     }
@@ -1398,7 +1440,7 @@ void  hal_tx_frame(void)
                     memcpy(tmp+offset, pTxDPape, len);
                     offset += len;
 #endif
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0)) && !defined (LINUX_PLATFORM)
                     __sync_fetch_and_add(&hif->HiStatus.Tx_Done_num,1);
 #else
                     atomic_add(1, &hif->HiStatus.Tx_Done_num);
@@ -1482,7 +1524,7 @@ int hal_calc_mpdu_page (int mpdulen)
     return howmanypage(mpdulen+FW_TXDESC_DATAOFFSET, PAGE_LEN);
 }
 
-int hal_calc_block_in_mpdu (int mpdulen)
+static int hal_calc_block_in_mpdu (int mpdulen)
 {
     return (mpdulen + (PAGE_LEN - 1)) / PAGE_LEN;
 }
@@ -1574,14 +1616,14 @@ struct sk_buff *hal_fill_agg_start(struct hi_agg_tx_desc *HI_AGG,struct hi_tx_pr
     frame_control = *(unsigned short *)(&pTxDPape->txdata[0]);//(frame_control & 0xff) == 0x88
     if (g_dbg_modules & AML_DBG_MODULES_HAL_TX)
     {
-        //printk("pTxDescFiFo->SN:%04x, frame_control:%04x\n", pTxDescFiFo->SN, frame_control);
+        //pr_debug("pTxDescFiFo->SN:%04x, frame_control:%04x\n", pTxDescFiFo->SN, frame_control);
         hal_show_txframe(pTxDPape);
     }
 #endif
 
     pTxDPape->TxOption.pkt_position = AML_PKT_IN_HAL;
     hal_priv->Hi_TxAgg[txqueueid] = pTxDPape;
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0)) && !defined (LINUX_PLATFORM)
     __sync_fetch_and_add(&hif->HiStatus.Tx_Send_num,1);
 #else
     atomic_add(1, &hif->HiStatus.Tx_Send_num);
@@ -1652,7 +1694,7 @@ struct sk_buff *hal_fill_priv(struct hi_tx_priv_hdr* HI_TxPriv,unsigned char que
         hal_show_txframe(pTxDPape);
     }
 #endif
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0)) && !defined (LINUX_PLATFORM)
     __sync_fetch_and_add(&hif->HiStatus.Tx_Send_num,1);
 #else
     atomic_add(1, &hif->HiStatus.Tx_Send_num);
@@ -1686,7 +1728,7 @@ int hal_get_priv_cnt(unsigned char queue_id)
 int hal_get_agg_pend_cnt(void)
 {
     struct hw_interface* hif = hif_get_hw_interface();
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0) && !defined (LINUX_PLATFORM)
     return hif->HiStatus.Tx_Send_num - hif->HiStatus.Tx_Free_num;
 #else
     return atomic_read(&hif->HiStatus.Tx_Send_num) - atomic_read(&hif->HiStatus.Tx_Free_num);
@@ -1715,7 +1757,7 @@ int hal_get_agg_pend_cnt(void)
 
     COMMON_LOCK();
     if (hal_is_empty_tx_id(hal_priv) < 0) {
-        printk("set bhaltxdrop to 1, tx_frames_map:%lx, %lx, page:%d\n",
+        pr_debug("set bhaltxdrop to 1, tx_frames_map:%lx, %lx, page:%d\n",
             hal_priv->tx_frames_map[0], hal_priv->tx_frames_map[1], hal_priv->txPageFreeNum);
         hal_priv->bhaltxdrop = 1;
     }
@@ -1731,7 +1773,7 @@ int hal_get_agg_pend_cnt(void)
             if (!((pTxDescFiFo->pTxDPape->TxPriv.vid == vid) || (vid == 3))) {
                 id = hal_alloc_tx_id(hal_priv,pTxDescFiFo);
                 if (id == TXID_INVALID) {
-                    printk("%s warning, please handle this situation!!!\n", __func__);
+                    pr_warn("%s warning, please handle this situation!!!\n", __func__);
                     break;//how to handle this situation
                 }
                 pTxDescFiFo->pTxDPape->TxPriv.hostcallbackid= (unsigned char)id;
@@ -1751,7 +1793,7 @@ int hal_get_agg_pend_cnt(void)
                 hal_free_tx_id(hal_priv, &txstatus, &callback, &queue_id);
                 hal_priv->hal_call_back->intr_tx_handle(hal_priv->drv_priv, &txstatus, pTxDescFiFo->callback, queue_id);
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0)) && !defined (LINUX_PLATFORM)
                 __sync_fetch_and_add(&hif->HiStatus.Tx_Done_num,1);
                 __sync_fetch_and_add(&hif->HiStatus.Tx_Free_num,1);
 #else
@@ -1777,7 +1819,7 @@ int hal_get_agg_pend_cnt(void)
 
     if (hal_priv->bhaltxdrop == 1) {
         hal_priv->bhaltxdrop = 0;
-        printk("recover bhaltxdrop to 0, tx_frames_map:%lx, %lx, page:%d, vid:%d\n",
+        pr_debug("recover bhaltxdrop to 0, tx_frames_map:%lx, %lx, page:%d, vid:%d\n",
             hal_priv->tx_frames_map[0], hal_priv->tx_frames_map[1], hal_priv->txPageFreeNum, vid);
     }
     return 0;
@@ -1851,27 +1893,27 @@ void hal_get_sts(unsigned int op_code, unsigned int ctrl_code)
     struct hw_interface* hif = hif_get_hw_interface();
     struct _CO_SHARED_FIFO * tx_share_fifo = NULL;
 
-    printk("\n--------hal statistic--------\n");
+    pr_debug("\n--------hal statistic--------\n");
 
     if((ctrl_code & STS_MOD_HAL) == STS_MOD_HAL)
     {
         if ((ctrl_code & STS_TYP_TX) == STS_TYP_TX)
         {
-            printk("en_beacon[0]=%d\nen_beacon[1]=%d\n", hal_priv->sts_en_bcn[0], hal_priv->sts_en_bcn[1]);
-            printk("dis_beacon[0]=%d\ndis_beacon[1]=%d\n", hal_priv->sts_dis_bcn[0], hal_priv->sts_dis_bcn[1]);
+            pr_debug("en_beacon[0]=%d\nen_beacon[1]=%d\n", hal_priv->sts_en_bcn[0], hal_priv->sts_en_bcn[1]);
+            pr_debug("dis_beacon[0]=%d\ndis_beacon[1]=%d\n", hal_priv->sts_dis_bcn[0], hal_priv->sts_dis_bcn[1]);
 
-            printk("hal:tx_free_page %d \n", hal_priv->txPageFreeNum);
-            printk("hal:tx_ok_num:%d, tx_fail_num:%d\n", hif->HiStatus.tx_ok_num, hif->HiStatus.tx_fail_num);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0)
-            printk("hal:send_frm:%d, done_frm:%d, free_frm:%d\n",  hif->HiStatus.Tx_Send_num, hif->HiStatus.Tx_Done_num, hif->HiStatus.Tx_Free_num);
+            pr_debug("hal:tx_free_page %d \n", hal_priv->txPageFreeNum);
+            pr_debug("hal:tx_ok_num:%d, tx_fail_num:%d\n", hif->HiStatus.tx_ok_num, hif->HiStatus.tx_fail_num);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0) && !defined (LINUX_PLATFORM)
+            pr_debug("hal:send_frm:%d, done_frm:%d, free_frm:%d\n",  hif->HiStatus.Tx_Send_num, hif->HiStatus.Tx_Done_num, hif->HiStatus.Tx_Free_num);
 #else
-            printk("hal:send_frm:%d, done_frm:%d, free_frm:%d\n",
+            pr_debug("hal:send_frm:%d, done_frm:%d, free_frm:%d\n",
                    atomic_read(&hif->HiStatus.Tx_Send_num),
                    atomic_read(&hif->HiStatus.Tx_Done_num),
                    atomic_read(&hif->HiStatus.Tx_Free_num));
 #endif
-            printk("hal:gpio irq cnt %d \n",  hal_priv->gpio_irq_cnt);
-            printk("tx_cmp: tx_done_frm %d, tx_mng_frm %d, tx_page %d\n",
+            pr_debug("hal:gpio irq cnt %d \n",  hal_priv->gpio_irq_cnt);
+            pr_debug("tx_cmp: tx_done_frm %d, tx_mng_frm %d, tx_page %d\n",
                 hal_priv->txcompletestatus->txdoneframecounter,
                 hal_priv->txcompletestatus->txmanageframecounter,
                 hal_priv->txcompletestatus->txpagecounter);
@@ -1879,7 +1921,7 @@ void hal_get_sts(unsigned int op_code, unsigned int ctrl_code)
             for(i = 0; i < HAL_NUM_TX_QUEUES; i++)
             {
                 tx_share_fifo = &hal_priv->txds_trista_fifo[i];
-                printk("txds_trista_fifo[%d]: make %d, set %d, get %d\n",
+                pr_debug("txds_trista_fifo[%d]: make %d, set %d, get %d\n",
                     i,
                     CO_SharedFifoNbElt(tx_share_fifo, CO_TX_BUFFER_MAKE),
                     CO_SharedFifoNbElt(tx_share_fifo, CO_TX_BUFFER_SET),
@@ -1888,7 +1930,7 @@ void hal_get_sts(unsigned int op_code, unsigned int ctrl_code)
 
             for(i = 0; i < hirq_max_idx; i++)
             {
-                printk("%s, %d\n", hirq_prt_info[i], hal_priv->sts_hirq[i]);
+                pr_debug("%s, %d\n", hirq_prt_info[i], hal_priv->sts_hirq[i]);
             }
         }
     }
@@ -1905,7 +1947,7 @@ int hal_close(void *drv_priv)
 
     to_sdio = 0x00000000;
     hi_clear_irq_status(to_sdio);
-    printk("%s(%d) hal_priv->bhalOpen 0x%x\n", __func__, __LINE__, hal_priv->bhalOpen);
+    pr_debug("%s(%d) hal_priv->bhalOpen 0x%x\n", __func__, __LINE__, hal_priv->bhalOpen);
     return 1;
 }
 
@@ -1999,7 +2041,7 @@ int hal_probe(void)
     hal_priv->bhalProbelok = 1;
     hal_priv->beaconaddr[0]=0;
     hal_priv->beaconaddr[1]=0;
-    printk("%s(%d) hal_priv->bhalOpen 0x%x\n", __func__, __LINE__, hal_priv->bhalOpen);
+    pr_debug("%s(%d) hal_priv->bhalOpen 0x%x\n", __func__, __LINE__, hal_priv->bhalOpen);
     return true;
 
 __exit_err:
@@ -2015,14 +2057,12 @@ static int hal_get_did(struct hw_interface* hif)
     int ret = false;
 
     PRINT("Wifi_DeviceID = %x\n",Wifi_DeviceID);
-    while ((Wifi_DeviceID!=PRODUCT_AMLOGIC) /*&& (delay_ms < HI_FI_SYNC_DELAY_MS) */)
-    {
+    while ((Wifi_DeviceID != PRODUCT_AMLOGIC) && (delay_ms < HI_FI_SYNC_DELAY_MS)) {
         Wifi_DeviceID = hi_get_device_id();
         OS_MDELAY( HI_FI_SYNC_DELAY_MS_STEP);
         delay_ms += HI_FI_SYNC_DELAY_MS_STEP;
     }
-    if (Wifi_DeviceID == PRODUCT_AMLOGIC)
-    {
+    if (Wifi_DeviceID == PRODUCT_AMLOGIC) {
         ret = true;
     }
     hif->Wifi_DeviceID = Wifi_DeviceID;
@@ -2035,15 +2075,13 @@ static int hal_get_vid(struct hw_interface* hif)
     int delay_ms = 0;
     int ret = false;
     PRINT("Wifi_DeviceID = %x\n",Wifi_VendorID);
-    while ((Wifi_VendorID!=VENDOR_AMLOGIC) && (delay_ms < HI_FI_SYNC_DELAY_MS) )
-    {
+    while ((Wifi_VendorID != VENDOR_AMLOGIC) && (delay_ms < HI_FI_SYNC_DELAY_MS)) {
         Wifi_VendorID = hi_get_vendor_id();
         OS_MDELAY( HI_FI_SYNC_DELAY_MS_STEP);
         delay_ms += HI_FI_SYNC_DELAY_MS_STEP;
         PRINT("Wifi_DeviceID = %x  already delayed=%dms\n",Wifi_VendorID, delay_ms);
     }
-    if (Wifi_VendorID == PRODUCT_AMLOGIC)
-    {
+    if (Wifi_VendorID == PRODUCT_AMLOGIC) {
         ret = true;
     }
     hif->Wifi_VendorID = Wifi_VendorID;
@@ -2060,13 +2098,13 @@ static int hal_get_chip_id(void)
     unsigned char chip_id_buf[23];
 
     chip_id_l = efuse_manual_read(CHIP_ID_EFUASE_L);
-    printk("efuse addr:%08x, chip_id is :%08x\n", CHIP_ID_EFUASE_L, chip_id_l);
+    pr_debug("efuse addr:%08x, chip_id is :%08x\n", CHIP_ID_EFUASE_L, chip_id_l);
     chip_id_h = efuse_manual_read(CHIP_ID_EFUASE_H);
-    printk("efuse addr:%08x, chip_id is :%08x\n", CHIP_ID_EFUASE_H, chip_id_h);
+    pr_debug("efuse addr:%08x, chip_id is :%08x\n", CHIP_ID_EFUASE_H, chip_id_h);
 
     sprintf(chip_id_buf, CHIP_ID_F, chip_id_h & 0xffff, chip_id_l);
     if (aml_store_to_file(WIFIMAC_PATH, chip_id_buf, strlen(chip_id_buf)) > 0) {
-        printk("write the chip_id to wifimac.txt \n");
+        pr_debug("write the chip_id to wifimac.txt \n");
         ret = true;
     }
 #endif
@@ -2513,13 +2551,19 @@ int hal_call_task(SYS_TYPE taskid,SYS_TYPE param1)
 int hal_work_thread(void *param)
 {
     struct hal_private * hal_priv = (struct hal_private *)param;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
     struct sched_param sch_param;
+#endif
     int  i = 0;
 
     PRINT("%s(%d)  =====creat thread hal_world_thread<=====\n",__func__,__LINE__);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
     sch_param.sched_priority = 91;
     sched_setscheduler(current, SCHED_RR, &sch_param);
+#else
+    sched_set_fifo_low(current);
+#endif
 
     WAKE_LOCK_INIT(hal_priv,WAKE_LOCK_WORK,"hal_work_thread");
     while (!hal_priv->work_thread_quit)
@@ -2566,7 +2610,11 @@ int hal_work_thread(void *param)
 
     PRINT("############# Exit work Thread ###############\n");
     WAKE_LOCK_DESTROY(hal_priv, WAKE_LOCK_WORK);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 17, 0)
     complete_and_exit(&hal_priv->work_thread_completion, 0);
+#else
+    kthread_complete_and_exit(&hal_priv->work_thread_completion, 0);
+#endif
 
     return 0;
 }
@@ -2579,11 +2627,17 @@ int hal_txok_thread(void *param)
     struct txdonestatus* txstatus = NULL;
     struct tx_nulldata_status* tx_null_status = NULL;
     unsigned long callback = 0;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
     struct sched_param sch_param;
+#endif
     unsigned char queue_id = 0;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
     sch_param.sched_priority = 91;
     sched_setscheduler(current, SCHED_RR, &sch_param);
+#else
+    sched_set_fifo_low(current);
+#endif
     WAKE_LOCK_INIT(hal_priv, WAKE_LOCK_TXOK, "hal_txok_thread");
     while (!hal_priv->txok_thread_quit)
     {
@@ -2619,7 +2673,7 @@ int hal_txok_thread(void *param)
                 /* free skb allocated by hal*/
                 if (hal_free_tx_id(hal_priv, txstatus, &callback, &queue_id) < 0)
                 {
-                    printk("free tx_id error \n");
+                    pr_err("free tx_id error \n");
                     tx_status_node_free(txok_status_node,txok_status_list);
                     txok_status_node = NULL;
                     continue;
@@ -2639,9 +2693,13 @@ int hal_txok_thread(void *param)
         }
     }
 
-    printk("%s(%d)  =====> exit TXOK Thread <=====\n",__func__,__LINE__);
+    pr_debug("%s(%d)  =====> exit TXOK Thread <=====\n",__func__,__LINE__);
     WAKE_LOCK_DESTROY(hal_priv, WAKE_LOCK_TXOK);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 17, 0)
     complete_and_exit(&hal_priv->txok_thread_completion, 0);
+#else
+    kthread_complete_and_exit(&hal_priv->txok_thread_completion, 0);
+#endif
 
     return 0;
 }
@@ -2650,7 +2708,9 @@ int hal_rx_thread(void *param)
 {
     struct hal_private * hal_priv = (struct hal_private *)param;
     struct hw_interface* hif = hal_priv->hif;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
     struct sched_param sch_param;
+#endif
     struct sk_buff *skb = NULL;
     unsigned int remain_num = 0;
     unsigned char rxtmpbuffer[RX_TMP_MAX_LEN] = {0};
@@ -2664,10 +2724,14 @@ int hal_rx_thread(void *param)
     unsigned short sn;
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
     sch_param.sched_priority = 91;
     sched_setscheduler(current, SCHED_FIFO, &sch_param);
+#else
+    sched_set_fifo(current);
+#endif
 
-    printk("%s(%d)  =====creat thread hal_rx_thread<=====\n",__func__,__LINE__);
+    pr_debug("%s(%d)  =====creat thread hal_rx_thread<=====\n",__func__,__LINE__);
 
     WAKE_LOCK_INIT(hal_priv,WAKE_LOCK_RX,"rx_proc amlwifi");
     while (!hal_priv->rx_thread_quit)
@@ -2714,7 +2778,7 @@ int hal_rx_thread(void *param)
             {
                 /*if RxLength error, discard all data in host rx fifo*/
                 rx_fifo_fdh = rx_fifo_fdt;
-                printk("%s(%d)(RxLength:%d,rx_fifo_total_len%d)\n", __func__,__LINE__,
+                pr_debug("%s(%d)(RxLength:%d,rx_fifo_total_len%d)\n", __func__,__LINE__,
                 pVRxDesc->RxLength,rx_fifo_total_len);
                 continue;
             }
@@ -2730,7 +2794,7 @@ int hal_rx_thread(void *param)
             skb = os_skb_alloc(pVRxDesc->RxLength + RX_PRIV_HDR_LEN);
             if (skb == NULL)
             {
-                printk("Couldn't allocate RX frame");
+                pr_err("Couldn't allocate RX frame");
                 break;
             }
 
@@ -2771,19 +2835,29 @@ int hal_rx_thread(void *param)
         WAKE_UNLOCK(hal_priv, WAKE_LOCK_RX);
     }
 
-    printk("%s(%d)  =====> exit RX Thread <=====\n",__func__,__LINE__);
+    pr_debug("%s(%d)  =====> exit RX Thread <=====\n",__func__,__LINE__);
     WAKE_LOCK_DESTROY(hal_priv, WAKE_LOCK_RX);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0)
+    kthread_complete_and_exit(&hal_priv->rx_thread_completion, 0);
+#else
     complete_and_exit(&hal_priv->rx_thread_completion, 0);
+#endif
     return 0;
 }
 
 int hi_irq_thread(void *param)
 {
     struct hal_private * hal_priv = (struct hal_private *)param;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
     struct sched_param sch_param;
+#endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
     sch_param.sched_priority = 93;
     sched_setscheduler(current, SCHED_FIFO, &sch_param);
+#else
+    sched_set_fifo(current);
+#endif
     hal_priv->hi_task_stop = 0;
     WAKE_LOCK_INIT(hal_priv,WAKE_LOCK_HI_IRQ_THREAD,"hi_irq_thread");
     while (!hal_priv->hi_irq_thread_quit)
@@ -2822,7 +2896,11 @@ int hi_irq_thread(void *param)
     }
 
     WAKE_LOCK_DESTROY(hal_priv, WAKE_LOCK_HI_IRQ_THREAD);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0)
+    kthread_complete_and_exit(&hal_priv->hi_irq_thread_completion, 0);
+#else
     complete_and_exit(&hal_priv->hi_irq_thread_completion, 0);
+#endif
 
     return 0;
 }
@@ -2836,7 +2914,6 @@ int hal_kill_thread(void)
         init_completion(&hal_priv->txok_thread_completion);
         hal_priv->txok_thread_quit = 1;
         up(&hal_priv->txok_thread_sem);
-        kthread_stop(hal_priv->txok_thread);
         wait_for_completion(&hal_priv->txok_thread_completion);
         hal_priv->txok_thread =0;
     }
@@ -2846,7 +2923,6 @@ int hal_kill_thread(void)
         init_completion(&hal_priv->rx_thread_completion);
         hal_priv->rx_thread_quit = 1;
         up(&hal_priv->rx_thread_sem);
-        kthread_stop(hal_priv->rx_thread);
         wait_for_completion(&hal_priv->rx_thread_completion);
         hal_priv->rx_thread =0;
     }
@@ -2856,7 +2932,6 @@ int hal_kill_thread(void)
         init_completion(&hal_priv->work_thread_completion);
         hal_priv->work_thread_quit = 1;
         up(&hal_priv->work_thread_sem);
-        kthread_stop(hal_priv->work_thread);
         wait_for_completion(&hal_priv->work_thread_completion);
         hal_priv->work_thread =0;
     }
@@ -2866,7 +2941,6 @@ int hal_kill_thread(void)
         init_completion(&hal_priv->hi_irq_thread_completion);
         hal_priv->hi_irq_thread_quit = 1;
         up(&hal_priv->hi_irq_thread_sem);
-        kthread_stop(hal_priv->hi_irq_thread);
         wait_for_completion(&hal_priv->hi_irq_thread_completion);
         hal_priv->hi_irq_thread =0;
     }
@@ -2938,7 +3012,7 @@ void show_rxvector (HW_RxDescripter_bit *RxPrivHdr)
 {
     PRINT("%s+++\n", __FUNCTION__);
     PRINT("%s dump rx PN\n", __FUNCTION__);
-    dump_memory_internel((unsigned char *)RxPrivHdr->PN, 16);
+    dump_memory_internal((unsigned char *)RxPrivHdr->PN, 16);
     PRINT("RxRSSI_ant0=%d RxRSSI_ant1=%d\n",
           RxPrivHdr->RxRSSI_ant0, RxPrivHdr->RxRSSI_ant1);
     PRINT("RxChannel=%d\n", RxPrivHdr->RxChannel);
@@ -2973,11 +3047,11 @@ void show_rxvector (HW_RxDescripter_bit *RxPrivHdr)
  void hal_show_rxframe (HW_RxDescripter_bit *RxPrivHdr)
 {
     PRINT("%s dump HW_RxDescripter_bit, len=%zd\n", __FUNCTION__, RX_PRIV_HDR_LEN);
-    dump_memory_internel((unsigned char*)RxPrivHdr, RX_PRIV_HDR_LEN);
+    dump_memory_internal((unsigned char*)RxPrivHdr, RX_PRIV_HDR_LEN);
     show_rxvector(RxPrivHdr);
 
     PRINT("%s dump body, len=%d(0x%x)\n", __FUNCTION__, RxPrivHdr->RxLength, RxPrivHdr->RxLength);
-    dump_memory_internel((unsigned char*)RxPrivHdr->data, RxPrivHdr->RxLength);
+    dump_memory_internal((unsigned char*)RxPrivHdr->data, RxPrivHdr->RxLength);
     show_macframe((unsigned char *)RxPrivHdr->data, RxPrivHdr->RxLength);
 }
 
@@ -3111,12 +3185,12 @@ void show_tx_priv (struct Fw_TxPriv *TxPriv)
     PRINT("%s---\n", __FUNCTION__);
 }
 
-void show_tx_option (struct HW_TxOption *TxOption)
+static void show_tx_option (struct HW_TxOption *TxOption)
 {
     PRINT("%s+++\n", __FUNCTION__);
     PRINT("KeyIdex=%d\n", TxOption->KeyIdex);
     PRINT("%s dump tx PN\n", __FUNCTION__);
-    dump_memory_internel((unsigned char *)TxOption->PN, 16);
+    dump_memory_internal((unsigned char *)TxOption->PN, 16);
     PRINT("%s---\n", __FUNCTION__);
 }
 
@@ -3133,9 +3207,9 @@ void show_tx_option (struct HW_TxOption *TxOption)
     PRINT("%s---\n", __FUNCTION__);
 }
 
-void show_macframe (unsigned char *start, unsigned char len)
+void show_macframe(unsigned char *start, unsigned char len)
 {
-    unsigned char* cursor = (unsigned char *)start;
+    unsigned char *cursor = (unsigned char *)start;
     unsigned short frame_control;
     unsigned short duration;
     unsigned char ra_mac_address[6], ta_mac_address[6], bssid_mac_address[6];
@@ -3169,9 +3243,9 @@ void show_macframe (unsigned char *start, unsigned char len)
     sequence = READ_16L(cursor);
     cursor += 2;
     PRINT("fragment number=%d, sequence number=%d(0x%x)\n",
-          sequence&SEQUENCE_CONTROL_FRAGMENT_MASK,
-          (sequence&SEQUENCE_CONTROL_SEQUENCE_MASK)>>SEQUENCE_CONTROL_SEQUENCE_SHIFT,
-          (sequence&SEQUENCE_CONTROL_SEQUENCE_MASK)>>SEQUENCE_CONTROL_SEQUENCE_SHIFT);
+          sequence & SEQUENCE_CONTROL_FRAGMENT_MASK,
+          (sequence & SEQUENCE_CONTROL_SEQUENCE_MASK) >> SEQUENCE_CONTROL_SEQUENCE_SHIFT,
+          (sequence & SEQUENCE_CONTROL_SEQUENCE_MASK) >> SEQUENCE_CONTROL_SEQUENCE_SHIFT);
 
     if ((frame_control & MAC_FCTRL_QOS_DATA) == MAC_FCTRL_QOS_DATA)
     {
@@ -3182,16 +3256,17 @@ void show_macframe (unsigned char *start, unsigned char len)
 
     if ((len - (cursor - start)) >= 8)
     {
-        if ((cursor[0]==0xaa) && (cursor[1]==0xaa) && (cursor[2]==0x03))
+        if ((cursor[0] == 0xaa) && (cursor[1]== 0xaa) &&
+            (cursor[2] == 0x03))
         {
             PRINT("LLC SNAP\n");
         }
-        PRINT("LLC type =0x%x\n", READ_16B(cursor+6));
-        if ((cursor[6]==0x08) && (cursor[7]==0x06))
+        PRINT("LLC type =0x%x\n", READ_16B(cursor + 6));
+        if ((cursor[6] == 0x08) && (cursor[7] == 0x06))
         {
             PRINT("ARP\n");
         }
-        if ((cursor[6]==0x08) && (cursor[7]==0x00))
+        if ((cursor[6] == 0x08) && (cursor[7] == 0x00))
         {
             PRINT("IP\n");
             llc_type_ip = 1;
@@ -3201,21 +3276,24 @@ void show_macframe (unsigned char *start, unsigned char len)
 
     if ((llc_type_ip==1) && ((len - (cursor - start)) >= 20))
     {
-        unsigned char  ipv4 = 0;
-        unsigned char ip_header_len = 0;
-        unsigned short fragmentation = 0;
+        unsigned char ipv4 = 0;
+        unsigned char ip_header_len;
+        unsigned short fragmentation;
+
         if (((cursor[0] & 0xf0)>>4) == 4)
         {
             ipv4 = 1;
         }
+
         PRINT("IPv%d\n", ((cursor[0] & 0xf0)>>4));
         ip_header_len = (cursor[0] & 0x0f)*4;
-        PRINT("IP Header Length=%dB\n", (cursor[0] & 0x0f)*4);
+        PRINT("IP Header Length=%dB\n", (cursor[0] & 0x0f) * 4);
         PRINT("IP type of service =0x%x\n", cursor[1]);
-        PRINT("IP Total Length=%dB\n", READ_16B(cursor+2));
-        PRINT("IP ID=%d\n", READ_16B(cursor+4));
-        fragmentation = READ_16B(cursor+6);
-        PRINT("IP fragmentation flags=0x%x offset=%d\n", ((fragmentation & 0xe000)>>13), fragmentation&0x1fff);
+        PRINT("IP Total Length=%dB\n", READ_16B(cursor + 2));
+        PRINT("IP ID=%d\n", READ_16B(cursor + 4));
+        fragmentation = READ_16B(cursor + 6);
+        PRINT("IP fragmentation flags=0x%x offset=%d\n", ((fragmentation & 0xe000) >> 13),
+              fragmentation & 0x1fff);
         PRINT("IP Time to live =%d\n", cursor[8]);
         PRINT("IP transfer protocol type=%d\n", cursor[9]);
         if (cursor[9] == 6)
@@ -3228,13 +3306,13 @@ void show_macframe (unsigned char *start, unsigned char len)
             udp = 1;
             PRINT("UDP\n");
         }
-        PRINT("IP Header checksum=0x%x\n", READ_16B(cursor+10));
+        PRINT("IP Header checksum=0x%x\n", READ_16B(cursor + 10));
         if (ipv4 == 1)
         {
             PRINT("Source IP address\n");
-            IPv4_address_print(cursor+12);
+            IPv4_address_print(cursor + 12);
             PRINT("Dest IP address\n");
-            IPv4_address_print(cursor+16);
+            IPv4_address_print(cursor + 16);
         }
         if ((len - (cursor - start)) >= ip_header_len)
         {
@@ -3247,24 +3325,24 @@ void show_macframe (unsigned char *start, unsigned char len)
         }
     }
 
-    if ((tcp==1) && ((len - (cursor - start)) >= 20))
+    if ((tcp == 1) && ((len - (cursor - start)) >= 20))
     {
-        unsigned char tcp_header_len = 0;
-        unsigned short tcp_flags = 0;
+        unsigned char tcp_header_len;
+        unsigned short tcp_flags;
 
         PRINT("TCP source port=%d\n", READ_16B(cursor));
-        PRINT("TCP dest port=%d\n", READ_16B(cursor+2));
-        PRINT("TCP sequence number=%u\n", READ_32B(cursor+4));
-        PRINT("TCP ack number=%u\n", READ_32B(cursor+8));
-        tcp_flags = READ_16B(cursor+12);
-        tcp_header_len = ((tcp_flags & 0xf000) >> 12)*4;
+        PRINT("TCP dest port=%d\n", READ_16B(cursor + 2));
+        PRINT("TCP sequence number=%u\n", READ_32B(cursor + 4));
+        PRINT("TCP ack number=%u\n", READ_32B(cursor + 8));
+        tcp_flags = READ_16B(cursor + 12);
+        tcp_header_len = ((tcp_flags & 0xf000) >> 12) * 4;
         PRINT("TCP Header Length=%d\n", tcp_header_len);
         PRINT("TCP flags URG=%d ACK=%d PSH=%d RST=%d SYN=%d FIN=%d\n",
-              !!(tcp_flags&0x20), !!(tcp_flags&0x10), !!(tcp_flags&0x08),
-              !!(tcp_flags&0x04), !!(tcp_flags&0x02), !!(tcp_flags&0x01));
-        PRINT("TCP window size=%d\n", READ_16B(cursor+14));
-        PRINT("TCP checksum of header and body=0x%x\n", READ_16B(cursor+16));
-        PRINT("TCP urgent pointer=0x%x\n", READ_16B(cursor+18));
+              !!(tcp_flags & 0x20), !!(tcp_flags & 0x10), !!(tcp_flags & 0x08),
+              !!(tcp_flags & 0x04), !!(tcp_flags & 0x02), !!(tcp_flags & 0x01));
+        PRINT("TCP window size=%d\n", READ_16B(cursor + 14));
+        PRINT("TCP checksum of header and body=0x%x\n", READ_16B(cursor + 16));
+        PRINT("TCP urgent pointer=0x%x\n", READ_16B(cursor + 18));
         if ((len - (cursor - start)) >= tcp_header_len)
         {
             cursor += tcp_header_len;
@@ -3312,19 +3390,18 @@ void hal_show_txframe (struct hi_tx_desc *pTxDPape)
 
 }
 
-
-void hal_show_txagg_desc( struct hi_agg_tx_desc*  HiTxDesc)
+void hal_show_txagg_desc(struct hi_agg_tx_desc *HiTxDesc)
 {
     PRINT("HiTxDesc->RateTableMode %x\n", HiTxDesc->RateTableMode);
     PRINT("HiTxDesc->TxPower %x\n", HiTxDesc->TxPower);
     PRINT("HiTxDesc->StaId %x\n",   HiTxDesc->StaId);
     PRINT("HiTxDesc->KeyId %x\n", HiTxDesc->KeyId);
     PRINT("HiTxDesc->EncryptType %x\n", HiTxDesc->EncryptType);
-    PRINT("HiTxDesc->TID %x\n",   HiTxDesc->TID);
+    PRINT("HiTxDesc->TID %x\n", HiTxDesc->TID);
     PRINT("HiTxDesc->CurrentRate %x\n", HiTxDesc->CurrentRate);
     PRINT("HiTxDesc->TxTryRate1 %x\n", HiTxDesc->TxTryRate1);
 
-    PRINT("HiTxDesc->TxTryNum0 %x\n",   HiTxDesc->TxTryNum0);
+    PRINT("HiTxDesc->TxTryNum0 %x\n", HiTxDesc->TxTryNum0);
 
     PRINT("HiTxDesc->FLAG %x\n", HiTxDesc->FLAG);
     PRINT("HiTxDesc->FLAG2 %x\n", HiTxDesc->FLAG2);
@@ -3334,7 +3411,7 @@ void hal_show_txagg_desc( struct hi_agg_tx_desc*  HiTxDesc)
     PRINT("HiTxDesc->MpduNum       %x\n", HiTxDesc->MpduNum);
 }
 
-void hal_tx_priv_desc_show(const struct hi_tx_priv_hdr* const HiTxPrivDesc)
+void hal_tx_priv_desc_show(const struct hi_tx_priv_hdr *const HiTxPrivDesc)
 {
     PRINT("HiTxPrivDesc->DMALEN %x\n", HiTxPrivDesc->DMALEN);
     PRINT("HiTxPrivDesc->MPDULEN %x\n", HiTxPrivDesc->MPDULEN);
@@ -3350,49 +3427,55 @@ void hal_tx_priv_desc_show(const struct hi_tx_priv_hdr* const HiTxPrivDesc)
 void hal_txinfo_show()
 {
     struct hal_private *hal_priv = hal_get_priv();
-    struct hw_interface* hif = hif_get_hw_interface();
+    struct hw_interface *hif = hif_get_hw_interface();
+    int i;
 
-    struct _CO_SHARED_FIFO* pTxShareFifo =NULL;//
-    int  i =0;
     DBG_ENTER();
 
-    for(i=0; i<HAL_NUM_TX_QUEUES; i++)
+    for (i = 0; i < HAL_NUM_TX_QUEUES; i++)
     {
+        struct _CO_SHARED_FIFO* pTxShareFifo;
+
         pTxShareFifo = &hal_priv->txds_trista_fifo[i];
-        PRINT("TID = %d,hal_get_priv_cnt %d\n", i,hal_get_priv_cnt(i));
-        PRINT("TID = %d,CO_TX_BUFFER_MAKE= %d\n", i, CO_SharedFifoNbElt(&hal_priv->txds_trista_fifo[i],CO_TX_BUFFER_MAKE)) ;
-        PRINT("TID = %d,CO_TX_BUFFER_SET= %d\n", i, CO_SharedFifoNbElt(&hal_priv->txds_trista_fifo[i],CO_TX_BUFFER_SET)) ;
-        PRINT("pTxShareFifo->IdxTab[0] %d,%d,\n", pTxShareFifo->IdxTab[0].In,pTxShareFifo->IdxTab[0].Out);
-        PRINT("pTxShareFifo->IdxTab[1] %d,%d,\n", pTxShareFifo->IdxTab[1].In,pTxShareFifo->IdxTab[1].Out);
-        PRINT("pTxShareFifo->IdxTab[2] %d,%d,\n", pTxShareFifo->IdxTab[2].In,pTxShareFifo->IdxTab[2].Out);
+        PRINT("TID = %d,hal_get_priv_cnt %d\n", i, hal_get_priv_cnt(i));
+        PRINT("TID = %d,CO_TX_BUFFER_MAKE= %d\n", i,
+              CO_SharedFifoNbElt(&hal_priv->txds_trista_fifo[i], CO_TX_BUFFER_MAKE)) ;
+        PRINT("TID = %d,CO_TX_BUFFER_SET= %d\n", i,
+              CO_SharedFifoNbElt(&hal_priv->txds_trista_fifo[i], CO_TX_BUFFER_SET)) ;
+        PRINT("pTxShareFifo->IdxTab[0] %d,%d,\n", pTxShareFifo->IdxTab[0].In,
+              pTxShareFifo->IdxTab[0].Out);
+        PRINT("pTxShareFifo->IdxTab[1] %d,%d,\n", pTxShareFifo->IdxTab[1].In,
+              pTxShareFifo->IdxTab[1].Out);
+        PRINT("pTxShareFifo->IdxTab[2] %d,%d,\n", pTxShareFifo->IdxTab[2].In,
+              pTxShareFifo->IdxTab[2].Out);
     }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0)
-    PRINT("HiStatus.Tx_Send_num %d \n",hif->HiStatus.Tx_Send_num);
-    PRINT("HiStatus.Tx_Free_num %d \n",hif->HiStatus.Tx_Free_num);
-    PRINT("HiStatus.Tx_Done_num %d \n",hif->HiStatus.Tx_Done_num);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0) && !defined (LINUX_PLATFORM)
+    PRINT("HiStatus.Tx_Send_num %d \n", hif->HiStatus.Tx_Send_num);
+    PRINT("HiStatus.Tx_Free_num %d \n", hif->HiStatus.Tx_Free_num);
+    PRINT("HiStatus.Tx_Done_num %d \n", hif->HiStatus.Tx_Done_num);
 #else
-    PRINT("HiStatus.Tx_Send_num %d \n",atomic_read(&hif->HiStatus.Tx_Send_num));
-    PRINT("HiStatus.Tx_Free_num %d \n",atomic_read(&hif->HiStatus.Tx_Free_num));
-    PRINT("HiStatus.Tx_Done_num %d \n",atomic_read(&hif->HiStatus.Tx_Done_num));
+    PRINT("HiStatus.Tx_Send_num %d \n", atomic_read(&hif->HiStatus.Tx_Send_num));
+    PRINT("HiStatus.Tx_Free_num %d \n", atomic_read(&hif->HiStatus.Tx_Free_num));
+    PRINT("HiStatus.Tx_Done_num %d \n", atomic_read(&hif->HiStatus.Tx_Done_num));
 #endif
-    PRINT(" hal_priv->txPageFreeNum%d,\n",  hal_priv->txPageFreeNum);
-    PRINT(" hal_priv->bitmap[0]=%lx,\n",   hal_priv->tx_frames_map[0]);
-    PRINT(" hal_priv->bitmap[1]=%lx,\n",   hal_priv->tx_frames_map[1]);
-    PRINT(" hal_priv->HalTxPageDoneCounter=%d,\n",   hal_priv->HalTxPageDoneCounter );
-    PRINT(" hal_priv->HalTxFrameDoneCounter=%d,\n",   hal_priv->HalTxFrameDoneCounter );
-    PRINT(" hal_priv->txcompletestatus->txpagecounter=%d,\n",   hal_priv->txcompletestatus->txpagecounter );
+    PRINT(" hal_priv->txPageFreeNum%d,\n", hal_priv->txPageFreeNum);
+    PRINT(" hal_priv->bitmap[0]=%lx,\n", hal_priv->tx_frames_map[0]);
+    PRINT(" hal_priv->bitmap[1]=%lx,\n", hal_priv->tx_frames_map[1]);
+    PRINT(" hal_priv->HalTxPageDoneCounter=%d,\n", hal_priv->HalTxPageDoneCounter );
+    PRINT(" hal_priv->HalTxFrameDoneCounter=%d,\n", hal_priv->HalTxFrameDoneCounter );
+    PRINT(" hal_priv->txcompletestatus->txpagecounter=%d,\n", hal_priv->txcompletestatus->txpagecounter );
 
-    PRINT("HiStatus.Tx_Done_num-- %d \n",hif->HiStatus.Tx_Done_num);
+    PRINT("HiStatus.Tx_Done_num-- %d \n", hif->HiStatus.Tx_Done_num);
 }
 
 void hal_dpd_memory_download(void)
 {
     unsigned int reg_tmp;
     struct hw_interface* hif = hif_get_hw_interface();
-    unsigned char * d_ptr = NULL;
+    unsigned char *d_ptr;
     unsigned int addr = DPD_MEMORY_ADDR;
-    int len = 0, offset = 0;
+    int len, offset = 0;
 
     d_ptr = (unsigned char *)MEMDATA;
     /* 1024 words */
@@ -3401,7 +3484,7 @@ void hal_dpd_memory_download(void)
     ASSERT(len > 0);
     ASSERT(len <= DPD_MEMORY_LEN);
 
-    //set ram share
+    /* set ram share */
     hif->hif_ops.hi_write_word(0x00a0d0e4, 0x8000007f);
 
     /*
@@ -3415,7 +3498,7 @@ void hal_dpd_memory_download(void)
     if (!(reg_tmp & BIT(23)))
     {
         reg_tmp |= BIT(23);
-        hif->hif_ops.hi_write_word(RG_SDIO_IF_MISC_CTRL , reg_tmp);
+        hif->hif_ops.hi_write_word(RG_SDIO_IF_MISC_CTRL, reg_tmp);
     }
     /*config msb 15 bit address in BaseAddr Register*/
     hif->hif_ops.hi_write_reg32(RG_SCFG_FUNC5_BADDR_A, addr & 0xfffe0000);
@@ -3423,8 +3506,8 @@ void hal_dpd_memory_download(void)
     /* len <= DPD_MEMORY_LEN, just for exception */
     do
     {
-        unsigned char* sdio_kmm = NULL;
-        int databyte = 0;
+        unsigned char *sdio_kmm;
+        int databyte;
 
         databyte = (len > SRAM_MAX_LEN) ? SRAM_MAX_LEN : len;
 
@@ -3433,8 +3516,8 @@ void hal_dpd_memory_download(void)
 
         memcpy(sdio_kmm, d_ptr + offset, databyte);
 
-        hif->hif_ops.bt_hi_write_sram(sdio_kmm,
-            (unsigned char*)(SYS_TYPE)((addr & 0x1ffff) + offset), databyte);
+        hif->hif_ops.bt_hi_write_sram(sdio_kmm, (unsigned char*)(SYS_TYPE)((addr & 0x1ffff) + offset),
+                                      databyte);
 
         len -= databyte;
         offset += databyte;
@@ -3464,7 +3547,7 @@ void hal_dpd_calibration(void)
 #endif
 }
 
-unsigned char fwlog_buf[SRAM_FWLOG_BUFFER_LEN] = {0};
+unsigned char fwlog_buf[SRAM_FWLOG_BUFFER_LEN] = { 0 };
 void hal_get_fwlog(void)
 {
     struct hw_interface *hif = hif_get_hw_interface();
@@ -3488,11 +3571,12 @@ void hal_get_fwlog(void)
         reg_tmp |= BIT(23);
         hif->hif_ops.hi_write_word(RG_SDIO_IF_MISC_CTRL , reg_tmp);
     }
-    /*config msb 15 bit address in BaseAddr Register*/
+    /* config msb 15 bit address in BaseAddr Register */
     hif->hif_ops.hi_write_reg32(RG_SCFG_FUNC5_BADDR_A, addr & 0xfffe0000);
 
     hif->hif_ops.bt_hi_read_sram((unsigned char*)fwlog_buf,
-        (unsigned char*)(SYS_TYPE)(addr & 0x1ffff), databyte);
+                                 (unsigned char*)(SYS_TYPE)(addr & 0x1ffff),
+                                 databyte);
 
     drv_priv->drv_ops.drv_print_fwlog(fwlog_buf, databyte);
 }

@@ -28,7 +28,7 @@
 #include <linux/errno.h>
 #include <linux/irq.h>
 #include <linux/interrupt.h>
-#include <linux/kernel.h> /* printk() */
+#include <linux/kernel.h> /* pr_debug() */
 #include <linux/list.h>
 #include <linux/netdevice.h>
 #include <linux/version.h>
@@ -499,7 +499,7 @@ struct  hal_work_task
     unsigned int TX_SEND_OK_EVENT_num[HAL_NUM_TX_QUEUES];
     unsigned int RX_No_buffer_err_num;
     unsigned int RX_No_buffer_err2_num;
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(5,15,0)
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(5,15,0) && !defined (LINUX_PLATFORM)
     unsigned int Tx_Send_num;
     unsigned int Tx_Done_num;
     unsigned int Tx_Free_num;    //num of tx frames have been freed after tx completed
@@ -776,7 +776,7 @@ struct hal_layer_ops
     unsigned int (* phy_enable_bcn)(unsigned char wnet_vif_id,unsigned short BeaconInterval, unsigned short DtimPeriod, unsigned char BssType);
     unsigned int (* phy_set_bcn_buf)(unsigned char wnet_vif_id,unsigned char *pBeacon, unsigned short len,unsigned short Rate,unsigned short Flag);
     unsigned int (* phy_switch_chan)(unsigned short channel, unsigned char bw, unsigned char restore);
-    unsigned int (* phy_set_rf_chan)(struct hal_channel *hchan, unsigned char flag, unsigned char vid);
+    unsigned int (* phy_set_rf_chan)(struct hal_channel *hchan, unsigned char flag, unsigned char vid, unsigned char opmode);
     unsigned int (* phy_set_mac_bssid)(unsigned char wnet_vif_id,unsigned char * Bssid);
     unsigned int (* phy_set_mac_addr)(unsigned char wnet_vif_id,unsigned char * MacAddr);
     unsigned int (* phy_vmac_disconnect)(unsigned char wnet_vif_id);
@@ -1093,7 +1093,7 @@ extern struct platform_wifi_gpio amlhal_gpio;
 #define TEST_WIFI_EFUSE             		BIT(16)
 
 #define HAL_TEST_DEFAULT    			(0)
-#define TEST_PRINT  				printk
+#define TEST_PRINT  				pr_debug
 
 #define INBUFFER_LEN_VALID_BIT 			(256-2)
 #define INBUFFER_LEN 				(256/8)
@@ -1369,4 +1369,7 @@ struct aml_hal_call_backs
 
 struct hal_private*  hal_get_priv(void);
 struct hw_interface* hif_get_hw_interface(void);
+
+void print_driver_version(void);
+
 #endif

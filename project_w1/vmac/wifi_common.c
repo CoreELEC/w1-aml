@@ -175,7 +175,7 @@ static int retriveFromFile(const char *path, u8 *buf, u32 sz)
     if (path && buf) {
         ret = openFile(&fp, path, O_RDONLY, 0);
         if (0 == ret) {
-            printk("openFile path:%s fp=%p\n", path , fp);
+            pr_debug("openFile path:%s fp=%p\n", path , fp);
             oldfs = get_fs();
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 1, 0))
             set_fs(KERNEL_DS);
@@ -186,7 +186,7 @@ static int retriveFromFile(const char *path, u8 *buf, u32 sz)
             set_fs(oldfs);
             closeFile(fp);
 
-            printk("readFile, ret:%d\n", ret);
+            pr_debug("readFile, ret:%d\n", ret);
         } else {
             ERROR_DEBUG_OUT("openFile path:%s Fail, ret:%d\n", path, ret);
         }
@@ -217,7 +217,7 @@ static int storeToFile(const char *path, u8 *buf, u32 sz)
     if (path && buf) {
         ret = openFile(&fp, path, O_CREAT | O_WRONLY, 0666);
         if (0 == ret) {
-            printk("openFile path:%s fp=%p\n", path , fp);
+            pr_debug("openFile path:%s fp=%p\n", path , fp);
             oldfs = get_fs();
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 1, 0))
             set_fs(KERNEL_DS);
@@ -227,7 +227,7 @@ static int storeToFile(const char *path, u8 *buf, u32 sz)
             ret = writeFile(fp, buf, sz);
             set_fs(oldfs);
             closeFile(fp);
-            printk("writeFile, ret:%d\n", ret);
+            pr_debug("writeFile, ret:%d\n", ret);
         } else {
             ERROR_DEBUG_OUT("openFile path:%s Fail, ret:%d\n", path, ret);
         }
@@ -345,7 +345,7 @@ u32 aml_read_macaddr_from_file(const char *path, u8 *buf)
 
     read_size = aml_retrieve_from_file(path, file_data, FILE_DATA_LEN);
     if (read_size != FILE_DATA_LEN) {
-        printk("%s read from %s fail\n", __func__, path);
+        pr_err("%s read from %s fail\n", __func__, path);
         goto exit;
     }
 
@@ -354,19 +354,19 @@ u32 aml_read_macaddr_from_file(const char *path, u8 *buf)
     for (i = 0 ; i < ETH_ALEN ; i++) {
         if (aml_char_is_hex_digit(file_data[PARSE_DIGIT_BASE + i * 3]) == false
             || aml_char_is_hex_digit(file_data[PARSE_DIGIT_BASE + i * 3 + 1]) == false) {
-            printk("%s invalid 8-bit hex format for address offset:%u\n", __func__, i);
+            pr_err("%s invalid 8-bit hex format for address offset:%u\n", __func__, i);
             goto exit;
         }
 
         if (i < ETH_ALEN - 1 && file_data[PARSE_DIGIT_BASE + i * 3 + 2] != ':') {
-            printk("%s invalid separator after address offset:%u\n", __func__, i);
+            pr_err("%s invalid separator after address offset:%u\n", __func__, i);
             goto exit;
         }
 
         temp[0] = file_data[PARSE_DIGIT_BASE + i * 3];
         temp[1] = file_data[PARSE_DIGIT_BASE + i * 3 + 1];
         if (sscanf(temp, "%hhx", &addr[i]) != 1) {
-            printk("%s sscanf fail for address offset:0x%03x\n", __func__, i);
+            pr_err("%s sscanf fail for address offset:0x%03x\n", __func__, i);
             goto exit;
         }
     }
