@@ -1736,7 +1736,7 @@ int wifi_mac_pwrsave_wow_suspend(SYS_TYPE param1,
             listen_interval = wnet_vif_tmp->vm_bcn_intval * wnet_vif_tmp->vm_dtim_period;
         else
             listen_interval = wnet_vif_tmp->vm_bcn_intval;
-        wifimac->drv_priv->drv_ops.Phy_beaconinit(wifimac->drv_priv,wnet_vif_tmp->wnet_vif_id, listen_interval);
+        wifimac->drv_priv->drv_ops.Phy_beaconinit(wifimac->drv_priv,wnet_vif_tmp->wnet_vif_id, (1<<16) | listen_interval);
 
         /* change beacon miss timer period */
         wifi_mac_set_beacon_miss_ex(wnet_vif_tmp, ENABLE, WIFINET_BCNMISS_TIME/* period, ms*/);

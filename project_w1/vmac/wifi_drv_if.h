@@ -37,7 +37,7 @@ struct wifi_station;
 #define HAL_RATECTRL_TX_SEND_SUCCESS 0X800
 #define HAL_RATECTRL_USE_SAMPLE_RATE 0X1000
 
-#define HAL_BEACON_PERIOD 0x0000ffff  /* beacon interval period */
+#define HAL_BEACON_PERIOD 0x0001ffff  /* beacon interval period */
 #define WLAN_CTRL_FRAME_SIZE 14   /* ACK+FCS */
 #define CO_WORK_GET 0
 #define CO_WORK_FREE 1
