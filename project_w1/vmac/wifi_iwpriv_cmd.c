@@ -1498,7 +1498,7 @@ static void sap_change_channel(struct wlan_net_vif *wnet_vif, unsigned int chann
         WIFI_CHANNEL_UNLOCK(wifimac);
     }
 
-    wifi_mac_set_wnet_vif_channel(wnet_vif, channel, wnet_vif->vm_bandwidth, center_chan);
+    wifi_mac_set_wnet_vif_channel(wnet_vif, channel, wnet_vif->vm_bandwidth, center_chan, CHANNEL_CONNECT_FLAG | CHANNEL_RESTORE_FLAG);
 }
 
 static int iw_standard_sap_set_freq(struct net_device *dev, struct iw_request_info *info,

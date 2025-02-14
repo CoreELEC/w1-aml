@@ -91,5 +91,7 @@ int wifi_mac_send_arp_req(struct wlan_net_vif *wnet_vif);
 int wifi_mac_set_arp_rsp(struct wlan_net_vif *wnet_vif) ;
 
 unsigned short wifi_mac_eth_type_trans(struct sk_buff *skb, struct net_device *dev);
-
+int wifi_mac_handle_csa(struct wlan_net_vif *wnet_vif, struct wifi_station *sta, int chan);
+int wifi_mac_csa_handle_timeout(void *arg);
+void wifi_mac_csa_wait_task(SYS_TYPE param1,SYS_TYPE param2, SYS_TYPE param3,SYS_TYPE param4,SYS_TYPE param5);
 #endif

@@ -49,5 +49,5 @@ extern char *aml_wifi_get_bus_type(void);
 extern char *aml_wifi_get_fw_type(void);
 extern unsigned int aml_wifi_is_enable_rf_test(void);
 extern void aml_w1_fw_recovery(void);
-
+extern void aml_wifi_set_con_mode(void *wifimac);
 #endif

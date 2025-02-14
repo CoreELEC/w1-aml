@@ -109,7 +109,7 @@ static void  wifi_mac_pwrsave_wakeup_ex(SYS_TYPE param1,
 {
     struct wlan_net_vif *wnet_vif = (struct wlan_net_vif *)param1;
 
-    wifi_mac_pwrsave_sleep_wait_cancle(wnet_vif);
+    wifi_mac_pwrsave_sleep_wait_cancel(wnet_vif);
     wifi_mac_pwrsave_wakeup(wnet_vif, WKUP_FROM_TRANSMIT);
 
     if ((wnet_vif->vm_opmode == WIFINET_M_STA) && (wnet_vif->vm_state == WIFINET_S_CONNECTED))
@@ -117,7 +117,7 @@ static void  wifi_mac_pwrsave_wakeup_ex(SYS_TYPE param1,
 #ifdef CONFIG_P2P
         if (wnet_vif->vm_p2p->p2p_flag & P2P_OPPPS_START_FLAG_HI)
         {
-            vm_p2p_client_cancle_opps(wnet_vif->vm_p2p);
+            vm_p2p_client_cancel_opps(wnet_vif->vm_p2p);
         }
 #endif
     }
@@ -215,7 +215,7 @@ static int wifi_mac_pwrsave_sleep_wait (void *arg)
     return OS_TIMER_NOT_REARMED;
 }
 
-void wifi_mac_pwrsave_sleep_wait_cancle (struct wlan_net_vif *wnet_vif)
+void wifi_mac_pwrsave_sleep_wait_cancel (struct wlan_net_vif *wnet_vif)
 {
     WIFINET_PWRSAVE_LOCK(wnet_vif);
     if (wnet_vif->vm_pwrsave.ips_flag_waitbeacon_timer_start)
@@ -330,7 +330,7 @@ int wifi_mac_pwrsave_wkup_and_NtfyAp (struct wlan_net_vif *wnet_vif,
 #ifdef CONFIG_P2P
         if (wnet_vif->vm_p2p->p2p_flag & P2P_OPPPS_START_FLAG_HI)
         {
-            vm_p2p_client_cancle_opps(wnet_vif->vm_p2p);
+            vm_p2p_client_cancel_opps(wnet_vif->vm_p2p);
         }
 #endif
     }
@@ -745,10 +745,27 @@ int wifi_mac_forward_txq_enqueue (struct sk_buff_head *fwdtxqueue, struct sk_buf
 
 int wifi_mac_buffer_txq_send(struct sk_buff_head *txqueue)
 {
-    struct sk_buff *skb = NULL;
+    struct sk_buff *skb = NULL, *tmp;
     struct wifi_station *sta;
     struct wifi_mac *wifimac;
     unsigned int qlen_real = WIFINET_SAVEQ_QLEN(txqueue);
+    if (qlen_real == 0) {
+        return qlen_real;
+    }
+
+    WIFINET_SAVEQ_LOCK(txqueue);
+    skb_queue_walk_safe(txqueue,skb,tmp) {
+        sta = os_skb_get_nsta(skb);
+        if (!sta_find_in_sta_tbl(sta)) {
+            AML_OUTPUT("not find sta: %p free skb\n",sta);
+            aml_skb_unlink(skb,txqueue);
+            wifi_mac_free_skb(skb);
+        }
+    }
+
+    qlen_real = WIFINET_SAVEQ_QLEN(txqueue);
+    WIFINET_SAVEQ_UNLOCK(txqueue);
+
     if (qlen_real == 0) {
         return qlen_real;
     }
@@ -1857,5 +1874,30 @@ int wifi_mac_pwrsave_wow_check(struct wlan_net_vif *wnet_vif)
     {
         wifi_mac_pwrsave_wow_resume(0, 0, 0, (SYS_TYPE)wnet_vif, 0);
     }
+    return 0;
+}
+
+unsigned char sta_find_in_sta_tbl(struct wifi_station *find_sta)
+{
+    unsigned char vid;
+    struct wifi_station *sta, *sta_next;
+    struct wifi_station_tbl *vm_sta_tbl = NULL;
+    struct drv_private *drv_priv = drv_get_drv_priv();
+
+    for (vid = 0; vid < WIFI_MAX_VID; ++vid)
+    {
+        vm_sta_tbl = &drv_priv->drv_wnet_vif_table[vid]->vm_sta_tbl;
+        WIFINET_NODE_LOCK(vm_sta_tbl);
+        list_for_each_entry_safe(sta, sta_next, &vm_sta_tbl->nt_nsta, sta_list)
+        {
+            if (find_sta == sta)
+            {
+                WIFINET_NODE_UNLOCK(vm_sta_tbl);
+                return 1;
+            }
+        }
+        WIFINET_NODE_UNLOCK(vm_sta_tbl);
+    }
+
     return 0;
 }

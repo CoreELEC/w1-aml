@@ -131,7 +131,7 @@ struct vm_wlan_net_vif_params
 
 #define WIFINET_BINTVAL_DEFAULT  100
 #define DEFAULT_MGMT_RETRY_TIMES 3
-#define DEFAULT_P2P_ACTION_RETRY_TIMES 5
+#define DEFAULT_P2P_ACTION_RETRY_TIMES 3
 #define DEFAULT_MGMT_RETRY_INTERVAL 512
 #define DEFAULT_P2P_ACTION_RETRY_INTERVAL 50
 #define DEFAULT_AUTH_RETRY_INTERVAL 512
@@ -326,11 +326,24 @@ enum
     CONCURRENT_CHANNEL_SWITCH = BIT(0),
     CONCURRENT_NOTIFY_AP = BIT(1),
     CONCURRENT_NOTIFY_AP_SUCCESS = BIT(2),
+    CONCURRENT_AP_SWITCH_CHANNEL = BIT(3),
+    CONCURRENT_SWITCH_TO_STA_CHANNEL = BIT(4),
+};
+
+struct chan_switch_target_t {
+    unsigned char start;
+    struct wifi_channel switch_chan;
 };
 
 struct wifi_mac_chan_overlapping {
     unsigned char chan_index;
     unsigned short overlapping;
+};
+
+enum VsdbState {
+    VSDB_STATE_DISABLE,
+    VSDB_STATE_ENABLE,
+    VSDB_STATE_MAX,
 };
 
 struct wifi_mac
@@ -411,10 +424,12 @@ struct wifi_mac
 
 #ifdef CONFIG_CONCURRENT_MODE
     struct os_timer_ext wm_concurrenttimer;
+    unsigned char wm_vsdb_sate;
     unsigned char wm_vsdb_slot;
     unsigned short wm_vsdb_flags;
     unsigned long wm_vsdb_switch_time;
 #endif //CONFIG_CONCURRENT_MODE
+    struct os_timer_ext wm_csa_trigger_timer;
 
     enum wifi_mac_protmode wm_protmode;
     unsigned short wm_nonerpsta;
@@ -449,6 +464,7 @@ struct wifi_mac
     int msdu_cnt[WME_NUM_TID ];
     struct msdu_list msdu_node_list;
 
+    unsigned short wm_p2p_home_channel;
     unsigned char wm_p2p_connection_protect;
     unsigned long wm_p2p_connection_protect_period;
     unsigned char is_miracast_connect;
@@ -636,6 +652,8 @@ struct wlan_net_vif
     unsigned char vm_chanchange_count;
     unsigned char vm_bmiss_count;
     struct wifi_mac_rateset vm_legacy_rates;
+    struct chan_switch_target_t csa_target;
+    unsigned char csa_count;
 
     struct wifi_mac_wmm_ac_params vm_wmm_ac_params;
     struct wifi_mac_wmm_tspec_element tspecs[WME_AC_NUM][TS_DIR_IDX_COUNT];
@@ -735,6 +753,7 @@ struct wlan_net_vif
 #define WIFINET_F_WPA 0x01800000
 #define WIFINET_F_COUNTERM 0x04000000
 #define WIFINET_F_HIDESSID 0x08000000
+#define WIFINET_F_HIDESSID_TO_BIT0_OFST 27
 #define WIFINET_F_WMEUPDATE 0x20000000
 #define WIFINET_F_DOTH 0x40000000
 #define WIFINET_F_CHANSWITCH 0x80000000

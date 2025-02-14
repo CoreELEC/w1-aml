@@ -12,6 +12,7 @@
  * Date:    20160901
  ****************************************************************************************
  */
+#include <linux/string.h>
 #include "wifi_mac_com.h"
 #include "wifi_pt_init.h"
 #include "wifi_pt_network.h"
@@ -925,7 +926,6 @@ void Pool_Create( struct _Pool* my, unsigned short size,
         //
         // Enforce (at least) word alignment of all the blocks
         //
-        int i;
         ASSERT( ( unsigned int )(unsigned long)buffer % 4 == 0
             && size % 4 == 0 && count != 0 );
 
@@ -936,8 +936,7 @@ void Pool_Create( struct _Pool* my, unsigned short size,
         my->size = size;
         my->max_count = count;
         my->min_count = count;
-        for ( i =0; i<16; i++)
-                my->name[i] = name[i];
+        strscpy(my->name, name, sizeof(my->name));
         //
         // Important: queue_buffer[] size must be at least count + 1
         //

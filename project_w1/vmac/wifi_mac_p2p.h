@@ -384,6 +384,7 @@ struct wifi_mac_p2p
     unsigned char peer_dev_addr[MAX_MAC_BUF_LEN];
     unsigned char ap_mode_set_noa_enable;
     unsigned char wfd_session_id[MAC_WFD_SESSION_LEN];
+    unsigned char go_hidden_mode;
 };
 
 static inline void vm_p2p_set_enable(struct wifi_mac_p2p *p2p, int enable)
@@ -464,14 +465,14 @@ static inline int NL80211_IFTYPE_2_p2p_role (enum nl80211_iftype NL80211_IFTYPE)
 }
 #endif
 
-int vm_p2p_go_cancle_opps (struct wifi_mac_p2p *p2p);
-int vm_p2p_go_cancle_noa (struct wifi_mac_p2p *p2p);
-int vm_p2p_client_cancle_opps (struct wifi_mac_p2p *p2p);
+int vm_p2p_go_cancel_opps (struct wifi_mac_p2p *p2p);
+int vm_p2p_go_cancel_noa (struct wifi_mac_p2p *p2p);
+int vm_p2p_client_cancel_opps (struct wifi_mac_p2p *p2p);
 int vm_p2p_opps_start(struct wifi_mac_p2p *p2p, const union type_ctw_opps_u *ctw_opps_u);
 int vm_p2p_noa_start(struct wifi_mac_p2p *p2p, const struct p2p_noa *noa);
 unsigned char is_need_process_p2p_action(unsigned char* buf);
 int vm_p2p_parse_negotiation_frames(struct wifi_mac_p2p *p2p, const unsigned char *frm, unsigned int *len, unsigned char tx);
-int vm_p2p_client_cancle_noa (struct wifi_mac_p2p *p2p);
+int vm_p2p_client_cancel_noa (struct wifi_mac_p2p *p2p);
 void vm_change_p2pie_channel(struct wifi_mac_p2p *p2p , const unsigned char *frm, unsigned int *len);
 int vm_p2p_update_noa_ie (struct wifi_mac_p2p *p2p);
 void vm_change_p2pie_listenchannel(struct wifi_mac_p2p *p2p , const unsigned char *frm, unsigned int len);

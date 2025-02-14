@@ -1956,7 +1956,9 @@ int wifi_mac_parse_counterpart_rsn(struct wifi_mac_Rsnparms *rsn, unsigned char 
     frm += 2, len -= 2;
     if ((n <= 0) || (len < n * 4 + 2)) {
         ERROR_DEBUG_OUT("RSN ucast cipher data too short; len %u, n %u\n", len, n);
-        return WIFINET_REASON_IE_INVALID;
+        if (is_judge) {
+            return WIFINET_REASON_IE_INVALID;
+        }
     }
 
     w = 0;
@@ -1978,7 +1980,9 @@ int wifi_mac_parse_counterpart_rsn(struct wifi_mac_Rsnparms *rsn, unsigned char 
     frm += 2, len -= 2;
     if ((n <= 0) || (len < n * 4)) {
         ERROR_DEBUG_OUT("RSN keymgmt data too short; len %u, n %u\n", len, n);
-        return WIFINET_REASON_IE_INVALID;
+        if (is_judge) {
+            return WIFINET_REASON_IE_INVALID;
+        }
     }
 
     w = 0;
@@ -2171,11 +2175,11 @@ wifi_mac_parse_wmeparams(struct wlan_net_vif *wnet_vif, unsigned char *frm,
 
 static int
 wifi_mac_parse_dothparams(struct wlan_net_vif *wnet_vif, unsigned char *frm,
-                         struct wifi_mac_scan_param* sp)
+                         struct wifi_mac_scan_param* sp, struct wifi_station *sta)
 {
     struct wifi_mac *wifimac = wnet_vif->vm_wmac;
     unsigned int len = frm[1];
-    unsigned char chan, tbtt;
+    unsigned char chan, csa_cnt;
 
     if (len < 4-2)
     {
@@ -2185,69 +2189,32 @@ wifi_mac_parse_dothparams(struct wlan_net_vif *wnet_vif, unsigned char *frm,
     }
     wnet_vif->vm_mainsta->sta_channel_switch_mode = frm[2];
     chan = frm[3];
+    csa_cnt = frm[4];
+
     if (wifi_mac_chan_num_avail(wifimac, chan)==false)
     {
         WIFINET_DPRINTF(AML_DEBUG_ELEMID | AML_DEBUG_DOTH,
                         "channel switch invalid channel %u", chan);
         return -1;
     }
-    tbtt = frm[4];
 
-    if (tbtt <= 1)
+    if (csa_cnt > 0)
     {
-        struct wifi_mac_ie_htinfo *htinfo = (struct wifi_mac_ie_htinfo *)sp->htinfo;
-        struct wifi_mac_ie_htinfo_cmn *ie;
-        struct wifi_mac_ie_vht_opt *vhtop = (struct wifi_mac_ie_vht_opt *) sp->vht_opt;
-        int bw = 0, center_chan = 0, center_chan_vht = 0;
-        unsigned char ret_char = false;
         int ret = -1;
+        unsigned char ret_char = false;
 
-        if (!htinfo)
-            return ret;
+        sta->sta_chan_switch_chan = chan;
+        os_timer_ex_cancel(&sta->csa_timer, CANCEL_SLEEP);
+        os_timer_ex_start_period(&sta->csa_timer, csa_cnt * wnet_vif->vm_bcn_intval);
 
-        ie = &htinfo->hi_ie;
-
-        if (ie->hi_extchoff == WIFINET_HTINFO_EXTOFFSET_ABOVE)
-        {
-            center_chan = chan + 2;
-            bw = WIFINET_BWC_WIDTH40;
-        }
-        else if (ie->hi_extchoff == WIFINET_HTINFO_EXTOFFSET_BELOW)
-        {
-            center_chan = chan - 2;
-            bw = WIFINET_BWC_WIDTH40;
-        }
-        else
-        {
-            center_chan = chan;
-            bw = WIFINET_BWC_WIDTH20;
-        }
-        if (vhtop) {
-            if (vhtop->vht_op_chwidth == VHT_OPT_CHN_WD_80M)
-            {
-               center_chan_vht = wifi_mac_find_80M_channel_center_chan(chan);
-               if (center_chan_vht) {
-                   center_chan = center_chan_vht;
-                   bw = WIFINET_BWC_WIDTH80;
-               }
-            }
-            else if (vhtop->vht_op_chwidth > VHT_OPT_CHN_WD_80M)
-            {
-               ERROR_DEBUG_OUT("not support bandwidth %d yet \n", vhtop->vht_op_chwidth);
-            }
-        }
-        ret_char = wifi_mac_set_wnet_vif_channel(wnet_vif, chan, bw, center_chan);
-
-        if ((wnet_vif->vm_mainsta->sta_channel_switch_mode == 1) && (ret_char == true)) {
-            wnet_vif->vm_switchchan = wifi_mac_find_chan(wifimac, chan, bw, center_chan);
-            wnet_vif->vm_chan_switch_scan_flag = 1;
-            wifi_mac_start_scan(wnet_vif, WIFINET_SCANCFG_USERREQ | WIFINET_SCANCFG_ACTIVE | WIFINET_SCANCFG_FLUSH |
-                WIFINET_SCANCFG_CREATE, wnet_vif->vm_des_nssid, wnet_vif->vm_des_ssid);
+        if (csa_cnt == 1) {
+             AML_OUTPUT("start_csa count:%d target_chan:%d\n", csa_cnt, chan);
         }
 
         ret = ((ret_char==true)?0:-1);
         return ret;
     }
+
     return 0;
 }
 
@@ -2690,6 +2657,7 @@ void wifi_mac_parse_vht_ch_sw_wrp(struct wifi_station *sta, unsigned char *ie)
     struct wifi_mac_ie_vht_ch_sw_wrp* vht_ch_sw_wrp = (struct wifi_mac_ie_vht_ch_sw_wrp*) ie;
     unsigned char sub_ie_id = 0;
     unsigned char sub_ie_len = 0;
+    unsigned char sub_ie_ofst = 2;
 
     if ((vht_ch_sw_wrp == NULL) || (sta == NULL)) {
         return ;
@@ -2699,31 +2667,30 @@ void wifi_mac_parse_vht_ch_sw_wrp(struct wifi_station *sta, unsigned char *ie)
         return;
     }
 
-    sub_ie_id = vht_ch_sw_wrp->new_country_sub_ie[0];
-    sub_ie_len = vht_ch_sw_wrp->new_country_sub_ie[1];
-    if ((sub_ie_id == WIFINET_ELEMID_COUNTRY) &&  (sub_ie_len <= SUB_IE_MAX_LEN - 2)) {
-        memcpy(sta->sta_new_country_sub_ie, vht_ch_sw_wrp->new_country_sub_ie, sub_ie_len + 2);
+    memset(sta->sta_new_country_sub_ie, 0, SUB_IE_MAX_LEN);
+    memset(sta->sta_wide_bw_ch_sw_sub_ie, 0, SUB_IE_MAX_LEN);
+    memset(sta->sta_new_vht_tx_pw_sub_ie, 0, SUB_IE_MAX_LEN);
 
-    } else {
-        // nothing, just a tip
-    }
+    while (sub_ie_ofst < ie[1] + 2) {
+        sub_ie_id = ie[sub_ie_ofst];
+        sub_ie_len = ie[sub_ie_ofst + 1];
 
-    sub_ie_id = vht_ch_sw_wrp->wide_bw_ch_sw_sub_ie[0];
-    sub_ie_len = vht_ch_sw_wrp->wide_bw_ch_sw_sub_ie[1];
-    if ((sub_ie_id == WIFINET_ELEMID_WIDE_BAND_CHAN_SWITCH) &&  (sub_ie_len <= SUB_IE_MAX_LEN - 2)) {
-        memcpy(sta->sta_wide_bw_ch_sw_sub_ie, vht_ch_sw_wrp->wide_bw_ch_sw_sub_ie, sub_ie_len + 2);
+        AML_OUTPUT("sub_ie_id = %d, sub_id_len = %d\n", sub_ie_id, sub_ie_len);
 
-    } else {
-        // nothing, just a tip
-    }
+        if (!(sub_ie_len <= SUB_IE_MAX_LEN - 2)) {
+            ERROR_DEBUG_OUT("sub_ie_id[%d] : sub_ie_len[%d] is error\n",sub_ie_id,sub_ie_len);
+            break;
+        }
 
-    sub_ie_id = vht_ch_sw_wrp->new_vht_tx_pw_sub_ie[0];
-    sub_ie_len = vht_ch_sw_wrp->new_vht_tx_pw_sub_ie[1];
-    if ((sub_ie_id == WIFINET_ELEMID_VHT_TX_PWR_ENVLP) &&  (sub_ie_len <= SUB_IE_MAX_LEN - 2)) {
-        memcpy(sta->sta_new_vht_tx_pw_sub_ie,  vht_ch_sw_wrp->new_vht_tx_pw_sub_ie, sub_ie_len + 2);
+        if (sub_ie_id == WIFINET_ELEMID_COUNTRY) {
+            memcpy(sta->sta_new_country_sub_ie, &ie[sub_ie_ofst], sub_ie_len + 2);
+        } else if (sub_ie_id == WIFINET_ELEMID_WIDE_BAND_CHAN_SWITCH) {
+            memcpy(sta->sta_wide_bw_ch_sw_sub_ie, &ie[sub_ie_ofst], sub_ie_len + 2);
+        } else if (sub_ie_id == WIFINET_ELEMID_VHT_TX_PWR_ENVLP) {
+            memcpy(sta->sta_new_vht_tx_pw_sub_ie, &ie[sub_ie_ofst], sub_ie_len + 2);
+        }
 
-    } else {
-        // nothing, just a tip
+        sub_ie_ofst += sub_ie_len + 2;
     }
 }
 
@@ -2895,6 +2862,7 @@ static void wifi_mac_pkt_parse_element(struct wlan_net_vif *wnet_vif,
     wh = (struct wifi_frame *)os_skb_data(skb);
     frm = (unsigned char *)&wh[1];
     efrm = os_skb_data(skb) + os_skb_get_pktlen(skb);
+    scan->frame_len = os_skb_get_pktlen(skb);
     subtype = wh->i_fc[0] & WIFINET_FC0_SUBTYPE_MASK;
     snprintf(sa, MAX_MAC_BUF_LEN, "%02x:%02x:%02x:%02x:%02x:%02x",
          wh->i_addr2[0], wh->i_addr2[1], wh->i_addr2[2], wh->i_addr2[3], wh->i_addr2[4], wh->i_addr2[5]);
@@ -3193,8 +3161,15 @@ void wifi_mac_recv_beacon(struct wlan_net_vif *wnet_vif,
         WIFI_SCAN_SE_LIST_LOCK(st);
         list_for_each_entry_safe(se, si_next, &st->st_hash[hash], se_hash) {
             if (WIFINET_ADDR_EQ(se->scaninfo.SI_macaddr, wh->i_addr2)) {
-                WIFI_SCAN_SE_LIST_UNLOCK(st);
-                return;
+                if (vm_p2p_is_state(wnet_vif->vm_p2p, NET80211_P2P_STATE_SCAN)
+                    && (se->scaninfo.SI_frame_len < scan.frame_len)) {
+                    list_del_init(&se->se_list);
+                    list_del_init(&se->se_hash);
+                    FREE(se,"sta_add.se");
+                } else {
+                    WIFI_SCAN_SE_LIST_UNLOCK(st);
+                    return;
+                }
             }
         }
         WIFI_SCAN_SE_LIST_UNLOCK(st);
@@ -3268,9 +3243,9 @@ void wifi_mac_recv_beacon(struct wlan_net_vif *wnet_vif,
         }
 
         if (scan.doth != NULL) {
-            wifi_mac_parse_dothparams(wnet_vif, scan.doth, &scan);
+            wifi_mac_parse_dothparams(wnet_vif, scan.doth, &scan, sta);
         }
-        wifi_mac_pwrsave_sleep_wait_cancle(wnet_vif);
+        wifi_mac_pwrsave_sleep_wait_cancel(wnet_vif);
 
         if ((scan.tim != NULL) && (wifi_mac_pwrsave_is_sta_sleeping(wnet_vif) == 0)
             && ((wnet_vif->vm_pstxqueue_flags & WIFINET_PSQUEUE_PS4QUIET) == 0)) {
@@ -3448,9 +3423,22 @@ void wifi_mac_recv_probersp(struct wlan_net_vif *wnet_vif,
             }
         }
     }
+
+    /* Need to update existing entry. List is locked, and as
+     * 'oldse' is not NULL, 'wifi_mac_scan_rx()' recognizes
+     * it as updating entry and won't take lock on list.
+     */
+    if (oldse)
+        wifi_mac_scan_rx(wnet_vif, &scan, wh, rssi, oldse);
+
     WIFI_SCAN_SE_LIST_UNLOCK(st);
 
-    wifi_mac_scan_rx(wnet_vif, &scan, wh, rssi, oldse);
+    /* This will add new entry. 'oldse' is NULL, we release
+     * lock on list, 'wifi_mac_scan_rx()' will allocate new
+     * entry, will lock this list to insert new entry.
+     */
+    if (!oldse)
+        wifi_mac_scan_rx(wnet_vif, &scan, wh, rssi, oldse);
 }
 
 
@@ -3505,8 +3493,7 @@ void wifi_mac_recv_probe_req(struct wlan_net_vif *wnet_vif,
         }
 
         if (temp_wnet_vif != NULL && temp_wnet_vif->vm_curchan != NULL && temp_wnet_vif->vm_curchan->chan_pri_num != channel) {
-            DPRINTF(AML_DEBUG_WARNING, "%s %d ignore, probe req %d, %d\n",__func__,__LINE__, temp_wnet_vif->vm_curchan->chan_pri_num, channel);
-            return;
+            DPRINTF(AML_DEBUG_INFO, "%s %d ignore, probe req %d, %d\n",__func__,__LINE__, temp_wnet_vif->vm_curchan->chan_pri_num, channel);
         }
         if (WIFINET_IS_MULTICAST(wh->i_addr2))
         {
@@ -4504,7 +4491,7 @@ void wifi_mac_recv_action(struct wlan_net_vif *wnet_vif, struct wifi_station *st
     struct wifi_mac_action_mgt_args actionargs;
     struct wifi_mac_action_sa_query *sa_query = NULL;
     struct wifi_station *remote_sta = NULL;
-
+    struct wifi_mac_action_csa_frame *csa_frame = NULL;
     unsigned short statuscode;
     unsigned short batimeout;
     unsigned short reasoncode;
@@ -4660,6 +4647,21 @@ void wifi_mac_recv_action(struct wlan_net_vif *wnet_vif, struct wifi_station *st
                             wifi_mac_change_cbw(wifimac, 1);
                         }
                         break;
+
+                    case WIFINET_ACT_PUBLIC_CSA:
+                        if (wnet_vif->vm_opmode == WIFINET_M_STA && WIFINET_ADDR_EQ(sta->sta_bssid, wh->i_addr2)) {
+                           csa_frame = (struct wifi_mac_action_csa_frame *) frm;
+                           sta->sta_channel_switch_mode = csa_frame->csa.chan_switch_mode;
+                           sta->sta_chan_switch_chan = csa_frame->csa.new_chan_num;
+                           AML_OUTPUT("csa action frame:0x%x 0x%x 0x%x 0x%x\n", csa_frame->csa.chan_switch_mode, csa_frame->csa.new_chan_num,
+                               csa_frame->csa.new_operation_class, csa_frame->csa.chan_switch_count);
+                           os_timer_ex_start_period(&sta->csa_timer, csa_frame->csa.chan_switch_count * wnet_vif->vm_bcn_intval);
+                        } else {
+                            AML_OUTPUT("addr1:%s\n", ether_sprintf(wh->i_addr1));
+                            AML_OUTPUT("addr2:%s\n", ether_sprintf(wh->i_addr2));
+                            AML_OUTPUT("addr3:%s\n", ether_sprintf(wh->i_addr3));
+                        }
+                       break;
 
                     default:
                         vm_cfg80211_notify_mgmt_rx(wnet_vif, channel, os_skb_data(skb),os_skb_get_pktlen(skb));
@@ -4975,6 +4977,11 @@ wifi_mac_amsdu_input(struct wifi_station *sta, struct sk_buff *skb)
         }
 
         skb_subfrm = skb_clone(skb, GFP_ATOMIC);
+
+        if (!skb_subfrm) {
+            pr_warn("AMSDU: failed to clone sub frame\n");
+            goto err_amsdu;
+        }
         os_skb_pull(skb, roundup(subfrm_len, 4));
 
         wifi_mac_amsdu_subframe_decap(skb_subfrm);
@@ -5030,3 +5037,92 @@ wifi_mac_check_mic(struct wifi_station *sta, struct sk_buff *skb)
     return;
 }
 
+void wifi_mac_csa_wait_task(SYS_TYPE param1,SYS_TYPE param2, SYS_TYPE param3,SYS_TYPE param4,SYS_TYPE param5)
+{
+    struct wifi_mac *wifimac = (struct wifi_mac *)param1;
+    struct wlan_net_vif *wnet_vif = (struct wlan_net_vif *)param2;
+    unsigned char ret_char = (unsigned char)param3;
+    struct wifi_channel *vmac_chan = (struct wifi_channel *)param4;
+
+    /*
+    unsigned int delay_ms = 0;
+    while ((wifimac->wm_flags & WIFINET_F_DOTH) && (wifimac->wm_flags & WIFINET_F_CHANSWITCH) && delay_ms < 1000) {
+        msleep(10);
+        delay_ms += 10;
+    }
+    AML_OUTPUT("delay time [%d]\n", delay_ms);
+    */
+
+    if ((wnet_vif->vm_mainsta->sta_channel_switch_mode == 1) && (ret_char == true) && concurrent_check_is_vmac_same_pri_channel(wifimac)) {
+        wnet_vif->vm_switchchan = vmac_chan;
+        wnet_vif->vm_chan_switch_scan_flag = 1;
+        wifi_mac_start_scan(wnet_vif, WIFINET_SCANCFG_USERREQ | WIFINET_SCANCFG_ACTIVE | WIFINET_SCANCFG_FLUSH |
+            WIFINET_SCANCFG_CREATE, wnet_vif->vm_des_nssid, wnet_vif->vm_des_ssid);
+    } else {
+        wnet_vif->vm_mainsta->sta_channel_switch_mode = 0;
+    }
+}
+
+
+int wifi_mac_handle_csa(struct wlan_net_vif *wnet_vif, struct wifi_station *sta, int chan)
+{
+    struct wifi_mac *wifimac = wnet_vif->vm_wmac;
+    struct wifi_mac_ie_vht_wide_bw_switch *bw_chan_switch = (struct wifi_mac_ie_vht_wide_bw_switch *)sta->sta_wide_bw_ch_sw_sub_ie;
+    struct wifi_channel *vmac_chan = NULL;
+    int bw = 0, center_chan = 0;
+    unsigned char ret_char = false;
+
+    center_chan = chan;
+
+    if (bw_chan_switch->elem_len != 0) {
+        center_chan = bw_chan_switch->new_ch_freq_seg1;
+        if (bw_chan_switch->new_ch_width == NEW_CHANNEL_BANDWIDTH40) {
+            bw = WIFINET_BWC_WIDTH40;
+        } else if (bw_chan_switch->new_ch_width == NEW_CHANNEL_BANDWIDTH80) {
+            bw = WIFINET_BWC_WIDTH80;
+        } else {
+            ERROR_DEBUG_OUT("not support new_ch_width %d \n",bw_chan_switch->new_ch_width);
+        }
+        AML_OUTPUT("station channel switch chan:%d bw:%d center_chan:%d \n", chan, bw, center_chan);
+    }
+
+    sta->sta_chbw = bw;
+
+    vmac_chan = wifi_mac_find_chan(wifimac, chan, bw, center_chan);
+    if ((vmac_chan == WIFINET_CHAN_ERR) || (vmac_chan == wnet_vif->vm_curchan)) {
+        if (vmac_chan == WIFINET_CHAN_ERR) {
+            ERROR_DEBUG_OUT("null chan:%d bw:%d center_chan:%d\n", chan, bw, center_chan);
+            return ret_char;
+        } else {
+            wnet_vif->vm_mainsta->sta_channel_switch_mode = 0;
+        }
+    } else {
+        ret_char = wifi_mac_set_wnet_vif_channel(wnet_vif, chan, bw, center_chan,CHANNEL_CONNECT_FLAG | CHANNEL_RESTORE_FLAG);
+        wifi_mac_add_work_task(wifimac, vm_cfg80211_chan_switch_notify_task, NULL, (SYS_TYPE)wifimac, (SYS_TYPE)wnet_vif, 0, (SYS_TYPE)vmac_chan, 0);
+    }
+
+    if ((wifimac->wm_nrunning > 1) && !concurrent_check_is_vmac_same_pri_channel(wifimac)) {
+        if (wifimac->wm_vsdb_slot == CONCURRENT_SLOT_NONE) {
+            if ((wnet_vif->vm_p2p_support == 1) || (wnet_vif->vm_opmode == WIFINET_M_HOSTAP)) {
+                wifimac->wm_vsdb_slot = CONCURRENT_SLOT_P2P;
+            } else {
+                wifimac->wm_vsdb_slot = CONCURRENT_SLOT_STA;
+            }
+            wifi_mac_set_vsdb_task(wifimac, wnet_vif, ENABLE);
+        }
+
+        if (IS_APSTA_CONCURRENT(aml_wifi_get_con_mode()) && concurrent_check_vmac_is_AP(wifimac)) {
+            channel_switch_announce_trigger(wifimac, wnet_vif->vm_curchan);
+        }
+    }
+
+    wifi_mac_add_work_task(wifimac, wifi_mac_csa_wait_task, NULL, (SYS_TYPE)wifimac, (SYS_TYPE)wnet_vif, (SYS_TYPE)ret_char, (SYS_TYPE)vmac_chan, 0);
+    return ret_char;
+}
+
+int wifi_mac_csa_handle_timeout(void *arg)
+{
+    struct wifi_station *sta = (struct wifi_station *)arg;
+    wifi_mac_handle_csa(sta->sta_wnet_vif, sta, sta->sta_chan_switch_chan);
+    return OS_TIMER_NOT_REARMED;
+}

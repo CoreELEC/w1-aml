@@ -1996,6 +1996,8 @@ int hal_fw_repair(void)
 
     drv_set_config((void *)drv_priv, CHIP_PARAM_RETRY_LIMIT, 100 << 8 | 100);
     wifi_mac_set_tx_power_coefficient(drv_priv, NULL, drv_priv->drv_config.cfg_txpoweplan);
+
+    drv_priv->net_ops->wifi_mac_rate_ratmod_detach(drv_priv);
     drv_priv->net_ops->wifi_mac_rate_ratmod_attach(drv_priv);
 
     drv_rate_setup(drv_priv, WIFINET_MODE_11GNAC);

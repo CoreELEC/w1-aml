@@ -588,6 +588,38 @@ void wifi_mac_send_setup(struct wlan_net_vif *wnet_vif,
 }
 
 static void
+wifi_mac_mgmt_csa_action_broadcast_output(struct wifi_station *sta, struct sk_buff *skb, int type)
+{
+    struct wlan_net_vif *wnet_vif = sta->sta_wnet_vif;
+    struct wifi_mac *wifimac = sta->sta_wmac;
+    struct wifi_frame *wh;
+    struct wifi_skb_callback *cb = (struct wifi_skb_callback *)skb->cb;
+
+    KASSERT(sta != NULL, ("null nsta"));
+
+    cb->sta = sta;
+
+    wh = (struct wifi_frame *)os_skb_push(skb, sizeof(struct wifi_frame));
+    wifi_mac_send_setup(wnet_vif, sta, wh, WIFINET_FC0_TYPE_MGT | type,
+        wnet_vif->vm_myaddr, BROADCAST_ADDRESS, sta->sta_bssid);
+
+    if ((cb->flags & M_LINK0) != 0 && sta->sta_challenge != NULL)
+    {
+        cb->flags &= ~M_LINK0;
+        DPRINTF(AML_DEBUG_CONNECT, "recv addr is [%02x:%02x:%02x:%02x:%02x:%02x]\n",
+            wh->i_addr1[0], wh->i_addr1[1], wh->i_addr1[2],
+            wh->i_addr1[3], wh->i_addr1[4], wh->i_addr1[5]);
+        wh->i_fc[1] |= WIFINET_FC1_WEP;
+    }
+
+    if (WIFINET_VMAC_IS_SLEEPING(sta->sta_wnet_vif))
+        wh->i_fc[1] |= WIFINET_FC1_PWR_MGT;
+
+    WIFINET_NODE_STAT(sta, tx_mgmt);
+    wifi_mac_tx_mgmt_frm(wifimac, skb);
+}
+
+static void
 wifi_mac_mgmt_output(struct wifi_station *sta, struct sk_buff *skb, int type)
 {
     struct wlan_net_vif *wnet_vif;
@@ -2506,6 +2538,11 @@ int wifi_mac_send_probe_rsp(struct wlan_net_vif  *wnet_vif,
     if ((wifimac->wm_flags & WIFINET_F_DOTH) ||
         (wifimac->wm_flags_ext & WIFINET_FEXT_COUNTRYIE))
     {
+        if (wifimac->wm_countryinfo.country_len == 0)
+        {
+            AML_OUTPUT("country ie should init\n");
+            wifi_mac_build_country_ie(wnet_vif);
+        }
         frm = wifi_mac_add_country(frm, wifimac);
     }
 
@@ -2581,7 +2618,10 @@ int wifi_mac_send_probe_rsp(struct wlan_net_vif  *wnet_vif,
     if(wifi_mac_is_vht_enable(wnet_vif))
     {
         frm = wifi_mac_add_vht_cap(frm, sta);
-        frm = wifi_mac_add_vht_opt(frm, sta, WIFINET_FC0_SUBTYPE_PROBE_RESP);
+        if (!wnet_vif->vm_p2p_support || (wnet_vif->vm_p2p_support && wnet_vif->vm_curchan != NULL))
+        {
+            frm = wifi_mac_add_vht_opt(frm, sta, WIFINET_FC0_SUBTYPE_PROBE_RESP);
+        }
         //frm = wifi_mac_add_vht_txpw(frm, sta);
         //frm = wifi_mac_add_vht_ch_sw_wrp(frm, sta);
 
@@ -3455,6 +3495,12 @@ int wifi_mac_send_mgmt(struct wifi_station *sta, int type, void *arg)
 
     wnet_vif = sta->sta_wnet_vif;
 
+    if (wnet_vif->vm_curchan == NULL && !wnet_vif->vm_p2p_support) {
+        ERROR_DEBUG_OUT("vm_curchan is NULL, just return\n");
+        ret = EINVAL;
+        return ret;
+    }
+
     switch (type) {
         case WIFINET_FC0_SUBTYPE_PROBE_RESP:
             ret = wifi_mac_send_probe_rsp(wnet_vif,sta,arg);
@@ -3757,4 +3803,129 @@ void wifi_mac_complete_wbuf(struct sk_buff *skbbuf, int errcode)
     if (errcode == 0) {
         wifi_mac_free_skb(skbbuf);
     }
+}
+
+unsigned char *
+wifi_mac_add_wide_bandwidth_subie(unsigned char *frm,struct wifi_station *sta)
+{
+    struct wlan_net_vif *wnet_vif = sta->sta_wnet_vif;
+    struct wifi_channel *switch_chan = &(wnet_vif->csa_target.switch_chan);
+
+    if (WIFINET_IS_CHAN_ERR(switch_chan)) {
+        ERROR_DEBUG_OUT("NULL chan\n");
+        return frm;
+    }
+
+    *frm++ = WIFINET_ELEMID_WIDE_BAND_CHAN_SWITCH;
+    *frm++ = 3;
+    if (switch_chan->chan_bw == WIFINET_BWC_WIDTH80) {
+        *frm++ = 1;
+    } else {
+        /* for 40m bw*/
+        *frm++ = 0;
+    }
+    *frm++ = wifi_mac_mhz2chan(switch_chan->chan_cfreq1);
+    *frm++ = 0;
+    return frm;
+}
+
+unsigned char *
+wifi_mac_add_chansw_wrapper(unsigned char *frm,struct wifi_station *sta)
+{
+
+    *frm++ = WIFINET_ELEMID_CHAN_SWITCH_WRAP;
+    *frm++ = WIFINET_WIDEBANDCHANSW_BYTES;
+    return wifi_mac_add_wide_bandwidth_subie(frm,sta);
+}
+
+unsigned char *
+wifi_mac_add_extended_chanswitch(unsigned char *frm,struct wifi_station *sta)
+{
+    struct wifi_mac *wifimac = sta->sta_wmac;
+    struct wlan_net_vif *wnet_vif = sta->sta_wnet_vif;
+    struct wifi_channel *switch_chan = &(wnet_vif->csa_target.switch_chan);
+
+    *frm++ = WIFINET_ELEMID_EXTCHANSWITCHANN;
+    *frm++ = 4;
+    *frm++ = 1;
+    *frm++ = switch_chan->global_operating_class;
+    *frm++ = wifimac->wm_doth_channel;
+    *frm++ = wifimac->wm_doth_tbtt;
+    return frm;
+}
+
+unsigned char *
+wifi_mac_add_chanswitch(unsigned char *frm,struct wifi_station *sta)
+{
+    struct wifi_mac *wifimac = sta->sta_wmac;
+
+    *frm++ = WIFINET_ELEMID_CHANSWITCHANN;
+    *frm++ = 3;
+    *frm++ = 1;
+    *frm++ = wifimac->wm_doth_channel;
+    *frm++ = wifimac->wm_doth_tbtt;
+    return frm;
+}
+
+void wifi_mac_csa_send_action_task(SYS_TYPE param1,SYS_TYPE param2, SYS_TYPE param3,SYS_TYPE param4,SYS_TYPE param5)
+{
+    struct wifi_mac *wifimac = (struct wifi_mac *)param1;
+    struct wlan_net_vif *wnet_vif = (struct wlan_net_vif *)param2;
+    struct cfg80211_chan_def *chan_def_ptr = (struct cfg80211_chan_def *)param3;
+    struct cfg80211_chan_def chan_def = {0};
+
+
+    memcpy(&chan_def, chan_def_ptr, sizeof(struct cfg80211_chan_def));
+    wifi_mac_csa_send_action(wifimac, wnet_vif, wnet_vif->vm_mainsta, chan_def);
+    AML_OUTPUT("target_chan:%d, cur_chan:%d, wnet_vif->csa_count:%d\n", chan_def.chan->hw_value, wifimac->wm_curchan->chan_pri_num, wnet_vif->csa_count);
+
+    return;
+}
+
+int wifi_mac_csa_send_action(struct wifi_mac *wifimac, struct wlan_net_vif *wnet_vif, struct wifi_station *sta, struct cfg80211_chan_def chan_def)
+{
+    struct sk_buff *skb;
+    int ret = 0;
+    struct wifi_mac_csa_data* csa_data_p = NULL;
+
+    skb = wifi_mac_get_mgmt_frm(wifimac, MAX_ACTION_LEN);
+    if (skb == NULL) {
+        wnet_vif->vif_sts.sts_tx_no_buf++;
+        return -ENOMEM;
+    }
+
+    csa_data_p = (struct wifi_mac_csa_data*)os_skb_put(skb, sizeof(struct wifi_mac_csa_data));
+    csa_data_p->extend_csa.ac_header.ia_category = AML_CATEGORY_PUBLIC;
+    csa_data_p->extend_csa.ac_header.ia_action = WIFINET_ACT_PUBLIC_CSA; //ACT_PUBLIC_EXT_CHL_SWITCH
+    csa_data_p->extend_csa.csa.chan_switch_mode = CSA_BLOCK_TX;
+    csa_data_p->extend_csa.csa.new_operation_class = wifi_mac_get_operation_class(chan_def);
+    csa_data_p->extend_csa.csa.new_chan_num = ieee80211_frequency_to_channel(chan_def.chan->center_freq);
+    csa_data_p->extend_csa.csa.chan_switch_count = wnet_vif->csa_count--;
+    csa_data_p->csa_wrapper.ie = WLAN_EID_WIDE_BW_CHANNEL_SWITCH;
+    csa_data_p->csa_wrapper.len = 3;
+    /* New channel width */
+    switch (chan_def.width) {
+        case NL80211_CHAN_WIDTH_80:
+            csa_data_p->csa_wrapper.info[0] = IEEE80211_VHT_CHANWIDTH_80MHZ;
+        break;
+        case NL80211_CHAN_WIDTH_160:
+            csa_data_p->csa_wrapper.info[0] = IEEE80211_VHT_CHANWIDTH_160MHZ;
+        break;
+        case NL80211_CHAN_WIDTH_80P80:
+            csa_data_p->csa_wrapper.info[0] = IEEE80211_VHT_CHANWIDTH_80P80MHZ;
+        break;
+        default:
+            csa_data_p->csa_wrapper.info[0] = IEEE80211_VHT_CHANWIDTH_USE_HT;
+    }
+    /* new center frequency segment 0 */
+    csa_data_p->csa_wrapper.info[1] = ieee80211_frequency_to_channel(chan_def.center_freq1);
+    /* new center frequency segment 1 */
+    if (chan_def.center_freq2)
+        csa_data_p->csa_wrapper.info[2] = ieee80211_frequency_to_channel(chan_def.center_freq2);
+    else
+        csa_data_p->csa_wrapper.info[2] = 0;
+
+    wifi_mac_mgmt_csa_action_broadcast_output(sta, skb, WIFINET_FC0_SUBTYPE_ACTION);
+
+    return ret;
 }

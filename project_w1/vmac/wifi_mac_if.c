@@ -2635,6 +2635,11 @@ static void wifi_mac_tx_act_timeout_ex (SYS_TYPE param1,
             return;
         }
 
+        if (wnet_vif->vm_p2p->tx_status_flag == WIFINET_TX_STATUS_FAIL) {
+            wnet_vif->vm_p2p->send_tx_status_flag = 1;
+            cfg80211_mgmt_tx_status(wnet_vif->vm_wdev, wnet_vif->vm_p2p->cookie, wnet_vif->vm_p2p->raw_action_pkt, wnet_vif->vm_p2p->raw_action_pkt_len, WIFINET_TX_STATUS_FAIL, GFP_KERNEL);
+        }
+
         if (wnet_vif->vm_state == WIFINET_S_SCAN) {
             return;
         }
@@ -3177,17 +3182,25 @@ wifi_mac_sub_sm(struct wlan_net_vif *wnet_vif, enum wifi_mac_state nstate, int a
         wifi_mac_set_scan_time(wnet_vif);
     #ifdef CONFIG_CONCURRENT_MODE
         if ((wifimac->wm_nrunning > 1) && !concurrent_check_is_vmac_same_pri_channel(wifimac)) {
-            if (wnet_vif->vm_p2p_support == 1) {
+            if ((wnet_vif->vm_p2p_support == 1) || (wnet_vif->vm_opmode == WIFINET_M_HOSTAP)) {
                 wifimac->wm_vsdb_slot = CONCURRENT_SLOT_P2P;
             } else {
                 wifimac->wm_vsdb_slot = CONCURRENT_SLOT_STA;
             }
+#if 0
             if (IS_APSTA_CONCURRENT(aml_wifi_get_con_mode()) && concurrent_check_vmac_is_AP(wifimac)) {
                 /*softap and sta concurrent as scc, no need vsdb*/
                 wifimac->wm_vsdb_slot = CONCURRENT_SLOT_NONE;
             } else {
                 wifi_mac_add_work_task(wifimac, wifi_mac_set_vsdb, NULL, (SYS_TYPE)wifimac, 0, ENABLE, (SYS_TYPE)wnet_vif, 0);
             }
+#endif
+            if (IS_APSTA_CONCURRENT(aml_wifi_get_con_mode()) && concurrent_check_vmac_is_AP(wifimac)) {
+                struct wifi_channel *main_vmac_chan = wifi_mac_get_main_vmac_channel(wifimac);
+
+                channel_switch_announce_trigger(wifimac, main_vmac_chan);
+            }
+            wifi_mac_set_vsdb_task(wifimac, wnet_vif, ENABLE);
         }
     #endif
     }
@@ -3200,8 +3213,7 @@ wifi_mac_sub_sm(struct wlan_net_vif *wnet_vif, enum wifi_mac_state nstate, int a
             wifimac->wm_vsdb_flags = 0;
             wifimac->vsdb_mode_set_noa_enable = 0;
             wifi_mac_restore_wnet_vif_channel_task(wnet_vif);
-
-            wifi_mac_add_work_task(wifimac, wifi_mac_set_vsdb, NULL,(SYS_TYPE)wifimac, 0, DISABLE, (SYS_TYPE)wnet_vif, 0);
+            wifi_mac_set_vsdb_task(wifimac, wnet_vif, ENABLE);
         }
     #endif
     }
@@ -3581,9 +3593,20 @@ static void aml_reg_notifier(struct wiphy *wiphy,
                struct regulatory_request *request)
 {
     struct wifi_mac *wifimac = wifi_mac_get_mac_handle();
+    struct wlan_net_vif *wnet_vif = wiphy_to_adapter(wiphy);
+    unsigned char source_code[5][10] = {"core", "user", "driver", "countryie"};
+    unsigned int delay_ms = 0;
 
     if (!request)
         return;
+
+    while ((wifimac->wm_flags & WIFINET_F_DOTH) && (wifimac->wm_flags & WIFINET_F_CHANSWITCH) && delay_ms < 1000) {
+        msleep(50);
+        delay_ms+=50;
+    }
+
+    AML_OUTPUT("vid:%d, regdom set by %s, country <%s>, wiphy alpha2 %s\n",
+        wnet_vif->wnet_vif_id, source_code[request->initiator], request->alpha2, wiphy->regd->alpha2);
 
     switch (request->initiator) {
     case NL80211_REGDOM_SET_BY_CORE:
@@ -3769,27 +3792,72 @@ wifi_mac_build_country_ie_5G(struct wifi_mac *wifimac)
 }
 
 void
+wifi_mac_build_country_ie_2G_and_5G(struct wifi_mac *wifimac)
+{
+    struct wifi_channel *c;
+    int i = 0 ;
+    int channel_num = 0;
+    int first_channel = 0;
+    int max_power = 0;
+    int triplet_index = 0;
+
+    WIFI_CHANNEL_LOCK(wifimac);
+    for (i = 0; i < wifimac->wm_nchans; i++) {
+        c = &wifimac->wm_channels[i];
+
+        if (WIFINET_IS_CHAN_2GHZ(c) && (c->chan_bw == WIFINET_BWC_WIDTH20)) {
+            if (!first_channel) {
+                first_channel = c->chan_pri_num;
+                max_power = c->chan_maxpower;
+            }
+
+            if (max_power < c->chan_maxpower) {
+                max_power = c->chan_maxpower;
+            }
+            channel_num ++;
+        }
+    }
+
+    if (channel_num != 0) {
+        wifimac->wm_countryinfo.country_triplet[triplet_index++] = first_channel;
+        wifimac->wm_countryinfo.country_triplet[triplet_index++] = channel_num;
+        wifimac->wm_countryinfo.country_triplet[triplet_index++] = max_power;
+        wifimac->wm_countryinfo.country_len += 4;
+    }
+
+    for (i = 0; i < wifimac->wm_nchans; i++) {
+        c = &wifimac->wm_channels[i];
+
+        if (WIFINET_IS_CHAN_5GHZ(c) && (c->chan_bw == WIFINET_BWC_WIDTH20)) {
+            if (!(c->chan_flags & WIFINET_CHAN_DFS)) {
+                wifimac->wm_countryinfo.country_triplet[triplet_index++] = c->chan_pri_num;
+                wifimac->wm_countryinfo.country_triplet[triplet_index++] = 1;
+                wifimac->wm_countryinfo.country_triplet[triplet_index++] = c->chan_maxpower;
+                wifimac->wm_countryinfo.country_len += 3;
+            }
+        }
+    }
+    WIFI_CHANNEL_UNLOCK(wifimac);
+}
+
+void
 wifi_mac_build_country_ie(struct wlan_net_vif * wnet_vif)
 {
     struct wifi_mac *wifimac = wnet_vif->vm_wmac;
     struct _wifi_mac_country_iso country;
+
     memset(&wifimac->wm_countryinfo, 0, sizeof(wifimac->wm_countryinfo));
     wifimac->wm_countryinfo.country_id = WIFINET_ELEMID_COUNTRY;
     wifimac->wm_countryinfo.country_len = 0;
 
-    wifi_mac_get_country(wifimac,&country);
+    wifi_mac_get_country(wifimac, &country);
 
     wifimac->wm_countryinfo.country_str[0] = country.iso[0];
     wifimac->wm_countryinfo.country_str[1] = country.iso[1];
     wifimac->wm_countryinfo.country_str[2] = 0x20; //environment: Any
     wifimac->wm_countryinfo.country_len += 3;
 
-    if (WIFINET_IS_CHAN_2GHZ(wnet_vif->vm_curchan)) {
-        wifi_mac_build_country_ie_2G(wifimac);
-
-    } else {
-         wifi_mac_build_country_ie_5G(wifimac);
-    }
+    wifi_mac_build_country_ie_2G_and_5G(wifimac);
 
     DPRINTF(AML_DEBUG_INFO,"INFO::Country ie is %c%c%c\n", wifimac->wm_countryinfo.country_str[0],
         wifimac->wm_countryinfo.country_str[1], wifimac->wm_countryinfo.country_str[2]);
@@ -3834,6 +3902,15 @@ void wifi_mac_channel_switch_complete(struct wlan_net_vif *wnet_vif)
     if (!(wnet_vif->vm_pstxqueue_flags & WIFINET_PSQUEUE_NOA) ) {
         wifimac->drv_priv->drv_ops.drv_hal_tx_frm_pause(wifimac->drv_priv, 0);
     }
+
+    if (wifimac->wm_vsdb_flags & CONCURRENT_SWITCH_TO_STA_CHANNEL) {
+        wifimac->wm_vsdb_slot = CONCURRENT_SLOT_NONE;
+        wifimac->wm_vsdb_flags &= ~CONCURRENT_SWITCH_TO_STA_CHANNEL;
+        /*switch to sta channel,we need notify ap*/
+        wifi_mac_scan_notify_leave_or_back(wifimac->drv_priv->drv_wnet_vif_table[NET80211_MAIN_VMAC],0);
+        AML_OUTPUT("channel switch complete and sta notify ap back done\n");
+    }
+
     WIFI_SCAN_LOCK(ss);
     if (ss->scan_StateFlags & SCANSTATE_F_WAIT_CHANNEL_SWITCH) {
         ss->scan_StateFlags &= ~SCANSTATE_F_WAIT_CHANNEL_SWITCH;

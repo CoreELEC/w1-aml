@@ -284,7 +284,7 @@ int vm_p2p_opps_start(struct wifi_mac_p2p *p2p, const union type_ctw_opps_u *ctw
     return 0;
 }
 
-int vm_p2p_client_cancle_opps (struct wifi_mac_p2p *p2p)
+int vm_p2p_client_cancel_opps (struct wifi_mac_p2p *p2p)
 {
     union type_ctw_opps_u ctw_opps_u;
 
@@ -296,14 +296,14 @@ int vm_p2p_client_cancle_opps (struct wifi_mac_p2p *p2p)
 }
 
 
-int vm_p2p_go_cancle_opps (struct wifi_mac_p2p *p2p)
+int vm_p2p_go_cancel_opps (struct wifi_mac_p2p *p2p)
 {
-    vm_p2p_client_cancle_opps(p2p);
+    vm_p2p_client_cancel_opps(p2p);
     vm_p2p_update_noa_ie(p2p);
     return 0;
 }
 
-int vm_p2p_client_cancle_noa (struct wifi_mac_p2p *p2p)
+int vm_p2p_client_cancel_noa (struct wifi_mac_p2p *p2p)
 {
     struct p2p_noa noa = {0};
 
@@ -313,9 +313,9 @@ int vm_p2p_client_cancle_noa (struct wifi_mac_p2p *p2p)
     return 0;
 }
 
-int vm_p2p_go_cancle_noa (struct wifi_mac_p2p *p2p)
+int vm_p2p_go_cancel_noa (struct wifi_mac_p2p *p2p)
 {
-    vm_p2p_client_cancle_noa(p2p);
+    vm_p2p_client_cancel_noa(p2p);
     vm_p2p_update_noa_ie(p2p);
     return 0;
 }
@@ -436,10 +436,10 @@ int vm_p2p_client_parse_noa_ie (struct wifi_mac_p2p *p2p, const unsigned char *p
     }
     else  if (!(p2p->p2p_flag & P2P_NOA_INDEX_INIT_FLAG))
     {
-        AML_PRINT(AML_DBG_MODULES_P2P,"GO cancle noa ie\n");
+        AML_PRINT(AML_DBG_MODULES_P2P,"GO cancel noa ie\n");
         p2p->p2p_flag |= P2P_NOA_INDEX_INIT_FLAG;
-        vm_p2p_client_cancle_opps(p2p);
-        vm_p2p_client_cancle_noa(p2p);
+        vm_p2p_client_cancel_opps(p2p);
+        vm_p2p_client_cancel_noa(p2p);
     }
 
     return 0;
@@ -2490,7 +2490,7 @@ void vm_p2p_cancel_remain_channel(struct wifi_mac_p2p *p2p )
         cfg80211_remain_on_channel_expired(p2p->wnet_vif->vm_wdev, p2p->remain_on_ch_cookie,
             &p2p->remain_on_ch_channel, GFP_KERNEL);
 
-        DPRINTF(AML_DEBUG_CFG80211, "%s %d <%s> cancle WIFINET_F_NOSCAN\n",
+        DPRINTF(AML_DEBUG_CFG80211, "%s %d <%s> cancel WIFINET_F_NOSCAN\n",
                 __func__, __LINE__, VMAC_DEV_NAME(p2p->wnet_vif));
     }
 
@@ -2629,6 +2629,9 @@ int vm_p2p_up(struct wlan_net_vif *wnet_vif)
     if ((p2p->p2p_role == NET80211_P2P_ROLE_CLIENT) || (p2p->p2p_role == NET80211_P2P_ROLE_GO))
     {
         vm_p2p_set_enable(p2p, 1);
+        if (p2p->p2p_role == NET80211_P2P_ROLE_GO) {
+            p2p->p2p_negotiation_state = NET80211_P2P_STATE_GO_COMPLETE;
+        }
     }
     return 0;
 }

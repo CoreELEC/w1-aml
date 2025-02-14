@@ -267,6 +267,8 @@ struct wifi_station
     unsigned char sta_wide_bw_ch_sw_sub_ie[SUB_IE_MAX_LEN];
     unsigned char sta_new_vht_tx_pw_sub_ie[SUB_IE_MAX_LEN];
     unsigned char sta_channel_switch_mode;
+    int sta_chan_switch_chan;
+    struct os_timer_ext csa_timer;
 
     //ext bss ld element
     unsigned short sta_mu_mimo_sta_cnt;
@@ -584,5 +586,5 @@ void os_skb_set_tid(struct sk_buff *skb, unsigned char tid);
 void os_skb_set_amsdu(struct sk_buff *skb);
 int os_skb_is_amsdu(struct sk_buff *skb);
 int  os_skb_is_uapsd(struct sk_buff *skb);
-
+void aml_skb_unlink(struct sk_buff *skb, struct sk_buff_head *list);
 #endif /* _NET80211_IEEE80211_NODE_H_ */

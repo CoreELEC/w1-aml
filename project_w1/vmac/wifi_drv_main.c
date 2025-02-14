@@ -14,6 +14,7 @@
  */
 #include <linux/netdevice.h>
 #include <linux/inetdevice.h>
+#include <linux/string.h>
 #include <net/addrconf.h>
 
 #include "wifi_drv_power.h"
@@ -1870,11 +1871,11 @@ void p2p_noa_start_irq (struct wifi_mac_p2p *p2p, struct drv_private *drv_priv)
                 /* noa need to be canceled */
                 if (wnet_vif->vm_opmode == WIFINET_M_HOSTAP)
                 {
-                    vm_p2p_go_cancle_noa(p2p);
+                    vm_p2p_go_cancel_noa(p2p);
                 }
                 else if (wnet_vif->vm_opmode == WIFINET_M_STA)
                 {
-                    vm_p2p_client_cancle_noa(p2p);
+                    vm_p2p_client_cancel_noa(p2p);
                 }
             }
 
@@ -2457,7 +2458,7 @@ drv_dev_probe(void)
 
     /* 5 create vmac 'wlan0' and 'p2p0'. */
     vmac0 = aml_wifi_get_vif0_name();
-    memcpy(&vm_param.vm_param_name, vmac0, IFNAMSIZ);
+    strscpy(vm_param.vm_param_name, vmac0, sizeof(vm_param.vm_param_name));
 
     vif0opmode = aml_wifi_get_vif0_opmode();
     if ((vif0opmode >= WIFINET_M_IBSS) && (vif0opmode <= WIFINET_M_P2P_DEV)) {
@@ -2468,7 +2469,7 @@ drv_dev_probe(void)
     ret = drv_priv->net_ops->wifi_mac_create_vmac(wm_mac, &vm_param, 0);
 
     vmac1 = aml_wifi_get_vif1_name();
-    memcpy(&vm_param.vm_param_name, vmac1, IFNAMSIZ);
+    strscpy(vm_param.vm_param_name, vmac1, sizeof(vm_param.vm_param_name));
 
     vif1opmode = aml_wifi_get_vif1_opmode();
     if ((vif1opmode >= WIFINET_M_IBSS) && (vif1opmode <= WIFINET_M_P2P_DEV)) {

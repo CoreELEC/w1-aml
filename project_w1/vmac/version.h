@@ -1,1 +1,1 @@
-#define DRIVERVERSION    "v1.7.1_20240906-w1-r driver:c78d7b44b941e329b31f0224c82faf23825fd1ce"
+#define DRIVERVERSION    "v1.8.0_20250214-w1-r driver:888ce88b817c15e731df70ffb82bbfce58e99db9"

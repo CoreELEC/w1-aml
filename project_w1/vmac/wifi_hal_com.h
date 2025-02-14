@@ -68,6 +68,7 @@ struct _hi_agg_tx_desc_chain;
 #include "fi_sdio.h"
 #include "opt_all.h"
 #include "fi_cmd.h"
+#include "patch_fi_cmd.h"
 
 struct hw_interface;
 

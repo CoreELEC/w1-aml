@@ -50,6 +50,8 @@
 #define DRV_RXTID_UNLOCK(_rxtid)        OS_SPIN_UNLOCK(&(_rxtid)->agg_tid_slock)
 #define DRV_RXTID_LOCK_IRQ(_rxtid,flag)          OS_SPIN_LOCK_IRQ(&(_rxtid)->agg_tid_slock,flag)
 #define DRV_RXTID_UNLOCK_IRQ(_rxtid,flag)        OS_SPIN_UNLOCK_IRQ(&(_rxtid)->agg_tid_slock,flag)
+#define DRV_RXTID_LOCK_BH(_rxtid)    OS_SPIN_LOCK_BH(&(_rxtid)->agg_tid_slock)
+#define DRV_RXTID_UNLOCK_BH(_rxtid)    OS_SPIN_UNLOCK_BH(&(_rxtid)->agg_tid_slock)
 
 #define DRV_TXQUEUE_VALUE(drv_priv, i)        ((drv_priv)->drv_txqueue_map & (1<<i))
 

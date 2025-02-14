@@ -376,7 +376,7 @@ int cipher2cap(int cipher);
 void batch_dump_reg(struct wiphy *wiphy,unsigned int addr[], unsigned int addr_num);
 void wifi_softap_allsta_stopping(struct wlan_net_vif *wnet_vif, unsigned char is_disconnecting);
 int softap_get_sta_num(struct wlan_net_vif *wnet_vif);
-
+void vm_cfg80211_chan_switch_notify_task(SYS_TYPE param1,SYS_TYPE param2, SYS_TYPE param3,SYS_TYPE param4,SYS_TYPE param5);
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0)
 int vm_cfg80211_set_bitrate_mask(struct wiphy *wiphy,
     struct net_device *dev,
@@ -389,6 +389,5 @@ int vm_cfg80211_set_bitrate_mask(struct wiphy *wiphy,
     const unsigned char *peer,
     const struct cfg80211_bitrate_mask *mask);
 #endif
-
 #endif
 

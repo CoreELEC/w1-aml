@@ -165,6 +165,7 @@ struct wifi_mac_scan_param
     unsigned char *vht_ext_bss_ld;
     unsigned char *vht_quiet_ch;
     unsigned char *vht_opt_md_ntf;
+    unsigned int frame_len;
 };
 
 #define SCANINFO_IE_LENGTH     260
@@ -219,6 +220,7 @@ struct wifi_scan_info
     unsigned char ie_vht_ext_bss_ld[sizeof(struct wifi_mac_ie_vht_ext_bss_ld)];
     unsigned char ie_vht_quiet_ch[sizeof(struct wifi_mac_ie_vht_quiet_chn)];
     unsigned char ie_vht_opt_md_ntf[sizeof(struct wifi_mac_ie_vht_opt_md_ntf)];
+    unsigned int SI_frame_len;
 };
 
 #define WIFINET_SCAN_AGE_NUM 3
@@ -299,6 +301,5 @@ void wifi_mac_update_roaming_candidate_chan(struct wlan_net_vif *wnet_vif,const 
 int wifi_mac_scan_chk_11g_bss(struct wifi_mac_scan_state *ss, struct wlan_net_vif *wnet_vif);
 void is_connect_need_set_gain(struct wlan_net_vif *wnet_vif);
 void wifi_mac_scan_chking_leakap(void * station, struct wifi_frame *wh);
-
-
+struct wifi_channel* wifi_mac_connect_get_target_chan(struct wifi_mac_scan_state *ss, struct wlan_net_vif *wnet_vif);
 #endif /* _WIFI_NET_SCAN_H_ */

@@ -975,10 +975,6 @@ enum tx_frame_flag drv_set_tx_frame_flag(struct sk_buff *skbbuf)
         && (p2p_pub_act->action == WIFINET_ACT_PUBLIC_P2P)) {
         switch (p2p_pub_act->subtype) {
             case P2P_GO_NEGO_REQ:
-            case P2P_GO_NEGO_CONF:
-                ret = TX_P2P_GO_NEGO_REQ_GO_NEGO_CONF;
-                break;
-
             case P2P_GO_NEGO_RESP:
             case P2P_PROVISION_DISC_REQ:
             case P2P_PROVISION_DISC_RESP:
@@ -986,7 +982,9 @@ enum tx_frame_flag drv_set_tx_frame_flag(struct sk_buff *skbbuf)
             case P2P_INVITE_RESP:
                 ret = TX_P2P_OTHER_GO_NEGO_FRAME;
                 break;
-
+            case P2P_GO_NEGO_CONF:
+                ret = TX_P2P_GO_NEGO_CONF;
+                break;
             default:
                 break;
         }
@@ -1018,10 +1016,11 @@ enum tx_frame_flag drv_set_tx_frame_flag(struct sk_buff *skbbuf)
     } else if (WIFINET_IS_ACTION(wh)) {
         if ((p2p_pub_act->category == AML_CATEGORY_BACK) && (p2p_pub_act->action == WIFINET_ACTION_BA_ADDBA_REQUEST)) {
             ret = TX_MGMT_ADDBA_RSP;
+        } else if (p2p_pub_act->action == WIFINET_ACT_PUBLIC_CSA) {
+            ret = TX_MGMT_CSA_ACTION;
         }
     } else if (mac_pkt_info->b_eap) {
         ret = TX_MGMT_EAPOL;
-
     } else if (mac_pkt_info->b_dhcp) {
         ret = TX_MGMT_DHCP;
     }
@@ -1250,7 +1249,7 @@ static void drv_tx_complete_mgmt_handle(struct drv_private *drv_priv,struct drv_
     wnet_vif = sta->sta_wnet_vif;
 
     if ((ptxdesc->txdesc_frame_flag == TX_P2P_OTHER_GO_NEGO_FRAME)
-        || (ptxdesc->txdesc_frame_flag == TX_P2P_GO_NEGO_REQ_GO_NEGO_CONF)
+        || (ptxdesc->txdesc_frame_flag == TX_P2P_GO_NEGO_CONF)
         || (ptxdesc->txdesc_frame_flag == TX_P2P_PRESENCE_REQ)) {
 
         pr_debug("%s, txdesc_frame_flag=%d, status=%d\n", __func__, ptxdesc->txdesc_frame_flag, status);
@@ -1261,7 +1260,7 @@ static void drv_tx_complete_mgmt_handle(struct drv_private *drv_priv,struct drv_
                 sta->sta_wnet_vif->vm_p2p->raw_action_pkt, sta->sta_wnet_vif->vm_p2p->raw_action_pkt_len, txok, GFP_KERNEL);
 
         } else {
-            if (ptxdesc->txdesc_frame_flag == TX_P2P_GO_NEGO_REQ_GO_NEGO_CONF || ptxdesc->txdesc_frame_flag == TX_P2P_PRESENCE_REQ) {
+            if (ptxdesc->txdesc_frame_flag == TX_P2P_GO_NEGO_CONF || ptxdesc->txdesc_frame_flag == TX_P2P_PRESENCE_REQ) {
                 sta->sta_wnet_vif->vm_p2p->action_retry_time = DEFAULT_MGMT_RETRY_INTERVAL;
 
             } else {
@@ -1293,6 +1292,11 @@ static void drv_tx_complete_mgmt_handle(struct drv_private *drv_priv,struct drv_
         }
     }
 #endif
+
+    if (ptxdesc->txdesc_frame_flag == TX_MGMT_CSA_ACTION) {
+        AML_OUTPUT("channel switch announce action frm status=%d, channel:%d\n",status, sta->sta_wmac->wm_curchan->chan_pri_num);
+    }
+
     if ((ptxdesc->txdesc_frame_flag >= TX_MGMT_PROBE_REQ) && !txok) {
         drv_priv->drv_ops.cca_busy_check();
         pr_debug("%s, txdesc_frame_flag:%d, status=%d, rate:%02x\n",

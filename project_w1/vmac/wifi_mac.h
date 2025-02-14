@@ -246,13 +246,16 @@ struct country_na_freq_set
 
 #define  WIFINET_CHAN_MODE_MASK	0xff
 
+#define WIFINET_IS_CHAN_ERR(_c) ((_c) == WIFINET_CHAN_ERR)
+
 #define WIFINET_IS_CHAN_2GHZ(_c) \
-        (((_c)->chan_flags & WIFINET_CHAN_2GHZ) != 0)
+        ((!WIFINET_IS_CHAN_ERR(_c)) && (((_c)->chan_flags & WIFINET_CHAN_2GHZ) != 0))
+
 #define WIFINET_IS_CHAN_5GHZ(_c) \
-        (((_c)->chan_flags & WIFINET_CHAN_5GHZ) != 0)
+        ((!WIFINET_IS_CHAN_ERR(_c)) && (((_c)->chan_flags & WIFINET_CHAN_5GHZ) != 0))
 
 #define WIFINET_IS_CHAN_11N_HT40(_c) \
-        (((_c)->chan_bw == WIFINET_BWC_WIDTH40))
+        ((!WIFINET_IS_CHAN_ERR(_c)) && (((_c)->chan_bw == WIFINET_BWC_WIDTH40)))
 
 #define WIFINET_RATE_SIZE	8
 #define WIFINET_RATE_MAXSIZE	57
@@ -368,6 +371,7 @@ struct wifi_mac_wme_state
 
 struct wifi_mac_beacon_offsets
 {
+    unsigned char *bo_ssid;
     unsigned short *bo_caps;
     unsigned char *bo_rates;
     unsigned char *bo_channel;
@@ -388,9 +392,11 @@ struct wifi_mac_beacon_offsets
     unsigned char *bo_vhtcap;
     unsigned char *bo_obss_scan;
     unsigned char *bo_extcap;
+    unsigned char *bo_ch_sw_wrp;
     unsigned char *bo_vendor_ie[VENDOR_IE_MAX];
     unsigned short bo_chanswitch_trailerlen;
     unsigned short bo_extchanswitch_trailerlen;
+    unsigned short bo_chswwrp_trailerlen;
     unsigned char bo_initial;
     /* beacon sequence number */
     unsigned short bo_bcn_seq;
@@ -1104,6 +1110,8 @@ enum
 };
 
 #define WIFINET_CHANSWITCHANN_BYTES 5
+#define WIFINET_WIDEBANDCHANSW_BYTES 5
+#define WIFINET_EXTCHANSWITCHANN_BYTES 6
 
 struct wifi_mac_tim_ie
 {
@@ -1414,7 +1422,10 @@ struct wifi_mac_ie_vht_ch_sw_wrp
 /*
  * 802.11ac Wide Bandwidth Channel Switch Element
  */
-
+enum wifi_mac_new_channel_width {
+    NEW_CHANNEL_BANDWIDTH40 = 0,
+    NEW_CHANNEL_BANDWIDTH80 = 1,
+};
 
 struct wifi_mac_ie_vht_wide_bw_switch {
     unsigned char    elem_id;

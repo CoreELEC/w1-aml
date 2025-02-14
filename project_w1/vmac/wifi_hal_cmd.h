@@ -90,5 +90,4 @@ unsigned int hal_cfg_txpwr_cffc_param(void * chan, void * txpwr_plan);
 unsigned char get_s8_item(char *varbuf, int len, char *item, char *item_value);
 unsigned char get_s16_item(char *varbuf, int len, char *item, short *item_value);
 unsigned char get_s32_item(char *varbuf, int len, char *item, unsigned int *item_value);
-
 #endif  //__AML_PHY_H__

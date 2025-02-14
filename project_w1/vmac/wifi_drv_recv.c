@@ -54,7 +54,7 @@ int drv_rx_addbareq(struct drv_private *drv_priv, void *nsta, unsigned char dial
     unsigned short tid_index = baparamset->tid;
     struct drv_rx_scoreboard *RxTidState  = &drv_sta->rx_scb[tid_index];
 
-    DRV_RXTID_LOCK(RxTidState);
+    DRV_RXTID_LOCK_BH(RxTidState);
 
     if (!drv_priv->drv_config.cfg_rxaggr)
     {
@@ -108,7 +108,7 @@ int drv_rx_addbareq(struct drv_private *drv_priv, void *nsta, unsigned char dial
     RxTidState->baparamset.amsdusupported = WIFINET_BA_AMSDU_SUPPORTED;
     RxTidState->baparamset.tid           = tid_index;
 
-    DRV_RXTID_UNLOCK(RxTidState);
+    DRV_RXTID_UNLOCK_BH(RxTidState);
     return 0;
 }
 
@@ -176,13 +176,13 @@ drv_rx_bar(struct drv_private *drv_priv, struct aml_driver_nsta *drv_sta,  struc
     tid_index = (bar->i_ctl & WIFINET_BAR_CTL_TID_M) >> WIFINET_BAR_CTL_TID_S;
     seqnum = le16toh(bar->i_seq) >> WIFINET_SEQ_SEQ_SHIFT;
     RxTidState = &drv_sta->rx_scb[tid_index];
-    DRV_RXTID_LOCK(RxTidState);
+    DRV_RXTID_LOCK_BH(RxTidState);
     index = DRV_BA_INDEX(RxTidState->seq_next, seqnum);
 
     if ((index > RxTidState->baw_size) &&
         (index > (WIFINET_SEQ_MAX - (RxTidState->baw_size << 2))))
     {
-        DRV_RXTID_UNLOCK(RxTidState);
+        DRV_RXTID_UNLOCK_BH(RxTidState);
         drv_priv->drv_stats.rx_bardrop_cnt++;
         os_skb_free(skbbuf);
         return WIFINET_FC0_TYPE_CTL;
@@ -217,7 +217,7 @@ drv_rx_bar(struct drv_private *drv_priv, struct aml_driver_nsta *drv_sta,  struc
         CIRCLE_Add_One(RxTidState->baw_head, DRV_TID_MAX_BUFS);
         CIRCLE_Add_One(RxTidState->seq_next, WIFINET_SEQ_MAX);
     }
-    DRV_RXTID_UNLOCK(RxTidState);
+    DRV_RXTID_UNLOCK_BH(RxTidState);
     os_skb_free(skbbuf);
     return WIFINET_FC0_TYPE_CTL;
 }
@@ -233,7 +233,6 @@ int drv_rx_input( struct drv_private *drv_priv, void *nsta,
     unsigned char type, subtype;
     int b_mcast, tid, index, desc_id, rxdiff, is4addr;
     unsigned short rxseq;
-    unsigned long lockflags;
     struct aml_driver_nsta *drv_sta = (struct aml_driver_nsta *)nsta;
 
     wh = (struct wifi_frame *)os_skb_data(skbbuf);
@@ -278,10 +277,10 @@ int drv_rx_input( struct drv_private *drv_priv, void *nsta,
     }
     RxTidState = &drv_sta->rx_scb[tid];
 
-    DRV_RXTID_LOCK_IRQ(RxTidState,lockflags);
+    DRV_RXTID_LOCK_BH(RxTidState);
     if (!RxTidState->rx_addba_exchangecomplete)
     {
-        DRV_RXTID_UNLOCK_IRQ(RxTidState,lockflags);
+        DRV_RXTID_UNLOCK_BH(RxTidState);
         drv_priv->drv_stats.rx_nonqos_cnt++;
         return drv_priv->net_ops->wifi_mac_input(drv_sta->net_nsta, skbbuf, rs);
     }
@@ -297,7 +296,7 @@ int drv_rx_input( struct drv_private *drv_priv, void *nsta,
 
     if (index > (WIFINET_SEQ_MAX - (RxTidState->baw_size << 2)))
     {
-        DRV_RXTID_UNLOCK_IRQ(RxTidState,lockflags);
+        DRV_RXTID_UNLOCK_BH(RxTidState);
         os_skb_free(skbbuf);
         return WIFINET_FC0_TYPE_DATA;
     }
@@ -326,7 +325,7 @@ int drv_rx_input( struct drv_private *drv_priv, void *nsta,
 
     if (pRxDesc->rx_wbuf != NULL)
     {
-        DRV_RXTID_UNLOCK_IRQ(RxTidState,lockflags);
+        DRV_RXTID_UNLOCK_BH(RxTidState);
         drv_priv->drv_stats.rx_dup_cnt++;
         
         os_skb_free(skbbuf);
@@ -371,8 +370,7 @@ int drv_rx_input( struct drv_private *drv_priv, void *nsta,
     {
         os_timer_ex_cancel(&RxTidState->timer, CANCEL_NO_SLEEP);
     }
-    DRV_RXTID_UNLOCK_IRQ(RxTidState,lockflags);
-
+    DRV_RXTID_UNLOCK_BH(RxTidState);
     return WIFINET_FC0_TYPE_DATA;
 }
 
@@ -388,9 +386,8 @@ static void drv_rx_sort_timer_ex(SYS_TYPE param1, SYS_TYPE param2,
     int count = 0;
     unsigned long diff;
     int bawhead;
-    unsigned long lockflags;
 
-    DRV_RXTID_LOCK_IRQ(RxTidState,lockflags);
+    DRV_RXTID_LOCK_BH(RxTidState);
     bawhead = RxTidState->baw_head;
     while (bawhead != RxTidState->baw_tail)
     {
@@ -429,7 +426,7 @@ static void drv_rx_sort_timer_ex(SYS_TYPE param1, SYS_TYPE param2,
 
     if (RxTidState->baw_head != RxTidState->baw_tail)
         os_timer_ex_start(&RxTidState->timer);
-    DRV_RXTID_UNLOCK_IRQ(RxTidState,lockflags);
+    DRV_RXTID_UNLOCK_BH(RxTidState);
 }
 
 static int drv_rx_sort_timer(void *context)

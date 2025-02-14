@@ -19,7 +19,7 @@
 enum tx_frame_flag
 {
     TX_OTHER_FRAME = 0,
-    TX_P2P_GO_NEGO_REQ_GO_NEGO_CONF = 1,
+    TX_P2P_GO_NEGO_CONF = 1,
     TX_P2P_OTHER_GO_NEGO_FRAME = 2,
     TX_P2P_PRESENCE_REQ = 3,
 #ifdef CTS_VERIFIER_GAS
@@ -33,6 +33,7 @@ enum tx_frame_flag
     TX_MGMT_DHCP = 10,
     TX_MGMT_DEAUTH = 11,
     TX_MGMT_DISASSOC = 12,
+    TX_MGMT_CSA_ACTION = 14,
 };
 
 struct wifi_mac_pkt_info
@@ -63,7 +64,7 @@ struct wifi_drv_pkt_info
 struct drv_txdesc
 {
     struct list_head txdesc_queue; // drv_priv->txdesc_bufptr->txdesc_queue : to queue all descriptors
-    										              //-> drv_tx_descr_1->..->drv_tx_descr_n.
+                                   //-> drv_tx_descr_1->..->drv_tx_descr_n.
     struct drv_txdesc *txdesc_queue_last;
     struct drv_txdesc *txdesc_queue_lastframe;
     struct drv_txdesc *txdesc_queue_next;     /* next subframe in the aggregate */

@@ -203,7 +203,7 @@ void    wifi_mac_pwrsave_wakeup_for_tx (struct wlan_net_vif *wnet_vif);
 
 void wifi_mac_pwrsave_set_tim(struct wifi_station *sta, int set);
 void wifi_mac_pwrsave_restore_sleep(struct wlan_net_vif *wnet_vif);
-void wifi_mac_pwrsave_sleep_wait_cancle (struct wlan_net_vif *wnet_vif);
+void wifi_mac_pwrsave_sleep_wait_cancel (struct wlan_net_vif *wnet_vif);
 int wifi_mac_pwrsave_wkup_and_NtfyAp (struct wlan_net_vif *wnet_vif, enum wifinet_ps_wk_reason reason);
 int wifi_mac_pwrsave_fullsleep(struct wlan_net_vif *wnet_vif, enum wifinet_ps_sleep_reason reason);
 int wifi_mac_pwrsave_wakeup(struct wlan_net_vif *wnet_vif, enum wifinet_ps_wk_reason reason);
@@ -249,4 +249,5 @@ int wifi_mac_pwrsave_wow_check(struct wlan_net_vif *wnet_vif);
 void  wifi_mac_pwrsave_sleep_wait_ex(SYS_TYPE param1,
         SYS_TYPE param2,SYS_TYPE param3,SYS_TYPE param4,SYS_TYPE param5);
 void wifi_mac_send_nulldata_retry(void * data);
+unsigned char sta_find_in_sta_tbl(struct wifi_station *find_sta);
 #endif /* _NET80211_IEEE80211_POWER_H_ */

@@ -692,6 +692,7 @@ void wifi_mac_scan_rx(struct wlan_net_vif *wnet_vif, const struct wifi_mac_scan_
     }
 
     ise = &se->scaninfo;
+    ise->SI_frame_len = sp->frame_len;
     if (sp->rsn != NULL) {
         saveie(&ise->SI_rsn_ie[0], sp->rsn);
 
@@ -775,7 +776,9 @@ void wifi_mac_scan_rx(struct wlan_net_vif *wnet_vif, const struct wifi_mac_scan_
     saveie(&ise->SI_htinfo_ie[0], sp->htinfo);
     saveie(&ise->SI_country_ie[0], sp->country);
     saveie(&ise->SI_wpa_ie[0], sp->wpa);
-    saveie(&ise->SI_wps_ie[0], sp->wps);
+    if (sp->wps != NULL) {
+        saveie(&ise->SI_wps_ie[0], sp->wps);
+    }
 
     if (se->connectcnt && ((jiffies - se->ConnectTime) > WIFINET_CONNECT_CNT_AGE*HZ)) {
         se->connectcnt = 0;
@@ -797,12 +800,15 @@ void wifi_mac_scan_rx(struct wlan_net_vif *wnet_vif, const struct wifi_mac_scan_
 
     hash = STA_HASH(macaddr);
 
-    WIFI_SCAN_SE_LIST_LOCK(st);
     if (oldse == NULL) {
+        /* Need lock here, because when 'olsde' is NULL, this
+         * function was called with unlocked list.
+         */
+        WIFI_SCAN_SE_LIST_LOCK(st);
         list_add(&se->se_hash, &st->st_hash[hash]);
         list_add_tail(&se->se_list, &st->st_entry);
+        WIFI_SCAN_SE_LIST_UNLOCK(st);
     }
-    WIFI_SCAN_SE_LIST_UNLOCK(st);
 
     for (i=0; i<ss->ss_nssid; i++) {
         if (sp->ssid && sp->ssid[1] > 0 && sp->ssid[1] <= WIFINET_NWID_LEN) {
@@ -820,15 +826,14 @@ void wifi_mac_scan_rx(struct wlan_net_vif *wnet_vif, const struct wifi_mac_scan_
     return;
 
 fail:
-     WIFI_SCAN_SE_LIST_LOCK(st);
-     if (se != NULL && oldse != NULL) {
-     if (WIFINET_ADDR_EQ(se, oldse)) {
-         list_del_init(&se->se_list);
-         list_del_init(&se->se_hash);
-         pr_debug("[Micro]%s_%d,delete oldse\n", __func__, __LINE__);
-     }
+    if (oldse) {
+        /* We failed to update some existing entry. Remove it from
+         * list before freeing memory. We don't need lock here,
+         * because list is locked by caller!
+         */
+        list_del_init(&se->se_list);
+        list_del_init(&se->se_hash);
     }
-     WIFI_SCAN_SE_LIST_UNLOCK(st);
     FREE(se,"sta_add.se");
     pr_debug("[Micro]%s_%d\n", __func__, __LINE__);
     return;
@@ -1694,6 +1699,7 @@ void wifi_mac_end_scan( struct wifi_mac_scan_state *ss)
             if (P2P_NoA_START_FLAG(connect_wnet->vm_p2p->HiP2pNoaCountNow)) {
                 p2p_noa_start_irq(connect_wnet->vm_p2p, wifimac->drv_priv);
             }
+            connect_wnet->vm_p2p->HiP2pNoaCountNow = 0;
         }
     } else {
         wifimac->drv_priv->stop_noa_flag = 0;
@@ -1918,7 +1924,8 @@ void wifi_mac_notify_pkt_clear(struct wifi_mac *wifimac) {
 
     if (wifimac->wm_nrunning == 2) {
         #ifdef  CONFIG_CONCURRENT_MODE
-            if (wifimac->wm_vsdb_flags & CONCURRENT_NOTIFY_AP_SUCCESS) {
+            if ((wifimac->wm_vsdb_flags & CONCURRENT_NOTIFY_AP_SUCCESS)
+                 || (wifimac->wm_vsdb_flags & CONCURRENT_AP_SWITCH_CHANNEL)) {
                 if (drv_priv->hal_priv->hal_ops.hal_tx_empty()) {
                     concurrent_vsdb_do_channel_change(wifimac);
                 }
@@ -1980,7 +1987,7 @@ int vm_scan_user_set_chan(struct wlan_net_vif *wnet_vif,
                     }
                 }
 
-                if (c->chan_cfreq1 != request->channels[j]->center_freq && !vm_is_p2p_connect_scan(wnet_vif, request)) {
+                if (c->chan_cfreq1 != request->channels[j]->center_freq) {
                     continue;
                 }
 
@@ -2114,9 +2121,7 @@ int wifi_mac_chk_scan(struct wlan_net_vif *wnet_vif, int flags,
         AML_OUTPUT("vid:%d, wm_flags:0x%08x, scan_CfgFlags:0x%08x, ss_flag:0x%08x, next_chn:%d, last_chn:%d\n",
                    wnet_vif->wnet_vif_id, wifimac->wm_flags, ss->scan_CfgFlags, ss->scan_StateFlags,
                    ss->scan_next_chan_index, ss->scan_last_chan_index);
-        ss->scan_StateFlags |= SCANSTATE_F_CANCEL;
-        wifi_mac_scan_timeout((SYS_TYPE)wifimac->wm_scan, (SYS_TYPE)ss->VMacPriv, 0, 0, (SYS_TYPE)wifimac->wm_scanplayercnt);
-        ss->scan_StateFlags = 0;
+        return 0;
     }
 
     ss->scan_CfgFlags |= WIFINET_SCANCFG_CONNECT;
@@ -2286,4 +2291,35 @@ void wifi_mac_process_tx_error(struct wlan_net_vif *wnet_vif)
         wifi_mac_scan_end(wifimac);
         AML_OUTPUT("simulate scan end\n");
     }
+}
+
+struct wifi_channel*
+wifi_mac_connect_get_target_chan(struct wifi_mac_scan_state *ss, struct wlan_net_vif *wnet_vif)
+{
+    struct scaninfo_table *st = ss->ScanTablePriv;
+    struct scaninfo_entry *se = NULL;
+    struct scaninfo_entry *se_next = NULL;
+    struct wifi_channel* target_chan = NULL;
+
+    WIFI_SCAN_SE_LIST_LOCK(st);
+    list_for_each_entry_safe(se, se_next, &st->st_entry, se_list)
+    {
+        DPRINTF(AML_DEBUG_CONNECT, "se:0x%p, st_entry:0x%p\n", se, &st->st_entry);
+
+        if (WIFINET_ADDR_EQ(wnet_vif->vm_des_bssid, se->scaninfo.SI_bssid)
+            && match_ssid(se->scaninfo.SI_ssid, 1, wnet_vif->vm_des_ssid))
+        {
+            target_chan = se->scaninfo.SI_chan;
+
+            if (target_chan != NULL) {
+                AML_OUTPUT("pri_chan_num:%d, center_chan_num:%d, bw:%d",target_chan->chan_pri_num,
+                            wifi_mac_Mhz2ieee(target_chan->chan_cfreq1, 0), target_chan->chan_bw);
+                WIFI_SCAN_SE_LIST_UNLOCK(st);
+                return target_chan;
+            }
+        }
+    }
+    WIFI_SCAN_SE_LIST_UNLOCK(st);
+
+    return target_chan;
 }

@@ -327,7 +327,7 @@ struct tx_power_plan tx_power_plan_list[] = {
 };
 
 struct country_chan_plan country_chan_plan_list[] = {
-    /* 0x00 */ {17, {81,82,83,84,115,116,117,118,119,120,121,122,123,125,126,127,128}, 0xff, DFS_5G_B2|DFS_5G_B3|DFS_5G_B4|PASSIVE_2G_12_14, TX_POWER_DEFAULT}, //Worldwide
+    /* 0x00 */ {17, {81,82,83,84,115,116,117,118,119,120,121,122,123,125,126,127,128}, 0xff, DFS_5G_B2|DFS_5G_B3|PASSIVE_2G_12_14, TX_POWER_DEFAULT}, //Worldwide
     /* 0x01 */ {13, {81,83,84,115,116,117,118,119,120,125,126,127,128,0,0,0,0},       0x00, DFS_5G_B2,           TX_POWER_SRRC}, //China
     /* 0x02 */ {16, {81,83,84,115,116,117,118,119,120,121,122,123,125,126,127,128,0}, 0x01, DFS_5G_B2|DFS_5G_B3, TX_POWER_FCC}, //United States of America
     /* 0x03 */ {14, {81,83,84,115,116,117,118,119,120,121,122,123,125,128,0,0,0},     0x02, DFS_5G_B2|DFS_5G_B3, TX_POWER_CE}, //Europe
@@ -606,6 +606,35 @@ struct country_chan_mapping  country_chan_mapping_list[] = {
     {"ZW", 0x16}  /* Zimbabwe */
 };
 
+struct country_chan_mapping  southamerica_country[] = {
+    {"AR", 0x14}, /* Argentina */
+    {"BO", 0x0E}, /* Bolivia */
+    {"BR", 0x0C}, /* Brazil */
+    {"CL", 0x01}, /* Chile */
+    {"CO", 0x07}, /* Colombia */
+    {"EC", 0x0C}, /* Ecuador */
+    {"FK", 0x04}, /* Falkland Islands (Islas Malvinas) (UK) */
+    {"GF", 0x04}, /* French Guiana */
+    {"GY", 0x00}, /* Guyana */
+    {"PY", 0x02}, /* Paraguay */
+    {"PE", 0x10}, /* Peru */
+    {"SR", 0x00}, /* Suriname */
+    {"UY", 0x0A}, /* Uruguay */
+    {"VE", 0x0E}, /* Venezuela */
+};
+
+unsigned char if_southamerica_country(unsigned char *countrycode) {
+    unsigned char index;
+
+    for (index = 0; index < (sizeof(southamerica_country) / sizeof(southamerica_country[0])); index++) {
+        if ((southamerica_country[index].country[0] == countrycode[0])
+            && (southamerica_country[index].country[1] == countrycode[1])) {
+            return index + 1;
+        }
+    }
+
+    return 0;
+}
 
 static int  wifi_mac_get_pos(struct wifi_channel in[], int a, int b)
 {
@@ -1251,8 +1280,9 @@ void wifi_mac_set_wnet_vif_chan_ex(SYS_TYPE param1,SYS_TYPE param2, SYS_TYPE par
     struct wifi_mac *wifimac = (struct wifi_mac * )param1;
     struct wifi_channel *wnet_vif_chan = (struct wifi_channel * )param2;
     struct wlan_net_vif *wnet_vif = (struct wlan_net_vif *)param3;
+    unsigned char channel_switch_flag = (unsigned char)param4;
 
-    wifi_mac_ChangeChannel(wifimac, wnet_vif_chan, 3, wnet_vif->wnet_vif_id, wnet_vif->vm_opmode);
+    wifi_mac_ChangeChannel(wifimac, wnet_vif_chan, channel_switch_flag, wnet_vif->wnet_vif_id, wnet_vif->vm_opmode);
 }
 
 struct wifi_channel * wifi_mac_get_wm_chan (struct wifi_mac *wifimac)
@@ -1268,7 +1298,8 @@ struct wifi_channel * wifi_mac_get_wm_chan (struct wifi_mac *wifimac)
     }
 }
 
-int wifi_mac_set_wnet_vif_channel(struct wlan_net_vif *wnet_vif,  int chan, int bw, int center_chan)
+int wifi_mac_set_wnet_vif_channel(struct wlan_net_vif *wnet_vif,  int chan,
+                                 int bw, int center_chan, unsigned char switch_flag)
 {
     struct wifi_mac *wifimac = wnet_vif->vm_wmac;
     struct wifi_channel * c = NULL;
@@ -1282,11 +1313,14 @@ int wifi_mac_set_wnet_vif_channel(struct wlan_net_vif *wnet_vif,  int chan, int 
         return false;
     }
 
+    wnet_vif->vm_curchan = c;
+
     DPRINTF(AML_DEBUG_ERROR, "%s(%d),chan_pri_num =%d, chan_cfreq1 =%d,chan_flags =0x%x\n",
         __func__,__LINE__, c->chan_pri_num, c->chan_cfreq1, c->chan_flags);
-    wnet_vif->vm_curchan = c;
+
     wifi_mac_add_work_task(wnet_vif->vm_wmac, wifi_mac_set_wnet_vif_chan_ex, NULL,
-        (SYS_TYPE)(wnet_vif->vm_wmac), (SYS_TYPE)c, (SYS_TYPE)wnet_vif, 0, 0);
+        (SYS_TYPE)(wnet_vif->vm_wmac), (SYS_TYPE)c, (SYS_TYPE)wnet_vif, (SYS_TYPE)switch_flag, 0);
+
     return true;
 }
 
@@ -1311,6 +1345,7 @@ void wifi_mac_restore_wnet_vif_channel(struct wlan_net_vif *wnet_vif)
     struct wifi_mac *wifimac = wnet_vif->vm_wmac;
     struct drv_private* drv_priv = wifimac->drv_priv;
     struct wlan_net_vif *selected_wnet_vif = NULL;
+    struct wlan_net_vif *p2p_vmac = wifimac->drv_priv->drv_wnet_vif_table[NET80211_P2P_VMAC];
 
     if (wifimac->wm_nrunning > 1)
     {
@@ -1344,7 +1379,16 @@ void wifi_mac_restore_wnet_vif_channel(struct wlan_net_vif *wnet_vif)
     if ((selected_wnet_vif->vm_curchan != WIFINET_CHAN_ERR) && (wifimac->wm_curchan != selected_wnet_vif->vm_curchan)) {
         DPRINTF(AML_DEBUG_SCAN, "%s vid:%d, prichan:%d, bw:%d\n",  __func__, selected_wnet_vif->wnet_vif_id,
             selected_wnet_vif->vm_curchan->chan_pri_num, selected_wnet_vif->vm_curchan->chan_bw);
-        wifi_mac_ChangeChannel(wifimac, selected_wnet_vif->vm_curchan, 1, selected_wnet_vif->wnet_vif_id, selected_wnet_vif->vm_opmode);
+        if (wifimac->wm_flags & WIFINET_F_SCAN
+            && IS_APSTA_CONCURRENT(aml_wifi_get_con_mode())
+            && concurrent_check_vmac_is_AP(wifimac)
+            && (wnet_vif->vm_opmode == WIFINET_M_STA)
+            && (p2p_vmac->vm_state == WIFINET_S_CONNECTED)
+            && concurrent_check_is_vmac_same_pri_channel(wifimac)) {
+            wifi_mac_ChangeChannel(wifimac, selected_wnet_vif->vm_curchan, 1, selected_wnet_vif->wnet_vif_id, p2p_vmac->vm_opmode);
+        } else {
+            wifi_mac_ChangeChannel(wifimac, selected_wnet_vif->vm_curchan, 1, selected_wnet_vif->wnet_vif_id, selected_wnet_vif->vm_opmode);
+        }
     }
 
     wifi_mac_set_channel_rssi(wifimac, (unsigned char)(selected_wnet_vif->vm_mainsta->sta_avg_bcn_rssi));
@@ -1490,4 +1534,163 @@ int update_tx_power_band(int tx_power_plan, unsigned short pwr_value[])
     }
 
     return 0;
+}
+
+unsigned char wifi_mac_p2p_home_channel_enabled(struct wlan_net_vif *wnet_vif)
+{
+    struct wifi_mac *wifimac = wnet_vif->vm_wmac;
+
+    return ((wnet_vif->vm_p2p->p2p_role == NET80211_P2P_ROLE_GO)
+        && (wifimac->wm_p2p_home_channel != 0));
+}
+
+bool wifi_mac_get_chandef(struct wifi_channel *vmac_chan, struct cfg80211_chan_def *chandef)
+{
+    unsigned int index = 0;
+
+    if (vmac_chan == WIFINET_CHAN_ERR)
+    {
+        ERROR_DEBUG_OUT("vmac_chan is WIFINET_CHAN_ERR\n");
+        return false;
+    }
+
+    if (vmac_chan->chan_pri_num >= 1 && vmac_chan->chan_pri_num <= 14) {
+        chandef->chan = &aml_2ghz_channels[vmac_chan->chan_pri_num - 1];
+    } else if (vmac_chan->chan_pri_num >= 36) {
+        for (index = 0; index < AML_5G_CHANNELS_NUM; index++) {
+            if (aml_5ghz_channels[index].hw_value == vmac_chan->chan_pri_num) {
+                chandef->chan = &aml_5ghz_channels[index];
+                break;
+            }
+        }
+    }
+
+    if (!chandef->chan) {
+        ERROR_DEBUG_OUT("not find ieee chan pri_num:%d\n", vmac_chan->chan_pri_num);
+        return false;
+    }
+
+    if (vmac_chan->chan_bw == WIFINET_BWC_WIDTH20) {
+        chandef->width = NL80211_CHAN_WIDTH_20;
+    } else if (vmac_chan->chan_bw == WIFINET_BWC_WIDTH40) {
+        chandef->width = NL80211_CHAN_WIDTH_40;
+    } else if (vmac_chan->chan_bw == WIFINET_BWC_WIDTH80) {
+        chandef->width = NL80211_CHAN_WIDTH_80;
+    } else {
+        ERROR_DEBUG_OUT("station chan_bw  do not support\n");
+    }
+
+    chandef->center_freq1 = vmac_chan->chan_cfreq1;
+
+    return true;
+}
+
+unsigned char wifi_mac_get_operation_class(struct cfg80211_chan_def chandef)
+{
+    unsigned char vht_opclass = 0;
+    unsigned int freq = chandef.center_freq1;
+    unsigned char ret = 0;
+
+    if (freq >= 2412 && freq <= 2472) {
+        if (chandef.width > NL80211_CHAN_WIDTH_40)
+            return ret;
+
+        /* 2.407 GHz, channels 1..13 */
+        if (chandef.width == NL80211_CHAN_WIDTH_40) {
+            if (freq > chandef.chan->center_freq)
+                ret = 83; /* HT40+ */
+            else
+                ret = 84; /* HT40- */
+        } else {
+            ret = 81;
+        }
+
+        return ret;
+    }
+
+    if (freq == 2484) {
+        /* channel 14 is only for IEEE 802.11b */
+        if (chandef.width != NL80211_CHAN_WIDTH_20_NOHT)
+            return ret;
+        ret = 82; /* channel 14 */
+        return ret;
+    }
+
+    /* 5 GHz, channels 36..48 */
+    if (freq >= 5180 && freq <= 5240) {
+        if (vht_opclass) {
+            ret = vht_opclass;
+        } else if (chandef.width == NL80211_CHAN_WIDTH_40) {
+            if (freq > chandef.chan->center_freq)
+                ret = 116;
+            else
+                ret = 117;
+        } else {
+            ret = 115;
+        }
+
+        return ret;
+    }
+
+    /* 5 GHz, channels 52..64 */
+    if (freq >= 5260 && freq <= 5320) {
+        if (vht_opclass) {
+            ret = vht_opclass;
+        } else if (chandef.width == NL80211_CHAN_WIDTH_40) {
+            if (freq > chandef.chan->center_freq)
+                ret = 119;
+            else
+                ret = 120;
+        } else {
+            ret = 118;
+        }
+
+        return ret;
+    }
+
+    /* 5 GHz, channels 100..144 */
+    if (freq >= 5500 && freq <= 5720) {
+        if (vht_opclass) {
+            ret = vht_opclass;
+        } else if (chandef.width == NL80211_CHAN_WIDTH_40) {
+            if (freq > chandef.chan->center_freq)
+                ret = 122;
+            else
+                ret = 123;
+        } else {
+            ret = 121;
+        }
+
+        return ret;
+    }
+
+    /* 5 GHz, channels 149..169 */
+    if (freq >= 5745 && freq <= 5845) {
+        if (vht_opclass) {
+            ret = vht_opclass;
+        } else if (chandef.width == NL80211_CHAN_WIDTH_40) {
+            if (freq > chandef.chan->center_freq)
+                ret = 126;
+            else
+                ret = 127;
+        } else if (freq <= 5805) {
+            ret = 124;
+        } else {
+            ret = 125;
+        }
+
+        return ret;
+    }
+
+    /* 56.16 GHz, channel 1..4 */
+    if (freq >= 56160 + 2160 * 1 && freq <= 56160 + 2160 * 6) {
+        if (chandef.width >= NL80211_CHAN_WIDTH_40)
+            return ret;
+
+        ret = 180;
+        return ret;
+    }
+
+    /* not supported yet */
+    return ret;
 }

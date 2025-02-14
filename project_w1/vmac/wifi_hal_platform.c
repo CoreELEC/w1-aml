@@ -927,6 +927,21 @@ unsigned int aml_wifi_get_con_mode(void)
     return con_mode;
 }
 
+void aml_wifi_set_con_mode(void *wifimac)
+{
+    unsigned int concurrent_mode = 0;
+    struct drv_private *drv_priv = ((struct wifi_mac *)wifimac)->drv_priv;
+    struct wlan_net_vif *main_vmac = drv_priv->drv_wnet_vif_table[NET80211_MAIN_VMAC];
+    struct wlan_net_vif *p2p_vmac = drv_priv->drv_wnet_vif_table[NET80211_P2P_VMAC];
+
+    concurrent_mode = BIT(main_vmac->vm_opmode) | BIT(p2p_vmac->vm_opmode);
+    if (con_mode != concurrent_mode) {
+        con_mode = concurrent_mode;
+        AML_OUTPUT("con_mode = 0x%02x",con_mode);
+    }
+
+}
+
 char *aml_wifi_get_bus_type(void)
 {
     return hif_type;

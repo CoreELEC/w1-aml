@@ -141,11 +141,26 @@ struct wifi_mac_pub_gas_act_frame
 enum WIFINET_PUBLIC_ACTION
 {
     WIFINET_ACT_PUBLIC_BSSCOEXIST = 0,
+    WIFINET_ACT_PUBLIC_CSA = 4,
     WIFINET_ACT_PUBLIC_MP = 7,
     WIFINET_ACT_PUBLIC_P2P = 9,
     WIFINET_ACT_PUBLIC_GAS_REQ = 10,
     WIFINET_ACT_PUBLIC_GAS_RSP = 11,
 };
+
+struct wifi_mac_ie_csa
+{
+    unsigned char chan_switch_mode;
+    unsigned char new_operation_class;
+    unsigned char new_chan_num;
+    unsigned char chan_switch_count;
+}__packed;
+
+struct wifi_mac_action_csa_frame
+{
+    struct wifi_mac_action ac_header;
+    struct wifi_mac_ie_csa csa;
+} __packed;
 
 #define OUI_TYPE_P2P            0x09
 #define OUI_TYPE_DPP            0x1a

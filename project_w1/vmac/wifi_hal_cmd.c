@@ -299,7 +299,7 @@ unsigned int phy_set_bcn_buf(unsigned char wnet_vif_id,unsigned char *pBeacon,
     unsigned int BcnAddr = hif->hw_config.beaconframeaddress;
     struct TxDescPage *pbeacon_s = (struct TxDescPage *)buffer;
     struct OtherTxPage  *other_page = NULL;
-    int total_len = len + sizeof(struct TxDescPage) -1 + FCS_LEN;
+    int total_valid_len = len + sizeof(struct TxDescPage) - 1; /*not include fcs len*/
     /* beacon len per page */
     int firstpagelen = 0, otherpagelen = 0;
 
@@ -312,7 +312,7 @@ unsigned int phy_set_bcn_buf(unsigned char wnet_vif_id,unsigned char *pBeacon,
     memcpy(pbeacon_s->txdata,  pBeacon,  len);
 
     /* build page flag */
-    if (total_len <= PAGE_LEN) {
+    if (total_valid_len <= PAGE_LEN) {
         /* set firstpagelen and otherpagelen to 0 to be flag */
         firstpagelen = otherpagelen = 0;
         pbeacon_s->BufferInfo.MPDUBufFlag = 0;
@@ -439,7 +439,7 @@ unsigned int phy_set_bcn_buf(unsigned char wnet_vif_id,unsigned char *pBeacon,
     if (otherpagelen == 0)
     {
         hif->hif_ops.hi_write_sram((unsigned char*)(SYS_TYPE)buffer,
-            (unsigned char*)(SYS_TYPE)BcnAddr, total_len);
+            (unsigned char*)(SYS_TYPE)BcnAddr, total_valid_len);
     }
     else
     {
@@ -2215,7 +2215,6 @@ unsigned int hal_cfg_cali_param(void)
 
     return true;
 }
-
 
 #ifdef HAL_SIM_VER
 #ifdef FW_NAME

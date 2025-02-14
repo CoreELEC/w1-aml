@@ -27,4 +27,7 @@ void wifi_mac_process_beacon_miss_ex(SYS_TYPE arg);
 int wifi_mac_set_beacon_miss_ex(struct wlan_net_vif *wnet_vif, unsigned char enable, int period);
 void wifi_mac_set_beacon_miss(SYS_TYPE param1,             SYS_TYPE param2,SYS_TYPE param3, SYS_TYPE param4,SYS_TYPE param5);
 int wifi_mac_set_vsdb(SYS_TYPE param1,         SYS_TYPE param2,SYS_TYPE param3, SYS_TYPE param4,SYS_TYPE param5);
-
+void wifi_mac_beacon_update_csaie(struct wifi_station *sta,
+                           struct wifi_mac_beacon_offsets *bo, struct sk_buff *skb, struct wifi_channel *switch_chan);
+void wifi_mac_set_vsdb_task(struct wifi_mac *wifimac, struct wlan_net_vif *wnet_vif, enum VsdbState state);
+void wifi_mac_set_vsdb_task(struct wifi_mac *wifimac, struct wlan_net_vif *wnet_vif, enum VsdbState state);
