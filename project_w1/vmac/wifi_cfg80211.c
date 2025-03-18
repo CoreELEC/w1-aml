@@ -7174,6 +7174,13 @@ void batch_dump_reg(struct wiphy *wiphy,unsigned int addr[], unsigned int addr_n
 
 }
 
+/******************************************************************************
+ * CFG80211
+ *****************************************************************************/
+#if defined(IEEE80211_MLD_MAX_NUM_LINKS)
+  #define CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT 1
+#endif
+
 static void aml_cfg80211_ch_switch_notify(struct net_device *dev,
     struct cfg80211_chan_def *chandef, unsigned int link_id)
 {
