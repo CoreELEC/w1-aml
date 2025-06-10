@@ -7189,7 +7189,7 @@ static void aml_cfg80211_ch_switch_notify(struct net_device *dev,
     || (CONFIG_AMLOGIC_KERNEL_VERSION == 14515 && AML_KERNEL_VERSION >= 12) ) )\
     || (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0) && LINUX_VERSION_CODE < KERNEL_VERSION(6, 9, 0))
     return cfg80211_ch_switch_notify(dev, chandef, link_id, 0);
-#elif defined (CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT)
+#elif  (defined (CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT)) || (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 19, 2))
     return cfg80211_ch_switch_notify(dev, chandef, link_id);
 #else
     return cfg80211_ch_switch_notify(dev, chandef);
@@ -7204,8 +7204,10 @@ static void aml_cfg80211_ch_switch_started_notify(struct net_device *dev,
     || (CONFIG_AMLOGIC_KERNEL_VERSION == 14515 && AML_KERNEL_VERSION >= 12) ) )\
     || (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0) && LINUX_VERSION_CODE < KERNEL_VERSION(6, 9, 0))
     return cfg80211_ch_switch_started_notify(dev, chandef, link_id, count, quiet, 0);
-#elif defined (CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT)
+#elif (defined (CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT)) || (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0))
     return cfg80211_ch_switch_started_notify(dev, chandef, link_id, count, quiet);
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0))
+    return cfg80211_ch_switch_started_notify(dev, chandef, count, quiet);
 #else
     return cfg80211_ch_switch_started_notify(dev, chandef, count);
 #endif
