@@ -43,7 +43,7 @@ void hif_init_ops(void)
 {
     struct amlw_hif_ops* ops = &g_hw_interface.hif_ops;
 #ifdef SDIO_BUILD_IN
-    memcpy(&g_hw_interface.hif_ops, &g_w1_hif_ops, sizeof(struct amlw_hif_ops));
+    memcpy(&g_hw_interface.hif_ops, &w1_g_w1_hif_ops, sizeof(struct amlw_hif_ops));
 #endif
 
 #ifndef SDIO_BUILD_IN
@@ -611,7 +611,7 @@ void hi_cfg_firmware(void)
 }
 
 //asynchronous
-extern unsigned char  wifi_sdio_access;
+extern unsigned char  w1_wifi_sdio_access;
 unsigned char hi_set_cmd(unsigned char *pdata,unsigned int len)
 {
     struct hal_private * hal_priv = hal_get_priv();
@@ -626,7 +626,7 @@ unsigned char hi_set_cmd(unsigned char *pdata,unsigned int len)
     ASSERT(hal_priv != NULL);
     ASSERT(pCmdDownFifo != NULL);
 
-    if (!wifi_sdio_access) {
+    if (!w1_wifi_sdio_access) {
         AML_OUTPUT("recovering downloading firmware\n");
         return false;
     }
@@ -663,7 +663,7 @@ unsigned char hi_set_cmd(unsigned char *pdata,unsigned int len)
         }
         OS_UDELAY(20);
     }
-    aml_wifi_sdio_power_lock();
+    w1_aml_wifi_sdio_power_lock();
     POWER_BEGIN_LOCK();
     if (((hal_priv->powersave_init_flag == 0) && (pscmd.Cmd == Power_Save_Cmd) && (pscmd.psmode == PS_DOZE))
         || ((hal_priv->powersave_init_flag == 0) && (suspend_cmd.Cmd == WoW_Enable_Cmd) && (suspend_cmd.enable == 1)))
@@ -678,7 +678,7 @@ unsigned char hi_set_cmd(unsigned char *pdata,unsigned int len)
 
     hal_priv->hal_drv_ps_status &= ~HAL_DRV_IN_ACTIVE;
     POWER_END_LOCK();
-    aml_wifi_sdio_power_unlock();
+    w1_aml_wifi_sdio_power_unlock();
 
     return true;
 }

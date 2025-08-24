@@ -33,7 +33,7 @@
 #endif
 
 #ifdef NOT_AMLOGIC_PLATFORM
-extern void *aml_mem_prealloc(int section, unsigned long size);
+extern void *w1_aml_mem_prealloc(int section, unsigned long size);
 #else
 extern void *bcmdhd_mem_prealloc(int section, unsigned long size);
 #endif
@@ -57,7 +57,7 @@ void *wifi_mem_prealloc(int section, unsigned long size)
         }
 
 #ifdef NOT_AMLOGIC_PLATFORM
-        return aml_mem_prealloc(AML_RX, size);
+        return w1_aml_mem_prealloc(AML_RX, size);
 #else
         return bcmdhd_mem_prealloc(AML_RX, size);
 #endif
@@ -70,7 +70,7 @@ void *wifi_mem_prealloc(int section, unsigned long size)
         }
 
 #ifdef NOT_AMLOGIC_PLATFORM
-        return aml_mem_prealloc(AML_TX, size);;
+        return w1_aml_mem_prealloc(AML_TX, size);;
 #else
         return bcmdhd_mem_prealloc(AML_TX, size);;
 #endif

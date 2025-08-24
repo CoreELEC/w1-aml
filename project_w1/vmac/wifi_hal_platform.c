@@ -564,8 +564,8 @@ void wifi_cpu_clk_switch(unsigned int clk_cfg)
 
 #endif
 
-extern unsigned char wifi_in_insmod;
-extern unsigned char wifi_in_rmmod;
+extern unsigned char w1_wifi_in_insmod;
+extern unsigned char w1_wifi_in_rmmod;
 #ifdef ICCM_CHECK
 static unsigned char buf_iccm_rd[ICCM_BUFFER_RD_LEN];
 #endif
@@ -771,7 +771,7 @@ unsigned char hal_download_wifi_fw_img(void)
 
     printk("fw download success!\n");
 #ifdef SDIO_BUILD_IN
-    wifi_in_insmod = 0;
+    w1_wifi_in_insmod = 0;
 #endif
 
     return true;
@@ -957,15 +957,15 @@ unsigned int aml_wifi_is_enable_rf_test(void)
     return en_rf_test;
 }
 
-extern unsigned char wifi_in_insmod;
-extern unsigned char wifi_in_rmmod;
+extern unsigned char w1_wifi_in_insmod;
+extern unsigned char w1_wifi_in_rmmod;
 static int aml_insmod(void)
 {
     int ret = 0;
     struct hw_interface * hif = hif_get_hw_interface();
 
 #ifdef SDIO_BUILD_IN
-    wifi_in_insmod = 1;
+    w1_wifi_in_insmod = 1;
 #endif
 
     print_driver_version();
@@ -1004,7 +1004,7 @@ static int aml_insmod(void)
 
 insmod_failed:
 #ifdef SDIO_BUILD_IN
-    wifi_in_insmod = 0;
+    w1_wifi_in_insmod = 0;
 #endif
 
     return ret;
@@ -1016,7 +1016,7 @@ static void aml_rmmod(void)
     unsigned char i;
 #endif
 #ifdef SDIO_BUILD_IN
-    wifi_in_rmmod = 1;
+    w1_wifi_in_rmmod = 1;
 #endif
     printk("===================aml_rmmod start====================\n");
     hal_exit_priv();
@@ -1035,7 +1035,7 @@ static void aml_rmmod(void)
     }
 #endif
 #ifdef SDIO_BUILD_IN
-    wifi_in_rmmod = 0;
+    w1_wifi_in_rmmod = 0;
 #endif
 }
 

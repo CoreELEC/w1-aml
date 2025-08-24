@@ -717,9 +717,9 @@ void hal_ops_attach(void)
     hal_priv->hal_ops.hal_cfg_txpwr_cffc_param = hal_cfg_txpwr_cffc_param;
 
 #ifdef SDIO_BUILD_IN
-    host_wake_w1_req = hal_wake_fw_req;
-    host_suspend_req = aml_sdio_pm_suspend;
-    host_resume_req = aml_sdio_pm_resume;
+    w1_host_wake_w1_req = hal_wake_fw_req;
+    w1_host_suspend_req = aml_sdio_pm_suspend;
+    w1_host_resume_req = aml_sdio_pm_resume;
 #endif
     DBG_EXIT();
 }
@@ -782,9 +782,9 @@ void hal_ops_detach(void)
     hal_priv->hal_ops.hal_cfg_cali_param = NULL;
 
 #ifdef SDIO_BUILD_IN
-    host_wake_w1_req = NULL;
-    host_suspend_req = NULL;
-    host_resume_req = NULL;
+    w1_host_wake_w1_req = NULL;
+    w1_host_suspend_req = NULL;
+    w1_host_resume_req = NULL;
 #endif
 
 }
