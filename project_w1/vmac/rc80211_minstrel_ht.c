@@ -1053,9 +1053,9 @@ minstrel_ht_update_caps(void *priv, struct ieee80211_supported_band *sband,
 	struct minstrel_priv *mp = priv;
 	struct minstrel_ht_sta_priv *msp = priv_sta;
 	struct minstrel_ht_sta *mi = &msp->ht;
-	struct ieee80211_mcs_info *mcs = &sta->ht_cap.mcs;
-	u16 sta_cap = sta->ht_cap.cap;
-	struct ieee80211_sta_vht_cap *vht_cap = &sta->vht_cap;
+	struct ieee80211_mcs_info *mcs = &sta->deflink.ht_cap.mcs;
+	u16 sta_cap = sta->deflink.ht_cap.cap;
+	struct ieee80211_sta_vht_cap *vht_cap = &sta->deflink.vht_cap;
 	int use_vht;
 	int n_supported = 0;
 	int ack_dur;
@@ -1063,7 +1063,7 @@ minstrel_ht_update_caps(void *priv, struct ieee80211_supported_band *sband,
 	int i;
 
 	/* fall back to the old minstrel for legacy stations */
-	if (!sta->ht_cap.ht_supported)
+	if (!sta->deflink.ht_cap.ht_supported)
 		goto use_legacy;
 
 	//ASSERT(ARRAY_SIZE(minstrel_mcs_groups) != MINSTREL_GROUPS_NB);
@@ -1129,7 +1129,7 @@ minstrel_ht_update_caps(void *priv, struct ieee80211_supported_band *sband,
 		}
 
 		if (gflags & IEEE80211_TX_RC_40_MHZ_WIDTH &&
-		    sta->bandwidth < IEEE80211_STA_RX_BW_40)
+		    sta->deflink.bandwidth < IEEE80211_STA_RX_BW_40)
 			continue;
 
 		nss = minstrel_mcs_groups[i].streams;
@@ -1160,7 +1160,7 @@ minstrel_ht_update_caps(void *priv, struct ieee80211_supported_band *sband,
 			continue;
 
 		if (gflags & IEEE80211_TX_RC_80_MHZ_WIDTH) {
-			if (sta->bandwidth < IEEE80211_STA_RX_BW_80 ||
+			if (sta->deflink.bandwidth < IEEE80211_STA_RX_BW_80 ||
 				((gflags & IEEE80211_TX_RC_SHORT_GI) &&
 				!(vht_cap->cap & IEEE80211_VHT_CAP_SHORT_GI_80))) {
 				continue;
@@ -1174,7 +1174,7 @@ minstrel_ht_update_caps(void *priv, struct ieee80211_supported_band *sband,
 		else
 			bw = BW_20;
 
-		if (sta->bandwidth < bw) {
+		if (sta->deflink.bandwidth < bw) {
 			continue;
 		}
 

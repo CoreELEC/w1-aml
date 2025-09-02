@@ -257,10 +257,10 @@ unsigned int support_legacy_rate_init( struct wifi_station *sta ,  struct ieee80
     }
 
     if (channel_band == IEEE80211_BAND_2GHZ) {
-        p_ieee_sta->supp_rates[IEEE80211_BAND_2GHZ]  = bit_val;
+        p_ieee_sta->deflink.supp_rates[IEEE80211_BAND_2GHZ]  = bit_val;
 
     } else if (channel_band == IEEE80211_BAND_5GHZ) {
-        p_ieee_sta->supp_rates[IEEE80211_BAND_5GHZ] = (bit_val >> 4);
+        p_ieee_sta->deflink.supp_rates[IEEE80211_BAND_5GHZ] = (bit_val >> 4);
 
     } else {
         ERROR_DEBUG_OUT("input channel_band error\n");
@@ -446,8 +446,8 @@ void aml_minstrel_init(
     p_ieee_sta = &(sta->ieee_sta);
     p_ieee_sta->smps_mode = IEEE80211_SMPS_OFF;
     p_ieee_sta->rates = &(sta->sta_ieee_rates);
-    p_ieee_sta->bandwidth = sta->sta_chbw;
-    AML_OUTPUT("bw=%d, sta:%p,p_ieee_sta=%p\n", p_ieee_sta->bandwidth, sta,p_ieee_sta);
+    p_ieee_sta->deflink.bandwidth = sta->sta_chbw;
+    AML_OUTPUT("bw=%d, sta:%p,p_ieee_sta=%p\n", p_ieee_sta->deflink.bandwidth, sta,p_ieee_sta);
     if (sta->sta_wnet_vif->vm_curchan == NULL) {
         ERROR_DEBUG_OUT("vm_curchan is NULL, just return\n");
         return;
@@ -480,14 +480,14 @@ void aml_minstrel_init(
     aml_rate_adaptation_dev_init(sta, rate_mode, channel_band, p_ieee_sta);
 
     if (channel_band == IEEE80211_BAND_5GHZ) {
-        p_ieee_sta->vht_cap = g_aml_rate_adaptation_dev.sband->vht_cap;
-        AML_OUTPUT("vht_supported = %d\n", p_ieee_sta->vht_cap.vht_supported);
+        p_ieee_sta->deflink.vht_cap = g_aml_rate_adaptation_dev.sband->vht_cap;
+        AML_OUTPUT("vht_supported = %d\n", p_ieee_sta->deflink.vht_cap.vht_supported);
     }
 
     aml_get_ht_cap(&g_aml_rate_adaptation_dev, &(g_aml_rate_adaptation_dev.sband->ht_cap));
-    p_ieee_sta->ht_cap = g_aml_rate_adaptation_dev.sband->ht_cap;
+    p_ieee_sta->deflink.ht_cap = g_aml_rate_adaptation_dev.sband->ht_cap;
 
-    AML_OUTPUT("ht_supported:%d, minstel_pri=%p, p_ieee_sta=%p\n", p_ieee_sta->ht_cap.ht_supported, g_minstel_pri, p_ieee_sta);
+    AML_OUTPUT("ht_supported:%d, minstel_pri=%p, p_ieee_sta=%p\n", p_ieee_sta->deflink.ht_cap.ht_supported, g_minstel_pri, p_ieee_sta);
     p_rate_control_ops = get_rate_control_ops();
     p_rate_control_ops_ht = get_rate_control_ops_ht();
     if (mcs_rate_support) {
@@ -618,10 +618,10 @@ int minstrel_rate_index_to_vendor_rate_code(int minstrel_rate_idx, struct ieee80
 {
     enum ieee80211_band band = g_aml_rate_adaptation_dev.sband->band;
 
-    if (p_ieee80211_sta->vht_cap.vht_supported && ((minstrel_rate_idx >= 0) && (minstrel_rate_idx <= 9))) {
+    if (p_ieee80211_sta->deflink.vht_cap.vht_supported && ((minstrel_rate_idx >= 0) && (minstrel_rate_idx <= 9))) {
         return WIFINET_RATE_VHT_MCS + minstrel_rate_idx;
 
-    } else if (p_ieee80211_sta->ht_cap.ht_supported && ((minstrel_rate_idx >= 0) && (minstrel_rate_idx <= 7))) {
+    } else if (p_ieee80211_sta->deflink.ht_cap.ht_supported && ((minstrel_rate_idx >= 0) && (minstrel_rate_idx <= 7))) {
         return WIFINET_RATE_MCS + minstrel_rate_idx;
 
     } else {
@@ -902,6 +902,6 @@ void minstrel_tx_complete(
 
 void  minstrel_set_sta_bandwidth( int bw )
 {
-	g_sta.bandwidth = bw;
+	g_sta.deflink.bandwidth = bw;
 }
 
