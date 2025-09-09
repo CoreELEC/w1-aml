@@ -32,11 +32,8 @@
 #include <linux/amlogic/wlan_plat.h>
 #endif
 
-#ifdef NOT_AMLOGIC_PLATFORM
 extern void *aml_mem_prealloc(int section, unsigned long size);
-#else
-extern void *bcmdhd_mem_prealloc(int section, unsigned long size);
-#endif
+
 enum aml_prealloc_index {
     AML_RX_FIFO = 0,
     AML_TX_DESC_BUF = 1
@@ -56,11 +53,7 @@ void *wifi_mem_prealloc(int section, unsigned long size)
             return NULL;
         }
 
-#ifdef NOT_AMLOGIC_PLATFORM
         return aml_mem_prealloc(AML_RX, size);
-#else
-        return bcmdhd_mem_prealloc(AML_RX, size);
-#endif
     }
     if (section == AML_TX_DESC_BUF) {
         if (size > AML_TX_DESC_BUF_SIZE) {
@@ -69,11 +62,7 @@ void *wifi_mem_prealloc(int section, unsigned long size)
             return NULL;
         }
 
-#ifdef NOT_AMLOGIC_PLATFORM
         return aml_mem_prealloc(AML_TX, size);;
-#else
-        return bcmdhd_mem_prealloc(AML_TX, size);;
-#endif
     }
     return NULL;
 }

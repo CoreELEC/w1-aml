@@ -24,6 +24,7 @@ modules.builtin
 *.gcno
 *.bak
 *.ko.cmd
+.*.cmd
 .tmp_versions/
 Module.symvers
 print_version.*

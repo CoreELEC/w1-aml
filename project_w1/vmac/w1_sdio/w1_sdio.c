@@ -1263,11 +1263,8 @@ static struct sdio_driver aml_w1_sdio_driver =
     .drv.shutdown = aml_sdio_shutdown,
 };
 
-#ifdef NOT_AMLOGIC_PLATFORM
-
 static void *wlan_preallocated_rx_buf;
 static void *wlan_preallocated_tx_desc_buf;
-
 
 /* Two defines below taken from aml_static_buf.c. */
 #define AML_RX  11
@@ -1305,20 +1302,25 @@ EXPORT_SYMBOL(aml_mem_prealloc);
 
 static int aml_init_wlan_mem(void)
 {
-
-    wlan_preallocated_tx_desc_buf = vmalloc(TX_DESC_BUF_LEN);
-    if (!wlan_preallocated_rx_buf)
+    wlan_preallocated_tx_desc_buf = kmalloc(TX_DESC_BUF_LEN, GFP_KERNEL);
+    if (!wlan_preallocated_tx_desc_buf)
         return -ENOMEM;
+
+    wlan_preallocated_rx_buf = kvmalloc(RX_BUF_LEN, GFP_KERNEL);
+    if (!wlan_preallocated_rx_buf) {
+        vfree(wlan_preallocated_tx_desc_buf);
+        return -ENOMEM;
+    }
     return 0;
+}
 
 static void aml_deinit_wlan_mem(void)
 {
     kfree(wlan_preallocated_rx_buf);
     vfree(wlan_preallocated_tx_desc_buf);
 }
-#endif
 
-int  aml_w1_sdio_init(void)
+int aml_w1_sdio_init(void)
 {
     int err = 0;
     int i;
@@ -1402,14 +1404,13 @@ EXPORT_SYMBOL(g_w1_hif_ops);
 
 static int aml_w1_sdio_insmod(void)
 {
-#ifdef NOT_AMLOGIC_PLATFORM
     int ret;
     ret = aml_init_wlan_mem();
     if (ret) {
         PRINT("aml_init_wlan_mem err: %d \n", ret);
         return -ENOMEM;
     }
-#endif
+
     aml_w1_sdio_init();
     pr_debug("%s(%d) start...\n",__func__, __LINE__);
     return 0;
@@ -1418,9 +1419,7 @@ static int aml_w1_sdio_insmod(void)
 static void aml_w1_sdio_rmmod(void)
 {
     aml_w1_sdio_exit();
-#ifdef NOT_AMLOGIC_PLATFORM
     aml_deinit_wlan_mem();
-#endif
 }
 
 module_init(aml_w1_sdio_insmod);
