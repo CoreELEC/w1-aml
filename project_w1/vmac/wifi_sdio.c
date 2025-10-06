@@ -48,6 +48,8 @@ static inline struct amlw_hwif_sdio *aml_sdio_priv(void)
 #include <linux/mmc/sdio.h>
 #include <linux/mmc/card.h>
 
+MODULE_IMPORT_NS(W1-AML);
+
 #define HIF_SDIO_UNIT_MULTIBLKSZ
 
 #ifdef    DRIVER_FOR_BT  // access bt domain need more slower clk for cross the AHB bridge

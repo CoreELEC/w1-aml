@@ -35,6 +35,8 @@
 #include "wifi_mac_tx_reg.h"
 #include "wifi_mac_xmit.h"
 
+MODULE_IMPORT_NS(W1-AML);
+
 const unsigned char drv_bcast_mac[WIFINET_ADDR_LEN] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 
 static unsigned int drv_phy_reg_sta_id(struct drv_private *drv_priv, unsigned char wnet_vif_id,
