@@ -32,7 +32,7 @@
 #include <linux/amlogic/wlan_plat.h>
 #endif
 
-extern void *aml_mem_prealloc(int section, unsigned long size);
+extern void *w1_aml_mem_prealloc(int section, unsigned long size);
 
 enum aml_prealloc_index {
     AML_RX_FIFO = 0,
@@ -53,7 +53,7 @@ void *wifi_mem_prealloc(int section, unsigned long size)
             return NULL;
         }
 
-        return aml_mem_prealloc(AML_RX, size);
+        return w1_aml_mem_prealloc(AML_RX, size);
     }
     if (section == AML_TX_DESC_BUF) {
         if (size > AML_TX_DESC_BUF_SIZE) {
@@ -62,7 +62,7 @@ void *wifi_mem_prealloc(int section, unsigned long size)
             return NULL;
         }
 
-        return aml_mem_prealloc(AML_TX, size);;
+        return w1_aml_mem_prealloc(AML_TX, size);;
     }
     return NULL;
 }

@@ -173,11 +173,11 @@ extern void sdio_read_write(int idx, int addr, svBitPackedArrRef buff, int len, 
 #endif
 
 #ifdef SDIO_BUILD_IN
-    extern struct amlw_hif_ops g_w1_hif_ops;
-    extern struct amlw_hwif_sdio g_w1_hwif_sdio;
-    extern unsigned char (*host_wake_w1_req)(void);
-    extern int (*host_suspend_req)(struct device* device);
-    extern int (*host_resume_req)(struct device* device);
+    extern struct amlw_hif_ops w1_g_w1_hif_ops;
+    extern struct amlw_hwif_sdio w1_g_w1_hwif_sdio;
+    extern unsigned char (*w1_host_wake_w1_req)(void);
+    extern int (*w1_host_suspend_req)(struct device* device);
+    extern int (*w1_host_resume_req)(struct device* device);
     #define AML_W1_WIFI_POWER_ON 1
     #define AML_W1_WIFI_POWER_OFF 0
 

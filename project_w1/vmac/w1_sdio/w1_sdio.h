@@ -183,6 +183,6 @@ struct amlw1_hif_ops {
     int (*hif_suspend)(unsigned int suspend_enable);
 };
 
-void aml_wifi_sdio_power_lock(void);
-void aml_wifi_sdio_power_unlock(void);
-void *aml_mem_prealloc(int section, unsigned long size);
+void w1_aml_wifi_sdio_power_lock(void);
+void w1_aml_wifi_sdio_power_unlock(void);
+void *w1_aml_mem_prealloc(int section, unsigned long size);

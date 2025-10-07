@@ -46,7 +46,7 @@ extern void hal_dpd_calibration(void);
 extern struct notifier_block aml_inetaddr_cb;
 extern struct notifier_block aml_inet6addr_cb;
 extern int hal_tx_flush(unsigned char vid);
-extern unsigned char wifi_hal_probe_done;
+extern unsigned char w1_wifi_hal_probe_done;
 
 struct drv_private *drv_get_drv_priv(void)
 {
@@ -2430,11 +2430,11 @@ drv_dev_probe(void)
 
     /* 2 init hal, download fw, host init. */
     if ((hal_priv->hal_ops.hal_probe != NULL) && (!hal_priv->hal_ops.hal_probe())) {
-        wifi_hal_probe_done = 0;
+        w1_wifi_hal_probe_done = 0;
         ERROR_DEBUG_OUT("init hal error\n");
         goto err_ret;
     }
-    wifi_hal_probe_done = 1;
+    w1_wifi_hal_probe_done = 1;
 
     memset(drv_priv, 0, sizeof(struct drv_private));
     memset(wm_mac, 0, sizeof(struct wifi_mac));

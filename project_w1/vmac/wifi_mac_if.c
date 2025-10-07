@@ -28,7 +28,7 @@
 unsigned char tpc_mode = 0;
 extern unsigned char g_wftx_pwrtbl_en;
 extern unsigned char  host_wake_w1_fail_cnt;
-extern unsigned char wifi_in_insmod;
+extern unsigned char w1_wifi_in_insmod;
 
 static struct net_device_stats *wifi_mac_getstats(struct net_device *);
 static  int wifi_mac_change_mtu(struct net_device *, int);
@@ -65,7 +65,7 @@ static unsigned char wifi_mac_clear_host_wake_status(void)
 
 unsigned char wifi_mac_set_wifi_insmod_status(void)
 {
-    wifi_in_insmod = 1;
+    w1_wifi_in_insmod = 1;
     return 0;
 }
 
