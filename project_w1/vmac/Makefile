@@ -159,7 +159,7 @@ EXTRA_CFLAGS += -DWIFIMAC_PATH=\"/etc/wifi/wifimac.txt\"
 EXTRA_CFLAGS += -DLINUX_PLATFORM
 EXTRA_CFLAGS += -DWPA3_PATCH
 else
-EXTRA_CFLAGS += -DWIFIMAC_PATH=\"/data/vendor/wifi/wifimac.txt\"
+EXTRA_CFLAGS += -DWIFIMAC_PATH=\"/storage/.config/wifimac.txt\"
 endif
 endif
 

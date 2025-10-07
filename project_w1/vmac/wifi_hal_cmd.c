@@ -40,7 +40,7 @@ namespace FW_NAME
 MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
 #endif
 
-#define WIFI_CONF_PATH "/lib/firmware/w1"
+#define WIFI_CONF_PATH "/lib/firmware/aml"
 
 static char * conf_path = WIFI_CONF_PATH;
 module_param(conf_path, charp, S_IRUGO);
@@ -2078,21 +2078,21 @@ static unsigned char get_cali_param(struct Cali_Param *cali_param, struct WF2G_T
 
     memset(file_name, 0, 100);
     memset(chip_id_buf, 0, 100);
-    sprintf(file_name, "w1/aml_wifi_rf_%04x.txt", chip_id_l);
+    sprintf(file_name, "aml/aml_wifi_rf_%04x.txt", chip_id_l);
     if (request_firmware(&fw, file_name, dev)) {
         memset(chip_id_buf,'\0',sizeof(chip_id_buf));
         switch ((chip_id_l & 0xff00) >> 8) {
             case MODULE_ITON:
-                sprintf(file_name, "w1/aml_wifi_rf_iton.txt");
+                sprintf(file_name, "aml/aml_wifi_rf_iton.txt");
                 break;
             case MODULE_AMPAK:
-                sprintf(file_name, "w1/aml_wifi_rf_ampak.txt");
+                sprintf(file_name, "aml/aml_wifi_rf_ampak.txt");
                 break;
             case MODULE_FN_LINK:
-                sprintf(file_name, "w1/aml_wifi_rf_fn_link.txt");
+                sprintf(file_name, "aml/aml_wifi_rf_fn_link.txt");
                 break;
             default:
-                sprintf(file_name, "w1/aml_wifi_rf.txt");
+                sprintf(file_name, "aml/aml_wifi_rf.txt");
         }
         pr_info("aml wifi module SN:%04x  sn txt not found, the rf config: %s\n", chip_id_l, chip_id_buf);
     } else
@@ -2102,7 +2102,7 @@ static unsigned char get_cali_param(struct Cali_Param *cali_param, struct WF2G_T
     if (error) {
         // sn txt not found, the rf set default config
         memset(file_name, 0, 100);
-        sprintf(file_name, "w1/aml_wifi_rf.txt");
+        sprintf(file_name, "aml/aml_wifi_rf.txt");
         pr_info("aml wifi module SN:%04x  sn txt not found, the rf config: %s\n", chip_id_l, file_name);
         error = request_firmware(&fw, file_name, dev);
         if (error) {
