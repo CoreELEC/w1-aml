@@ -8,17 +8,17 @@
 #include "rf_d_top_reg.h"
 #include "wifi_coex_addr.h"
 
-struct amlw1_hwif_sdio g_w1_hwif_sdio;
-struct amlw1_hif_ops g_w1_hif_ops;
+struct amlw1_hwif_sdio w1_g_w1_hwif_sdio;
+struct amlw1_hif_ops w1_g_w1_hif_ops;
 
 unsigned char w1_sdio_wifi_bt_alive;
-unsigned char w1_sdio_driver_insmoded;
-unsigned char w1_sdio_after_porbe;
-unsigned char wifi_in_insmod;
-unsigned char wifi_in_rmmod;
-unsigned char  wifi_sdio_access = 1;
-unsigned char wifi_irq_enable = 0;
-unsigned char wifi_hal_probe_done = 0;
+unsigned char w1_w1_sdio_driver_insmoded;
+unsigned char w1_w1_sdio_after_porbe;
+unsigned char w1_wifi_in_insmod;
+unsigned char w1_wifi_in_rmmod;
+unsigned char  w1_wifi_sdio_access = 1;
+unsigned char w1_wifi_irq_enable = 0;
+unsigned char w1_wifi_hal_probe_done = 0;
 unsigned int  shutdown_i = 0;
 #define  I2C_CLK_QTR   0x4
 
@@ -38,25 +38,25 @@ static DEFINE_MUTEX(wifi_sdio_power_mutex);
 #define SDIO_DMA_BUF_SIZE    PAGE_SIZE
 static void *sdio_dma_buf[SDIO_MAX_FUNCS];
 
-void aml_wifi_sdio_power_lock(void)
+void w1_aml_wifi_sdio_power_lock(void)
 {
     mutex_lock(&wifi_sdio_power_mutex);
 }
 
-void aml_wifi_sdio_power_unlock(void)
+void w1_aml_wifi_sdio_power_unlock(void)
 {
     mutex_unlock(&wifi_sdio_power_mutex);
 }
 
-unsigned char (*host_wake_w1_req)(void);
-int (*host_suspend_req)(struct device *device);
-int (*host_resume_req)(struct device *device);
+unsigned char (*w1_host_wake_w1_req)(void);
+int (*w1_host_suspend_req)(struct device *device);
+int (*w1_host_resume_req)(struct device *device);
 
 
 static struct sdio_func *aml_priv_to_func(int func_n)
 {
     ASSERT(func_n >= 0 &&  func_n < SDIO_FUNCNUM_MAX);
-    return g_w1_hwif_sdio.sdio_func_if[func_n];
+    return w1_g_w1_hwif_sdio.sdio_func_if[func_n];
 }
 
 static unsigned int aml_w1_bt_hi_read_word(unsigned int addr)
@@ -70,16 +70,16 @@ static unsigned int aml_w1_bt_hi_read_word(unsigned int addr)
      * one address-mapping: 32-bit AHB Address = BaseAddr + cmdRegAddr
      */
 
-    reg_tmp = g_w1_hif_ops.hi_read_word( RG_SDIO_IF_MISC_CTRL);
+    reg_tmp = w1_g_w1_hif_ops.hi_read_word( RG_SDIO_IF_MISC_CTRL);
 
     if (!(reg_tmp & BIT(23))) {
         reg_tmp |= BIT(23);
-        g_w1_hif_ops.hi_write_word( RG_SDIO_IF_MISC_CTRL, reg_tmp);
+        w1_g_w1_hif_ops.hi_write_word( RG_SDIO_IF_MISC_CTRL, reg_tmp);
     }
 
     /*config msb 15 bit address in BaseAddr Register*/
-    g_w1_hif_ops.hi_write_reg32(RG_SCFG_FUNC5_BADDR_A,addr & 0xfffe0000);
-    g_w1_hif_ops.bt_hi_read_sram((unsigned char*)(SYS_TYPE)&regdata,
+    w1_g_w1_hif_ops.hi_write_reg32(RG_SCFG_FUNC5_BADDR_A,addr & 0xfffe0000);
+    w1_g_w1_hif_ops.bt_hi_read_sram((unsigned char*)(SYS_TYPE)&regdata,
         /*sdio cmd 52/53 can only take 17 bit address*/
         (unsigned char*)(SYS_TYPE)(addr & 0x1ffff), sizeof(unsigned int));
 
@@ -95,36 +95,36 @@ static void aml_w1_bt_hi_write_word(unsigned int addr,unsigned int data)
      * all 128k space in one sdio-function use only
      * one address-mapping: 32-bit AHB Address = BaseAddr + cmdRegAddr
      */
-    reg_tmp = g_w1_hif_ops.hi_read_word( RG_SDIO_IF_MISC_CTRL);
+    reg_tmp = w1_g_w1_hif_ops.hi_read_word( RG_SDIO_IF_MISC_CTRL);
 
     if (!(reg_tmp & BIT(23))) {
         reg_tmp |= BIT(23);
-        g_w1_hif_ops.hi_write_word( RG_SDIO_IF_MISC_CTRL, reg_tmp);
+        w1_g_w1_hif_ops.hi_write_word( RG_SDIO_IF_MISC_CTRL, reg_tmp);
     }
     /*config msb 15 bit address in BaseAddr Register*/
-    g_w1_hif_ops.hi_write_reg32(RG_SCFG_FUNC5_BADDR_A,addr & 0xfffe0000);
+    w1_g_w1_hif_ops.hi_write_reg32(RG_SCFG_FUNC5_BADDR_A,addr & 0xfffe0000);
 
-    g_w1_hif_ops.bt_hi_write_sram((unsigned char *)&data,
+    w1_g_w1_hif_ops.bt_hi_write_sram((unsigned char *)&data,
         /*sdio cmd 52/53 can only take 17 bit address*/
         (unsigned char*)(SYS_TYPE)(addr & 0x1ffff), sizeof(unsigned int));
 }
 
 static void aml_w1_bt_sdio_read_sram (unsigned char *buf, unsigned char *addr, SYS_TYPE len)
 {
-    g_w1_hif_ops.hi_bottom_read(SDIO_FUNC5, ((SYS_TYPE)addr & SDIO_ADDR_MASK),
+    w1_g_w1_hif_ops.hi_bottom_read(SDIO_FUNC5, ((SYS_TYPE)addr & SDIO_ADDR_MASK),
         buf, len, (len > 8 ? SDIO_OPMODE_INCREMENT : SDIO_OPMODE_FIXED));
 }
 
 /*For BT use only start */
 static void aml_w1_bt_sdio_write_sram (unsigned char *buf, unsigned char *addr, SYS_TYPE len)
 {
-    g_w1_hif_ops.hi_bottom_write(SDIO_FUNC5, ((SYS_TYPE)addr & SDIO_ADDR_MASK),
+    w1_g_w1_hif_ops.hi_bottom_write(SDIO_FUNC5, ((SYS_TYPE)addr & SDIO_ADDR_MASK),
         buf, len, (len > 8 ? SDIO_OPMODE_INCREMENT : SDIO_OPMODE_FIXED));
 }
 
 static int aml_w1_sdio_write_reg32(unsigned long sram_addr, unsigned long sramdata)
 {
-    return g_w1_hif_ops.hi_bottom_write(SDIO_FUNC1, sram_addr&SDIO_ADDR_MASK,
+    return w1_g_w1_hif_ops.hi_bottom_write(SDIO_FUNC1, sram_addr&SDIO_ADDR_MASK,
         (unsigned char *)&sramdata,  sizeof(unsigned long), SDIO_OPMODE_INCREMENT);
 }
 
@@ -132,14 +132,14 @@ static unsigned int aml_w1_aon_read_reg(unsigned int addr)
 {
     unsigned int regdata = 0;
 
-    regdata = g_w1_hif_ops.bt_hi_read_word((addr));
+    regdata = w1_g_w1_hif_ops.bt_hi_read_word((addr));
     return regdata;
 }
 
 /* aon module address from 0x00f00000, we need read/write by sdio func5 */
 static void aml_w1_aon_write_reg(unsigned int addr,unsigned int data)
 {
-    g_w1_hif_ops.bt_hi_write_word((addr), data);
+    w1_g_w1_hif_ops.bt_hi_write_word((addr), data);
 }
 
 static int _aml_w1_sdio_request_byte(unsigned char func_num,
@@ -260,7 +260,7 @@ static int aml_w1_sdio_bottom_read(unsigned char func_num, int addr, void *buf, 
 
     ASSERT(func_num != SDIO_FUNC0);
 
-    if (!wifi_sdio_access) {
+    if (!w1_wifi_sdio_access) {
         if (func_num == SDIO_FUNC5) {
             /*SDIO_FUNC5 ignore*/
             ERROR_DEBUG_OUT("SDIO_FUNC5, func num %d, addr 0x%08x\n", func_num, addr);
@@ -280,13 +280,13 @@ static int aml_w1_sdio_bottom_read(unsigned char func_num, int addr, void *buf, 
     }
 
 
-    aml_wifi_sdio_power_lock();
+    w1_aml_wifi_sdio_power_lock();
 
-    if (host_wake_w1_req != NULL)
+    if (w1_host_wake_w1_req != NULL)
     {
-        if (host_wake_w1_req() == 0)
+        if (w1_host_wake_w1_req() == 0)
         {
-            aml_wifi_sdio_power_unlock();
+            w1_aml_wifi_sdio_power_unlock();
             ERROR_DEBUG_OUT("aml_w1_sdio_bottom_read, host wake w1 fail\n");
             return -1;
         }
@@ -332,7 +332,7 @@ static int aml_w1_sdio_bottom_read(unsigned char func_num, int addr, void *buf, 
         sdio_release_host(func);
 
         AML_W1_BT_WIFI_MUTEX_OFF();
-        aml_wifi_sdio_power_unlock();
+        w1_aml_wifi_sdio_power_unlock();
         return SDIOH_API_RC_FAIL;
     }
 
@@ -348,7 +348,7 @@ static int aml_w1_sdio_bottom_read(unsigned char func_num, int addr, void *buf, 
     sdio_release_host(func);
 
     AML_W1_BT_WIFI_MUTEX_OFF();
-    aml_wifi_sdio_power_unlock();
+    w1_aml_wifi_sdio_power_unlock();
     return result;
 }
 
@@ -361,7 +361,7 @@ static int aml_w1_sdio_bottom_write(unsigned char func_num, int addr, void *buf,
     struct sdio_func * func = aml_priv_to_func(func_num);
     size_t sdio_aligned_len;
 
-    if (!wifi_sdio_access) {
+    if (!w1_wifi_sdio_access) {
         if (func_num == SDIO_FUNC5) {
             /*SDIO_FUNC5 ignore*/
             ERROR_DEBUG_OUT("SDIO_FUNC5, func num %d, addr 0x%08x\n", func_num, addr);
@@ -380,14 +380,14 @@ static int aml_w1_sdio_bottom_write(unsigned char func_num, int addr, void *buf,
         }
     }
 
-    aml_wifi_sdio_power_lock();
+    w1_aml_wifi_sdio_power_lock();
     ASSERT(func_num != SDIO_FUNC0);
 
-    if (host_wake_w1_req != NULL)
+    if (w1_host_wake_w1_req != NULL)
     {
-        if (host_wake_w1_req() == 0)
+        if (w1_host_wake_w1_req() == 0)
         {
-            aml_wifi_sdio_power_unlock();
+            w1_aml_wifi_sdio_power_unlock();
             ERROR_DEBUG_OUT("aml_w1_sdio_bottom_write, host wake w1 fail\n");
             return -1;
         }
@@ -410,7 +410,7 @@ static int aml_w1_sdio_bottom_write(unsigned char func_num, int addr, void *buf,
             ERROR_DEBUG_OUT("kmalloc buf fail\n");
             sdio_release_host(func);
             AML_W1_BT_WIFI_MUTEX_OFF();
-            aml_wifi_sdio_power_unlock();
+            w1_aml_wifi_sdio_power_unlock();
             return SDIOH_API_RC_FAIL;
         }
     } else {
@@ -425,19 +425,19 @@ static int aml_w1_sdio_bottom_write(unsigned char func_num, int addr, void *buf,
     sdio_release_host(func);
 
     AML_W1_BT_WIFI_MUTEX_OFF();
-    aml_wifi_sdio_power_unlock();
+    w1_aml_wifi_sdio_power_unlock();
     return result;
 }
 
 static void aml_w1_sdio_read_sram (unsigned char *buf, unsigned char *addr, SYS_TYPE len)
 {
-    g_w1_hif_ops.hi_bottom_read(SDIO_FUNC2, (SYS_TYPE)addr&SDIO_ADDR_MASK,
+    w1_g_w1_hif_ops.hi_bottom_read(SDIO_FUNC2, (SYS_TYPE)addr&SDIO_ADDR_MASK,
         buf, len, (len > 8 ? SDIO_OPMODE_INCREMENT : SDIO_OPMODE_FIXED));
 }
 
 static void aml_w1_sdio_write_sram (unsigned char *buf, unsigned char *addr, SYS_TYPE len)
 {
-    g_w1_hif_ops.hi_bottom_write(SDIO_FUNC2, (SYS_TYPE)addr&SDIO_ADDR_MASK,
+    w1_g_w1_hif_ops.hi_bottom_write(SDIO_FUNC2, (SYS_TYPE)addr&SDIO_ADDR_MASK,
         buf, len, (len > 8 ? SDIO_OPMODE_INCREMENT : SDIO_OPMODE_FIXED));
 }
 
@@ -539,7 +539,7 @@ static void aml_w1_sdio_write_cmd32(unsigned long sram_addr, unsigned long sramd
     aml_sdio_read_write(sram_addr&SDIO_ADDR_MASK,	(unsigned char *)&sramdata, 4,
                         SDIO_FUNC3,SDIO_RW_FLAG_WRITE,SDIO_F_SYNCHRONOUS);
 #elif defined (HAL_FPGA_VER)
-    g_w1_hif_ops.hi_bottom_write(SDIO_FUNC3, sram_addr&SDIO_ADDR_MASK,
+    w1_g_w1_hif_ops.hi_bottom_write(SDIO_FUNC3, sram_addr&SDIO_ADDR_MASK,
         (unsigned char *)&sramdata, sizeof(unsigned long), SDIO_OPMODE_INCREMENT);
 #endif /* End of HAL_SIM_VER */
 }
@@ -599,13 +599,13 @@ static unsigned long  aml_w1_sdio_read_reg8(unsigned long sram_addr )
 {
     unsigned char regdata[8] = {0};
 
-    g_w1_hif_ops.hi_bottom_read(SDIO_FUNC1, sram_addr&SDIO_ADDR_MASK, regdata, 1, SDIO_OPMODE_INCREMENT);
+    w1_g_w1_hif_ops.hi_bottom_read(SDIO_FUNC1, sram_addr&SDIO_ADDR_MASK, regdata, 1, SDIO_OPMODE_INCREMENT);
     return regdata[0];
 }
 
 static void   aml_w1_sdio_write_reg8(unsigned long sram_addr, unsigned long sramdata)
 {
-    g_w1_hif_ops.hi_bottom_write(SDIO_FUNC1, sram_addr&SDIO_ADDR_MASK,
+    w1_g_w1_hif_ops.hi_bottom_write(SDIO_FUNC1, sram_addr&SDIO_ADDR_MASK,
         (unsigned char *)&sramdata, sizeof(unsigned long), SDIO_OPMODE_INCREMENT);
 }
 
@@ -613,13 +613,13 @@ static unsigned long  aml_w1_sdio_read_reg32(unsigned long sram_addr)
 {
     unsigned long sramdata;
 
-    g_w1_hif_ops.hi_bottom_read(SDIO_FUNC1, sram_addr&SDIO_ADDR_MASK, &sramdata, 4, SDIO_OPMODE_INCREMENT);
+    w1_g_w1_hif_ops.hi_bottom_read(SDIO_FUNC1, sram_addr&SDIO_ADDR_MASK, &sramdata, 4, SDIO_OPMODE_INCREMENT);
     return sramdata;
 }
 
 static struct amlw_hif_scatter_req *aml_w1_sdio_scatter_req_get(void)
 {
-    struct amlw1_hwif_sdio *hif_sdio = &g_w1_hwif_sdio;
+    struct amlw1_hwif_sdio *hif_sdio = &w1_g_w1_hwif_sdio;
 
     struct amlw_hif_scatter_req *scat_req = NULL;
 
@@ -661,7 +661,7 @@ static int amlw_w1_sdio_alloc_prep_scat_req(struct amlw1_hwif_sdio *hif_sdio)
 
 static int aml_w1_sdio_enable_scatter(void)
 {
-    struct amlw1_hwif_sdio *hif_sdio = &g_w1_hwif_sdio;
+    struct amlw1_hwif_sdio *hif_sdio = &w1_g_w1_hwif_sdio;
     int ret;
 
     ASSERT(hif_sdio != NULL);
@@ -673,7 +673,7 @@ static int aml_w1_sdio_enable_scatter(void)
 
     hif_sdio->scatter_enabled = true;
 
-    ret = amlw_w1_sdio_alloc_prep_scat_req(&g_w1_hwif_sdio);
+    ret = amlw_w1_sdio_alloc_prep_scat_req(&w1_g_w1_hwif_sdio);
     return ret;
 }
 
@@ -727,7 +727,7 @@ static int aml_w1_sdio_scat_rw(struct scatterlist *sg_list, unsigned int sg_num,
 static void aml_w1_sdio_scat_complete (struct amlw_hif_scatter_req * scat_req)
 {
     int  i;
-    struct amlw1_hwif_sdio *hif_sdio = &g_w1_hwif_sdio;
+    struct amlw1_hwif_sdio *hif_sdio = &w1_g_w1_hwif_sdio;
 
     ASSERT(scat_req != NULL);
     ASSERT(hif_sdio != NULL);
@@ -754,7 +754,7 @@ static void aml_w1_sdio_scat_complete (struct amlw_hif_scatter_req * scat_req)
 
 static void aml_w1_sdio_cleanup_scatter(void)
 {
-    struct amlw1_hwif_sdio *hif_sdio = &g_w1_hwif_sdio;
+    struct amlw1_hwif_sdio *hif_sdio = &w1_g_w1_hwif_sdio;
     pr_debug("[sdio sg cleanup]: enter\n");
 
     ASSERT(hif_sdio != NULL);
@@ -773,13 +773,13 @@ static void aml_w1_sdio_cleanup_scatter(void)
 
 static void aml_w1_sdio_recv_frame (unsigned char *buf, unsigned char *addr, SYS_TYPE len)
 {
-    g_w1_hif_ops.hi_bottom_read(SDIO_FUNC6, ((SYS_TYPE)addr & SDIO_ADDR_MASK),
+    w1_g_w1_hif_ops.hi_bottom_read(SDIO_FUNC6, ((SYS_TYPE)addr & SDIO_ADDR_MASK),
         buf, len, SDIO_OPMODE_INCREMENT);
 }
 
 static void aml_w1_sdio_init_ops(void)
 {
-    struct amlw1_hif_ops* ops = &g_w1_hif_ops;
+    struct amlw1_hif_ops* ops = &w1_g_w1_hif_ops;
 
     ops->hi_bottom_write8 = aml_w1_sdio_bottom_write8;
     ops->hi_bottom_read8 = aml_w1_sdio_bottom_read8;
@@ -813,11 +813,11 @@ static void aml_w1_sdio_init_ops(void)
     //ops->hif_get_sts = hif_get_sts;
     //ops->hif_pt_rx_start = hif_pt_rx_start;
     //ops->hif_pt_rx_stop = hif_pt_rx_stop;
-    w1_sdio_after_porbe = 1;
+    w1_w1_sdio_after_porbe = 1;
 
     // check and wake w1 firstly.
-    host_wake_w1_req = NULL;
-    host_suspend_req = NULL;
+    w1_host_wake_w1_req = NULL;
+    w1_host_suspend_req = NULL;
 }
 
 static int aml_w1_sdio_probe(struct sdio_func *func, const struct sdio_device_id *id)
@@ -839,14 +839,14 @@ static int aml_w1_sdio_probe(struct sdio_func *func, const struct sdio_device_id
     {
         sdio_func_0.num = 0;
         sdio_func_0.card = func->card;
-        g_w1_hwif_sdio.sdio_func_if[0] = &sdio_func_0;
+        w1_g_w1_hwif_sdio.sdio_func_if[0] = &sdio_func_0;
     }
-    g_w1_hwif_sdio.sdio_func_if[func->num] = func;
+    w1_g_w1_hwif_sdio.sdio_func_if[func->num] = func;
     pr_debug("%s(%d): func->num %d sdio_func=%p, \n", __func__, __LINE__,
         func->num,  func);
 
     sdio_release_host(func);
-    sdio_set_drvdata(func, (void *)(&g_w1_hwif_sdio));
+    sdio_set_drvdata(func, (void *)(&w1_g_w1_hwif_sdio));
     if (func->num != FUNCNUM_SDIO_LAST)
     {
         pr_debug("%s(%d):func_num=%d, last func num=%d\n", __func__, __LINE__,
@@ -880,23 +880,23 @@ static void  aml_w1_sdio_remove(struct sdio_func *func)
     sdio_disable_func(func);
     sdio_release_host(func);
 
-    host_wake_w1_req = NULL;
-    host_suspend_req = NULL;
-    host_resume_req = NULL;
+    w1_host_wake_w1_req = NULL;
+    w1_host_suspend_req = NULL;
+    w1_host_resume_req = NULL;
 }
 
 static int aml_sdio_pm_suspend(struct device *device)
 {
-    if (host_suspend_req != NULL)
-        return host_suspend_req(device);
+    if (w1_host_suspend_req != NULL)
+        return w1_host_suspend_req(device);
     else
         return aml_w1_sdio_suspend(1);
 }
 
 static int aml_sdio_pm_resume(struct device *device)
 {
-    if (host_resume_req != NULL)
-        return host_resume_req(device);
+    if (w1_host_resume_req != NULL)
+        return w1_host_resume_req(device);
     else
         return 0;
 }
@@ -1215,9 +1215,9 @@ extern int wifi_irq_num(void);
 static void aml_sdio_shutdown(struct device *device)
 {
     pr_debug("===>>> enter %s <<<===\n", __func__);
-    if (wifi_irq_enable == 1) {
+    if (w1_wifi_irq_enable == 1) {
 #if (USE_SDIO_IRQ==1)
-        struct sdio_func *func = g_w1_hwif_sdio.sdio_func_if[SDIO_FUNC1];
+        struct sdio_func *func = w1_g_w1_hwif_sdio.sdio_func_if[SDIO_FUNC1];
         sdio_claim_host(func);
         sdio_release_irq(func);
         sdio_release_host(func);
@@ -1225,11 +1225,11 @@ static void aml_sdio_shutdown(struct device *device)
         unsigned int irq_num = wifi_irq_num();
         disable_irq(irq_num);
 #endif
-        wifi_irq_enable = 0;
+        w1_wifi_irq_enable = 0;
     }
     shutdown_i += 1;
     if (shutdown_i == 1) {
-        if (wifi_hal_probe_done) {
+        if (w1_wifi_hal_probe_done) {
             config_pmu_reg_off();
         }
     } else if (shutdown_i == 7) {
@@ -1284,7 +1284,7 @@ static void *wlan_preallocated_tx_desc_buf;
  */
 #define TX_DESC_BUF_LEN  246272
 
-void *aml_mem_prealloc(int section, unsigned long size)
+void *w1_aml_mem_prealloc(int section, unsigned long size)
 {
     switch (section) {
         case AML_RX:
@@ -1301,7 +1301,7 @@ void *aml_mem_prealloc(int section, unsigned long size)
                 return NULL;
     }
 }
-EXPORT_SYMBOL(aml_mem_prealloc);
+EXPORT_SYMBOL(w1_aml_mem_prealloc);
 
 static int aml_init_wlan_mem(void)
 {
@@ -1318,7 +1318,7 @@ static void aml_deinit_wlan_mem(void)
 }
 #endif
 
-int  aml_w1_sdio_init(void)
+int  w1_aml_w1_sdio_init(void)
 {
     int err = 0;
     int i;
@@ -1333,9 +1333,9 @@ int  aml_w1_sdio_init(void)
     }
 
     err = sdio_register_driver(&aml_w1_sdio_driver);
-    w1_sdio_driver_insmoded = 1;
-    wifi_in_insmod = 0;
-    wifi_in_rmmod = 0;
+    w1_w1_sdio_driver_insmoded = 1;
+    w1_wifi_in_insmod = 0;
+    w1_wifi_in_rmmod = 0;
     PRINT("*****************aml sdio common driver is insmoded********************\n");
     if (err) {
         PRINT("failed to register sdio driver: %d \n", err);
@@ -1350,38 +1350,38 @@ err_out:
 
     return err;
 }
-EXPORT_SYMBOL(aml_w1_sdio_init);
+EXPORT_SYMBOL(w1_aml_w1_sdio_init);
 
-void  aml_w1_sdio_exit(void)
+void  w1_aml_w1_sdio_exit(void)
 {
     int i = 0;
-    PRINT("aml_w1_sdio_exit++ \n");
+    PRINT("w1_aml_w1_sdio_exit++ \n");
     sdio_unregister_driver(&aml_w1_sdio_driver);
-    w1_sdio_driver_insmoded = 0;
-    w1_sdio_after_porbe = 0;
+    w1_w1_sdio_driver_insmoded = 0;
+    w1_w1_sdio_after_porbe = 0;
     PRINT("*****************aml sdio common driver is rmmoded********************\n");
     for (i = 0; i < ARRAY_SIZE(sdio_dma_buf); i++)
         kfree(sdio_dma_buf[i]);
 }
-//EXPORT_SYMBOL(aml_w1_sdio_exit);
+//EXPORT_SYMBOL(w1_aml_w1_sdio_exit);
 
-EXPORT_SYMBOL(w1_sdio_driver_insmoded);
-EXPORT_SYMBOL(wifi_in_insmod);
-EXPORT_SYMBOL(wifi_in_rmmod);
-EXPORT_SYMBOL(w1_sdio_after_porbe);
-EXPORT_SYMBOL(host_wake_w1_req);
-EXPORT_SYMBOL(host_suspend_req);
-EXPORT_SYMBOL(host_resume_req);
-EXPORT_SYMBOL(wifi_sdio_access);
-EXPORT_SYMBOL(wifi_irq_enable);
-EXPORT_SYMBOL(wifi_hal_probe_done);
+EXPORT_SYMBOL(w1_w1_sdio_driver_insmoded);
+EXPORT_SYMBOL(w1_wifi_in_insmod);
+EXPORT_SYMBOL(w1_wifi_in_rmmod);
+EXPORT_SYMBOL(w1_w1_sdio_after_porbe);
+EXPORT_SYMBOL(w1_host_wake_w1_req);
+EXPORT_SYMBOL(w1_host_suspend_req);
+EXPORT_SYMBOL(w1_host_resume_req);
+EXPORT_SYMBOL(w1_wifi_sdio_access);
+EXPORT_SYMBOL(w1_wifi_irq_enable);
+EXPORT_SYMBOL(w1_wifi_hal_probe_done);
 
-EXPORT_SYMBOL(aml_wifi_sdio_power_lock);
-EXPORT_SYMBOL(aml_wifi_sdio_power_unlock);
-/*set_wifi_bt_sdio_driver_bit() is used to determine whether to unregister sdio power driver.
-  *Only when w1_sdio_wifi_bt_alive is 0, then call aml_w1_sdio_exit().
+EXPORT_SYMBOL(w1_aml_wifi_sdio_power_lock);
+EXPORT_SYMBOL(w1_aml_wifi_sdio_power_unlock);
+/*w1_set_wifi_bt_sdio_driver_bit() is used to determine whether to unregister sdio power driver.
+  *Only when w1_sdio_wifi_bt_alive is 0, then call w1_aml_w1_sdio_exit().
 */
-void set_wifi_bt_sdio_driver_bit(bool is_register, int shift)
+void w1_set_wifi_bt_sdio_driver_bit(bool is_register, int shift)
 {
     AML_W1_BT_WIFI_MUTEX_ON();
     if (is_register) {
@@ -1391,14 +1391,14 @@ void set_wifi_bt_sdio_driver_bit(bool is_register, int shift)
         PRINT("Rmmod %s sdio driver!\n", (shift ? "WiFi":"BT"));
         w1_sdio_wifi_bt_alive &= ~(1 << shift);
         if (!w1_sdio_wifi_bt_alive) {
-            aml_w1_sdio_exit();
+            w1_aml_w1_sdio_exit();
         }
     }
     AML_W1_BT_WIFI_MUTEX_OFF();
 }
-EXPORT_SYMBOL(set_wifi_bt_sdio_driver_bit);
-EXPORT_SYMBOL(g_w1_hwif_sdio);
-EXPORT_SYMBOL(g_w1_hif_ops);
+EXPORT_SYMBOL(w1_set_wifi_bt_sdio_driver_bit);
+EXPORT_SYMBOL(w1_g_w1_hwif_sdio);
+EXPORT_SYMBOL(w1_g_w1_hif_ops);
 
 static int aml_w1_sdio_insmod(void)
 {
@@ -1410,14 +1410,14 @@ static int aml_w1_sdio_insmod(void)
         return -ENOMEM;
     }
 #endif
-    aml_w1_sdio_init();
+    w1_aml_w1_sdio_init();
     pr_debug("%s(%d) start...\n",__func__, __LINE__);
     return 0;
 }
 
 static void aml_w1_sdio_rmmod(void)
 {
-    aml_w1_sdio_exit();
+    w1_aml_w1_sdio_exit();
 #ifdef NOT_AMLOGIC_PLATFORM
     aml_deinit_wlan_mem();
 #endif
