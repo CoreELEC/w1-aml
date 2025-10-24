@@ -2094,9 +2094,9 @@ static unsigned char get_cali_param(struct Cali_Param *cali_param, struct WF2G_T
             default:
                 sprintf(file_name, "w1/aml_wifi_rf.txt");
         }
-        pr_info("aml wifi module SN:%04x  sn txt not found, the rf config: %s\n", chip_id_l, chip_id_buf);
+        pr_info("aml wifi module SN:%04x  sn txt not found, the rf config: %s\n", chip_id_l, file_name);
     } else
-        pr_info("aml wifi module SN:%04x  the rf config: %s\n", chip_id_l, chip_id_buf);
+        pr_info("aml wifi module SN:%04x  the rf config: %s\n", chip_id_l, file_name);
 
     error = request_firmware(&fw, file_name, dev);
     if (error) {
