@@ -125,6 +125,22 @@ aml_sdio-objs += w1_sdio/w1_sdio.o
 
 obj-m += $(TARGET).o
 DISCARD :=
+# print_version.c defines print_driver_version(), which wifi_cfg80211.c,
+# wifi_hal_platform.c, wifi_iwpriv_cmd.c and wifi_cmd_func.c all declare
+# `extern` and call. It's a generated file, normally produced by this
+# Makefile's own top-level "modules" target (further below) running
+# `perl ./create_version_file.pl` before recursing into the kernel build.
+# External build systems that invoke Kbuild directly -- i.e.
+# `make -C $(KERNELDIR) M=$(CUR_DIR) modules`, which lands straight in
+# this KERNELRELEASE-set branch without ever going through this
+# Makefile's own "modules" target -- skip that step entirely. SRC_FILE
+# below is a plain `wildcard`, so if print_version.c doesn't already
+# exist on disk by the time this line is evaluated, it's silently left
+# out of the build, and print_driver_version() ends up undefined at
+# link/modpost time instead of failing to compile. Regenerating it here,
+# inside the KERNELRELEASE branch itself, makes the source list correct
+# regardless of which entry point was used to invoke the build.
+$(shell perl $(CUR_DIR)/create_version_file.pl 2>/dev/null)
 SRC_FILE := $(wildcard $(CUR_DIR)/*.c $(CUR_DIR)/rf_t9026/*.c $(CUR_DIR)/crypto/*.c)
 TARGET_FILE = $(subst $(CUR_DIR)/,, $(SRC_FILE:%.c=%.o))
 
