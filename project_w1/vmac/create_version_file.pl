@@ -34,10 +34,24 @@ if ($fw_commit =~ m/commit (.*)/){
   $fw_hash = $1;
 }
 
-open OUTPUT, ">", "$output" or die "open $output fail";
+my $version_file = "version.h";
+my $driver_version = "";
+if (open(my $vh, "<", $version_file)) {
+    while (my $line = <$vh>) {
+        if ($line =~ /#define\s+DRIVERVERSION\s+"([^"]+)"/) {
+            $driver_version = $1;
+            last;
+        }
+    }
+    close($vh);
+} else {
+    warn "warning: could not open $version_file: $!";
+}
 
+open OUTPUT, ">", "$output" or die "open $output fail";
 print OUTPUT "#include \"wifi_hal_com.h\"\n\n";
 print OUTPUT "void print_driver_version(void) {\n";
+print OUTPUT "    pr_info(\"driver version: $driver_version\\n\");\n";
 print OUTPUT "    pr_info(\"driver compile date: $date,driver hash: $drv_hash\\n\");\n";
 print OUTPUT "    pr_info(\"fw compile date: $fw_date,fw hash: $fw_hash,fw size: $fw_size\\n\");\n";
 print OUTPUT "}\n";
