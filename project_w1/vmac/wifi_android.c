@@ -204,6 +204,13 @@ static int aml_android_cmdstr_to_num(char *cmdstr)
     int i = 0;
     int is_found = 0;
 
+    /*
+     * Reached through SIOCDEVPRIVATE, for which the core checks no
+     * capability, and the commands below reconfigure the chip.
+     */
+    if (!capable(CAP_NET_ADMIN))
+        return -EPERM;
+
     if (!IS_RUNNING(wnet_vif->vm_ndev))
     {
         DPRINTF(AML_DEBUG_ANDROID,"%s %d flags %x cmd abort\n", __func__, __LINE__, wnet_vif->vm_ndev->flags);

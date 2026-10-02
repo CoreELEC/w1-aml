@@ -62,6 +62,10 @@ static int aml_ap_set_amsdu_state(struct net_device *dev,
 static int aml_ap_set_ampdu_state(struct net_device *dev,
     struct iw_request_info *info, union iwreq_data *wrqu, char *extra)
 {
+    /* Odd private ioctl: the WEXT core checks CAP_NET_ADMIN only for even ones. */
+    if (!capable(CAP_NET_ADMIN))
+        return -EPERM;
+
     pr_debug("%s, %s\n", __func__,extra);
     aml_set_drv_ampdu_switch_state(extra);
 
@@ -567,6 +571,9 @@ static int aml_iwpriv_send_para1(struct net_device *dev,
     char buf[30] = {0};
     int len = 0;
 
+    /* Odd private ioctl: the WEXT core checks CAP_NET_ADMIN only for even ones. */
+    if (!capable(CAP_NET_ADMIN))
+        return -EPERM;
 
     pr_debug("%s, sub_cmd %d, value %d\n", __func__,param[0], param[1]);
 
@@ -854,6 +861,9 @@ static int aml_iwpriv_send_para2(struct net_device *dev,
     int set2 = param[2];
     int legacy_set = 0;
 
+    /* Odd private ioctl: the WEXT core checks CAP_NET_ADMIN only for even ones. */
+    if (!capable(CAP_NET_ADMIN))
+        return -EPERM;
 
     pr_debug("%s, sub_cmd %d, value %d %d\n", __func__,param[0], param[1], param[2]);
 
@@ -1061,6 +1071,10 @@ static int aml_iwpriv_get(struct net_device *dev,
 static int aml_iwpriv_start_capture(struct net_device *dev,
     struct iw_request_info *info, union iwreq_data *wrqu, char *extra)
 {
+    /* Odd private ioctl: the WEXT core checks CAP_NET_ADMIN only for even ones. */
+    if (!capable(CAP_NET_ADMIN))
+        return -EPERM;
+
     dut_start_capture(0x00005e00);//start capture on 0x5e
     return 0;
 }
@@ -1302,6 +1316,10 @@ static void aml_iwpriv_set_bt_dev_id(char* arg_iw)
 static int aml_set_dev_sn(struct net_device *dev,
     struct iw_request_info *info, union iwreq_data *wrqu, char *extra)
 {
+    /* Odd private ioctl: the WEXT core checks CAP_NET_ADMIN only for even ones. */
+    if (!capable(CAP_NET_ADMIN))
+        return -EPERM;
+
     pr_debug("%s, %s\n", __func__,extra);
     aml_iwpriv_set_dev_sn(extra);
 
@@ -1326,6 +1344,10 @@ static int aml_set_bt_dev_id(struct net_device *dev,
     struct iw_request_info *info, union iwreq_data *wrqu, char *extra)
 {
     char buf[19] = {0};
+
+    /* Odd private ioctl: the WEXT core checks CAP_NET_ADMIN only for even ones. */
+    if (!capable(CAP_NET_ADMIN))
+        return -EPERM;
 
     if (copy_from_user(buf, wrqu->data.pointer, 18)) {
         return -EFAULT;
