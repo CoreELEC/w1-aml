@@ -1364,7 +1364,7 @@ void wifi_mac_free_sta(struct wifi_station *sta)
     struct nsta_entry *del_nsta;
     unsigned char new_delete = 0;
 
-    del_nsta = (struct nsta_entry *)NET_MALLOC(sizeof(struct nsta_entry *),
+    del_nsta = (struct nsta_entry *)NET_MALLOC(sizeof(struct nsta_entry),
     GFP_ATOMIC, "del_nsta");
 
     if (del_nsta) {

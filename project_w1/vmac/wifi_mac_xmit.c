@@ -393,6 +393,14 @@ netdev_tx_t wifi_mac_hardstart(struct sk_buff *skb, struct net_device *dev)
     struct drv_txdesc *ptxdesc = NULL;
     unsigned char error = 0;
 
+    /*
+     * skb->cb can still hold data from the layer that queued the skb, and
+     * the drop path below uses the TID before wifi_mac_classify() sets it.
+     * Start with a valid TID so early drops cannot index past the stats array.
+     */
+    if (skb != NULL)
+        os_skb_set_tid(skb, 0);
+
     if (aml_wifi_is_enable_rf_test())
         goto bad;
 
@@ -525,7 +533,8 @@ bad:
         if (skb != NULL) {
             wnet_vif->vif_sts.sts_tx_drop_msdu++;
             wnet_vif->vm_devstats.tx_dropped++;
-            wnet_vif->vif_sts.sts_tx_tid_drop_msdu[os_skb_get_tid(skb)]++;
+            if (os_skb_get_tid(skb) < WME_NUM_TID)
+                wnet_vif->vif_sts.sts_tx_tid_drop_msdu[os_skb_get_tid(skb)]++;
             os_skb_free(skb);
         }
         return 0;
